@@ -21,10 +21,12 @@ export default function DashboardClient() {
     // Metrics
     const [inboxCount, setInboxCount] = useState(0);
     const [todayCount, setTodayCount] = useState(0);
+    const [overdueCount, setOverdueCount] = useState(0);
     const [upcomingCount, setUpcomingCount] = useState(0);
     const [doneCount, setDoneCount] = useState(0);
 
     // Lists
+    const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
     const [morningTasks, setMorningTasks] = useState<Task[]>([]);
     const [afternoonTasks, setAfternoonTasks] = useState<Task[]>([]);
     const [eveningTasks, setEveningTasks] = useState<Task[]>([]);
@@ -69,11 +71,20 @@ export default function DashboardClient() {
                 // Derived from plannedAll
                 const todayDerived = plannedAll.filter(t => t.scheduled_date === todayStr);
                 const upcomingDerived = plannedAll.filter(t => t.scheduled_date && t.scheduled_date > todayStr);
+                const overdueDerived = plannedAll
+                    .filter(t => t.scheduled_date && t.scheduled_date < todayStr)
+                    .sort((a, b) => {
+                        const d = (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? "");
+                        if (d !== 0) return d;
+                        return (b.priority ?? 0) - (a.priority ?? 0);
+                    });
 
                 setTodayCount(todayDerived.length);
                 setUpcomingCount(upcomingDerived.length);
+                setOverdueCount(overdueDerived.length);
 
                 // 3. Set Lists
+                setOverdueTasks(overdueDerived.slice(0, 5)); // Top 5 overdue
                 setMorningTasks(morning);
                 setAfternoonTasks(afternoon);
                 setEveningTasks(evening);
@@ -108,7 +119,8 @@ export default function DashboardClient() {
     return (
         <div className="space-y-8">
             {/* Overview Cards */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                <DashboardCard title="Overdue" count={overdueCount} href="/planner" color="red" />
                 <DashboardCard title="Inbox" count={inboxCount} href="/inbox" color="blue" />
                 <DashboardCard title="Today" count={todayCount} href="/today" color="green" />
                 <DashboardCard title="Upcoming" count={upcomingCount} href="/planner" color="indigo" />
@@ -120,6 +132,33 @@ export default function DashboardClient() {
                     Plan says: "Today Buckets Section (3 cols/stack)". 
                     Let's make a grid for buckets. */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* Overdue List (if any) */}
+                    {overdueTasks.length > 0 && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                            <div className="flex items-center justify-between mb-3 text-red-900">
+                                <h3 className="font-semibold text-sm uppercase tracking-wide">⚠️ Overdue Tasks</h3>
+                                <Link href="/planner" className="text-xs hover:underline">View all</Link>
+                            </div>
+                            <ul className="space-y-2">
+                                {overdueTasks.map(t => (
+                                    <li key={t.id} className="bg-white px-3 py-2 rounded-lg border border-red-100 shadow-sm text-sm flex items-center justify-between">
+                                        <div className="truncate text-gray-800 font-medium">{t.title}</div>
+                                        <div className="flex items-center gap-2 text-xs shrink-0">
+                                            {t.scheduled_date && (
+                                                <span className="text-red-600 font-semibold">{new Date(t.scheduled_date).toLocaleDateString("en-GB", { day: 'numeric', month: 'short' })}</span>
+                                            )}
+                                            {t.workspace !== "avacrm" && (
+                                                <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">
+                                                    {t.workspace}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     <h2 className="text-xl font-semibold text-gray-800">Today&apos;s Focus</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <BucketColumn title="Morning" tasks={morningTasks} emptyText="No morning tasks" />
@@ -160,12 +199,13 @@ export default function DashboardClient() {
     );
 }
 
-function DashboardCard({ title, count, href, color }: { title: string; count: number; href: string; color: "blue" | "green" | "indigo" | "gray" }) {
+function DashboardCard({ title, count, href, color }: { title: string; count: number; href: string; color: "blue" | "green" | "indigo" | "gray" | "red" }) {
     const colorClasses = {
         blue: "bg-blue-50 text-blue-700 border-blue-100 hover:border-blue-300",
         green: "bg-green-50 text-green-700 border-green-100 hover:border-green-300",
         indigo: "bg-indigo-50 text-indigo-700 border-indigo-100 hover:border-indigo-300",
         gray: "bg-gray-50 text-gray-700 border-gray-100 hover:border-gray-300",
+        red: "bg-red-50 text-red-700 border-red-100 hover:border-red-300",
     };
 
     return (
