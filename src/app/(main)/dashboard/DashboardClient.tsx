@@ -21,6 +21,7 @@ export default function DashboardClient() {
     // Metrics
     const [inboxCount, setInboxCount] = useState(0);
     const [todayCount, setTodayCount] = useState(0);
+    const [overdueCount, setOverdueCount] = useState(0);
     const [upcomingCount, setUpcomingCount] = useState(0);
     const [doneCount, setDoneCount] = useState(0);
 
@@ -69,9 +70,11 @@ export default function DashboardClient() {
                 // Derived from plannedAll
                 const todayDerived = plannedAll.filter(t => t.scheduled_date === todayStr);
                 const upcomingDerived = plannedAll.filter(t => t.scheduled_date && t.scheduled_date > todayStr);
+                const overdueDerived = plannedAll.filter(t => t.scheduled_date && t.scheduled_date < todayStr);
 
                 setTodayCount(todayDerived.length);
                 setUpcomingCount(upcomingDerived.length);
+                setOverdueCount(overdueDerived.length);
 
                 // 3. Set Lists
                 setMorningTasks(morning);
@@ -108,7 +111,8 @@ export default function DashboardClient() {
     return (
         <div className="space-y-8">
             {/* Overview Cards */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+                <DashboardCard title="Overdue" count={overdueCount} href="/today" color="red" />
                 <DashboardCard title="Inbox" count={inboxCount} href="/inbox" color="blue" />
                 <DashboardCard title="Today" count={todayCount} href="/today" color="green" />
                 <DashboardCard title="Upcoming" count={upcomingCount} href="/planner" color="indigo" />
@@ -160,12 +164,13 @@ export default function DashboardClient() {
     );
 }
 
-function DashboardCard({ title, count, href, color }: { title: string; count: number; href: string; color: "blue" | "green" | "indigo" | "gray" }) {
+function DashboardCard({ title, count, href, color }: { title: string; count: number; href: string; color: "blue" | "green" | "indigo" | "gray" | "red" }) {
     const colorClasses = {
         blue: "bg-blue-50 text-blue-700 border-blue-100 hover:border-blue-300",
         green: "bg-green-50 text-green-700 border-green-100 hover:border-green-300",
         indigo: "bg-indigo-50 text-indigo-700 border-indigo-100 hover:border-indigo-300",
         gray: "bg-gray-50 text-gray-700 border-gray-100 hover:border-gray-300",
+        red: "bg-red-50 text-red-700 border-red-100 hover:border-red-300",
     };
 
     return (
