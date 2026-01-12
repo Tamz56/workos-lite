@@ -36,3 +36,33 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+# WorkOS-Lite (ArborDesk)
+
+Local-first personal WorkOS built with Next.js + SQLite (better-sqlite3).
+Focus: task-first planning + docs + attachments with a fast, practical dashboard.
+
+## What you get
+- Dashboard (KPI + Workload by workspace + Hygiene alerts + Recent activity)
+- Inbox / Today / Planner / Done
+- Docs (Markdown) + Print view
+- Attachments per task
+- Export / Import (backup/restore)
+
+## Tech stack
+- Next.js (App Router)
+- TypeScript
+- SQLite (better-sqlite3) — local-first
+- Tailwind CSS
+
+## Local-first data
+This project stores data locally (SQLite + files). Do **not** commit real data.
+Recommended `.gitignore` should exclude:
+- SQLite db files (`*.db`, `*.sqlite*`)
+- attachments/storage folders (if containing real assets)
+
+## Getting started
+Install dependencies:
+```bash
+npm ci

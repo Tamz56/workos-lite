@@ -142,3 +142,49 @@ Observation:
 - Mark a task as done today → Done Today increases
 - Make a task `scheduled_date = null` → appears in Unscheduled Top 5
 - Make a planned-today task with `schedule_bucket = none` → appears in Unbucketed Today Top 5
+
+
+
+---
+
+## 2) เพิ่ม GitHub Actions: `.github/workflows/ci.yml`
+
+สร้างโฟลเดอร์และไฟล์:
+- `workos-lite/.github/workflows/ci.yml`
+
+คัดลอกไปวางได้เลย:
+
+```yml
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint_build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
