@@ -14,8 +14,8 @@ import { toErrorMessage } from "@/lib/error";
 
 const WORKSPACES: { value: Workspace; label: string }[] = [
     { value: "avacrm", label: "avaCRM" },
-    { value: "ops", label: "ops" },
-    { value: "content", label: "content" },
+    { value: "ops", label: "Ops" },
+    { value: "content", label: "Content" },
 ];
 
 export default function InboxClient() {
@@ -34,7 +34,7 @@ export default function InboxClient() {
         setLoading(true);
         setErr(null);
         try {
-            const rows = await getTasks({ status: "inbox", limit: 300 });
+            const rows = await getTasks({ status: "inbox", scheduled_date: "null", limit: 300 });
             setTasks(rows);
         } catch (e: unknown) {
             setErr(toErrorMessage(e));
@@ -52,8 +52,12 @@ export default function InboxClient() {
         if (!t) return;
         setErr(null);
         try {
-            await createTask({ title: t, workspace, status: "inbox" });
+            const newTask = await createTask({ title: t, workspace, status: "inbox" });
             setTitle("");
+            // Optimistic update (Instant Refresh)
+            setTasks(prev => [newTask, ...prev]);
+
+            // Reload to ensure consistency
             await load();
         } catch (e: unknown) {
             setErr(`createTask failed: ${toErrorMessage(e)}`);
