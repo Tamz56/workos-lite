@@ -1,7 +1,9 @@
-// src/app/(main)/dashboard/page.tsx
+import { Metadata } from "next";
 import DashboardClient from "./DashboardClient";
 
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+    title: "Dashboard | WorkOS",
+};
 
 export default function DashboardPage() {
     return <DashboardClient />;

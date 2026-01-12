@@ -1,373 +1,201 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
+import { getTasks } from "@/lib/api";
+import type { Task } from "@/lib/types";
 
-type Bucket = "morning" | "afternoon" | "evening" | "none";
+type DocSubset = { id: string; title: string; updated_at: string };
 
-type DashboardDTO = {
-    today: {
-        date: string;
-        total: number;
-        by_bucket: Record<Bucket, number>;
-        unbucketed: number;
-    };
-    inbox: { total: number; by_workspace: Record<string, number> };
-    done_today: { total: number };
-    hygiene: { unscheduled: number };
-    workspaces: Array<{
-        workspace: string;
-        inbox: number;
-        today: number;
-        done_today: number;
-    }>;
-    recent: Array<{
-        id: string;
-        title: string;
-        workspace: string;
-        status: string;
-        updated_at: string;
-    }>;
-    unscheduled_tasks: Array<{
-        id: string;
-        title: string;
-        workspace: string;
-        status: string;
-        updated_at: string;
-    }>;
-    unbucketed_today_tasks: Array<{
-        id: string;
-        title: string;
-        workspace: string;
-        status: string;
-        updated_at: string;
-    }>;
-};
-
-function toErrorMessage(e: unknown) {
-    if (e instanceof Error) return e.message;
-    return typeof e === "string" ? e : JSON.stringify(e);
-}
-
-function fmtThai(dt: string) {
-    try {
-        return new Date(dt).toLocaleString("th-TH", { hour12: false });
-    } catch {
-        return dt;
-    }
-}
-
-function Card({
-    title,
-    value,
-    hint,
-    onClick,
-}: {
-    title: string;
-    value: number | string;
-    hint?: string;
-    onClick?: () => void;
-}) {
-    const clickable = !!onClick;
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            disabled={!clickable}
-            className={[
-                "rounded-2xl border p-4 text-left shadow-sm",
-                clickable ? "hover:bg-gray-50 active:bg-gray-100 cursor-pointer" : "opacity-80 cursor-default",
-            ].join(" ")}
-        >
-            <div className="text-sm text-gray-600">{title}</div>
-            <div className="mt-1 text-3xl font-semibold">{value}</div>
-            {hint ? <div className="mt-2 text-xs text-gray-500">{hint}</div> : null}
-        </button>
-    );
+function toYYYYMMDD(d: Date) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
 }
 
 export default function DashboardClient() {
-    const router = useRouter();
-    const [data, setData] = useState<DashboardDTO | null>(null);
-    const [err, setErr] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    async function load() {
-        setLoading(true);
-        setErr(null);
-        try {
-            const res = await fetch("/api/dashboard", { cache: "no-store" });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const json = (await res.json()) as DashboardDTO;
-            setData(json);
-        } catch (e: unknown) {
-            setErr(toErrorMessage(e));
-        } finally {
-            setLoading(false);
-        }
-    }
+    // Metrics
+    const [inboxCount, setInboxCount] = useState(0);
+    const [todayCount, setTodayCount] = useState(0);
+    const [upcomingCount, setUpcomingCount] = useState(0);
+    const [doneCount, setDoneCount] = useState(0);
+
+    // Lists
+    const [morningTasks, setMorningTasks] = useState<Task[]>([]);
+    const [afternoonTasks, setAfternoonTasks] = useState<Task[]>([]);
+    const [eveningTasks, setEveningTasks] = useState<Task[]>([]);
+    const [recentDocs, setRecentDocs] = useState<DocSubset[]>([]);
+
+    // Stable today string
+    const todayStr = useMemo(() => toYYYYMMDD(new Date()), []);
 
     useEffect(() => {
-        load();
-    }, []);
+        async function load() {
+            setLoading(true);
+            setError(null);
+            try {
+                // 1. Parallel Fetching
+                const [
+                    inboxUnplanned,
+                    plannedAll,
+                    doneAll,
+                    morning,
+                    afternoon,
+                    evening,
+                    docsRes
+                ] = await Promise.all([
+                    // Inbox: status=inbox, date=null
+                    getTasks({ status: "inbox", scheduled_date: "null", limit: 500 }),
+                    // Planned: status=planned (fetch all, filter client-side)
+                    getTasks({ status: "planned", limit: 500 }),
+                    // Done: status=done
+                    getTasks({ status: "done", limit: 500 }),
+                    // Today Buckets (specific queries as per plan)
+                    getTasks({ status: "planned", scheduled_date: todayStr, schedule_bucket: "morning", limit: 5 }),
+                    getTasks({ status: "planned", scheduled_date: todayStr, schedule_bucket: "afternoon", limit: 5 }),
+                    getTasks({ status: "planned", scheduled_date: todayStr, schedule_bucket: "evening", limit: 5 }),
+                    // Recent Docs (raw fetch)
+                    fetch("/api/docs").then(res => res.json())
+                ]);
+
+                // 2. Compute Counts
+                setInboxCount(inboxUnplanned.length);
+                setDoneCount(doneAll.length);
+
+                // Derived from plannedAll
+                const todayDerived = plannedAll.filter(t => t.scheduled_date === todayStr);
+                const upcomingDerived = plannedAll.filter(t => t.scheduled_date && t.scheduled_date > todayStr);
+
+                setTodayCount(todayDerived.length);
+                setUpcomingCount(upcomingDerived.length);
+
+                // 3. Set Lists
+                setMorningTasks(morning);
+                setAfternoonTasks(afternoon);
+                setEveningTasks(evening);
+
+                // Docs (client-side slice)
+                if (docsRes && Array.isArray(docsRes.docs)) {
+                    setRecentDocs(docsRes.docs.slice(0, 5));
+                } else {
+                    setRecentDocs([]);
+                }
+
+            } catch (e) {
+                console.error(e);
+                setError("Failed to load dashboard data.");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        void load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // todayStr is stable
 
     if (loading) {
-        return (
-            <div className="p-6">
-                <div className="text-xl font-semibold">Dashboard</div>
-                <div className="mt-2 text-sm text-gray-600">กำลังโหลดข้อมูล…</div>
-            </div>
-        );
+        return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
     }
 
-    if (err || !data) {
-        return (
-            <div className="p-6">
-                <div className="text-xl font-semibold">Dashboard</div>
-                <div className="mt-2 text-sm text-red-600">โหลดไม่สำเร็จ: {err ?? "unknown error"}</div>
-                <button
-                    className="mt-4 rounded-xl border px-4 py-2 hover:bg-gray-50"
-                    onClick={() => load()}
-                >
-                    Retry
-                </button>
-            </div>
-        );
+    if (error) {
+        return <div className="p-8 text-center text-red-500">{error}</div>;
     }
-
-    const d = data.today.date;
 
     return (
-        <div className="p-6 space-y-8">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <div className="text-xl font-semibold">Dashboard</div>
-                    <div className="mt-1 text-sm text-gray-600">
-                        ภาพรวมงานวันนี้ ({d}) และสุขภาพของระบบ
+        <div className="space-y-8">
+            {/* Overview Cards */}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <DashboardCard title="Inbox" count={inboxCount} href="/inbox" color="blue" />
+                <DashboardCard title="Today" count={todayCount} href="/today" color="green" />
+                <DashboardCard title="Upcoming" count={upcomingCount} href="/planner" color="indigo" />
+                <DashboardCard title="Done" count={doneCount} href="/done" color="gray" />
+            </div>
+
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                {/* Left: Today Buckets (2 cols wide on large screens?) No, usually 3 cols for buckets? 
+                    Plan says: "Today Buckets Section (3 cols/stack)". 
+                    Let's make a grid for buckets. */}
+                <div className="lg:col-span-2 space-y-6">
+                    <h2 className="text-xl font-semibold text-gray-800">Today&apos;s Focus</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <BucketColumn title="Morning" tasks={morningTasks} emptyText="No morning tasks" />
+                        <BucketColumn title="Afternoon" tasks={afternoonTasks} emptyText="No afternoon tasks" />
+                        <BucketColumn title="Evening" tasks={eveningTasks} emptyText="No evening tasks" />
                     </div>
                 </div>
-                <button
-                    className="rounded-xl border px-4 py-2 hover:bg-gray-50"
-                    onClick={() => load()}
-                    title="Refresh"
-                >
-                    Refresh
-                </button>
-            </div>
 
-            {/* Section A: KPI Cards */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                <Card
-                    title="Today Total"
-                    value={data.today.total}
-                    hint="งาน planned วันนี้"
-                    onClick={() => router.push(`/today`)}
-                />
-                <Card
-                    title="Today: Morning"
-                    value={data.today.by_bucket.morning}
-                    onClick={() => router.push(`/today?schedule_bucket=morning`)}
-                />
-                <Card
-                    title="Today: Afternoon"
-                    value={data.today.by_bucket.afternoon}
-                    onClick={() => router.push(`/today?schedule_bucket=afternoon`)}
-                />
-                <Card
-                    title="Today: Evening"
-                    value={data.today.by_bucket.evening}
-                    onClick={() => router.push(`/today?schedule_bucket=evening`)}
-                />
-                <Card
-                    title="Unbucketed Today"
-                    value={data.today.unbucketed}
-                    hint="planned วันนี้ แต่ bucket = none หรือยังเป็น null"
-                    onClick={() => router.push(`/today?schedule_bucket=none`)}
-                />
-                <Card
-                    title="Inbox Backlog"
-                    value={data.inbox.total}
-                    onClick={() => router.push(`/inbox`)}
-                />
-                {/* ถ้าต้องการ 7 การ์ด (Done today) ให้ย้าย layout เป็น 7 columns หรือแถวใหม่ */}
-            </div>
-
-            {/* Optional small row for Done Today + Unscheduled */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Card
-                    title="Done Today"
-                    value={data.done_today.total}
-                    hint="สถานะ done และ done_at เป็นวันนี้"
-                    onClick={() => router.push(`/done`)}
-                />
-                <Card
-                    title="Unscheduled (Hygiene)"
-                    value={data.hygiene.unscheduled}
-                    hint="งานที่ยังไม่ได้กำหนดวัน (scheduled_date = null)"
-                    onClick={() => router.push(`/inbox?scheduled_date=null`)}
-                />
-            </div>
-
-            {/* Section B: Workload by Workspace */}
-            <div className="rounded-2xl border p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <div className="text-base font-semibold">Workload by Workspace</div>
-                    <div className="text-xs text-gray-500">คลิกแถวเพื่อเปิด Inbox ตาม workspace</div>
-                </div>
-
-                <div className="mt-3 overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="text-left text-gray-600">
-                            <tr className="border-b">
-                                <th className="py-2 pr-3">Workspace</th>
-                                <th className="py-2 pr-3">Inbox</th>
-                                <th className="py-2 pr-3">Today</th>
-                                <th className="py-2 pr-3">Done Today</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {data.workspaces.map((w) => (
-                                <tr
-                                    key={w.workspace}
-                                    className="border-b hover:bg-gray-50 cursor-pointer"
-                                    onClick={() => router.push(`/inbox?workspace=${encodeURIComponent(w.workspace)}`)}
-                                >
-                                    <td className="py-2 pr-3 font-medium">{w.workspace}</td>
-                                    <td className="py-2 pr-3">{w.inbox}</td>
-                                    <td className="py-2 pr-3">{w.today}</td>
-                                    <td className="py-2 pr-3">{w.done_today}</td>
-                                </tr>
-                            ))}
-                            {data.workspaces.length === 0 ? (
-                                <tr>
-                                    <td className="py-3 text-gray-500" colSpan={4}>
-                                        ยังไม่มีข้อมูล workspace
-                                    </td>
-                                </tr>
-                            ) : null}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Section C: Alerts / Recent */}
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {/* Alerts */}
-                <div className="rounded-2xl border p-4 shadow-sm">
-                    <div className="text-base font-semibold">Alerts / Hygiene</div>
-                    <div className="mt-3 space-y-3 text-sm">
-                        <div className="flex items-center justify-between">
-                            <div className="text-gray-700">Unscheduled tasks</div>
-                            <button
-                                className="rounded-xl border px-3 py-1 hover:bg-gray-50"
-                                onClick={() => router.push(`/inbox?scheduled_date=null`)}
-                            >
-                                {data.hygiene.unscheduled}
-                            </button>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="text-gray-700">Inbox backlog</div>
-                            <button
-                                className="rounded-xl border px-3 py-1 hover:bg-gray-50"
-                                onClick={() => router.push(`/inbox`)}
-                            >
-                                {data.inbox.total}
-                            </button>
-                        </div>
-
-                        {/* Unscheduled (Top 5) */}
-                        <div className="pt-2 border-t">
-                            <div className="text-xs text-gray-500">Unscheduled (top 5)</div>
-                            <div className="mt-2 space-y-2">
-                                {data.unscheduled_tasks.length === 0 ? (
-                                    <div className="text-sm text-gray-500">ไม่มีงานหลุดวัน</div>
-                                ) : (
-                                    data.unscheduled_tasks.map((t) => (
-                                        <button
-                                            key={t.id}
-                                            className="w-full text-left rounded-lg border px-3 py-2 hover:bg-gray-50"
-                                            onClick={() => router.push(`/inbox?scheduled_date=null`)}
-                                            title="Open Inbox (unscheduled)"
-                                        >
-                                            <div className="text-sm font-medium line-clamp-1">{t.title}</div>
-                                            <div className="mt-1 text-xs text-gray-600">
-                                                ws: {t.workspace} · updated: {fmtThai(t.updated_at)}
+                {/* Right: Recent Docs */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold text-gray-800">Recent Docs</h2>
+                        <Link href="/docs" className="text-sm text-blue-600 hover:underline">View all</Link>
+                    </div>
+                    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+                        {recentDocs.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-gray-400">No recent docs</div>
+                        ) : (
+                            <ul className="divide-y">
+                                {recentDocs.map(d => (
+                                    <li key={d.id} className="group hover:bg-gray-50 transition">
+                                        <Link href={`/docs/${d.id}`} className="block p-3">
+                                            <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 truncate">
+                                                {d.title || "Untitled"}
                                             </div>
-                                        </button>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Unbucketed Today (Top 5) */}
-                        <div className="pt-2 border-t">
-                            <div className="text-xs text-gray-500">Unbucketed Today (top 5)</div>
-                            <div className="mt-2 space-y-2">
-                                {data.unbucketed_today_tasks.length === 0 ? (
-                                    <div className="text-sm text-gray-500">ไม่มีงานหลุด bucket วันนี้</div>
-                                ) : (
-                                    data.unbucketed_today_tasks.map((t) => (
-                                        <button
-                                            key={t.id}
-                                            className="w-full text-left rounded-lg border px-3 py-2 hover:bg-gray-50"
-                                            onClick={() => router.push(`/today?schedule_bucket=none`)}
-                                            title="Open Today (bucket=none)"
-                                        >
-                                            <div className="text-sm font-medium line-clamp-1">{t.title}</div>
-                                            <div className="mt-1 text-xs text-gray-600">
-                                                ws: {t.workspace} · updated: {fmtThai(t.updated_at)}
+                                            <div className="text-xs text-gray-400 mt-1">
+                                                {new Date(d.updated_at).toLocaleDateString("th-TH")}
                                             </div>
-                                        </button>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Optional: แสดง top workspace in inbox */}
-                        <div className="pt-2 border-t">
-                            <div className="text-xs text-gray-500">Inbox by workspace (top)</div>
-                            <div className="mt-2 space-y-2">
-                                {Object.entries(data.inbox.by_workspace)
-                                    .sort((a, b) => b[1] - a[1])
-                                    .slice(0, 5)
-                                    .map(([ws, c]) => (
-                                        <div key={ws} className="flex items-center justify-between">
-                                            <button
-                                                className="text-left underline decoration-dotted text-gray-800 hover:text-black"
-                                                onClick={() => router.push(`/inbox?workspace=${encodeURIComponent(ws)}`)}
-                                            >
-                                                {ws}
-                                            </button>
-                                            <div className="text-gray-700">{c}</div>
-                                        </div>
-                                    ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Recent */}
-                <div className="rounded-2xl border p-4 shadow-sm">
-                    <div className="text-base font-semibold">Recent activity</div>
-                    <div className="mt-3 space-y-2">
-                        {data.recent.map((t) => (
-                            <div key={t.id} className="rounded-xl border p-3 hover:bg-gray-50">
-                                <div className="text-sm font-medium line-clamp-1">{t.title}</div>
-                                <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
-                                    <span>ws: {t.workspace}</span>
-                                    <span>status: {t.status}</span>
-                                    <span>updated: {fmtThai(t.updated_at)}</span>
-                                </div>
-                            </div>
-                        ))}
-                        {data.recent.length === 0 ? (
-                            <div className="text-sm text-gray-500">ยังไม่มี activity</div>
-                        ) : null}
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 </div>
             </div>
+        </div>
+    );
+}
+
+function DashboardCard({ title, count, href, color }: { title: string; count: number; href: string; color: "blue" | "green" | "indigo" | "gray" }) {
+    const colorClasses = {
+        blue: "bg-blue-50 text-blue-700 border-blue-100 hover:border-blue-300",
+        green: "bg-green-50 text-green-700 border-green-100 hover:border-green-300",
+        indigo: "bg-indigo-50 text-indigo-700 border-indigo-100 hover:border-indigo-300",
+        gray: "bg-gray-50 text-gray-700 border-gray-100 hover:border-gray-300",
+    };
+
+    return (
+        <Link href={href} className={`block rounded-xl border p-5 transition text-center ${colorClasses[color]}`}>
+            <div className="text-3xl font-bold mb-1">{count}</div>
+            <div className="text-sm font-medium opacity-80">{title}</div>
+        </Link>
+    );
+}
+
+function BucketColumn({ title, tasks, emptyText }: { title: string; tasks: Task[]; emptyText: string }) {
+    return (
+        <div className="bg-gray-50 rounded-xl border p-4 flex flex-col h-full">
+            <h3 className="font-medium text-gray-700 mb-3 text-sm uppercase tracking-wide border-b pb-2">{title}</h3>
+            {tasks.length === 0 ? (
+                <div className="text-sm text-gray-400 italic py-2">{emptyText}</div>
+            ) : (
+                <ul className="space-y-2">
+                    {tasks.map(t => (
+                        <li key={t.id} className="bg-white px-3 py-2 rounded-lg border shadow-sm text-sm">
+                            <div className="truncate text-gray-800">{t.title}</div>
+                            {t.workspace !== "avacrm" && (
+                                <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">
+                                    {t.workspace}
+                                </span>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
         </div>
     );
 }
