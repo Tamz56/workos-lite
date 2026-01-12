@@ -112,7 +112,7 @@ export default function DashboardClient() {
         <div className="space-y-8">
             {/* Overview Cards */}
             <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-                <DashboardCard title="Overdue" count={overdueCount} href="/today" color="red" />
+                <DashboardCard title="Overdue" count={overdueCount} href="/planner" color="red" />
                 <DashboardCard title="Inbox" count={inboxCount} href="/inbox" color="blue" />
                 <DashboardCard title="Today" count={todayCount} href="/today" color="green" />
                 <DashboardCard title="Upcoming" count={upcomingCount} href="/planner" color="indigo" />
