@@ -26,13 +26,9 @@ export async function getTasks(params: GetTasksParams = {}): Promise<Task[]> {
     if (!res.ok) throw new Error(`getTasks failed: ${res.status}`);
     const data = await res.json();
 
-    // API currently returns an ARRAY: [ ... ]
+    // API might return Task[] OR { tasks: Task[] }
     if (Array.isArray(data)) return data as Task[];
-
-    // Backward/alternate shape: { tasks: [...] }
-    if (data && Array.isArray(data.tasks)) return data.tasks as Task[];
-
-    return [];
+    return (data?.tasks ?? []) as Task[];
 }
 
 export async function createTask(input: { title: string; workspace: Workspace; status?: TaskStatus }): Promise<Task> {
