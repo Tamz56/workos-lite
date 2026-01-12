@@ -1,0 +1,28 @@
+# Node / Next
+node_modules
+.next
+out
+dist
+*.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode
+
+# Local data / SQLite (สำคัญมาก)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.sqlite-journal
+
+# Uploads / attachments (ถ้าเป็นไฟล์ใหญ่/ข้อมูลจริง)
+attachments/
+storage/
+uploads/
+
+# Env
+.env
+.env.local
+.env.*.local
