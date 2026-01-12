@@ -25,7 +25,14 @@ export async function getTasks(params: GetTasksParams = {}): Promise<Task[]> {
     const res = await fetch(`/api/tasks${qs(params)}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`getTasks failed: ${res.status}`);
     const data = await res.json();
-    return data.tasks ?? [];
+
+    // API currently returns an ARRAY: [ ... ]
+    if (Array.isArray(data)) return data as Task[];
+
+    // Backward/alternate shape: { tasks: [...] }
+    if (data && Array.isArray(data.tasks)) return data.tasks as Task[];
+
+    return [];
 }
 
 export async function createTask(input: { title: string; workspace: Workspace; status?: TaskStatus }): Promise<Task> {
@@ -36,7 +43,7 @@ export async function createTask(input: { title: string; workspace: Workspace; s
     });
     if (!res.ok) throw new Error(`createTask failed: ${res.status}`);
     const data = await res.json();
-    return data.task as Task;
+    return (data?.task ?? data) as Task;
 }
 
 export async function patchTask(id: string, patch: Partial<Task>): Promise<Task> {

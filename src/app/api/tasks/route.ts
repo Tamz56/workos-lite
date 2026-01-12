@@ -126,7 +126,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
-        const body = (await req.json().catch(() => ({}))) as unknown;
+        const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+
+        // Normalize workspace to lowercase if present
+        if (body && typeof body.workspace === "string") {
+            body.workspace = body.workspace.toLowerCase();
+        }
+
         const parsed = CreateTaskSchema.safeParse(body);
 
         if (!parsed.success) {
@@ -169,7 +175,7 @@ export async function POST(req: NextRequest) {
         });
 
         const created = getDb().prepare("SELECT * FROM tasks WHERE id = ?").get(id);
-        return NextResponse.json(created, { status: 201 });
+        return NextResponse.json({ task: created }, { status: 201 });
     } catch (e: unknown) {
         return NextResponse.json(
             { error: toErrorMessage(e) },
