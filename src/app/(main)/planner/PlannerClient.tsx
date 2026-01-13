@@ -2,7 +2,7 @@
 import { useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { ScheduleBucket, Task, Workspace } from "@/lib/types";
-import { getTasks, patchTask } from "@/lib/api";
+import { getTasks, patchTask, type GetTasksParams } from "@/lib/api";
 import { useTaskEditor } from "@/hooks/useTaskEditor";
 import TaskDetailDialog from "@/components/TaskDetailDialog";
 import TaskTitleInlineEdit from "@/components/TaskTitleInlineEdit";
@@ -72,7 +72,7 @@ export default function PlannerClient() {
         try {
             if (isSpecial) {
                 // Special Mode: Just filter, ignore date/bucket
-                const params: any = {
+                const params: GetTasksParams = {
                     filter,
                     workspace,
                     q,
