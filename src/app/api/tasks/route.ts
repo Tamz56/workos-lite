@@ -42,7 +42,32 @@ export async function GET(req: NextRequest) {
         const workspaceOk = !!(workspace && Workspace.safeParse(workspace).success);
         const bucketOk = !!(schedule_bucket && Bucket.safeParse(schedule_bucket).success);
 
-        if (statusOk) {
+        // Filter Logic (overdue / upcoming)
+        const filter = url.searchParams.get("filter");
+        const cutoff_date = url.searchParams.get("cutoff_date");
+
+        // normalize cutoff
+        const cutoffOk = !!(cutoff_date && isDateYYYYMMDD(cutoff_date));
+        if (cutoffOk) bind.cutoff_date = cutoff_date;
+
+        // default cutoff: local today (YYYY-MM-DD)
+        const cutoffExpr = cutoffOk ? "@cutoff_date" : "date('now','localtime')";
+
+        if (filter === "overdue") {
+            // strict: only planned tasks
+            where.push("status = 'planned'");
+            where.push("scheduled_date IS NOT NULL");
+            where.push(`scheduled_date < ${cutoffExpr}`);
+        } else if (filter === "upcoming") {
+            // strict: only planned tasks
+            where.push("status = 'planned'");
+            where.push("scheduled_date IS NOT NULL");
+            where.push(`scheduled_date > ${cutoffExpr}`);
+        }
+
+        const isSpecialFilter = filter === "overdue" || filter === "upcoming";
+
+        if (!isSpecialFilter && statusOk) {
             where.push("status = @status");
             bind.status = status;
         }

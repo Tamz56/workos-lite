@@ -7,6 +7,7 @@ type GetTasksParams = {
     scheduled_date?: string | "null";
     schedule_bucket?: ScheduleBucket;
     limit?: number;
+    cutoff_date?: string;
 };
 
 const qs = (params: Record<string, unknown>) => {

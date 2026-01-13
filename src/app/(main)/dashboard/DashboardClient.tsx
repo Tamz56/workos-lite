@@ -14,6 +14,14 @@ function toYYYYMMDD(d: Date) {
     return `${year}-${month}-${day}`;
 }
 
+function plannerLinkForTask(t: Task) {
+    const date = t.scheduled_date;
+    const bucket = t.schedule_bucket && t.schedule_bucket !== "none" ? t.schedule_bucket : null;
+
+    if (!date) return "/planner?filter=overdue";
+    return bucket ? `/planner?date=${date}&bucket=${bucket}` : `/planner?date=${date}`;
+}
+
 export default function DashboardClient() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -120,10 +128,10 @@ export default function DashboardClient() {
         <div className="space-y-8">
             {/* Overview Cards */}
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                <DashboardCard title="Overdue" count={overdueCount} href="/planner" color="red" />
+                <DashboardCard title="Overdue" count={overdueCount} href="/planner?filter=overdue&date=today" color="red" />
                 <DashboardCard title="Inbox" count={inboxCount} href="/inbox" color="blue" />
                 <DashboardCard title="Today" count={todayCount} href="/today" color="green" />
-                <DashboardCard title="Upcoming" count={upcomingCount} href="/planner" color="indigo" />
+                <DashboardCard title="Upcoming" count={upcomingCount} href="/planner?filter=upcoming&date=today" color="indigo" />
                 <DashboardCard title="Done" count={doneCount} href="/done" color="gray" />
             </div>
 
@@ -137,22 +145,24 @@ export default function DashboardClient() {
                         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                             <div className="flex items-center justify-between mb-3 text-red-900">
                                 <h3 className="font-semibold text-sm uppercase tracking-wide">⚠️ Overdue Tasks</h3>
-                                <Link href="/planner" className="text-xs hover:underline">View all</Link>
+                                <Link href="/planner?filter=overdue&date=today" className="text-xs hover:underline">View all</Link>
                             </div>
                             <ul className="space-y-2">
                                 {overdueTasks.map(t => (
-                                    <li key={t.id} className="bg-white px-3 py-2 rounded-lg border border-red-100 shadow-sm text-sm flex items-center justify-between">
-                                        <div className="truncate text-gray-800 font-medium">{t.title}</div>
-                                        <div className="flex items-center gap-2 text-xs shrink-0">
-                                            {t.scheduled_date && (
-                                                <span className="text-red-600 font-semibold">{new Date(t.scheduled_date).toLocaleDateString("en-GB", { day: 'numeric', month: 'short' })}</span>
-                                            )}
-                                            {t.workspace !== "avacrm" && (
-                                                <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">
-                                                    {t.workspace}
-                                                </span>
-                                            )}
-                                        </div>
+                                    <li key={t.id} className="bg-white rounded-lg border border-red-100 shadow-sm text-sm hover:shadow-md transition-shadow">
+                                        <Link href={plannerLinkForTask(t)} className="flex items-center justify-between px-3 py-2">
+                                            <div className="truncate text-gray-800 font-medium">{t.title}</div>
+                                            <div className="flex items-center gap-2 text-xs shrink-0">
+                                                {t.scheduled_date && (
+                                                    <span className="text-red-600 font-semibold">{new Date(t.scheduled_date).toLocaleDateString("en-GB", { day: 'numeric', month: 'short' })}</span>
+                                                )}
+                                                {t.workspace !== "avacrm" && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">
+                                                        {t.workspace}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </Link>
                                     </li>
                                 ))}
                             </ul>
