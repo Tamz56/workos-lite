@@ -1,13 +1,15 @@
 "use client";
-
+import { useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { ScheduleBucket, Task, Workspace } from "@/lib/types";
-import { getTasks, patchTask } from "@/lib/api";
+import { getTasks, patchTask, type GetTasksParams } from "@/lib/api";
 import { useTaskEditor } from "@/hooks/useTaskEditor";
 import TaskDetailDialog from "@/components/TaskDetailDialog";
 import TaskTitleInlineEdit from "@/components/TaskTitleInlineEdit";
 import TaskDeleteButton from "@/components/TaskDeleteButton";
 import { toErrorMessage } from "@/lib/error";
+
+type PlannerFilter = "overdue" | "upcoming" | null;
 
 const buckets: { key: ScheduleBucket; label: string }[] = [
     { key: "morning", label: "Morning" },
@@ -17,6 +19,24 @@ const buckets: { key: ScheduleBucket; label: string }[] = [
 
 function todayYYYYMMDD() {
     return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeDateParam(v: string | null): string | null {
+    if (!v) return null;
+    if (v === "today") {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+    }
+    // expect YYYY-MM-DD
+    return v;
+}
+
+function normalizeBucketParam(v: string | null) {
+    if (v === "morning" || v === "afternoon" || v === "evening") return v;
+    return null;
 }
 
 export default function PlannerClient() {
@@ -31,10 +51,41 @@ export default function PlannerClient() {
 
     const { editingTask, setEditingTask, initialTab, openEditor, closeEditor } = useTaskEditor();
 
+    const sp = useSearchParams();
+
+    // Deep Link Params
+    const filter = (sp.get("filter") as PlannerFilter) || null;
+    const isSpecial = filter === "overdue" || filter === "upcoming";
+
+    const deepDate = normalizeDateParam(sp.get("date"));
+    const deepBucket = normalizeBucketParam(sp.get("bucket"));
+
+    // Sync Date from Param
+    useEffect(() => {
+        if (!deepDate) return;
+        setDate(deepDate);
+    }, [deepDate]);
+
     const load = useCallback(async () => {
         setLoading(true);
         setErr(null);
         try {
+            if (isSpecial) {
+                // Special Mode: Just filter, ignore date/bucket
+                const params: GetTasksParams = {
+                    filter,
+                    workspace,
+                    q,
+                    limit: 300,
+                    cutoff_date: date, // use current date state as cutoff
+                };
+                const rows = await getTasks(params);
+                setPlanned(rows);
+                setInbox([]);
+                return;
+            }
+
+            // Normal Planner View
             const [plannedRows, inboxRows] = await Promise.all([
                 getTasks({
                     status: "planned",
@@ -42,9 +93,11 @@ export default function PlannerClient() {
                     workspace,
                     q,
                     limit: 300,
+                    schedule_bucket: deepBucket ? (deepBucket as ScheduleBucket) : undefined
                 }),
                 getTasks({
                     status: "inbox",
+                    scheduled_date: "null",
                     workspace,
                     q,
                     limit: 200,
@@ -52,12 +105,13 @@ export default function PlannerClient() {
             ]);
             setPlanned(plannedRows);
             setInbox(inboxRows);
+
         } catch (e: unknown) {
             setErr(toErrorMessage(e));
         } finally {
             setLoading(false);
         }
-    }, [date, workspace, q]);
+    }, [date, workspace, q, filter, deepBucket, isSpecial]);
 
     useEffect(() => {
         load();
@@ -135,12 +189,18 @@ export default function PlannerClient() {
                 }}
             >
                 <div>
-                    <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>Date</div>
+                    <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>
+                        {isSpecial ? <span className="text-red-600 font-bold">Cutoff Date ({filter})</span> : "Date"}
+                    </div>
                     <input
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        style={{ border: "1px solid #111", borderRadius: 8, padding: "8px 10px" }}
+                        style={{
+                            border: "1px solid #111",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                        }}
                     />
                 </div>
 

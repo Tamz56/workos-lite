@@ -1,12 +1,14 @@
 import type { Task, Workspace, TaskStatus, ScheduleBucket, Doc, Attachment } from "@/lib/types";
 
-type GetTasksParams = {
+export type GetTasksParams = {
     status?: TaskStatus;
     workspace?: Workspace | "all";
     q?: string;
     scheduled_date?: string | "null";
     schedule_bucket?: ScheduleBucket;
     limit?: number;
+    cutoff_date?: string;
+    filter?: "overdue" | "upcoming";
 };
 
 const qs = (params: Record<string, unknown>) => {
