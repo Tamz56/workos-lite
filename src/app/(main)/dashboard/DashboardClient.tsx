@@ -242,7 +242,7 @@ function WorkspaceCard(props: {
     );
 }
 
-// Minimal 2-Column Calendar Widget
+// Hybrid Calendar Widget: Mini Month + Agenda (Selected) + Legacy Upcoming List
 function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOpenGCal?: () => void }) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(props.todayYmd);
@@ -297,6 +297,14 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
 
     const selectedEvents = eventsByDate[selectedDate] || [];
 
+    // Filter for Legacy List (Global upcoming)
+    const upcomingEvents = useMemo(() => {
+        return props.events
+            .filter(e => e.start_time >= props.todayYmd) // Future or today events
+            .sort((a, b) => a.start_time.localeCompare(b.start_time))
+            .slice(0, 5); // Take top 5
+    }, [props.events, props.todayYmd]);
+
     return (
         <Card title="Calendar" className="h-full flex flex-col" right={
             props.onOpenGCal ? (
@@ -305,7 +313,8 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
                 </button>
             ) : null
         }>
-            <div className="flex flex-col md:flex-row gap-6 h-full min-h-[300px]">
+            {/* Top Section: Month + Agenda */}
+            <div className="flex flex-col md:flex-row gap-6 mb-6">
                 {/* Left: Mini Month */}
                 <div className="flex-none w-full md:w-[260px] flex flex-col">
                     <div className="flex items-center justify-between mb-3 px-1">
@@ -345,39 +354,55 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
                     </div>
                 </div>
 
-                {/* Right: Agenda */}
+                {/* Right: Selected Date Agenda */}
                 <div className="flex-1 flex flex-col border-l border-neutral-100 pl-0 md:pl-6 pt-4 md:pt-0">
                     <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">
                         {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                     </div>
 
-                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 max-h-[250px] scrollbar-thin">
+                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 max-h-[220px] scrollbar-thin">
                         {selectedEvents.length === 0 && (
-                            <div className="text-center text-sm text-neutral-400 py-8 italic flex flex-col items-center">
-                                <span className="text-2xl mb-1 opacity-50">🏝️</span>
-                                No events planned
+                            <div className="text-center text-sm text-neutral-400 py-4 italic flex flex-col items-center">
+                                <span className="text-xl mb-1 opacity-50">🏝️</span>
+                                No events
                             </div>
                         )}
                         {selectedEvents.sort((a, b) => a.start_time.localeCompare(b.start_time)).map(ev => (
                             <div key={ev.id} className="group flex gap-3 items-start p-2 rounded-lg hover:bg-neutral-50 border border-transparent hover:border-neutral-100 transition-all">
-                                <div className="w-12 text-center pt-0.5">
-                                    <div className="text-xs font-bold text-neutral-900">{ev.all_day ? "ALL" : fmtTimeLocal(ev.start_time).slice(11)}</div>
-                                    {!ev.all_day && <div className="text-[9px] text-neutral-400">{fmtTimeLocal(ev.start_time).slice(-2)}</div>}
+                                <div className="w-10 text-center pt-0.5">
+                                    <div className="text-[10px] font-bold text-neutral-900">{ev.all_day ? "ALL" : fmtTimeLocal(ev.start_time).slice(11)}</div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-neutral-800 truncate leading-snug">{ev.title}</div>
-                                    {ev.workspace && (
-                                        <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 mt-1 uppercase tracking-wider font-bold">
-                                            {ev.workspace}
-                                        </span>
-                                    )}
+                                    <div className="text-xs font-medium text-neutral-800 truncate leading-snug">{ev.title}</div>
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <div className="pt-3 mt-auto border-t border-neutral-100 text-center">
-                        <Link href="/calendar" className="text-xs font-medium text-neutral-500 hover:text-black">View Full Calendar →</Link>
-                    </div>
+                </div>
+            </div>
+
+            {/* Bottom Section: Divider & Legacy List */}
+            <div className="border-t border-neutral-100 pt-4 mt-auto">
+                <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Upcoming (Next 30 Days)</span>
+                    <Link href="/calendar" className="text-[10px] font-medium text-neutral-500 hover:text-black">Full Calendar →</Link>
+                </div>
+                <div className="space-y-2">
+                    {upcomingEvents.map(ev => (
+                        <div key={ev.id} className="flex gap-3 items-center p-2 hover:bg-neutral-50 rounded-lg transition-colors border border-transparent hover:border-neutral-100">
+                            <div className="flex-none text-center min-w-[32px] bg-neutral-50 border border-neutral-100 rounded p-1">
+                                <div className="text-[8px] uppercase font-bold text-neutral-500">{new Date(ev.start_time).toLocaleDateString('en-US', { month: 'short' })}</div>
+                                <div className="text-sm font-bold leading-none text-neutral-900">{new Date(ev.start_time).getDate()}</div>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="text-xs font-medium truncate text-neutral-800">{ev.title}</div>
+                                <div className="text-[10px] text-neutral-400 flex items-center gap-1">
+                                    {ev.all_day ? "All Day" : fmtTimeLocal(ev.start_time)}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {upcomingEvents.length === 0 && <div className="text-center text-xs text-neutral-400 py-2">No upcoming events</div>}
                 </div>
             </div>
         </Card>
@@ -410,6 +435,10 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
         return d;
     }, [props.todayYmd]);
 
+    // Summary if needed
+    const totalProjects = projects.length;
+    const totalScheduled = projects.reduce((acc, [_, items]) => acc + items.length, 0);
+
     if (projects.length === 0) return (
         <Card title="Project Timeline" className="h-full min-h-[150px] flex items-center justify-center">
             <div className="text-center">
@@ -420,7 +449,7 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
     );
 
     return (
-        <Card title="Project Timeline (14 Days)" className="h-full overflow-x-auto">
+        <Card title={`Project Timeline (14 Days)`} right={<span className="text-[10px] text-neutral-400 font-normal">{totalProjects} Projects, {totalScheduled} Tasks</span>} className="h-full overflow-x-auto">
             <div className="min-w-[500px]">
                 <div className="grid grid-cols-[100px_1fr] gap-3 mb-2 border-b border-neutral-100 pb-1">
                     <div className="text-[9px] uppercase font-bold text-neutral-400 self-end">Project</div>
@@ -527,7 +556,7 @@ export default function DashboardClient() {
         try {
             const [allTasks, allEvents, allDocs, healthRes] = await Promise.all([
                 fetchTasks({ limit: "1000" }),
-                fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }), // Fetch wider range for calendar
+                fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }),
                 fetchDocs({ limit: "100" }),
                 fetch("/api/health").catch(() => ({ ok: false }))
             ]);
@@ -587,13 +616,13 @@ export default function DashboardClient() {
     const openGCal = hasGCalEmbed ? () => window.open(process.env.NEXT_PUBLIC_GCAL_EMBED_URL, '_blank') : undefined;
 
     return (
-        <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-6 lg:px-8 py-6 space-y-6 animate-in fade-in duration-500">
+        <div className="w-full px-6 2xl:px-10 py-6 space-y-6 animate-in fade-in duration-500 flex flex-col min-h-screen">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold font-display tracking-tight text-neutral-900">Dashboard v2</h1>
+                    <h1 className="text-2xl font-bold font-display tracking-tight text-neutral-900">Dashboard <span className="text-neutral-300 font-light">v2.1</span></h1>
                     <div className="text-sm text-neutral-500 font-medium mt-1">
-                        Overview for {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </div>
                 </div>
                 <div className="flex gap-2">
@@ -604,34 +633,35 @@ export default function DashboardClient() {
                 </div>
             </div>
 
-            {/* Row 1: Workspace Cards Grid (Density Optimized) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Row 1: Main Work (Timeline) + Calendar */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 h-auto xl:h-[450px]">
+                {/* Timeline: 8 Cols */}
+                <div className="xl:col-span-8 h-full flex flex-col">
+                    <ProjectTimeline tasks={tasks} todayYmd={todayYmd} />
+                </div>
+
+                {/* Calendar: 4 Cols */}
+                <div className="xl:col-span-4 h-full flex flex-col">
+                    <CalendarWidget events={events} todayYmd={todayYmd} onOpenGCal={openGCal} />
+                </div>
+            </div>
+
+            {/* Row 2: Workspace Cards (3 Cols) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <WorkspaceCard workspace="avacrm" tasks={wsTasks['avacrm']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
                 <WorkspaceCard workspace="ops" tasks={wsTasks['ops']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
                 <WorkspaceCard workspace="content" tasks={wsTasks['content']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
             </div>
 
-            {/* Row 2: Calendar & Timeline */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-auto lg:h-[350px]">
-                {/* Calendar Widget (Takes roughly 4/12 columns or more on large screens if desired) */}
-                <div className="lg:col-span-4 h-full">
-                    <CalendarWidget events={events} todayYmd={todayYmd} onOpenGCal={openGCal} />
-                </div>
-                {/* Project Timeline (Takes roughly 8/12 columns) */}
-                <div className="lg:col-span-8 h-full">
-                    <ProjectTimeline tasks={tasks} todayYmd={todayYmd} />
-                </div>
-            </div>
-
             {/* Row 3: Work Strip */}
             <div>
-                <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-2 ml-1">More Workspaces</h3>
+                <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-2 ml-1">Secondary Workspaces</h3>
                 <WorkStrip workspaces={['finance', 'travel', 'admin', 'personal', 'other']} tasks={tasks} todayYmd={todayYmd} />
             </div>
 
-            {/* Row 4: Email & System (Footer) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card title="Quick Links" className="h-full bg-gradient-to-br from-white to-neutral-50/50">
+            {/* Row 4: Footer Utils */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
+                <Card title="Quick Access" className="h-full bg-gradient-to-br from-white to-neutral-50/50">
                     <div className="grid grid-cols-4 gap-4">
                         <a href="https://gmail.com" target="_blank" className="aspect-square flex flex-col items-center justify-center p-2 rounded-xl border border-neutral-200 bg-white hover:border-red-200 hover:shadow-md transition-all group">
                             <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">📧</span>
@@ -648,27 +678,27 @@ export default function DashboardClient() {
                     </div>
                 </Card>
 
-                <Card title="System Health" className="h-full border-l-4 border-l-green-500">
+                <Card title="System Status" className="h-full border-l-4 border-l-green-500">
                     <div className="flex items-center gap-4 mb-4">
                         <div className={`text-3xl ${health?.ok ? 'text-green-500' : 'text-red-500'}`}>{health?.ok ? '✅' : '⚠️'}</div>
                         <div>
                             <div className="text-base font-bold text-neutral-900">{health?.status || "Checking..."}</div>
-                            <div className="text-xs text-neutral-500">Database & API Status</div>
+                            <div className="text-xs text-neutral-500">Database & API Services</div>
                         </div>
-                        <div className="ml-auto text-xs font-mono bg-neutral-100 px-2.5 py-1 rounded text-neutral-500">v2.1.0</div>
+                        <div className="ml-auto text-xs font-mono bg-neutral-100 px-2.5 py-1 rounded text-neutral-500">v2.2.0</div>
                     </div>
                     <div className="flex gap-3">
                         <button onClick={() => window.location.href = "/api/export-zip"} className="flex-1 py-2.5 px-4 rounded-xl bg-neutral-900 text-white text-sm font-medium hover:bg-black hover:shadow-lg transition-all flex items-center justify-center gap-2">
-                            <span>💾</span> Backup Data
+                            <span>💾</span> Backup
                         </button>
                         <Link href="/settings/data" className="flex-1 py-2.5 px-4 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-medium hover:bg-neutral-50 transition-colors flex items-center justify-center gap-2">
-                            <span>⚙️</span> Settings
+                            <span>⚙️</span> Config
                         </Link>
                     </div>
                 </Card>
             </div>
 
-            {/* Quick Add Modals */}
+            {/* Modals */}
             <Modal open={quickAdd === "template"} title="New Content Project" onClose={() => setQuickAdd(null)}>
                 <form onSubmit={handleCreateContentTemplate} className="space-y-5">
                     <div className="space-y-1.5">
