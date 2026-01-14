@@ -134,9 +134,9 @@ function fmtTimeLocal(iso: string) {
 
 function Card(props: { title: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
     return (
-        <div className={`rounded-2xl border bg-white/50 p-4 shadow-sm ${props.className || ""}`}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">{props.title}</div>
+        <div className={`rounded-2xl border border-neutral-200/70 bg-white p-5 md:p-6 shadow-sm hover:shadow-md transition-shadow ${props.className || ""}`}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="text-sm font-medium text-neutral-900">{props.title}</div>
                 {props.right}
             </div>
             {props.children}
@@ -148,11 +148,11 @@ function Modal(props: { open: boolean; title: string; onClose: () => void; child
     if (!props.open) return null;
     return (
         <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/30" onClick={props.onClose} />
-            <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border bg-white p-4 shadow-lg">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold">{props.title}</div>
-                    <button className="rounded-lg border px-2 py-1 text-sm hover:bg-neutral-50" onClick={props.onClose}>
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={props.onClose} />
+            <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-200/70 bg-white p-6 shadow-xl">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="text-lg font-medium text-neutral-900">{props.title}</div>
+                    <button className="rounded-lg px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-50" onClick={props.onClose}>
                         Close
                     </button>
                 </div>
@@ -221,9 +221,6 @@ export default function DashboardClient() {
             setTasks(allTasks);
 
             // Inbox count (separate mostly because logic might differ or plain count is cheaper)
-            // But we can filter from allTasks if 'status=inbox' is there. 
-            // Let's stick to API fetch to be safe if 'allTasks' limit truncates.
-            // Actually, let's just use allTasks filter for simplicity if we trust limit 500 covers active work.
             const inbox = allTasks.filter(t => t.status === "inbox");
             setInboxCount(inbox.length);
 
@@ -319,74 +316,76 @@ export default function DashboardClient() {
         const relatedDocs = listDocsByTaskId(docs, t.id);
         // Expect 3 standard ones. Check strictly? 
         // We look for 00-Brief, 01-Script, 02-Storyboard markers
-        let missingCount = 0;
-        if (!relatedDocs.some(d => d.title.includes("00-Brief"))) missingCount++;
-        if (!relatedDocs.some(d => d.title.includes("01-Script"))) missingCount++;
-        if (!relatedDocs.some(d => d.title.includes("02-Storyboard"))) missingCount++;
-        if (missingCount > 0) missingDocsMap[t.id] = missingCount;
+        const missing = [
+            !relatedDocs.some(d => d.title.includes("00-Brief")),
+            !relatedDocs.some(d => d.title.includes("01-Script")),
+            !relatedDocs.some(d => d.title.includes("02-Storyboard"))
+        ].filter(Boolean).length;
+
+        if (missing > 0) missingDocsMap[t.id] = missing;
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-6 lg:px-8 py-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-xl font-bold font-display">Command Center</h1>
-                    <div className="text-xs text-neutral-500">Today: {todayYmd}</div>
+                    <h1 className="text-xl font-bold font-display tracking-tight text-neutral-900">Command Center</h1>
+                    <div className="text-xs text-neutral-500 font-medium">Today: {todayYmd}</div>
                 </div>
                 <div className="flex gap-2">
                     <button
                         onClick={() => refreshAll()}
-                        className="p-2 hover:bg-neutral-100 rounded-full"
+                        className="p-2 hover:bg-neutral-100 rounded-full text-neutral-500 hover:text-black transition-colors"
                         title="Refresh"
                     >
                         🔄
                     </button>
-                    <Link href="/planner" className="rounded-xl bg-black text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800 transition-colors">
+                    <Link href="/planner" className="rounded-xl bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-black transition-colors shadow-sm">
                         Open Planner
                     </Link>
                 </div>
             </div>
 
             {/* Grid Layout (4 Cards) */}
-            <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+            <div className="grid gap-4 lg:gap-5 grid-cols-1 lg:grid-cols-2">
 
                 {/* Card 1: Today Focus */}
                 <Card
                     title="Today Focus"
-                    right={<button onClick={() => setQuickAdd("task")} className="text-xs bg-neutral-100 px-2 py-1 rounded hover:bg-neutral-200">+ Quick Task</button>}
+                    right={<button onClick={() => setQuickAdd("task")} className="text-xs font-medium bg-neutral-100 px-2.5 py-1.5 rounded-lg hover:bg-neutral-200 text-neutral-600 transition-colors">+ Quick Task</button>}
                     className="h-full"
                 >
-                    <div className="grid grid-cols-3 gap-4 text-center py-4">
+                    <div className="grid grid-cols-3 gap-3 md:gap-4 text-center py-2">
                         {/* Refinement 5: Make overdue clickable */}
-                        <Link href="/planner?filter=overdue" className="p-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors block">
-                            <div className="text-2xl font-bold text-red-600">{overdueTasks.length}</div>
-                            <div className="text-xs text-red-500 font-medium uppercase tracking-wide">Overdue</div>
+                        <Link href="/planner?filter=overdue" className="p-3 bg-red-50/50 border border-red-100 rounded-xl hover:bg-red-50 hover:border-red-200 transition-all block group">
+                            <div className="text-2xl font-bold text-red-600 group-hover:scale-105 transition-transform">{overdueTasks.length}</div>
+                            <div className="text-[10px] md:text-xs text-red-500 font-bold uppercase tracking-wide">Overdue</div>
                         </Link>
-                        <Link href="/today" className="p-3 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors block">
-                            <div className="text-2xl font-bold text-blue-600">{todayTasks.length}</div>
-                            <div className="text-xs text-blue-500 font-medium uppercase tracking-wide">Today</div>
+                        <Link href="/today" className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-all block group">
+                            <div className="text-2xl font-bold text-blue-600 group-hover:scale-105 transition-transform">{todayTasks.length}</div>
+                            <div className="text-[10px] md:text-xs text-blue-500 font-bold uppercase tracking-wide">Today</div>
                         </Link>
-                        <Link href="/inbox" className="p-3 bg-neutral-50 rounded-xl hover:bg-neutral-100 transition-colors block">
-                            <div className="text-2xl font-bold text-neutral-600">{inboxCount}</div>
-                            <div className="text-xs text-neutral-500 font-medium uppercase tracking-wide">Inbox</div>
+                        <Link href="/inbox" className="p-3 bg-neutral-50 border border-neutral-100 rounded-xl hover:bg-neutral-100 hover:border-neutral-200 transition-all block group">
+                            <div className="text-2xl font-bold text-neutral-600 group-hover:scale-105 transition-transform">{inboxCount}</div>
+                            <div className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wide">Inbox</div>
                         </Link>
                     </div>
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-5 space-y-0">
                         {todayTasks.length === 0 && overdueTasks.length > 0 ? (
-                            <div className="text-sm text-neutral-500 text-center italic py-2">
+                            <div className="text-sm text-neutral-500 text-center italic py-4 bg-neutral-50/50 rounded-xl border border-neutral-100">
                                 You have {overdueTasks.length} overdue tasks!
-                                <Link href="/planner?filter=overdue" className="ml-1 underline text-red-500">View</Link>
+                                <Link href="/planner?filter=overdue" className="ml-1 underline text-red-500 hover:text-red-700">View</Link>
                             </div>
                         ) : null}
 
                         {todayTasks.slice(0, 5).map(t => (
-                            <Link key={t.id} href={`/planner`} className="flex items-center gap-2 text-sm border-b last:border-0 pb-2 hover:bg-neutral-50 rounded px-1 -mx-1">
-                                <span className={`w-2 h-2 rounded-full ${t.workspace === 'personal' ? 'bg-purple-400' : 'bg-green-400'}`} />
-                                <span className="truncate flex-1">{t.title}</span>
+                            <Link key={t.id} href={`/planner`} className="flex items-center gap-3 text-sm border-b border-neutral-100 last:border-0 py-3 hover:bg-neutral-50 px-2 -mx-2 rounded-lg transition-colors group">
+                                <span className={`w-2 h-2 rounded-full ring-2 ring-white shadow-sm ${t.workspace === 'personal' ? 'bg-purple-400' : 'bg-green-400'}`} />
+                                <span className="truncate flex-1 font-medium text-neutral-700 group-hover:text-black transition-colors">{t.title}</span>
                             </Link>
                         ))}
-                        {todayTasks.length === 0 && overdueTasks.length === 0 && <div className="text-sm text-neutral-400 text-center italic">All caught up for today!</div>}
+                        {todayTasks.length === 0 && overdueTasks.length === 0 && <div className="text-sm text-neutral-400 text-center italic py-4">All caught up for today!</div>}
                     </div>
                 </Card>
 
@@ -396,70 +395,74 @@ export default function DashboardClient() {
                     right={
                         <button
                             onClick={() => setQuickAdd("template")}
-                            className="flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 font-medium"
+                            className="flex items-center gap-1.5 text-xs bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg hover:bg-purple-100 font-medium transition-colors border border-purple-100"
                         >
                             <span>✨</span> New Template
                         </button>
                     }
                     className="h-full row-span-2 overflow-hidden flex flex-col"
                 >
-                    <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                    <div className="flex-1 overflow-y-auto space-y-6 pr-2 -mr-2">
                         {/* Render simple list grouped by stage */}
                         {pipelineStages.map(stage => {
                             const items = groupedContent[stage];
                             if (!items || items.length === 0) return null;
-                            const stageLabel = stage.replace("stage:", "").toUpperCase(); // Refinement 2: Mapped correctly enough? Yes (idea->IDEA, script->SCRIPT)
+                            const stageLabel = stage.replace("stage:", "").toUpperCase();
 
                             // Refinement 4: Limit items per stage
                             const visibleItems = items.slice(0, 5);
                             const hasMore = items.length > 5;
 
                             return (
-                                <div key={stage} className="space-y-2">
-                                    <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                                <div key={stage} className="space-y-3">
+                                    <div className="flex items-center gap-3 text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
                                         <div className="flex-1 h-px bg-neutral-100"></div>
                                         {stageLabel}
                                         <div className="flex-1 h-px bg-neutral-100"></div>
                                     </div>
                                     {visibleItems.map(t => (
-                                        <div key={t.id} className="group rounded-xl border p-3 hover:border-purple-300 transition-colors bg-white">
+                                        <div key={t.id} className="group rounded-xl border border-neutral-100 p-3 hover:border-purple-200 hover:shadow-sm transition-all bg-white relative">
                                             <div className="flex justify-between items-start gap-2">
-                                                <div className="font-medium text-sm text-neutral-800">{t.title}</div>
-                                                <Link href={`/docs`} className="opacity-0 group-hover:opacity-100 text-[10px] bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-500 hover:bg-neutral-200">
+                                                <div className="font-medium text-sm text-neutral-700 group-hover:text-black max-w-[85%]">{t.title}</div>
+                                                <Link href={`/docs`} className="opacity-0 group-hover:opacity-100 text-[10px] bg-neutral-50 border border-neutral-100 px-2 py-1 rounded-md text-neutral-500 hover:bg-white hover:shadow-sm transition-all absolute top-3 right-3">
                                                     Docs
                                                 </Link>
                                             </div>
                                             {/* Refinement 3: Logic fixed in utils.ts/loop above? Yes. Prefix check in loop */}
                                             {missingDocsMap[t.id] ? (
-                                                <div className="mt-2 flex items-center gap-2">
-                                                    <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">
-                                                        Missing {missingDocsMap[t.id]} docs
+                                                <div className="mt-2.5 flex items-center gap-2">
+                                                    <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-medium border border-red-100 flex items-center gap-1">
+                                                        📄 {3 - missingDocsMap[t.id]}/3 Docs
                                                     </span>
                                                     <button
                                                         onClick={() => handleRetryMissingDocs(t.id, t.title)}
-                                                        className="text-[10px] underline text-neutral-500 hover:text-black"
+                                                        className="text-[10px] font-medium text-neutral-400 hover:text-black hover:underline transition-colors"
                                                     >
                                                         Fix
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="mt-1 text-[10px] text-neutral-400 flex gap-1">
-                                                    <span>📄 3/3 Docs Linked</span>
+                                                <div className="mt-2.5 flex gap-1">
+                                                    <span className="text-[10px] text-green-700 bg-green-50 border border-green-100 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                                                        ✅ 3/3 Docs
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
                                     ))}
                                     {hasMore && (
-                                        <div className="text-[10px] text-center text-neutral-400 hover:text-neutral-600 cursor-pointer">
-                                            +{items.length - 5} more • <Link href="/today" className="underline">View all</Link>
+                                        <div className="text-[10px] text-center text-neutral-400 hover:text-black cursor-pointer font-medium py-1">
+                                            +{items.length - 5} more • <Link href="/today" className="underline decoration-neutral-300">View all</Link>
                                         </div>
                                     )}
                                 </div>
                             );
                         })}
                         {Object.keys(groupedContent).length === 0 && (
-                            <div className="text-center py-10 text-neutral-400 text-sm">
-                                No content tasks. Start by creating one!
+                            <div className="text-center py-12">
+                                <div className="text-4xl mb-3 opacity-20">📝</div>
+                                <div className="text-neutral-900 font-medium text-sm">No content tasks yet</div>
+                                <div className="text-neutral-500 text-xs mt-1">Start by creating a new template</div>
                             </div>
                         )}
                     </div>
@@ -469,26 +472,28 @@ export default function DashboardClient() {
                 <Card title="Next Up (Events)" className="h-full">
                     <div className="space-y-3">
                         {events.slice(0, 3).map(ev => (
-                            <div key={ev.id} className="flex items-start gap-3">
-                                <div className="flex flex-col items-center min-w-[3rem] p-1 bg-neutral-50 rounded-lg border">
-                                    <span className="text-[10px] uppercase text-neutral-500 font-bold">
+                            <div key={ev.id} className="flex items-start gap-4 p-2 rounded-xl hover:bg-neutral-50 transition-colors -mx-2">
+                                <div className="flex flex-col items-center min-w-[3.5rem] p-1.5 bg-neutral-50 rounded-xl border border-neutral-100 shadow-sm">
+                                    <span className="text-[10px] uppercase text-neutral-500 font-bold tracking-wider">
                                         {new Date(ev.start_time).toLocaleString('en-US', { month: 'short' })}
                                     </span>
-                                    <span className="text-lg font-bold leading-none">
+                                    <span className="text-xl font-bold leading-none text-neutral-900 mt-0.5">
                                         {new Date(ev.start_time).getDate()}
                                     </span>
                                 </div>
-                                <div className="min-w-0">
-                                    <div className="text-sm font-medium truncate">{ev.title}</div>
-                                    <div className="text-xs text-neutral-500">
-                                        {ev.all_day ? "All Day" : fmtTimeLocal(ev.start_time)}
-                                        {ev.workspace && ` • ${ev.workspace}`}
+                                <div className="min-w-0 flex-1 pt-0.5">
+                                    <div className="text-sm font-medium truncate text-neutral-800">{ev.title}</div>
+                                    <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
+                                        <span className="bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                            {ev.all_day ? "All Day" : fmtTimeLocal(ev.start_time)}
+                                        </span>
+                                        {ev.workspace && <span className="text-neutral-400">• {ev.workspace}</span>}
                                     </div>
                                 </div>
                             </div>
                         ))}
-                        {events.length === 0 && <div className="text-sm text-neutral-500 py-4">No upcoming events</div>}
-                        <Link href="/calendar" className="block text-center text-xs text-neutral-400 hover:text-black mt-2">
+                        {events.length === 0 && <div className="text-sm text-neutral-400 py-6 text-center italic">No upcoming events</div>}
+                        <Link href="/calendar" className="block text-center text-xs font-medium text-neutral-500 hover:text-black mt-2 py-2 rounded-lg hover:bg-neutral-50 transition-colors">
                             View Calendar →
                         </Link>
                     </div>
@@ -496,27 +501,30 @@ export default function DashboardClient() {
 
                 {/* Card 4: System Safety */}
                 <Card title="System Safety" className="h-full border-l-4 border-l-neutral-200">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-2">
-                            <span className={`w-3 h-3 rounded-full ${health?.ok ? "bg-green-500" : "bg-yellow-500"}`} />
-                            <span className="text-sm font-medium">{health?.status || "Checking..."}</span>
+                            <span className={`relative flex h-3 w-3`}>
+                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${health?.ok ? "bg-green-400" : "bg-yellow-400"}`}></span>
+                                <span className={`relative inline-flex rounded-full h-3 w-3 ${health?.ok ? "bg-green-500" : "bg-yellow-500"}`}></span>
+                            </span>
+                            <span className="text-sm font-medium text-neutral-700">{health?.status || "Checking..."}</span>
                         </div>
-                        <div className="text-xs text-neutral-400">v0.1.1</div>
+                        <div className="text-[10px] font-mono text-neutral-400 bg-neutral-50 px-2 py-1 rounded border border-neutral-100">v0.1.1</div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <Link href="/settings/data" className="flex flex-col items-center justify-center p-3 border rounded-xl hover:bg-neutral-50 transition-colors text-center gap-1">
-                            <span className="text-xl">🛡️</span>
-                            <span className="text-xs font-medium">Data Settings</span>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Link href="/settings/data" className="flex flex-col items-center justify-center p-4 border border-neutral-200/60 rounded-xl hover:bg-neutral-50 hover:border-neutral-300 transition-all text-center gap-2 group bg-neutral-50/30">
+                            <span className="text-2xl group-hover:scale-110 transition-transform duration-300">🛡️</span>
+                            <span className="text-xs font-medium text-neutral-600 group-hover:text-black">Data Settings</span>
                         </Link>
 
                         <button
                             // Lock Point 6: Real download
                             onClick={() => window.location.href = "/api/export-zip"}
-                            className="flex flex-col items-center justify-center p-3 border rounded-xl hover:bg-neutral-50 transition-colors text-center gap-1 group"
+                            className="flex flex-col items-center justify-center p-4 border border-neutral-200/60 rounded-xl hover:bg-neutral-50 hover:border-neutral-300 transition-all text-center gap-2 group bg-neutral-50/30"
                         >
-                            <span className="text-xl group-hover:scale-110 transition-transform">💾</span>
-                            <span className="text-xs font-medium">Quick Export</span>
+                            <span className="text-2xl group-hover:scale-110 transition-transform duration-300">💾</span>
+                            <span className="text-xs font-medium text-neutral-600 group-hover:text-black">Quick Export</span>
                         </button>
                     </div>
                 </Card>
@@ -529,27 +537,27 @@ export default function DashboardClient() {
                 title="New Content Project"
                 onClose={() => setQuickAdd(null)}
             >
-                <form onSubmit={handleCreateContentTemplate} className="space-y-4">
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold uppercase text-neutral-600">Project Title</label>
+                <form onSubmit={handleCreateContentTemplate} className="space-y-5">
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wide text-neutral-500">Project Title</label>
                         <input
                             autoFocus
-                            className="w-full rounded-xl border px-3 py-2 text-sm focus:border-purple-500 focus:outline-none"
+                            className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-all placeholder:text-neutral-400"
                             placeholder="e.g. iPhone 16 Review"
                             value={qaTitle}
                             onChange={(e) => setQaTitle(e.target.value)}
                         />
-                        <p className="text-[10px] text-neutral-400">
+                        <p className="text-[10px] text-neutral-400 pl-1">
                             Updates "Content Pipeline". Creates Task + Brief/Script/Storyboard automatically.
                         </p>
                     </div>
 
-                    {qaErr && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{qaErr}</div>}
+                    {qaErr && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 flex items-center gap-2"><span>⚠️</span>{qaErr}</div>}
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    <div className="flex justify-end gap-3 pt-2">
                         <button
                             type="button"
-                            className="rounded-xl border px-3 py-2 text-sm hover:bg-neutral-50"
+                            className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors"
                             onClick={() => setQuickAdd(null)}
                         >
                             Cancel
@@ -557,7 +565,7 @@ export default function DashboardClient() {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="rounded-xl bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                            className="rounded-xl bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-70 shadow-sm hover:shadow active:scale-95 transition-all flex items-center gap-2"
                         >
                             {isSubmitting ? "Generating..." : "Create Project"}
                         </button>
@@ -571,7 +579,7 @@ export default function DashboardClient() {
                 onClose={() => setQuickAdd(null)}
             >
                 <form
-                    className="space-y-3"
+                    className="space-y-4"
                     onSubmit={async (e) => {
                         e.preventDefault();
                         const title = qaTitle.trim();
@@ -609,10 +617,10 @@ export default function DashboardClient() {
                         }
                     }}
                 >
-                    <div className="space-y-1">
-                        <div className="text-xs text-neutral-600 font-semibold uppercase">Task Title</div>
+                    <div className="space-y-1.5">
+                        <div className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Task Title</div>
                         <input
-                            className="w-full rounded-xl border px-3 py-2 text-sm focus:border-black focus:outline-none"
+                            className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-black focus:ring-1 focus:ring-black focus:outline-none transition-all placeholder:text-neutral-400"
                             value={qaTitle}
                             onChange={(e) => setQaTitle(e.target.value)}
                             placeholder="e.g., Follow up with client"
@@ -620,26 +628,32 @@ export default function DashboardClient() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                            <div className="text-xs text-neutral-600 font-semibold uppercase">Workspace</div>
-                            <select
-                                className="w-full rounded-xl border px-3 py-2 text-sm focus:border-black focus:outline-none bg-white font-medium"
-                                value={qaWorkspace}
-                                onChange={(e) => setQaWorkspace(e.target.value as Workspace)}
-                            >
-                                {WORKSPACES.map((w) => (
-                                    <option key={w} value={w}>
-                                        {workspaceLabel(w)}
-                                    </option>
-                                ))}
-                            </select>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <div className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Workspace</div>
+                            <div className="relative">
+                                <select
+                                    className="w-full appearance-none rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-black focus:outline-none bg-white font-medium"
+                                    value={qaWorkspace}
+                                    onChange={(e) => setQaWorkspace(e.target.value as Workspace)}
+                                >
+                                    {WORKSPACES.map((w) => (
+                                        <option key={w} value={w}>
+                                            {workspaceLabel(w)}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-500">
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                                </div>
+                            </div>
                         </div>
-                        <div className="space-y-1">
-                            <div className="text-xs text-neutral-600 font-semibold uppercase">Schedule</div>
-                            <label className="flex h-[38px] items-center gap-2 cursor-pointer text-sm font-medium border rounded-xl px-3 bg-white">
+                        <div className="space-y-1.5">
+                            <div className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Schedule</div>
+                            <label className="flex h-[42px] items-center gap-3 cursor-pointer text-sm font-medium border border-neutral-200 rounded-xl px-4 bg-white hover:border-neutral-300 transition-colors">
                                 <input
                                     type="checkbox"
+                                    className="rounded border-neutral-300 text-black focus:ring-black"
                                     checked={taskAddToToday}
                                     onChange={(e) => setTaskAddToToday(e.target.checked)}
                                 />
@@ -649,26 +663,31 @@ export default function DashboardClient() {
                     </div>
 
                     {taskAddToToday && (
-                        <div className="space-y-1">
-                            <div className="text-xs text-neutral-600 font-semibold uppercase">Time Slot</div>
-                            <select
-                                className="w-full rounded-xl border px-3 py-2 text-sm focus:border-black focus:outline-none bg-white font-medium"
-                                value={taskBucket}
-                                onChange={(e) => setTaskBucket(e.target.value as any)}
-                            >
-                                <option value="morning">Morning</option>
-                                <option value="afternoon">Afternoon</option>
-                                <option value="evening">Evening</option>
-                            </select>
+                        <div className="space-y-1.5">
+                            <div className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Time Slot</div>
+                            <div className="relative">
+                                <select
+                                    className="w-full appearance-none rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-black focus:outline-none bg-white font-medium"
+                                    value={taskBucket}
+                                    onChange={(e) => setTaskBucket(e.target.value as any)}
+                                >
+                                    <option value="morning">Morning</option>
+                                    <option value="afternoon">Afternoon</option>
+                                    <option value="evening">Evening</option>
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-500">
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                                </div>
+                            </div>
                         </div>
                     )}
 
-                    {qaErr && <div className="text-sm text-red-600">{qaErr}</div>}
+                    {qaErr && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl border-red-100 border flex items-center gap-2"><span>⚠️</span>{qaErr}</div>}
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    <div className="flex justify-end gap-3 pt-3 border-t border-neutral-100">
                         <button
                             type="button"
-                            className="rounded-xl border px-3 py-2 text-sm hover:bg-neutral-50"
+                            className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors"
                             onClick={() => setQuickAdd(null)}
                         >
                             Cancel
@@ -676,7 +695,7 @@ export default function DashboardClient() {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="rounded-xl bg-black px-6 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                            className="rounded-xl bg-black px-6 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-70 shadow-md hover:shadow-lg active:scale-95 transition-all"
                         >
                             {isSubmitting ? "Creating..." : "Create Task"}
                         </button>
