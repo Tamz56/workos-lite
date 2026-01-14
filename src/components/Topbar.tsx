@@ -16,8 +16,8 @@ export default function Topbar() {
     };
 
     return (
-        <header className="sticky top-0 z-10 flex h-14 items-center border-b bg-white px-4 md:px-6">
-            <h1 className="text-lg font-semibold text-gray-900">{getTitle()}</h1>
+        <header className="sticky top-0 z-10 flex h-16 items-center border-b border-neutral-200 bg-white px-4 md:px-6 shadow-[0_1px_0_0_rgba(0,0,0,0.03)]">
+            <h1 className="text-lg font-bold text-neutral-900">{getTitle()}</h1>
         </header>
     );
 }
