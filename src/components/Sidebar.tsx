@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import RestoreBackupButton from "@/components/RestoreBackupButton";
 
 const nav = [
     { href: "/dashboard", label: "Dashboard" },
@@ -11,6 +10,7 @@ const nav = [
     { href: "/done", label: "Done" },
     { href: "/planner", label: "Planner" },
     { href: "/docs", label: "Docs" },
+    { href: "/calendar", label: "Calendar" },
 ];
 
 export function Sidebar() {
@@ -26,7 +26,7 @@ export function Sidebar() {
             <nav className="px-2 pb-4">
                 <ul className="space-y-1">
                     {nav.map((n) => {
-                        const active = pathname === n.href;
+                        const active = pathname === n.href || pathname.startsWith(n.href + "/");
                         return (
                             <li key={n.href}>
                                 <Link
@@ -43,35 +43,22 @@ export function Sidebar() {
                     })}
                 </ul>
 
-                <div className="mt-4 border-t pt-4 px-3 flex flex-col">
-                    <a
-                        href="/api/export-zip"
-                        className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-neutral-50 transition"
-                    >
-                        Export Backup (ZIP)
-                    </a>
-                    <div className="mt-1 text-[11px] text-gray-400 text-center">
-                        backup.json + attachments
-                    </div>
-
-                    <a
-                        href="/api/export"
-                        className="mt-4 inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-neutral-50 transition border-dashed"
-                    >
-                        Export Metadata (JSON)
-                    </a>
-                    <div className="mt-1 text-[11px] text-gray-400 text-center">
-                        tasks, docs & clips
-                    </div>
-                </div>
-
-                <div className="mt-2 border-t pt-2 px-3">
+                <div className="mt-4 border-t pt-4 px-3">
                     <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-                        Data Management
+                        Settings
                     </div>
-                    <RestoreBackupButton />
+                    <Link
+                        href="/settings/data"
+                        className={[
+                            "block rounded-md px-3 py-2 text-sm transition",
+                            pathname === "/settings/data" ? "bg-gray-900 text-white" : "text-gray-700 hover:bg-gray-100",
+                        ].join(" ")}
+                    >
+                        Data Management
+                    </Link>
                 </div>
             </nav>
         </aside>
     );
 }
+
