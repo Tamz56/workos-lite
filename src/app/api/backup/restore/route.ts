@@ -157,12 +157,44 @@ async function extractZipAttachments(
 function safeRename(src: string, dest: string): boolean {
     try {
         if (fs.existsSync(src)) {
+            // Remove dest if exists (for swap operations)
+            if (fs.existsSync(dest)) {
+                fs.rmSync(dest, { recursive: true, force: true });
+            }
             fs.renameSync(src, dest);
             return true;
         }
         return true; // Source doesn't exist, nothing to rename
     } catch {
+        // Rename failed - try copy+delete as fallback (Windows compatibility)
+        try {
+            if (fs.existsSync(src) && fs.statSync(src).isDirectory()) {
+                safeCopyDir(src, dest);
+                fs.rmSync(src, { recursive: true, force: true });
+                return true;
+            }
+        } catch {
+            return false;
+        }
         return false;
+    }
+}
+
+function safeCopyDir(src: string, dest: string): void {
+    if (!fs.existsSync(dest)) {
+        fs.mkdirSync(dest, { recursive: true });
+    }
+
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+    for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+
+        if (entry.isDirectory()) {
+            safeCopyDir(srcPath, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
     }
 }
 
@@ -475,6 +507,18 @@ export async function POST(req: Request) {
                 const workosDir = path.dirname(attachmentsDir);
                 if (!fs.existsSync(workosDir)) {
                     fs.mkdirSync(workosDir, { recursive: true });
+                }
+
+                // DEV-ONLY: Test hook to simulate attachments swap failure
+                if (process.env.NODE_ENV !== "production" && process.env.SIMULATE_ATTACH_SWAP_FAIL === "1") {
+                    // Restore safety backup before returning error
+                    if (safetyDbPath && fs.existsSync(safetyDbPath)) {
+                        safeCopyFile(safetyDbPath, dbPath);
+                    }
+                    if (safetyAttachmentsPath) {
+                        safeRename(safetyAttachmentsPath, attachmentsDir);
+                    }
+                    return errorResponse("attachments", ["Simulated attachments swap failure (test hook)"], "zip", format, warnings);
                 }
 
                 // Atomic swap
