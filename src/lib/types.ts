@@ -46,3 +46,4 @@ export interface Attachment {
     storage_path: string;
     created_at: string;
 }
+

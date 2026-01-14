@@ -10,11 +10,54 @@ function now() {
     return new Date().toISOString();
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const docs = getDb()
-            .prepare("SELECT * FROM docs ORDER BY updated_at DESC")
-            .all() as { id: string; title: string; content_md: string; created_at: string; updated_at: string }[];
+        const { searchParams } = new URL(req.url);
+
+        const limitRaw = searchParams.get("limit");
+        const offsetRaw = searchParams.get("offset");
+        const qRaw = searchParams.get("q");
+
+        // clamp เพื่อกันยิงหนัก
+        const limit = Math.min(Math.max(parseInt(limitRaw ?? "50", 10) || 50, 1), 200);
+        const offset = Math.max(parseInt(offsetRaw ?? "0", 10) || 0, 0);
+
+        const q = (qRaw ?? "").trim();
+        const hasQ = q.length > 0;
+
+        const db = getDb();
+
+        const docs = hasQ
+            ? (db.prepare(
+                `
+                  SELECT *
+                  FROM docs
+                  WHERE title LIKE ? ESCAPE '\\'
+                     OR content_md LIKE ? ESCAPE '\\'
+                  ORDER BY updated_at DESC
+                  LIMIT ? OFFSET ?
+                  `
+            ).all(`%${q.replace(/[%_\\]/g, "\\$&")}%`, `%${q.replace(/[%_\\]/g, "\\$&")}%`, limit, offset) as {
+                id: string;
+                title: string;
+                content_md: string;
+                created_at: string;
+                updated_at: string;
+            }[])
+            : (db.prepare(
+                `
+                  SELECT *
+                  FROM docs
+                  ORDER BY updated_at DESC
+                  LIMIT ? OFFSET ?
+                  `
+            ).all(limit, offset) as {
+                id: string;
+                title: string;
+                content_md: string;
+                created_at: string;
+                updated_at: string;
+            }[]);
 
         return NextResponse.json({ docs });
     } catch (e: unknown) {

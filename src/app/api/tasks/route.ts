@@ -6,7 +6,9 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { toErrorMessage } from "@/lib/error";
 
-const Workspace = z.enum(["avacrm", "ops", "content"]);
+import { WORKSPACES } from "@/lib/workspaces";
+
+const Workspace = z.enum(WORKSPACES);
 const Status = z.enum(["inbox", "planned", "done"]);
 const Bucket = z.enum(["none", "morning", "afternoon", "evening"]);
 

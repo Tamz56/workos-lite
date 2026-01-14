@@ -63,3 +63,71 @@ export function formatFileSize(bytes: number): string {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
+// ============================================================
+// Restore API
+// ============================================================
+
+export type RestoreStage = "validate" | "safety_backup" | "transaction" | "attachments" | "postcheck";
+
+export type RestoreRes = {
+    ok: boolean;
+    mode: "replace";
+    kind: "backup" | "zip" | null;
+    format: "v1" | "legacy" | null;
+    stage: RestoreStage | null;
+    restored: {
+        tasks: number;
+        events: number;
+        docs: number;
+        attachments: number;
+    } | null;
+    warnings: string[];
+    errors: string[];
+};
+
+function normalizeRestoreResponse(json: unknown): RestoreRes {
+    const obj = (typeof json === "object" && json !== null ? json : {}) as Record<string, unknown>;
+
+    return {
+        ok: Boolean(obj.ok),
+        mode: "replace",
+        kind: (obj.kind as RestoreRes["kind"]) ?? null,
+        format: (obj.format as RestoreRes["format"]) ?? null,
+        stage: (obj.stage as RestoreRes["stage"]) ?? null,
+        restored: obj.restored as RestoreRes["restored"] ?? null,
+        warnings: Array.isArray(obj.warnings) ? obj.warnings : [],
+        errors: Array.isArray(obj.errors) ? obj.errors : [],
+    };
+}
+
+/**
+ * Restore a backup file via /api/backup/restore
+ * @param file - The file to restore (.json or .zip)
+ */
+export async function restoreBackup(file: File): Promise<RestoreRes> {
+    const form = new FormData();
+    form.append("file", file);
+
+    try {
+        const res = await fetch("/api/backup/restore", {
+            method: "POST",
+            body: form,
+        });
+
+        const json = await res.json();
+        return normalizeRestoreResponse(json);
+    } catch (err) {
+        return {
+            ok: false,
+            mode: "replace",
+            kind: null,
+            format: null,
+            stage: null,
+            restored: null,
+            warnings: [],
+            errors: [err instanceof Error ? err.message : "Network error"],
+        };
+    }
+}
+
