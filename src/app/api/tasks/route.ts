@@ -46,6 +46,9 @@ export async function GET(req: NextRequest) {
         const filter = url.searchParams.get("filter");
         const cutoff_date = url.searchParams.get("cutoff_date");
 
+        // NEW: inclusive flag (accept "1" or "true")
+        const inclusive = ["1", "true"].includes((url.searchParams.get("inclusive") ?? "").toLowerCase());
+
         // normalize cutoff
         const cutoffOk = !!(cutoff_date && isDateYYYYMMDD(cutoff_date));
         if (cutoffOk) bind.cutoff_date = cutoff_date;
@@ -57,12 +60,15 @@ export async function GET(req: NextRequest) {
             // strict: only planned tasks
             where.push("status = 'planned'");
             where.push("scheduled_date IS NOT NULL");
+            // keep overdue strict to avoid overlapping "today"
             where.push(`scheduled_date < ${cutoffExpr}`);
         } else if (filter === "upcoming") {
             // strict: only planned tasks
             where.push("status = 'planned'");
             where.push("scheduled_date IS NOT NULL");
-            where.push(`scheduled_date > ${cutoffExpr}`);
+            // NEW: inclusive affects upcoming only
+            const op = inclusive ? ">=" : ">";
+            where.push(`scheduled_date ${op} ${cutoffExpr}`);
         }
 
         const isSpecialFilter = filter === "overdue" || filter === "upcoming";

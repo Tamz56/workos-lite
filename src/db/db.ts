@@ -85,8 +85,31 @@ function ensureDocsAndAttachments() {
     }
 }
 
+function ensureEvents() {
+    const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='events'").get();
+    if (!row) {
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS events (
+              id TEXT PRIMARY KEY,
+              title TEXT NOT NULL,
+              start_time TEXT NOT NULL,
+              end_time TEXT,
+              all_day INTEGER DEFAULT 0,
+              kind TEXT DEFAULT 'appointment',
+              workspace TEXT,
+              description TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_events_start_time ON events(start_time);
+            CREATE INDEX IF NOT EXISTS idx_events_workspace ON events(workspace);
+        `);
+    }
+}
+
 // Run migrations on init
 ensureSchema();
 ensureMigrations();
 ensureDocsAndAttachments();
+ensureEvents();
 

@@ -78,6 +78,8 @@ export default function PlannerClient() {
                     q,
                     limit: 300,
                     cutoff_date: date, // use current date state as cutoff
+                    // NEW: upcoming inclusive
+                    inclusive: filter === "upcoming",
                 };
                 const rows = await getTasks(params);
                 setPlanned(rows);
