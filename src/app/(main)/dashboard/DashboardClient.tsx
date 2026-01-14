@@ -76,8 +76,6 @@ async function fetchTasks(params: Record<string, string>) {
 
     // Client-side Tag Parsing (No DB changes)
     return rows.map(t => {
-        // Match "project:name" or "#tag"
-        // Regex: start of string or whitespace, followed by project:... or #...
         const matches = t.title.match(/(?:^|\s)(project:[\w-]+|#[\w-]+)/g);
         const tags = matches ? matches.map(s => s.trim()) : [];
         return { ...t, tags };
@@ -149,11 +147,11 @@ function Card(props: { title: string; right?: React.ReactNode; children: React.R
     );
 }
 
-function StatBadge(props: { value: number; label: string; colorClass: string; href?: string }) {
+function StatBadge(props: { value: number; label: string; colorClass: string; href?: string; compact?: boolean }) {
     const content = (
-        <div className={`flex flex-col items-center justify-center p-2 rounded-xl border ${props.colorClass} transition-transform hover:scale-105`}>
-            <div className="text-xl font-bold leading-none">{props.value}</div>
-            <div className="text-[10px] font-bold uppercase tracking-wider opacity-80 mt-1">{props.label}</div>
+        <div className={`flex flex-col items-center justify-center rounded-xl border ${props.colorClass} transition-transform hover:scale-105 ${props.compact ? 'p-1.5' : 'p-2'}`}>
+            <div className={`${props.compact ? 'text-lg' : 'text-xl'} font-bold leading-none`}>{props.value}</div>
+            <div className="text-[9px] font-bold uppercase tracking-wider opacity-80 mt-1">{props.label}</div>
         </div>
     );
     if (props.href) return <Link href={props.href} className="block">{content}</Link>;
@@ -180,12 +178,18 @@ function WorkspaceCard(props: {
         return [...tasks]
             .filter(t => t.status !== 'done')
             .sort((a, b) => {
+                // Priority: Overdue > Scheduled > Inbox
                 const da = a.scheduled_date || '9999-99-99';
                 const db = b.scheduled_date || '9999-99-99';
                 return da.localeCompare(db);
             })
-            .slice(0, 5);
+            .slice(0, 4); // Limit to 4 for compactness
     }, [tasks]);
+
+    // Additional Density Logic
+    const overdueList = useMemo(() => {
+        return tasks.filter(t => t.scheduled_date && t.scheduled_date < todayYmd && t.status !== "done").slice(0, 3);
+    }, [tasks, todayYmd]);
 
     const title = workspaceLabel(workspace);
     const colorMap: Record<string, string> = {
@@ -198,20 +202,183 @@ function WorkspaceCard(props: {
 
     return (
         <Card title={title} right={<button onClick={() => props.onQuickAdd(workspace)} className="text-[10px] bg-neutral-100 hover:bg-neutral-200 px-2 py-1 rounded font-medium text-neutral-600">+ Task</button>} className={props.className}>
-            <div className="grid grid-cols-3 gap-2 mb-4">
-                <StatBadge value={stats.overdue} label="Overdue" colorClass="bg-red-50 text-red-600 border-red-100" href={`/planner?filter=overdue&workspace=${workspace}`} />
-                <StatBadge value={stats.today} label="Today" colorClass={theme} href={`/planner?workspace=${workspace}`} />
-                <StatBadge value={stats.inbox} label="Inbox" colorClass="bg-neutral-50 text-neutral-600 border-neutral-100" href={`/inbox?workspace=${workspace}`} />
+            <div className="grid grid-cols-3 gap-2 mb-3">
+                <StatBadge value={stats.overdue} label="Overdue" colorClass="bg-red-50 text-red-600 border-red-100" href={`/planner?filter=overdue&workspace=${workspace}`} compact />
+                <StatBadge value={stats.today} label="Today" colorClass={theme} href={`/planner?workspace=${workspace}`} compact />
+                <StatBadge value={stats.inbox} label="Inbox" colorClass="bg-neutral-50 text-neutral-600 border-neutral-100" href={`/inbox?workspace=${workspace}`} compact />
             </div>
-            <div className="space-y-1">
-                {topTasks.map(t => (
-                    <div key={t.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-neutral-50 last:border-0 hover:bg-neutral-50 px-1 -mx-1 rounded group">
-                        <span className={`w-1.5 h-1.5 rounded-full ${t.scheduled_date && t.scheduled_date < todayYmd ? 'bg-red-500' : 'bg-neutral-300'}`} />
-                        <span className="truncate flex-1 font-medium text-neutral-700 group-hover:text-black">{t.title}</span>
-                        {t.scheduled_date && <span className="text-[9px] text-neutral-400">{t.scheduled_date.slice(5)}</span>}
+
+            {/* Contextual Density: Show overdue list if overdue > 0, else show top tasks */}
+            {stats.overdue > 0 ? (
+                <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                        <span>🔥 Attention Needed</span>
                     </div>
-                ))}
-                {topTasks.length === 0 && <div className="text-center text-xs text-neutral-400 py-4 italic">No active tasks</div>}
+                    {overdueList.map(t => (
+                        <Link key={t.id} href={`/planner?q=${encodeURIComponent(t.title)}`} className="flex items-center gap-2 text-xs py-1.5 border-b border-neutral-50 last:border-0 hover:bg-red-50 px-1 -mx-1 rounded group">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            <span className="truncate flex-1 font-medium text-neutral-800 group-hover:text-red-700">{t.title}</span>
+                            <span className="text-[9px] text-red-400 font-mono">{t.scheduled_date?.slice(5)}</span>
+                        </Link>
+                    ))}
+                    {topTasks.length > overdueList.length && (
+                        <div className="pt-2 text-[10px] text-neutral-400 text-center">+ {topTasks.length - overdueList.length} more active tasks</div>
+                    )}
+                </div>
+            ) : (
+                <div className="space-y-1">
+                    <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5">Next Up</div>
+                    {topTasks.map(t => (
+                        <div key={t.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-neutral-50 last:border-0 hover:bg-neutral-50 px-1 -mx-1 rounded group">
+                            <span className={`w-1.5 h-1.5 rounded-full ${t.scheduled_date && t.scheduled_date === todayYmd ? 'bg-green-500' : 'bg-neutral-300'}`} />
+                            <span className="truncate flex-1 font-medium text-neutral-700 group-hover:text-black">{t.title}</span>
+                            {t.scheduled_date && <span className="text-[9px] text-neutral-400">{t.scheduled_date.slice(5)}</span>}
+                        </div>
+                    ))}
+                    {topTasks.length === 0 && <div className="text-center text-xs text-neutral-400 py-4 italic">All caught up! 🎉</div>}
+                </div>
+            )}
+        </Card>
+    );
+}
+
+// Minimal 2-Column Calendar Widget
+function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOpenGCal?: () => void }) {
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(props.todayYmd);
+
+    // Group events by YYYY-MM-DD
+    const eventsByDate = useMemo(() => {
+        const map: Record<string, CalendarEvent[]> = {};
+        props.events.forEach(e => {
+            const ymd = e.start_time.slice(0, 10);
+            if (!map[ymd]) map[ymd] = [];
+            map[ymd].push(e);
+        });
+        return map;
+    }, [props.events]);
+
+    // Generate calendar grid (6 weeks max)
+    const calendarDays = useMemo(() => {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+
+        const days = [];
+        // Add padding for start of week (Sunday=0)
+        for (let i = 0; i < firstDay.getDay(); i++) {
+            days.push({ day: 0, date: '', inMonth: false });
+        }
+        // Add days of month
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+            const date = `${year}-${pad2(month + 1)}-${pad2(i)}`;
+            days.push({ day: i, date: date, inMonth: true });
+        }
+        // Fill remaining slots
+        while (days.length % 7 !== 0) {
+            days.push({ day: 0, date: '', inMonth: false });
+        }
+        return days;
+    }, [currentMonth]);
+
+    const changeMonth = (delta: number) => {
+        const next = new Date(currentMonth);
+        next.setMonth(currentMonth.getMonth() + delta);
+        setCurrentMonth(next);
+        // Default select 1st of new month if not today
+        const ymd = toYmdLocal(next).slice(0, 8) + "01";
+        if (toYmdLocal(new Date()).startsWith(toYmdLocal(next).slice(0, 7))) {
+            setSelectedDate(toYmdLocal(new Date())); // Keep today if valid
+        } else {
+            setSelectedDate(ymd);
+        }
+    };
+
+    const selectedEvents = eventsByDate[selectedDate] || [];
+
+    return (
+        <Card title="Calendar" className="h-full flex flex-col" right={
+            props.onOpenGCal ? (
+                <button onClick={props.onOpenGCal} className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition-colors flex items-center gap-1">
+                    <span>📅</span> GCal
+                </button>
+            ) : null
+        }>
+            <div className="flex flex-col md:flex-row gap-6 h-full min-h-[300px]">
+                {/* Left: Mini Month */}
+                <div className="flex-none w-full md:w-[260px] flex flex-col">
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-neutral-100 rounded text-neutral-500">◀</button>
+                        <span className="text-sm font-bold text-neutral-800">
+                            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </span>
+                        <button onClick={() => changeMonth(1)} className="p-1 hover:bg-neutral-100 rounded text-neutral-500">▶</button>
+                    </div>
+
+                    <div className="grid grid-cols-7 text-center mb-1">
+                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <div key={d} className="text-[10px] font-bold text-neutral-400 py-1">{d}</div>)}
+                    </div>
+                    <div className="grid grid-cols-7 gap-y-1 gap-x-1 flex-1 content-start">
+                        {calendarDays.map((d, i) => {
+                            if (!d.inMonth) return <div key={i} />;
+                            const isToday = d.date === props.todayYmd;
+                            const isSelected = d.date === selectedDate;
+                            const hasEvents = eventsByDate[d.date]?.length > 0;
+
+                            return (
+                                <button key={i}
+                                    onClick={() => setSelectedDate(d.date)}
+                                    className={`
+                                        aspect-square rounded-lg flex flex-col items-center justify-center relative transition-all
+                                        ${isSelected ? 'bg-black text-white shadow-md' : 'hover:bg-neutral-50 text-neutral-700'}
+                                        ${isToday && !isSelected ? 'bg-neutral-100 text-black font-bold ring-1 ring-inset ring-neutral-200' : ''}
+                                    `}
+                                >
+                                    <span className="text-xs leading-none">{d.day}</span>
+                                    {hasEvents && (
+                                        <span className={`absolute bottom-1.5 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-red-500'}`} />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Right: Agenda */}
+                <div className="flex-1 flex flex-col border-l border-neutral-100 pl-0 md:pl-6 pt-4 md:pt-0">
+                    <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">
+                        {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                    </div>
+
+                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 max-h-[250px] scrollbar-thin">
+                        {selectedEvents.length === 0 && (
+                            <div className="text-center text-sm text-neutral-400 py-8 italic flex flex-col items-center">
+                                <span className="text-2xl mb-1 opacity-50">🏝️</span>
+                                No events planned
+                            </div>
+                        )}
+                        {selectedEvents.sort((a, b) => a.start_time.localeCompare(b.start_time)).map(ev => (
+                            <div key={ev.id} className="group flex gap-3 items-start p-2 rounded-lg hover:bg-neutral-50 border border-transparent hover:border-neutral-100 transition-all">
+                                <div className="w-12 text-center pt-0.5">
+                                    <div className="text-xs font-bold text-neutral-900">{ev.all_day ? "ALL" : fmtTimeLocal(ev.start_time).slice(11)}</div>
+                                    {!ev.all_day && <div className="text-[9px] text-neutral-400">{fmtTimeLocal(ev.start_time).slice(-2)}</div>}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-neutral-800 truncate leading-snug">{ev.title}</div>
+                                    {ev.workspace && (
+                                        <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 mt-1 uppercase tracking-wider font-bold">
+                                            {ev.workspace}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="pt-3 mt-auto border-t border-neutral-100 text-center">
+                        <Link href="/calendar" className="text-xs font-medium text-neutral-500 hover:text-black">View Full Calendar →</Link>
+                    </div>
+                </div>
             </div>
         </Card>
     );
@@ -244,44 +411,43 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
     }, [props.todayYmd]);
 
     if (projects.length === 0) return (
-        <Card title="Project Timeline (14 Days)" className="h-full min-h-[200px] flex items-center justify-center">
+        <Card title="Project Timeline" className="h-full min-h-[150px] flex items-center justify-center">
             <div className="text-center">
-                <div className="text-neutral-300 text-4xl mb-2">📊</div>
-                <div className="text-sm text-neutral-500">No active projects found</div>
-                <div className="text-xs text-neutral-400 mt-1">Tag tasks with <code>project:name</code> to see them here</div>
+                <div className="text-neutral-300 text-2xl mb-1">📊</div>
+                <div className="text-xs text-neutral-400">No active projects (tag: <code>project:name</code>)</div>
             </div>
         </Card>
     );
 
     return (
         <Card title="Project Timeline (14 Days)" className="h-full overflow-x-auto">
-            <div className="min-w-[600px]">
-                <div className="grid grid-cols-[120px_1fr] gap-4 mb-3 border-b border-neutral-100 pb-2">
-                    <div className="text-[10px] uppercase font-bold text-neutral-400 self-end">Project</div>
-                    <div className="grid grid-cols-14 gap-0.5">
+            <div className="min-w-[500px]">
+                <div className="grid grid-cols-[100px_1fr] gap-3 mb-2 border-b border-neutral-100 pb-1">
+                    <div className="text-[9px] uppercase font-bold text-neutral-400 self-end">Project</div>
+                    <div className="grid grid-cols-14 gap-px">
                         {days.map(d => (
-                            <div key={d} className="text-[9px] text-center text-neutral-400 font-medium">
-                                {d.slice(8)} <br /> <span className="opacity-50">{new Date(d).toLocaleDateString('en-US', { weekday: 'narrow' })}</span>
+                            <div key={d} className="text-[8px] text-center text-neutral-400 font-medium overflow-hidden">
+                                {d.slice(8)}
                             </div>
                         ))}
                     </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3">
                     {projects.map(([projName, items]) => (
-                        <div key={projName} className="grid grid-cols-[120px_1fr] gap-4 items-center group">
+                        <div key={projName} className="grid grid-cols-[100px_1fr] gap-3 items-center group">
                             <Link href={`/planner?q=project:${projName}`} className="text-xs font-semibold text-neutral-700 truncate hover:text-blue-600 hover:underline" title={projName}>
                                 {projName}
-                                <span className="block text-[9px] font-normal text-neutral-400">{items.length} tasks</span>
+                                <span className="block text-[8px] font-normal text-neutral-400">{items.length} tasks</span>
                             </Link>
-                            <div className="grid grid-cols-14 gap-0.5 h-6 bg-neutral-50 rounded-md p-0.5">
+                            <div className="grid grid-cols-14 gap-px h-5 bg-neutral-50 rounded p-px">
                                 {days.map(d => {
                                     const tasksOnDay = items.filter(t => t.scheduled_date === d);
-                                    if (tasksOnDay.length === 0) return <div key={d} className="h-full rounded hover:bg-neutral-100 transition-colors" />;
+                                    if (tasksOnDay.length === 0) return <div key={d} className="h-full rounded-sm hover:bg-neutral-100 transition-colors" />;
                                     return (
                                         <div key={d} className="relative group/day h-full">
-                                            <div className="w-full h-full rounded bg-blue-400 hover:bg-blue-600 cursor-pointer shadow-sm transition-colors border border-blue-500/50"></div>
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/day:block bg-black text-white text-[10px] p-2 rounded whitespace-nowrap z-20 shadow-xl">
-                                                <div className="font-bold">{d}</div>
+                                            <div className="w-full h-full rounded-sm bg-blue-400 hover:bg-blue-600 cursor-pointer shadow-sm transition-colors opacity-80 hover:opacity-100"></div>
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/day:block bg-black text-white text-[9px] p-2 rounded whitespace-nowrap z-20 shadow-xl pointer-events-none">
+                                                <div className="font-bold border-b border-white/20 pb-1 mb-1">{d}</div>
                                                 {tasksOnDay.map(t => <div key={t.id} className="truncate max-w-[150px]">• {t.title}</div>)}
                                             </div>
                                         </div>
@@ -298,19 +464,18 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
 
 function WorkStrip(props: { workspaces: Workspace[]; tasks: TaskRow[]; todayYmd: string }) {
     return (
-        <div className="flex gap-4 overflow-x-auto pb-4 pt-1 scrollbar-hide">
+        <div className="flex gap-4 overflow-x-auto pb-4 pt-1 scrollbar-hide py-2">
             {props.workspaces.map(w => {
                 const count = props.tasks.filter(t => t.workspace === w && t.status !== 'done').length;
                 const overdue = props.tasks.filter(t => t.workspace === w && t.scheduled_date && t.scheduled_date < props.todayYmd && t.status !== 'done').length;
                 return (
-                    <Link key={w} href={`/planner?workspace=${w}`} className="flex-none min-w-[140px] p-4 bg-white rounded-xl border border-neutral-200/70 shadow-sm hover:shadow-md hover:border-neutral-300 transition-all group flex flex-col justify-between h-[100px]">
+                    <Link key={w} href={`/planner?workspace=${w}`} className="flex-none min-w-[120px] p-3 bg-white rounded-xl border border-neutral-200/70 shadow-sm hover:shadow-md hover:border-neutral-300 transition-all group flex flex-col justify-between h-[80px]">
                         <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] uppercase font-bold text-neutral-500 group-hover:text-black transition-colors">{workspaceLabel(w)}</span>
-                            {overdue > 0 && <span className="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">{overdue} !</span>}
+                            <span className="text-[9px] uppercase font-bold text-neutral-500 group-hover:text-black transition-colors">{workspaceLabel(w)}</span>
+                            {overdue > 0 && <span className="text-[8px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">{overdue} !</span>}
                         </div>
                         <div>
-                            <div className="text-3xl font-bold text-neutral-700 group-hover:text-black transition-colors">{count}</div>
-                            <div className="text-[10px] text-neutral-400">Total active tasks</div>
+                            <div className="text-2xl font-bold text-neutral-700 group-hover:text-black transition-colors">{count}</div>
                         </div>
                     </Link>
                 );
@@ -362,7 +527,7 @@ export default function DashboardClient() {
         try {
             const [allTasks, allEvents, allDocs, healthRes] = await Promise.all([
                 fetchTasks({ limit: "1000" }),
-                fetchEvents({ start: toUtcIso(new Date()), end: toUtcIso(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)) }),
+                fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }), // Fetch wider range for calendar
                 fetchDocs({ limit: "100" }),
                 fetch("/api/health").catch(() => ({ ok: false }))
             ]);
@@ -417,10 +582,12 @@ export default function DashboardClient() {
 
     if (loading && tasks.length === 0) return <div className="p-10 flex justify-center items-center gap-3 text-neutral-400"><span className="animate-spin text-xl">⏳</span> Loading Command Center...</div>;
 
-    const gcalUrl = process.env.NEXT_PUBLIC_GCAL_EMBED_URL;
+    // Check if gcal embed is available
+    const hasGCalEmbed = !!process.env.NEXT_PUBLIC_GCAL_EMBED_URL;
+    const openGCal = hasGCalEmbed ? () => window.open(process.env.NEXT_PUBLIC_GCAL_EMBED_URL, '_blank') : undefined;
 
     return (
-        <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-6 lg:px-8 py-8 space-y-8 animate-in fade-in duration-500">
+        <div className="mx-auto w-full max-w-screen-2xl px-4 md:px-6 lg:px-8 py-6 space-y-6 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -437,62 +604,33 @@ export default function DashboardClient() {
                 </div>
             </div>
 
-            {/* Row 1: Workspace Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Row 1: Workspace Cards Grid (Density Optimized) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <WorkspaceCard workspace="avacrm" tasks={wsTasks['avacrm']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
                 <WorkspaceCard workspace="ops" tasks={wsTasks['ops']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
                 <WorkspaceCard workspace="content" tasks={wsTasks['content']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
             </div>
 
-            {/* Row 2: Timeline & Calendar */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 h-auto lg:h-[320px]">
-                <div className="lg:col-span-2 h-full">
-                    <ProjectTimeline tasks={tasks} todayYmd={todayYmd} />
+            {/* Row 2: Calendar & Timeline */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-auto lg:h-[350px]">
+                {/* Calendar Widget (Takes roughly 4/12 columns or more on large screens if desired) */}
+                <div className="lg:col-span-4 h-full">
+                    <CalendarWidget events={events} todayYmd={todayYmd} onOpenGCal={openGCal} />
                 </div>
-                <div className="lg:col-span-1 h-full flex flex-col">
-                    <Card title="Calendar" className="flex-1 flex flex-col h-full overflow-hidden">
-                        {gcalUrl ? (
-                            <div className="flex-1 rounded-lg overflow-hidden border border-neutral-100 bg-neutral-50">
-                                <iframe src={gcalUrl} className="w-full h-full border-0" frameBorder="0" scrolling="no"></iframe>
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex flex-col overflow-hidden">
-                                <div className="flex-1 overflow-y-auto pr-1 space-y-2">
-                                    {events.slice(0, 10).map(ev => (
-                                        <div key={ev.id} className="flex gap-3 items-center p-2 hover:bg-neutral-50 rounded-lg transition-colors border border-transparent hover:border-neutral-100">
-                                            <div className="flex-none text-center min-w-[40px] bg-neutral-50 border border-neutral-100 rounded-lg p-1">
-                                                <div className="text-[9px] uppercase font-bold text-neutral-500">{new Date(ev.start_time).toLocaleDateString('en-US', { month: 'short' })}</div>
-                                                <div className="text-lg font-bold leading-none text-neutral-900">{new Date(ev.start_time).getDate()}</div>
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="text-sm font-medium truncate text-neutral-800">{ev.title}</div>
-                                                <div className="text-xs text-neutral-500 flex items-center gap-1">
-                                                    {ev.all_day ? "All Day" : fmtTimeLocal(ev.start_time)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {events.length === 0 && <div className="text-center text-sm text-neutral-400 py-10 italic">No upcoming events found</div>}
-                                </div>
-                                <div className="pt-3 mt-2 border-t border-neutral-100">
-                                    <Link href="/calendar" className="block text-center text-xs text-neutral-500 hover:text-black font-medium py-1 rounded hover:bg-neutral-50 transition-colors">
-                                        Open Full Calendar →
-                                    </Link>
-                                </div>
-                            </div>
-                        )}
-                    </Card>
+                {/* Project Timeline (Takes roughly 8/12 columns) */}
+                <div className="lg:col-span-8 h-full">
+                    <ProjectTimeline tasks={tasks} todayYmd={todayYmd} />
                 </div>
             </div>
 
             {/* Row 3: Work Strip */}
             <div>
-                <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3 ml-1">More Workspaces</h3>
+                <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-2 ml-1">More Workspaces</h3>
                 <WorkStrip workspaces={['finance', 'travel', 'admin', 'personal', 'other']} tasks={tasks} todayYmd={todayYmd} />
             </div>
 
-            {/* Row 4: Email & System */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Row 4: Email & System (Footer) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card title="Quick Links" className="h-full bg-gradient-to-br from-white to-neutral-50/50">
                     <div className="grid grid-cols-4 gap-4">
                         <a href="https://gmail.com" target="_blank" className="aspect-square flex flex-col items-center justify-center p-2 rounded-xl border border-neutral-200 bg-white hover:border-red-200 hover:shadow-md transition-all group">
@@ -501,7 +639,7 @@ export default function DashboardClient() {
                         </a>
                         <a href="https://calendar.google.com" target="_blank" className="aspect-square flex flex-col items-center justify-center p-2 rounded-xl border border-neutral-200 bg-white hover:border-blue-200 hover:shadow-md transition-all group">
                             <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">📅</span>
-                            <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-wide">Calendar</span>
+                            <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-wide">GCal</span>
                         </a>
                         <button disabled className="aspect-square flex flex-col items-center justify-center p-2 rounded-xl border border-neutral-100 bg-neutral-50 opacity-60 cursor-not-allowed">
                             <span className="text-3xl mb-2 grayscale">💬</span>
@@ -517,7 +655,7 @@ export default function DashboardClient() {
                             <div className="text-base font-bold text-neutral-900">{health?.status || "Checking..."}</div>
                             <div className="text-xs text-neutral-500">Database & API Status</div>
                         </div>
-                        <div className="ml-auto text-xs font-mono bg-neutral-100 px-2.5 py-1 rounded text-neutral-500">v2.0.0</div>
+                        <div className="ml-auto text-xs font-mono bg-neutral-100 px-2.5 py-1 rounded text-neutral-500">v2.1.0</div>
                     </div>
                     <div className="flex gap-3">
                         <button onClick={() => window.location.href = "/api/export-zip"} className="flex-1 py-2.5 px-4 rounded-xl bg-neutral-900 text-white text-sm font-medium hover:bg-black hover:shadow-lg transition-all flex items-center justify-center gap-2">
