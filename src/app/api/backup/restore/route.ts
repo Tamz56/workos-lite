@@ -7,6 +7,7 @@ import { toErrorMessage } from "@/lib/error";
 import fs from "fs";
 import path from "path";
 import yauzl from "yauzl";
+import { performHousekeeping } from "@/lib/backup/housekeeping";
 
 export const runtime = "nodejs";
 
@@ -591,14 +592,6 @@ export async function POST(req: Request) {
             warnings.push(`Post-restore check warning: ${toErrorMessage(e)}`);
         }
 
-        // ============================================================
-        // CLEANUP: Remove safety backups on success
-        // ============================================================
-        // Keep safety backup for a while (don't delete immediately)
-        // User can manually clean up old backups
-        if (safetyAttachmentsPath) {
-            safeRemoveDir(safetyAttachmentsPath);
-        }
 
         return successResponse(
             isZip ? "zip" : "backup",
@@ -621,5 +614,10 @@ export async function POST(req: Request) {
         if (tmpAttachmentsPath) {
             safeRemoveDir(tmpAttachmentsPath);
         }
+
+        // Run housekeeping (fire and forget / non-blocking)
+        // Clean up old safety backups and stale temp files
+        const dataDir = path.resolve(process.cwd(), "data");
+        performHousekeeping(dataDir);
     }
 }

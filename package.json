@@ -6,7 +6,10 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "smoke:tasks": "node scripts/smoke_tasks.js",
+    "smoke:events": "node scripts/smoke_events.js",
+    "smoke:backup": "node scripts/smoke_backup.js"
   },
   "dependencies": {
     "archiver": "^7.0.1",
