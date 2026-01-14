@@ -242,7 +242,7 @@ function WorkspaceCard(props: {
     );
 }
 
-// Hybrid Calendar Widget: Mini Month + Agenda (Selected) + Legacy Upcoming List
+// Hybrid Calendar Widget: Agenda (Left) + Mini Month (Right) + Legacy Upcoming List
 function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOpenGCal?: () => void }) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(props.todayYmd);
@@ -313,10 +313,37 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
                 </button>
             ) : null
         }>
-            {/* Top Section: Month + Agenda */}
-            <div className="flex flex-col md:flex-row gap-6 mb-6">
-                {/* Left: Mini Month */}
-                <div className="flex-none w-full md:w-[260px] flex flex-col">
+            {/* Top Section: Agenda (Left) + Month (Right) */}
+            <div className="flex flex-col-reverse md:flex-row gap-6 mb-6">
+
+                {/* Left: Selected Date Agenda (Expanded) */}
+                <div className="flex-1 flex flex-col pt-4 md:pt-0 min-w-0">
+                    <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">
+                        {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                    </div>
+
+                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 max-h-[220px] scrollbar-thin">
+                        {selectedEvents.length === 0 && (
+                            <div className="text-center text-sm text-neutral-400 py-4 italic flex flex-col items-center">
+                                <span className="text-xl mb-1 opacity-50">🏝️</span>
+                                No events
+                            </div>
+                        )}
+                        {selectedEvents.sort((a, b) => a.start_time.localeCompare(b.start_time)).map(ev => (
+                            <div key={ev.id} className="group flex gap-3 items-start p-2 rounded-lg hover:bg-neutral-50 border border-transparent hover:border-neutral-100 transition-all">
+                                <div className="w-10 text-center pt-0.5">
+                                    <div className="text-[10px] font-bold text-neutral-900">{ev.all_day ? "ALL" : fmtTimeLocal(ev.start_time).slice(11)}</div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium text-neutral-800 truncate leading-snug">{ev.title}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Right: Mini Month (Fixed Width) */}
+                <div className="flex-none w-full md:w-[260px] flex flex-col border-l border-neutral-100 pl-0 md:pl-6">
                     <div className="flex items-center justify-between mb-3 px-1">
                         <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-neutral-100 rounded text-neutral-500">◀</button>
                         <span className="text-sm font-bold text-neutral-800">
@@ -351,32 +378,6 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
                                 </button>
                             );
                         })}
-                    </div>
-                </div>
-
-                {/* Right: Selected Date Agenda */}
-                <div className="flex-1 flex flex-col border-l border-neutral-100 pl-0 md:pl-6 pt-4 md:pt-0">
-                    <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">
-                        {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                    </div>
-
-                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 max-h-[220px] scrollbar-thin">
-                        {selectedEvents.length === 0 && (
-                            <div className="text-center text-sm text-neutral-400 py-4 italic flex flex-col items-center">
-                                <span className="text-xl mb-1 opacity-50">🏝️</span>
-                                No events
-                            </div>
-                        )}
-                        {selectedEvents.sort((a, b) => a.start_time.localeCompare(b.start_time)).map(ev => (
-                            <div key={ev.id} className="group flex gap-3 items-start p-2 rounded-lg hover:bg-neutral-50 border border-transparent hover:border-neutral-100 transition-all">
-                                <div className="w-10 text-center pt-0.5">
-                                    <div className="text-[10px] font-bold text-neutral-900">{ev.all_day ? "ALL" : fmtTimeLocal(ev.start_time).slice(11)}</div>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-medium text-neutral-800 truncate leading-snug">{ev.title}</div>
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </div>
             </div>
@@ -450,7 +451,7 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
 
     return (
         <Card title={`Project Timeline (14 Days)`} right={<span className="text-[10px] text-neutral-400 font-normal">{totalProjects} Projects, {totalScheduled} Tasks</span>} className="h-full overflow-x-auto">
-            <div className="min-w-[500px]">
+            <div className="min-w-full">
                 <div className="grid grid-cols-[100px_1fr] gap-3 mb-2 border-b border-neutral-100 pb-1">
                     <div className="text-[9px] uppercase font-bold text-neutral-400 self-end">Project</div>
                     <div className="grid grid-cols-14 gap-px">
@@ -491,25 +492,51 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
     );
 }
 
-function WorkStrip(props: { workspaces: Workspace[]; tasks: TaskRow[]; todayYmd: string }) {
+function OtherWorkspacesList(props: { tasks: TaskRow[]; todayYmd: string }) {
+    const workspaces: Workspace[] = ['finance', 'travel', 'admin', 'personal', 'other'];
+
+    const rows = workspaces.map(w => {
+        const wsTasks = props.tasks.filter(t => t.workspace === w && t.status !== 'done');
+        const activeCount = wsTasks.length;
+        // Find next task: sort by scheduled_date (asc), then by id (pseudo-created)
+        const nextTask = wsTasks.sort((a, b) => {
+            const da = a.scheduled_date || '9999-99-99';
+            const db = b.scheduled_date || '9999-99-99';
+            return da.localeCompare(db);
+        })[0];
+        return { w, activeCount, nextTask };
+    });
+
     return (
-        <div className="flex gap-4 overflow-x-auto pb-4 pt-1 scrollbar-hide py-2">
-            {props.workspaces.map(w => {
-                const count = props.tasks.filter(t => t.workspace === w && t.status !== 'done').length;
-                const overdue = props.tasks.filter(t => t.workspace === w && t.scheduled_date && t.scheduled_date < props.todayYmd && t.status !== 'done').length;
-                return (
-                    <Link key={w} href={`/planner?workspace=${w}`} className="flex-none min-w-[120px] p-3 bg-white rounded-xl border border-neutral-200/70 shadow-sm hover:shadow-md hover:border-neutral-300 transition-all group flex flex-col justify-between h-[80px]">
-                        <div className="flex items-center justify-between mb-1">
-                            <span className="text-[9px] uppercase font-bold text-neutral-500 group-hover:text-black transition-colors">{workspaceLabel(w)}</span>
-                            {overdue > 0 && <span className="text-[8px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">{overdue} !</span>}
+        <Card title="Other Workspaces" className="h-full flex flex-col">
+            <div className="flex-1 space-y-3 pt-1">
+                {rows.map(({ w, activeCount, nextTask }) => (
+                    <Link key={w} href={`/planner?workspace=${w}`} className="grid grid-cols-[80px_40px_1fr] gap-3 items-center group hover:bg-neutral-50 -mx-2 px-2 py-1.5 rounded-lg transition-colors">
+                        <div className="text-xs font-bold text-neutral-600 uppercase tracking-wide group-hover:text-black">{workspaceLabel(w)}</div>
+                        <div className="text-center">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeCount > 0 ? 'bg-neutral-200 text-neutral-800' : 'bg-neutral-100 text-neutral-400'}`}>
+                                {activeCount}
+                            </span>
                         </div>
-                        <div>
-                            <div className="text-2xl font-bold text-neutral-700 group-hover:text-black transition-colors">{count}</div>
+                        <div className="min-w-0">
+                            {nextTask ? (
+                                <div className="text-xs truncate text-neutral-500 group-hover:text-neutral-800">
+                                    <span className="font-medium text-neutral-700">{nextTask.title}</span>
+                                    {nextTask.scheduled_date && <span className="ml-1.5 opacity-60 text-[10px]">{nextTask.scheduled_date.slice(5)}</span>}
+                                </div>
+                            ) : (
+                                <div className="text-[10px] text-neutral-300 italic">No active tasks</div>
+                            )}
                         </div>
                     </Link>
-                );
-            })}
-        </div>
+                ))}
+            </div>
+            <div className="mt-auto pt-3 border-t border-neutral-100 text-center">
+                <Link href="/planner" className="text-[10px] font-bold text-neutral-400 hover:text-black uppercase tracking-widest">
+                    View All in Planner
+                </Link>
+            </div>
+        </Card>
     );
 }
 
@@ -633,33 +660,34 @@ export default function DashboardClient() {
                 </div>
             </div>
 
-            {/* Row 1: Main Work (Timeline) + Calendar */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 h-auto xl:h-[450px]">
+            {/* Row 1: Timeline (Left) + Calendar (Right) */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start justify-items-stretch">
                 {/* Timeline: 8 Cols */}
-                <div className="xl:col-span-8 h-full flex flex-col">
+                <div className="xl:col-span-8 h-full flex flex-col min-w-0">
                     <ProjectTimeline tasks={tasks} todayYmd={todayYmd} />
                 </div>
 
                 {/* Calendar: 4 Cols */}
-                <div className="xl:col-span-4 h-full flex flex-col">
+                <div className="xl:col-span-4 h-full flex flex-col min-w-0">
                     <CalendarWidget events={events} todayYmd={todayYmd} onOpenGCal={openGCal} />
                 </div>
             </div>
 
-            {/* Row 2: Workspace Cards (3 Cols) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <WorkspaceCard workspace="avacrm" tasks={wsTasks['avacrm']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
-                <WorkspaceCard workspace="ops" tasks={wsTasks['ops']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
-                <WorkspaceCard workspace="content" tasks={wsTasks['content']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
+            {/* Row 2: Workspaces */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start justify-items-stretch">
+                {/* Main Cards: 8 Cols */}
+                <div className="xl:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-6 min-w-0">
+                    <WorkspaceCard workspace="avacrm" tasks={wsTasks['avacrm']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
+                    <WorkspaceCard workspace="ops" tasks={wsTasks['ops']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
+                    <WorkspaceCard workspace="content" tasks={wsTasks['content']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
+                </div>
+                {/* Other Workspaces List: 4 Cols */}
+                <div className="xl:col-span-4 h-full flex flex-col min-w-0">
+                    <OtherWorkspacesList tasks={tasks} todayYmd={todayYmd} />
+                </div>
             </div>
 
-            {/* Row 3: Work Strip */}
-            <div>
-                <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-2 ml-1">Secondary Workspaces</h3>
-                <WorkStrip workspaces={['finance', 'travel', 'admin', 'personal', 'other']} tasks={tasks} todayYmd={todayYmd} />
-            </div>
-
-            {/* Row 4: Footer Utils */}
+            {/* Row 3: Footer Utils */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
                 <Card title="Quick Access" className="h-full bg-gradient-to-br from-white to-neutral-50/50">
                     <div className="grid grid-cols-4 gap-4">
