@@ -12,6 +12,7 @@
     "smoke:backup": "node scripts/smoke_backup.js"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "archiver": "^7.0.1",
     "better-sqlite3": "^12.5.0",
     "clsx": "^2.1.1",

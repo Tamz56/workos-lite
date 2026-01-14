@@ -137,12 +137,14 @@ function fmtTimeLocal(iso: string) {
 
 function Card(props: { title: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
     return (
-        <div className={`rounded-2xl border border-neutral-200/70 bg-white p-5 shadow-sm hover:shadow-md transition-shadow ${props.className || ""}`}>
-            <div className="mb-4 flex items-center justify-between gap-3 border-b border-neutral-50 pb-2">
+        <div className={`rounded-2xl border border-neutral-200/70 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col ${props.className || ""}`}>
+            <div className="mb-4 flex items-center justify-between gap-3 border-b border-neutral-50 pb-2 flex-none">
                 <div className="text-sm font-semibold text-neutral-900 uppercase tracking-wide">{props.title}</div>
                 {props.right}
             </div>
-            {props.children}
+            <div className="flex-1 min-h-0">
+                {props.children}
+            </div>
         </div>
     );
 }
@@ -202,7 +204,7 @@ function WorkspaceCard(props: {
 
     return (
         <Card title={title} right={<button onClick={() => props.onQuickAdd(workspace)} className="text-[10px] bg-neutral-100 hover:bg-neutral-200 px-2 py-1 rounded font-medium text-neutral-600">+ Task</button>} className={props.className}>
-            <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="flex-none grid grid-cols-3 gap-2 mb-3">
                 <StatBadge value={stats.overdue} label="Overdue" colorClass="bg-red-50 text-red-600 border-red-100" href={`/planner?filter=overdue&workspace=${workspace}`} compact />
                 <StatBadge value={stats.today} label="Today" colorClass={theme} href={`/planner?workspace=${workspace}`} compact />
                 <StatBadge value={stats.inbox} label="Inbox" colorClass="bg-neutral-50 text-neutral-600 border-neutral-100" href={`/inbox?workspace=${workspace}`} compact />
@@ -314,10 +316,10 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
             ) : null
         }>
             {/* Top Section: Agenda (Left) + Month (Right) */}
-            <div className="flex flex-col-reverse md:flex-row gap-6 mb-6">
+            <div className="flex flex-col md:flex-row gap-6 mb-6 flex-1 min-h-0">
 
                 {/* Left: Selected Date Agenda (Expanded) */}
-                <div className="flex-1 flex flex-col pt-4 md:pt-0 min-w-0">
+                <div className="flex-1 flex flex-col pt-4 md:pt-0 min-w-0 order-2 md:order-1">
                     <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">
                         {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                     </div>
@@ -343,7 +345,7 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
                 </div>
 
                 {/* Right: Mini Month (Fixed Width) */}
-                <div className="flex-none w-full md:w-[260px] flex flex-col border-l border-neutral-100 pl-0 md:pl-6">
+                <div className="flex-none w-full md:w-[260px] flex flex-col md:border-l md:border-neutral-100 pl-0 md:pl-6 order-1 md:order-2">
                     <div className="flex items-center justify-between mb-3 px-1">
                         <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-neutral-100 rounded text-neutral-500">◀</button>
                         <span className="text-sm font-bold text-neutral-800">
@@ -383,7 +385,7 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
             </div>
 
             {/* Bottom Section: Divider & Legacy List */}
-            <div className="border-t border-neutral-100 pt-4 mt-auto">
+            <div className="border-t border-neutral-100 pt-4 mt-auto flex-none">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Upcoming (Next 30 Days)</span>
                     <Link href="/calendar" className="text-[10px] font-medium text-neutral-500 hover:text-black">Full Calendar →</Link>
@@ -643,7 +645,7 @@ export default function DashboardClient() {
     const openGCal = hasGCalEmbed ? () => window.open(process.env.NEXT_PUBLIC_GCAL_EMBED_URL, '_blank') : undefined;
 
     return (
-        <div className="w-full px-6 2xl:px-10 py-6 space-y-6 animate-in fade-in duration-500 flex flex-col min-h-screen">
+        <div className="w-full px-4 md:px-6 2xl:px-10 py-6 space-y-6 animate-in fade-in duration-500 flex flex-col min-h-screen">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -674,9 +676,9 @@ export default function DashboardClient() {
             </div>
 
             {/* Row 2: Workspaces */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start justify-items-stretch">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch justify-items-stretch">
                 {/* Main Cards: 8 Cols */}
-                <div className="xl:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-6 min-w-0">
+                <div className="xl:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-6 min-w-0 h-full">
                     <WorkspaceCard workspace="avacrm" tasks={wsTasks['avacrm']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
                     <WorkspaceCard workspace="ops" tasks={wsTasks['ops']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
                     <WorkspaceCard workspace="content" tasks={wsTasks['content']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
