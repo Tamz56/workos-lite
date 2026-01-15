@@ -49,6 +49,70 @@ function ensureMigrations() {
     }
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_done_at ON tasks(done_at)");
 
+    // Migration: Remove workspace CHECK constraint (SQLite requires table recreation)
+    // Check if constraint exists by looking at table SQL
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get() as { sql: string } | undefined;
+    if (tableInfo && tableInfo.sql.includes("CHECK (workspace IN") && !tableInfo.sql.includes("'finance'")) {
+        // First, fix any NULL timestamps in existing data
+        db.exec(`
+            UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL OR created_at = '';
+            UPDATE tasks SET updated_at = COALESCE(NULLIF(updated_at,''), created_at, datetime('now')) WHERE updated_at IS NULL OR updated_at = '';
+        `);
+
+        db.exec(`
+            -- Cleanup any leftover from previous failed migration
+            DROP TABLE IF EXISTS tasks_new;
+            
+            -- Step 1: Create new table without workspace CHECK constraint
+            CREATE TABLE tasks_new (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                workspace TEXT NOT NULL DEFAULT 'avacrm',
+                status TEXT NOT NULL DEFAULT 'inbox' CHECK (status IN ('inbox','planned','done')),
+                scheduled_date TEXT NULL,
+                schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning','afternoon','evening','none') OR schedule_bucket IS NULL),
+                start_time TEXT NULL,
+                end_time TEXT NULL,
+                priority INTEGER NULL,
+                notes TEXT NULL,
+                doc_id TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                done_at TEXT NULL
+            );
+            
+            -- Step 2: Copy data with explicit columns and COALESCE for timestamps
+            INSERT INTO tasks_new (id, title, workspace, status, scheduled_date, schedule_bucket, start_time, end_time, priority, notes, doc_id, created_at, updated_at, done_at)
+            SELECT 
+                id, title, workspace, status, scheduled_date, schedule_bucket, start_time, end_time, priority, notes, doc_id,
+                COALESCE(NULLIF(created_at,''), datetime('now')) AS created_at,
+                COALESCE(NULLIF(updated_at,''), NULLIF(created_at,''), datetime('now')) AS updated_at,
+                done_at 
+            FROM tasks;
+            
+            -- Step 3: Drop old table
+            DROP TABLE tasks;
+            
+            -- Step 4: Rename new table
+            ALTER TABLE tasks_new RENAME TO tasks;
+            
+            -- Step 5: Recreate indexes
+            CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+            CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace);
+            CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_date ON tasks(scheduled_date);
+            CREATE INDEX IF NOT EXISTS idx_tasks_bucket ON tasks(schedule_bucket);
+            CREATE INDEX IF NOT EXISTS idx_tasks_done_at ON tasks(done_at);
+            
+            -- Step 6: Recreate trigger
+            CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
+            AFTER UPDATE ON tasks
+            FOR EACH ROW
+            BEGIN
+                UPDATE tasks SET updated_at = datetime('now') WHERE id = OLD.id;
+            END;
+        `);
+    }
+
     migrated = true;
 }
 
@@ -85,8 +149,30 @@ function ensureDocsAndAttachments() {
     }
 }
 
+function ensureEvents() {
+    // Run consistently to ensure table and new indexes exist
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS events (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT,
+            all_day INTEGER DEFAULT 0,
+            kind TEXT DEFAULT 'appointment',
+            workspace TEXT,
+            description TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_events_start_time ON events(start_time);
+        -- Optimized Composite Index: Filter by workspace -> Range scan by start_time
+        CREATE INDEX IF NOT EXISTS idx_events_workspace_start_time ON events(workspace, start_time);
+    `);
+}
+
 // Run migrations on init
 ensureSchema();
 ensureMigrations();
 ensureDocsAndAttachments();
+ensureEvents();
 

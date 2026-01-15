@@ -1,13 +1,16 @@
 "use client";
 import { useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import type { ScheduleBucket, Task, Workspace } from "@/lib/types";
+import { type ScheduleBucket, type Task } from "@/lib/types";
+import { type Workspace, WORKSPACES } from "@/lib/workspaces";
 import { getTasks, patchTask, type GetTasksParams } from "@/lib/api";
 import { useTaskEditor } from "@/hooks/useTaskEditor";
 import TaskDetailDialog from "@/components/TaskDetailDialog";
 import TaskTitleInlineEdit from "@/components/TaskTitleInlineEdit";
 import TaskDeleteButton from "@/components/TaskDeleteButton";
 import { toErrorMessage } from "@/lib/error";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 type PlannerFilter = "overdue" | "upcoming" | null;
 
@@ -78,6 +81,8 @@ export default function PlannerClient() {
                     q,
                     limit: 300,
                     cutoff_date: date, // use current date state as cutoff
+                    // NEW: upcoming inclusive
+                    inclusive: filter === "upcoming",
                 };
                 const rows = await getTasks(params);
                 setPlanned(rows);
@@ -152,34 +157,25 @@ export default function PlannerClient() {
 
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-                <div>
-                    <h1 style={{ fontSize: 42, margin: 0 }}>Planner</h1>
-                    <div style={{ marginTop: 6, color: "#555" }}>
-                        เลือกวัน → ดึงจาก Inbox มาวาง → ย้าย bucket/ย้ายวัน → Done
-                    </div>
-                </div>
-
-                <button
-                    onClick={load}
-                    style={{
-                        border: "1px solid #111",
-                        borderRadius: 8,
-                        padding: "10px 16px",
-                        background: "#fff",
-                        cursor: "pointer",
-                    }}
-                >
-                    Refresh
-                </button>
-            </div>
+        <PageShell>
+            <PageHeader
+                title="Planner"
+                subtitle="เลือกวัน → ดึงจาก Inbox มาวาง → ย้าย bucket/ย้ายวัน → Done"
+                actions={
+                    <button
+                        onClick={load}
+                        className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-medium hover:bg-neutral-50 transition-colors bg-white text-neutral-700"
+                    >
+                        Refresh
+                    </button>
+                }
+            />
 
             {/* Controls */}
             <div
                 style={{
-                    marginTop: 18,
-                    border: "1px solid #111",
+                    marginTop: 0,
+                    border: "1px solid #e5e7eb",
                     borderRadius: 12,
                     padding: 16,
                     display: "flex",
@@ -196,11 +192,7 @@ export default function PlannerClient() {
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        style={{
-                            border: "1px solid #111",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                        }}
+                        className="border border-neutral-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-black transition-colors"
                     />
                 </div>
 
@@ -209,12 +201,12 @@ export default function PlannerClient() {
                     <select
                         value={workspace}
                         onChange={(e) => setWorkspace(e.target.value as "all" | Workspace)}
-                        style={{ border: "1px solid #111", borderRadius: 8, padding: "8px 10px", minWidth: 140 }}
+                        className="border border-neutral-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-black transition-colors min-w-[140px]"
                     >
                         <option value="all">All</option>
-                        <option value="avacrm">avaCRM</option>
-                        <option value="ops">ops</option>
-                        <option value="content">content</option>
+                        {WORKSPACES.map(w => (
+                            <option key={w} value={w}>{w}</option>
+                        ))}
                     </select>
                 </div>
 
@@ -224,36 +216,29 @@ export default function PlannerClient() {
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
                         placeholder="ค้นหา title / workspace / id"
-                        style={{ width: "100%", border: "1px solid #111", borderRadius: 8, padding: "8px 10px" }}
+                        className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black transition-colors"
                     />
                 </div>
 
                 <button
                     onClick={load}
-                    style={{
-                        border: "1px solid #111",
-                        borderRadius: 8,
-                        padding: "10px 16px",
-                        background: "#111827",
-                        color: "#fff",
-                        cursor: "pointer",
-                    }}
+                    className="rounded-lg bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-black transition-colors self-end mb-0.5"
                 >
                     Apply
                 </button>
 
-                <div style={{ color: "#555", fontSize: 12 }}>
+                <div className="text-xs text-neutral-500 ml-auto self-end mb-2">
                     {loading ? "Loading..." : err ? `Error: ${err}` : `Planned: ${planned.length} | Inbox: ${inbox.length}`}
                 </div>
             </div>
 
             {/* Unbucketed Alert */}
             {plannedByBucket.none && plannedByBucket.none.length > 0 && (
-                <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 12, border: "1px solid #fcd34d", background: "#fffbeb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ fontSize: 13, color: "#92400e" }}>
+                <div className="mt-4 p-4 rounded-xl border border-yellow-200 bg-yellow-50 flex justify-between items-center text-yellow-800">
+                    <div className="text-sm">
                         <b>⚠️ พบงานที่ยังไม่ได้ระบุช่วงเวลา ({plannedByBucket.none.length} รายการ):</b> กรุณาย้ายงานลง Bucket เพื่อให้แสดงในตารางแผนงาน
                     </div>
-                    <div style={{ display: "flex", gap: 8, overflowX: "auto", maxWidth: "60%" }}>
+                    <div className="flex gap-2 overflow-x-auto max-w-[60%]">
                         {plannedByBucket.none.map(t => (
                             <div
                                 key={t.id}
@@ -263,8 +248,7 @@ export default function PlannerClient() {
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") openEditor(t);
                                 }}
-                                className="cursor-pointer hover:bg-white"
-                                style={{ padding: "4px 8px", background: "#fff", border: "1px solid #fcd34d", borderRadius: 6, fontSize: 11, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}
+                                className="cursor-pointer hover:bg-white bg-white/50 border border-yellow-300 rounded px-2 py-1 text-xs whitespace-nowrap flex items-center gap-2"
                             >
                                 <TaskTitleInlineEdit
                                     id={t.id}
@@ -289,7 +273,7 @@ export default function PlannerClient() {
                                     <select
                                         value="none"
                                         onChange={(e) => movePlanned(t, { schedule_bucket: e.target.value as ScheduleBucket })}
-                                        style={{ border: "none", fontSize: 10, background: "#f3f4f6", borderRadius: 4, cursor: "pointer" }}
+                                        className="border-none text-[10px] bg-neutral-100 rounded cursor-pointer"
                                     >
                                         <option value="none" disabled>ย้าย...</option>
                                         <option value="morning">Morning</option>
@@ -304,21 +288,21 @@ export default function PlannerClient() {
             )}
 
             {/* Layout: Inbox pool + Day columns */}
-            <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 16, marginTop: 16 }}>
+            <div className="grid grid-cols-[420px_1fr] gap-4 mt-4">
                 {/* Inbox Pool */}
-                <div style={{ border: "1px solid #111", borderRadius: 12, padding: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <div style={{ fontWeight: 700 }}>Inbox Pool</div>
-                        <div style={{ color: "#555", fontSize: 12 }}>({inbox.length})</div>
+                <div className="border border-neutral-200 rounded-xl p-4 bg-white">
+                    <div className="flex justify-between items-baseline mb-2">
+                        <div className="font-bold text-neutral-800">Inbox Pool</div>
+                        <div className="text-xs text-neutral-500">({inbox.length})</div>
                     </div>
 
-                    <div style={{ marginTop: 10, color: "#555", fontSize: 12 }}>
+                    <div className="text-xs text-neutral-500 mb-3">
                         Tip: กด Plan (Morning/Afternoon/Evening) เพื่อวางลงวันที่เลือก
                     </div>
 
-                    <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div className="flex flex-col gap-2.5">
                         {inbox.length === 0 ? (
-                            <div style={{ color: "#777", padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
+                            <div className="text-neutral-400 p-3 border border-neutral-100 rounded-lg text-sm italic text-center">
                                 ไม่มีงานใน Inbox (หรือโดน filter)
                             </div>
                         ) : (
@@ -331,8 +315,7 @@ export default function PlannerClient() {
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") openEditor(t);
                                     }}
-                                    style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12, cursor: "pointer" }}
-                                    className="hover:bg-gray-50 transition-colors"
+                                    className="border border-neutral-200 rounded-lg p-3 cursor-pointer hover:bg-neutral-50 transition-colors bg-white group"
                                 >
                                     <div className="flex items-center gap-2">
                                         <TaskTitleInlineEdit
@@ -357,12 +340,12 @@ export default function PlannerClient() {
                                             </span>
                                         )}
                                     </div>
-                                    <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
+                                    <div className="text-xs text-neutral-400 mt-1">
                                         workspace: {t.workspace} • id: {t.id.slice(0, 8)}…
                                     </div>
 
                                     <div
-                                        style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}
+                                        className="flex gap-2 mt-2 flex-wrap"
                                         onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
@@ -370,19 +353,19 @@ export default function PlannerClient() {
                                     >
                                         <button
                                             onClick={() => planFromInbox(t, "morning")}
-                                            style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 10px", cursor: "pointer", backgroundColor: "white" }}
+                                            className="border border-neutral-200 rounded px-2 py-1 text-xs hover:bg-neutral-100 bg-white text-neutral-600"
                                         >
                                             Plan Morning
                                         </button>
                                         <button
                                             onClick={() => planFromInbox(t, "afternoon")}
-                                            style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 10px", cursor: "pointer", backgroundColor: "white" }}
+                                            className="border border-neutral-200 rounded px-2 py-1 text-xs hover:bg-neutral-100 bg-white text-neutral-600"
                                         >
                                             Plan Afternoon
                                         </button>
                                         <button
                                             onClick={() => planFromInbox(t, "evening")}
-                                            style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 10px", cursor: "pointer", backgroundColor: "white" }}
+                                            className="border border-neutral-200 rounded px-2 py-1 text-xs hover:bg-neutral-100 bg-white text-neutral-600"
                                         >
                                             Plan Evening
                                         </button>
@@ -402,18 +385,18 @@ export default function PlannerClient() {
                 </div>
 
                 {/* Day plan columns */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+                <div className="grid grid-cols-3 gap-4">
                     {buckets.map((b) => (
-                        <div key={b.key} style={{ border: "1px solid #111", borderRadius: 12 }}>
-                            <div style={{ padding: 14, borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between" }}>
-                                <div style={{ fontWeight: 700 }}>{b.label}</div>
-                                <div style={{ color: "#555", fontSize: 12 }}>{plannedByBucket[b.key].length} tasks</div>
+                        <div key={b.key} className="border border-neutral-200 rounded-xl bg-white flex flex-col h-full">
+                            <div className="p-3 border-b border-neutral-100 flex justify-between items-center bg-neutral-50 rounded-t-xl">
+                                <div className="font-bold text-sm text-neutral-800">{b.label}</div>
+                                <div className="text-xs text-neutral-500">{plannedByBucket[b.key].length} tasks</div>
                             </div>
 
-                            <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div className="p-3 flex flex-col gap-2.5 flex-1 min-h-0 overflow-y-auto">
                                 {plannedByBucket[b.key].length === 0 ? (
-                                    <div style={{ color: "#777", border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
-                                        ยังไม่มีงานในช่วงนี้
+                                    <div className="text-neutral-400 text-xs italic text-center py-4 border border-dashed border-neutral-100 rounded-lg">
+                                        Empty
                                     </div>
                                 ) : (
                                     plannedByBucket[b.key].map((t) => (
@@ -425,8 +408,7 @@ export default function PlannerClient() {
                                             onKeyDown={(e) => {
                                                 if (e.key === "Enter") openEditor(t);
                                             }}
-                                            style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12, cursor: "pointer" }}
-                                            className="hover:bg-gray-50 transition-colors"
+                                            className="border border-neutral-200 rounded-lg p-3 cursor-pointer hover:bg-neutral-50 transition-colors bg-white group shadow-sm"
                                         >
                                             <div className="flex items-center gap-2">
                                                 <TaskTitleInlineEdit
@@ -451,12 +433,12 @@ export default function PlannerClient() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
-                                                workspace: {t.workspace}
+                                            <div className="text-[10px] text-neutral-400 mt-1">
+                                                {t.workspace}
                                             </div>
 
                                             <div
-                                                style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}
+                                                className="flex gap-2 mt-2 flex-wrap items-center opacity-0 group-hover:opacity-100 transition-opacity"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                 }}
@@ -467,7 +449,7 @@ export default function PlannerClient() {
                                                     onChange={(e) =>
                                                         movePlanned(t, { schedule_bucket: e.target.value as ScheduleBucket })
                                                     }
-                                                    style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 10px", backgroundColor: "white" }}
+                                                    className="border border-neutral-200 rounded px-1 py-0.5 text-[10px] bg-white text-neutral-600 focus:outline-none"
                                                 >
                                                     <option value="morning">morning</option>
                                                     <option value="afternoon">afternoon</option>
@@ -480,7 +462,7 @@ export default function PlannerClient() {
                                                         e.stopPropagation();
                                                         markDone(t);
                                                     }}
-                                                    style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 10px", cursor: "pointer", backgroundColor: "white" }}
+                                                    className="border border-neutral-200 rounded px-2 py-0.5 text-[10px] bg-white hover:bg-green-50 text-green-700 hover:border-green-200"
                                                 >
                                                     Done
                                                 </button>
@@ -490,7 +472,7 @@ export default function PlannerClient() {
                                                         e.stopPropagation();
                                                         backToInbox(t);
                                                     }}
-                                                    style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 10px", cursor: "pointer", backgroundColor: "white" }}
+                                                    className="border border-neutral-200 rounded px-2 py-0.5 text-[10px] bg-white hover:bg-neutral-100 text-neutral-600"
                                                 >
                                                     Inbox
                                                 </button>
@@ -512,8 +494,8 @@ export default function PlannerClient() {
                 </div>
             </div>
 
-            <div style={{ marginTop: 14, color: "#555", fontSize: 12 }}>
-                หมายเหตุ: Planner นี้ใช้แนวคิด “Inbox Pool → วางลงวัน + bucket” เพื่อให้วางงานข้ามวันได้จริง โดยไม่ต้องไปแก้ Inbox ให้ซับซ้อนก่อน
+            <div className="mt-6 text-neutral-400 text-xs text-center pb-8 border-t border-neutral-100 pt-4">
+                Planner v2.0 • Drag and drop support coming soon maybe?
             </div>
 
             <TaskDetailDialog
@@ -527,6 +509,6 @@ export default function PlannerClient() {
                     load();
                 }}
             />
-        </div>
+        </PageShell>
     );
 }

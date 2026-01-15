@@ -6,7 +6,9 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { toErrorMessage } from "@/lib/error";
 
-const Workspace = z.enum(["avacrm", "ops", "content"]);
+import { WORKSPACES, normalizeWorkspace } from "@/lib/workspaces";
+
+const Workspace = z.enum(WORKSPACES);
 const Status = z.enum(["inbox", "planned", "done"]);
 const Bucket = z.enum(["none", "morning", "afternoon", "evening"]);
 
@@ -46,6 +48,9 @@ export async function GET(req: NextRequest) {
         const filter = url.searchParams.get("filter");
         const cutoff_date = url.searchParams.get("cutoff_date");
 
+        // NEW: inclusive flag (accept "1" or "true")
+        const inclusive = ["1", "true"].includes((url.searchParams.get("inclusive") ?? "").toLowerCase());
+
         // normalize cutoff
         const cutoffOk = !!(cutoff_date && isDateYYYYMMDD(cutoff_date));
         if (cutoffOk) bind.cutoff_date = cutoff_date;
@@ -57,12 +62,15 @@ export async function GET(req: NextRequest) {
             // strict: only planned tasks
             where.push("status = 'planned'");
             where.push("scheduled_date IS NOT NULL");
+            // keep overdue strict to avoid overlapping "today"
             where.push(`scheduled_date < ${cutoffExpr}`);
         } else if (filter === "upcoming") {
             // strict: only planned tasks
             where.push("status = 'planned'");
             where.push("scheduled_date IS NOT NULL");
-            where.push(`scheduled_date > ${cutoffExpr}`);
+            // NEW: inclusive affects upcoming only
+            const op = inclusive ? ">=" : ">";
+            where.push(`scheduled_date ${op} ${cutoffExpr}`);
         }
 
         const isSpecialFilter = filter === "overdue" || filter === "upcoming";
@@ -153,9 +161,9 @@ export async function POST(req: NextRequest) {
     try {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
-        // Normalize workspace to lowercase if present
+        // Normalize workspace using central logic
         if (body && typeof body.workspace === "string") {
-            body.workspace = body.workspace.toLowerCase();
+            body.workspace = normalizeWorkspace(body.workspace);
         }
 
         const parsed = CreateTaskSchema.safeParse(body);

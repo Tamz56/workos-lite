@@ -2,76 +2,90 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import RestoreBackupButton from "@/components/RestoreBackupButton";
+import {
+    CalendarIcon,
+    ChartBarIcon,
+    FolderIcon,
+    HomeIcon,
+    InboxIcon, // Changed from ClipboardIcon to InboxIcon for Inbox
+    Cog6ToothIcon // Settings icon
+} from "@heroicons/react/24/outline";
 
-const nav = [
-    { href: "/dashboard", label: "Dashboard" },
-    { href: "/inbox", label: "Inbox" },
-    { href: "/today", label: "Today" },
-    { href: "/done", label: "Done" },
-    { href: "/planner", label: "Planner" },
-    { href: "/docs", label: "Docs" },
-];
+// Helper for consistent Nav Items
+function NavItem(props: { href: string; icon: React.ReactNode; label: string; active?: boolean }) {
+    return (
+        <Link
+            href={props.href}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${props.active
+                ? "bg-neutral-900 text-white"
+                : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                }`}
+        >
+            {props.icon}
+            {props.label}
+        </Link>
+    );
+}
 
 export function Sidebar() {
     const pathname = usePathname();
 
     return (
-        <aside className="w-64 border-r bg-white">
-            <div className="p-4">
-                <div className="text-lg font-semibold leading-tight">ArborDesk</div>
-                <div className="text-xs text-gray-500">WorkOS-Lite</div>
+        <aside className="w-64 bg-white border-r border-neutral-200 shadow-[1px_0_0_rgba(0,0,0,0.03)] flex flex-col h-screen sticky top-0 z-40">
+            {/* Logo */}
+            <div className="h-16 flex items-center px-6 border-b border-neutral-100 mb-4">
+                <div className="flex flex-col leading-none">
+                    <span className="text-lg font-bold text-neutral-900">ArborDesk</span>
+                    <span className="text-[10px] text-neutral-400 font-medium tracking-wide">WorkOS-Lite</span>
+                </div>
             </div>
 
-            <nav className="px-2 pb-4">
-                <ul className="space-y-1">
-                    {nav.map((n) => {
-                        const active = pathname === n.href;
-                        return (
-                            <li key={n.href}>
-                                <Link
-                                    href={n.href}
-                                    className={[
-                                        "block rounded-md px-3 py-2 text-sm transition",
-                                        active ? "bg-gray-900 text-white" : "text-gray-700 hover:bg-gray-100",
-                                    ].join(" ")}
-                                >
-                                    {n.label}
-                                </Link>
-                            </li>
-                        );
-                    })}
-                </ul>
-
-                <div className="mt-4 border-t pt-4 px-3 flex flex-col">
-                    <a
-                        href="/api/export-zip"
-                        className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-neutral-50 transition"
-                    >
-                        Export Backup (ZIP)
-                    </a>
-                    <div className="mt-1 text-[11px] text-gray-400 text-center">
-                        backup.json + attachments
-                    </div>
-
-                    <a
-                        href="/api/export"
-                        className="mt-4 inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-neutral-50 transition border-dashed"
-                    >
-                        Export Metadata (JSON)
-                    </a>
-                    <div className="mt-1 text-[11px] text-gray-400 text-center">
-                        tasks, docs & clips
-                    </div>
-                </div>
-
-                <div className="mt-2 border-t pt-2 px-3">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-                        Data Management
-                    </div>
-                    <RestoreBackupButton />
-                </div>
+            {/* Navigation */}
+            <nav className="flex-1 px-4 space-y-1">
+                <NavItem
+                    href="/dashboard"
+                    label="Command Center"
+                    icon={<HomeIcon className="w-5 h-5" />}
+                    active={pathname === "/dashboard"}
+                />
+                <NavItem
+                    href="/planner"
+                    label="Planner"
+                    icon={<CalendarIcon className="w-5 h-5" />}
+                    active={pathname === "/planner"}
+                />
+                <NavItem
+                    href="/inbox"
+                    label="Inbox"
+                    icon={<InboxIcon className="w-5 h-5" />}
+                    active={pathname === "/inbox"}
+                />
+                <NavItem
+                    href="/workspaces"
+                    label="Workspaces"
+                    icon={<ChartBarIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/workspaces")}
+                />
+                <NavItem
+                    href="/docs"
+                    label="Docs"
+                    icon={<FolderIcon className="w-5 h-5" />}
+                    active={pathname === "/docs"}
+                />
             </nav>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-neutral-100">
+                <NavItem
+                    href="/settings"
+                    label="Settings"
+                    icon={<Cog6ToothIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/settings")}
+                />
+            </div>
         </aside>
     );
 }
+
+// Default export as well for flexibility
+export default Sidebar;

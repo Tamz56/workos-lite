@@ -1,10 +1,10 @@
-import { Metadata } from "next";
+import { Suspense } from "react";
 import DashboardClient from "./DashboardClient";
 
-export const metadata: Metadata = {
-    title: "Dashboard | WorkOS",
-};
-
 export default function DashboardPage() {
-    return <DashboardClient />;
+    return (
+        <Suspense fallback={<div className="p-6 text-neutral-400">Loading dashboard…</div>}>
+            <DashboardClient />
+        </Suspense>
+    );
 }

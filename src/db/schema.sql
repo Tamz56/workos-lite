@@ -5,7 +5,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS tasks (
   id            TEXT PRIMARY KEY,
   title         TEXT NOT NULL,
-  workspace     TEXT NOT NULL CHECK (workspace IN ('avacrm','ops','content')),
+  workspace     TEXT NOT NULL,
 
   status        TEXT NOT NULL CHECK (status IN ('inbox','planned','done')),
 
