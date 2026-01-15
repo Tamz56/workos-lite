@@ -1,8 +1,16 @@
 "use client";
 
+import TaskEditorDialog from "@/components/TaskDetailDialog";
+import BulkTaskDialog from "@/components/BulkTaskDialog";
 import Link from "next/link";
-import { WORKSPACES, workspaceLabel, type Workspace } from "@/lib/workspaces";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { WORKSPACES, WORKSPACES_LIST, workspaceLabel, type Workspace } from "@/lib/workspaces";
+import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "@/lib/styles";
+import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
+import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon } from "lucide-react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useTaskEditor } from '@/hooks/useTaskEditor';
+import { getTasks, patchTask } from "@/lib/api";
+import { Task, TaskStatus } from "@/lib/types";
 import { STAGE_TAGS, ContentStage } from "@/lib/content/templates";
 import { getPipelineStage, listDocsByTaskId } from "@/lib/content/utils";
 import { createContentTask, createMissingContentDocs } from "@/lib/content/createContentTask";
@@ -11,14 +19,8 @@ import { createContentTask, createMissingContentDocs } from "@/lib/content/creat
 
 type ScheduleBucket = "morning" | "afternoon" | "evening";
 
-type TaskRow = {
-    id: string;
-    title: string;
-    workspace?: string | null;
-    scheduled_date?: string | null;
-    schedule_bucket?: ScheduleBucket | null;
-    status?: string | null;
-    tags?: string[];
+type DashboardTask = Task & {
+    tags: string[];
 };
 
 type CalendarEvent = {
@@ -58,7 +60,7 @@ function pickArray<T>(v: unknown): T[] {
     if (typeof v === "object" && v !== null) {
         const candidates = ["events", "docs", "rows", "data", "items", "result", "tasks"];
         for (const k of candidates) {
-            // @ts-ignore
+            // @ts-expect-error dynamic key access
             const maybe = v[k];
             if (Array.isArray(maybe)) return maybe as T[];
         }
@@ -72,26 +74,28 @@ async function fetchTasks(params: Record<string, string>) {
     const res = await fetch(`/api/tasks?${sp.toString()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`tasks: HTTP ${res.status} `);
     const data: unknown = await res.json();
-    const rows = pickArray<TaskRow>(data);
+    const rows = pickArray<Task>(data);
 
     // Client-side Tag Parsing (No DB changes)
-    return rows.map(t => {
+    return (rows as unknown as Task[]).map(t => {
         const matches = t.title.match(/(?:^|\s)(project:[\w-]+|#[\w-]+)/g);
         const tags = matches ? matches.map(s => s.trim()) : [];
-        return { ...t, tags };
+        return { ...t, tags } as DashboardTask;
     });
 }
 
-function mapEventRow(raw: any): CalendarEvent {
+type EventRow = Record<string, unknown>;
+
+function mapEventRow(raw: EventRow): CalendarEvent {
     return {
-        id: String(raw.id || ""),
-        workspace: String(raw.workspace || ""),
-        title: String(raw.title || ""),
+        id: String(raw.id ?? ""),
+        workspace: String(raw.workspace ?? ""),
+        title: String(raw.title ?? ""),
         all_day: raw.all_day === 1 || raw.all_day === true,
-        start_time: String(raw.start_time || ""),
-        end_time: raw.end_time ? String(raw.end_time) : null,
-        kind: raw.kind ? String(raw.kind) : null,
-        description: raw.description ? String(raw.description) : null,
+        start_time: String(raw.start_time ?? ""),
+        end_time: raw.end_time != null ? String(raw.end_time) : null,
+        kind: raw.kind != null ? String(raw.kind) : null,
+        description: raw.description != null ? String(raw.description) : null,
     };
 }
 
@@ -101,7 +105,7 @@ async function fetchEvents(params: Record<string, string>) {
     const res = await fetch(`/api/events?${sp.toString()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`events: HTTP ${res.status} `);
     const raw: unknown = await res.json();
-    return pickArray<any>(raw).map(mapEventRow);
+    return pickArray<unknown>(raw).map(r => mapEventRow((r ?? {}) as EventRow));
 }
 
 async function fetchDocs(params: Record<string, string>) {
@@ -162,7 +166,7 @@ function StatBadge(props: { value: number; label: string; colorClass: string; hr
 
 function WorkspaceCard(props: {
     workspace: Workspace;
-    tasks: TaskRow[];
+    tasks: DashboardTask[];
     onQuickAdd: (ws: Workspace) => void;
     todayYmd: string;
     className?: string;
@@ -217,7 +221,7 @@ function WorkspaceCard(props: {
                         <span>🔥 Attention Needed</span>
                     </div>
                     {overdueList.map(t => (
-                        <Link key={t.id} href={`/planner?q=${encodeURIComponent(t.title)}`} className="flex items-center gap-2 text-xs py-1.5 border-b border-neutral-50 last:border-0 hover:bg-red-50 px-1 -mx-1 rounded group">
+                        <Link key={t.id} href={`?taskId=${t.id}`} scroll={false} replace className="flex items-center gap-2 text-xs py-1.5 border-b border-neutral-50 last:border-0 hover:bg-red-50 px-1 -mx-1 rounded group">
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                             <span className="truncate flex-1 font-medium text-neutral-800 group-hover:text-red-700">{t.title}</span>
                             <span className="text-[9px] text-red-400 font-mono">{t.scheduled_date?.slice(5)}</span>
@@ -231,11 +235,11 @@ function WorkspaceCard(props: {
                 <div className="space-y-1">
                     <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5">Next Up</div>
                     {topTasks.map(t => (
-                        <div key={t.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-neutral-50 last:border-0 hover:bg-neutral-50 px-1 -mx-1 rounded group">
+                        <Link key={t.id} href={`?taskId=${t.id}`} scroll={false} replace className="flex items-center gap-2 text-xs py-1.5 border-b border-neutral-50 last:border-0 hover:bg-neutral-50 px-1 -mx-1 rounded group">
                             <span className={`w-1.5 h-1.5 rounded-full ${t.scheduled_date && t.scheduled_date === todayYmd ? 'bg-green-500' : 'bg-neutral-300'}`} />
                             <span className="truncate flex-1 font-medium text-neutral-700 group-hover:text-black">{t.title}</span>
                             {t.scheduled_date && <span className="text-[9px] text-neutral-400">{t.scheduled_date.slice(5)}</span>}
-                        </div>
+                        </Link>
                     ))}
                     {topTasks.length === 0 && <div className="text-center text-xs text-neutral-400 py-4 italic">All caught up! 🎉</div>}
                 </div>
@@ -244,12 +248,115 @@ function WorkspaceCard(props: {
     );
 }
 
-// Hybrid Calendar Widget: Agenda (Left) + Mini Month (Right) + Legacy Upcoming List
-function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOpenGCal?: () => void }) {
-    const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(props.todayYmd);
+// Helper for Tabbed Feed
+function addDays(d: Date, days: number) {
+    const x = new Date(d);
+    x.setDate(x.getDate() + days);
+    return x;
+}
 
-    // Group events by YYYY-MM-DD
+type CalendarFeedMode = "today" | "tomorrow" | "upcoming";
+
+// --- New Components for PR 8.4 ---
+
+function AgendaCardBig(props: { events: CalendarEvent[]; className?: string; todayYmd: string }) {
+    const [feedMode, setFeedMode] = useState<CalendarFeedMode>("today");
+
+    const feedEvents = useMemo(() => {
+        const today = new Date();
+        const todayYmd = toYmdLocal(today);
+        const tomorrowYmd = toYmdLocal(addDays(today, 1));
+        const upcomingEnd = addDays(today, 30);
+        const upcomingEndYmd = toYmdLocal(upcomingEnd);
+
+        // Enrich with local YMD for safe comparison
+        const all = props.events.map(e => ({
+            ...e,
+            _localYmd: toYmdLocal(new Date(e.start_time))
+        }));
+
+        let targetEvents = [];
+
+        if (feedMode === "today") {
+            targetEvents = all.filter(e => e._localYmd === todayYmd);
+        } else if (feedMode === "tomorrow") {
+            targetEvents = all.filter(e => e._localYmd === tomorrowYmd);
+        } else {
+            // Upcoming: Today -> 30 Days (Inclusive)
+            targetEvents = all.filter(e => e._localYmd >= todayYmd && e._localYmd <= upcomingEndYmd);
+        }
+
+        return targetEvents.sort((a, b) => a.start_time.localeCompare(b.start_time));
+    }, [props.events, feedMode]);
+
+    return (
+        <Card title="Agenda" className={`flex flex-col ${props.className || ""}`} right={
+            <div className="flex items-center gap-1 bg-neutral-50 p-1 rounded-lg">
+                {(["today", "tomorrow", "upcoming"] as const).map(mode => (
+                    <button
+                        key={mode}
+                        onClick={() => setFeedMode(mode)}
+                        className={`
+                            px-3 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md transition-all
+                            ${feedMode === mode ? 'bg-white text-black shadow-sm ring-1 ring-black/5' : 'text-neutral-500 hover:text-neutral-700'}
+                        `}
+                    >
+                        {mode}
+                    </button>
+                ))}
+            </div>
+        }>
+            <div className="flex flex-col h-full overflow-hidden">
+                <div className="text-xs text-neutral-400 mb-3 ml-1">
+                    {feedMode === "today" ? "Today's Schedule" : feedMode === "tomorrow" ? "Tomorrow's Schedule" : "Next 30 Days"}
+                </div>
+
+                <div className="flex-1 overflow-y-auto min-h-0 pr-1 space-y-2 scrollbar-thin">
+                    {feedEvents.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-neutral-400 py-10">
+                            <div className="text-2xl mb-2 opacity-50">🏝️</div>
+                            <div className="text-sm italic">No {feedMode} events</div>
+                        </div>
+                    ) : (
+                        feedEvents.map((e) => (
+                            <div key={e.id} className="py-3 flex items-start gap-4 p-3 rounded-xl border border-neutral-100 hover:border-neutral-200 hover:bg-neutral-50 transition-colors group">
+                                <div className="w-12 shrink-0 rounded-lg border border-neutral-200 bg-white text-center py-2 group-hover:border-neutral-300 transition-colors">
+                                    <div className="text-[9px] uppercase font-bold text-neutral-400 leading-none mb-0.5">
+                                        {new Date(e.start_time).toLocaleString("en-US", { month: "short" })}
+                                    </div>
+                                    <div className="text-lg font-bold leading-none text-neutral-900">
+                                        {new Date(e.start_time).getDate()}
+                                    </div>
+                                </div>
+
+                                <div className="min-w-0 flex-1 pt-0.5">
+                                    <div className="text-sm font-semibold truncate text-neutral-900 leading-tight">{e.title}</div>
+                                    <div className="text-xs text-neutral-500 mt-1 flex items-center gap-2">
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold ${e.all_day ? 'bg-blue-50 text-blue-600' : 'bg-neutral-100 text-neutral-600'}`}>
+                                            {e.all_day ? "All Day" : fmtTimeLocal(e.start_time)}
+                                        </span>
+                                        {e.workspace && <span className="text-[10px] text-neutral-400">• {workspaceLabel(e.workspace as Workspace)}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-neutral-50 flex justify-end">
+                    <Link href="/calendar" className="text-xs font-medium text-neutral-500 hover:text-neutral-900 flex items-center gap-1">
+                        View Full Calendar <span>→</span>
+                    </Link>
+                </div>
+            </div>
+        </Card>
+    );
+}
+
+function MiniMonthCard(props: { events: CalendarEvent[]; todayYmd: string; onOpenGCal?: () => void; className?: string }) {
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+
+    // Group events for dots
     const eventsByDate = useMemo(() => {
         const map: Record<string, CalendarEvent[]> = {};
         props.events.forEach(e => {
@@ -260,7 +367,6 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
         return map;
     }, [props.events]);
 
-    // Generate calendar grid (6 weeks max)
     const calendarDays = useMemo(() => {
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
@@ -268,19 +374,12 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
         const lastDay = new Date(year, month + 1, 0);
 
         const days = [];
-        // Add padding for start of week (Sunday=0)
-        for (let i = 0; i < firstDay.getDay(); i++) {
-            days.push({ day: 0, date: '', inMonth: false });
-        }
-        // Add days of month
+        for (let i = 0; i < firstDay.getDay(); i++) days.push({ day: 0, date: '', inMonth: false });
         for (let i = 1; i <= lastDay.getDate(); i++) {
             const date = `${year}-${pad2(month + 1)}-${pad2(i)}`;
             days.push({ day: i, date: date, inMonth: true });
         }
-        // Fill remaining slots
-        while (days.length % 7 !== 0) {
-            days.push({ day: 0, date: '', inMonth: false });
-        }
+        while (days.length % 7 !== 0) days.push({ day: 0, date: '', inMonth: false });
         return days;
     }, [currentMonth]);
 
@@ -288,133 +387,58 @@ function CalendarWidget(props: { events: CalendarEvent[]; todayYmd: string; onOp
         const next = new Date(currentMonth);
         next.setMonth(currentMonth.getMonth() + delta);
         setCurrentMonth(next);
-        // Default select 1st of new month if not today
-        const ymd = toYmdLocal(next).slice(0, 8) + "01";
-        if (toYmdLocal(new Date()).startsWith(toYmdLocal(next).slice(0, 7))) {
-            setSelectedDate(toYmdLocal(new Date())); // Keep today if valid
-        } else {
-            setSelectedDate(ymd);
-        }
     };
 
-    const selectedEvents = eventsByDate[selectedDate] || [];
-
-    // Filter for Legacy List (Global upcoming)
-    const upcomingEvents = useMemo(() => {
-        return props.events
-            .filter(e => e.start_time >= props.todayYmd) // Future or today events
-            .sort((a, b) => a.start_time.localeCompare(b.start_time))
-            .slice(0, 5); // Take top 5
-    }, [props.events, props.todayYmd]);
-
     return (
-        <Card title="Calendar" className="h-full flex flex-col" right={
+        <Card title="Calendar" className={`flex flex-col ${props.className || ""}`} right={
             props.onOpenGCal ? (
                 <button onClick={props.onOpenGCal} className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition-colors flex items-center gap-1">
                     <span>📅</span> GCal
                 </button>
             ) : null
         }>
-            {/* Top Section: Agenda (Left) + Month (Right) */}
-            <div className="flex flex-col md:flex-row gap-6 mb-6 flex-1 min-h-0">
-
-                {/* Left: Selected Date Agenda (Expanded) */}
-                <div className="flex-1 flex flex-col pt-4 md:pt-0 min-w-0 order-2 md:order-1">
-                    <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">
-                        {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                    </div>
-
-                    <div className="space-y-2 overflow-y-auto flex-1 pr-1 max-h-[220px] scrollbar-thin">
-                        {selectedEvents.length === 0 && (
-                            <div className="text-center text-sm text-neutral-400 py-4 italic flex flex-col items-center">
-                                <span className="text-xl mb-1 opacity-50">🏝️</span>
-                                No events
-                            </div>
-                        )}
-                        {selectedEvents.sort((a, b) => a.start_time.localeCompare(b.start_time)).map(ev => (
-                            <div key={ev.id} className="group flex gap-3 items-start p-2 rounded-lg hover:bg-neutral-50 border border-transparent hover:border-neutral-100 transition-all">
-                                <div className="w-10 text-center pt-0.5">
-                                    <div className="text-[10px] font-bold text-neutral-900">{ev.all_day ? "ALL" : fmtTimeLocal(ev.start_time).slice(11)}</div>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-medium text-neutral-800 truncate leading-snug">{ev.title}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+            <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-4 px-2">
+                    <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-neutral-100 rounded text-neutral-500">◀</button>
+                    <span className="text-sm font-bold text-neutral-800">
+                        {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </span>
+                    <button onClick={() => changeMonth(1)} className="p-1 hover:bg-neutral-100 rounded text-neutral-500">▶</button>
                 </div>
 
-                {/* Right: Mini Month (Fixed Width) */}
-                <div className="flex-none w-full md:w-[260px] flex flex-col md:border-l md:border-neutral-100 pl-0 md:pl-6 order-1 md:order-2">
-                    <div className="flex items-center justify-between mb-3 px-1">
-                        <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-neutral-100 rounded text-neutral-500">◀</button>
-                        <span className="text-sm font-bold text-neutral-800">
-                            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                        </span>
-                        <button onClick={() => changeMonth(1)} className="p-1 hover:bg-neutral-100 rounded text-neutral-500">▶</button>
-                    </div>
-
-                    <div className="grid grid-cols-7 text-center mb-1">
-                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <div key={d} className="text-[10px] font-bold text-neutral-400 py-1">{d}</div>)}
-                    </div>
-                    <div className="grid grid-cols-7 gap-y-1 gap-x-1 flex-1 content-start">
-                        {calendarDays.map((d, i) => {
-                            if (!d.inMonth) return <div key={i} />;
-                            const isToday = d.date === props.todayYmd;
-                            const isSelected = d.date === selectedDate;
-                            const hasEvents = eventsByDate[d.date]?.length > 0;
-
-                            return (
-                                <button key={i}
-                                    onClick={() => setSelectedDate(d.date)}
-                                    className={`
-                                        aspect-square rounded-lg flex flex-col items-center justify-center relative transition-all
-                                        ${isSelected ? 'bg-black text-white shadow-md' : 'hover:bg-neutral-50 text-neutral-700'}
-                                        ${isToday && !isSelected ? 'bg-neutral-100 text-black font-bold ring-1 ring-inset ring-neutral-200' : ''}
-                                    `}
-                                >
-                                    <span className="text-xs leading-none">{d.day}</span>
-                                    {hasEvents && (
-                                        <span className={`absolute bottom-1.5 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-red-500'}`} />
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
+                <div className="grid grid-cols-7 text-center mb-2">
+                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <div key={d} className="text-[10px] font-bold text-neutral-400 py-1">{d}</div>)}
                 </div>
-            </div>
 
-            {/* Bottom Section: Divider & Legacy List */}
-            <div className="border-t border-neutral-100 pt-4 mt-auto flex-none">
-                <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Upcoming (Next 30 Days)</span>
-                    <Link href="/calendar" className="text-[10px] font-medium text-neutral-500 hover:text-black">Full Calendar →</Link>
-                </div>
-                <div className="space-y-2">
-                    {upcomingEvents.map(ev => (
-                        <div key={ev.id} className="flex gap-3 items-center p-2 hover:bg-neutral-50 rounded-lg transition-colors border border-transparent hover:border-neutral-100">
-                            <div className="flex-none text-center min-w-[32px] bg-neutral-50 border border-neutral-100 rounded p-1">
-                                <div className="text-[8px] uppercase font-bold text-neutral-500">{new Date(ev.start_time).toLocaleDateString('en-US', { month: 'short' })}</div>
-                                <div className="text-sm font-bold leading-none text-neutral-900">{new Date(ev.start_time).getDate()}</div>
+                <div className="grid grid-cols-7 gap-1 flex-1 content-start">
+                    {calendarDays.map((d, i) => {
+                        if (!d.inMonth) return <div key={i} />;
+                        const isToday = d.date === props.todayYmd;
+                        const hasEvents = eventsByDate[d.date]?.length > 0;
+
+                        return (
+                            <div key={i}
+                                className={`
+                                    aspect-square rounded-lg flex flex-col items-center justify-center relative transition-all cursor-default
+                                    ${isToday ? 'bg-neutral-900 text-white font-bold shadow-md' : 'text-neutral-700 hover:bg-neutral-50'}
+                                `}
+                            >
+                                <span className="text-xs leading-none">{d.day}</span>
+                                {hasEvents && !isToday && (
+                                    <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-red-500" />
+                                )}
                             </div>
-                            <div className="min-w-0 flex-1">
-                                <div className="text-xs font-medium truncate text-neutral-800">{ev.title}</div>
-                                <div className="text-[10px] text-neutral-400 flex items-center gap-1">
-                                    {ev.all_day ? "All Day" : fmtTimeLocal(ev.start_time)}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    {upcomingEvents.length === 0 && <div className="text-center text-xs text-neutral-400 py-2">No upcoming events</div>}
+                        );
+                    })}
                 </div>
             </div>
         </Card>
     );
 }
 
-function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
+function ProjectTimeline(props: { tasks: DashboardTask[]; todayYmd: string; className?: string }) {
     const projects = useMemo(() => {
-        const map = new Map<string, TaskRow[]>();
+        const map = new Map<string, DashboardTask[]>();
         props.tasks.forEach(t => {
             if (t.status === 'done') return;
             const projTag = t.tags?.find(tag => tag.startsWith("project:"));
@@ -443,7 +467,7 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
     const totalScheduled = projects.reduce((acc, [_, items]) => acc + items.length, 0);
 
     if (projects.length === 0) return (
-        <Card title="Project Timeline" className="h-full min-h-[150px] flex items-center justify-center">
+        <Card title="Project Timeline" className={`h-full min-h-[150px] flex items-center justify-center ${props.className || ""}`}>
             <div className="text-center">
                 <div className="text-neutral-300 text-2xl mb-1">📊</div>
                 <div className="text-xs text-neutral-400">No active projects (tag: <code>project:name</code>)</div>
@@ -452,7 +476,7 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
     );
 
     return (
-        <Card title={`Project Timeline (14 Days)`} right={<span className="text-[10px] text-neutral-400 font-normal">{totalProjects} Projects, {totalScheduled} Tasks</span>} className="h-full overflow-x-auto">
+        <Card title={`Project Timeline (14 Days)`} right={<span className="text-[10px] text-neutral-400 font-normal">{totalProjects} Projects, {totalScheduled} Tasks</span>} className={`h-full overflow-x-auto ${props.className || ""}`}>
             <div className="min-w-full">
                 <div className="grid grid-cols-[100px_1fr] gap-3 mb-2 border-b border-neutral-100 pb-1">
                     <div className="text-[9px] uppercase font-bold text-neutral-400 self-end">Project</div>
@@ -494,7 +518,7 @@ function ProjectTimeline(props: { tasks: TaskRow[]; todayYmd: string }) {
     );
 }
 
-function OtherWorkspacesList(props: { tasks: TaskRow[]; todayYmd: string }) {
+function OtherWorkspacesList(props: { tasks: DashboardTask[]; todayYmd: string; className?: string }) {
     const workspaces: Workspace[] = ['finance', 'travel', 'admin', 'personal', 'other'];
 
     const rows = workspaces.map(w => {
@@ -510,7 +534,7 @@ function OtherWorkspacesList(props: { tasks: TaskRow[]; todayYmd: string }) {
     });
 
     return (
-        <Card title="Other Workspaces" className="h-full flex flex-col">
+        <Card title="Other Workspaces" className={`flex flex-col ${props.className || ""}`}>
             <div className="flex-1 space-y-3 pt-1">
                 {rows.map(({ w, activeCount, nextTask }) => (
                     <Link key={w} href={`/planner?workspace=${w}`} className="grid grid-cols-[80px_40px_1fr] gap-3 items-center group hover:bg-neutral-50 -mx-2 px-2 py-1.5 rounded-lg transition-colors">
@@ -560,13 +584,98 @@ function Modal(props: { open: boolean; title: string; onClose: () => void; child
     );
 }
 
+// --- Action Helper ---
+function ActionBtn(props: { icon: LucideIcon; label: string; onClick: () => void; className?: string }) {
+    const Icon = props.icon;
+    return (
+        <button
+            onClick={props.onClick}
+            className={`inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90 transition-all active:scale-95 ${props.className || ""}`}
+        >
+            <Icon className="h-4 w-4" />
+            <span>{props.label}</span>
+        </button>
+    );
+}
+
+function ActionBar() {
+    const router = useRouter();
+
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <ActionBtn
+                icon={PlusSquare}
+                label="New Task"
+                onClick={() => router.push("/dashboard?newTask=1")}
+            />
+
+            <ActionBtn
+                icon={FileText}
+                label="New Doc"
+                onClick={() => router.push("/docs?newDoc=1")}
+            />
+
+            <ActionBtn
+                icon={CalendarPlus}
+                label="New Event"
+                onClick={() => router.push("/dashboard?newEvent=1")}
+            />
+
+            <div className="w-px h-6 bg-neutral-200 mx-2" />
+
+            <ActionBtn
+                icon={Zap}
+                label="Bulk Paste"
+                onClick={() => router.push("/dashboard?bulkPaste=1")}
+            />
+
+            <ActionBtn
+                icon={LayoutGrid}
+                label="Open Planner"
+                onClick={() => router.push("/planner")}
+            />
+        </div>
+    );
+}
+
 // --- Main Dashboard ---
 
 export default function DashboardClient() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <DashboardContent />
+        </Suspense>
+    );
+}
+
+function DashboardContent() {
     const todayYmd = useMemo(() => toYmdLocal(new Date()), []);
+    const sp = useSearchParams();
+    const router = useRouter();
+
+    // Controlled Modals
+    const [isBulkOpen, setIsBulkOpen] = useState(false);
+    const [isNewEventOpen, setIsNewEventOpen] = useState(false);
+    const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+
+    useEffect(() => {
+        if (sp.get("bulkPaste") === "1") {
+            setIsBulkOpen(true);
+            router.replace("/dashboard");
+        }
+        if (sp.get("newEvent") === "1") {
+            setIsNewEventOpen(true);
+            router.replace("/dashboard");
+        }
+        if (sp.get("newTask") === "1") {
+            setIsNewTaskOpen(true);
+            router.replace("/dashboard");
+        }
+    }, [sp, router]);
+
     const [loading, setLoading] = useState(true);
 
-    const [tasks, setTasks] = useState<TaskRow[]>([]);
+    const [tasks, setTasks] = useState<DashboardTask[]>([]);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [docs, setDocs] = useState<DocRow[]>([]);
     const [health, setHealth] = useState<{ ok: boolean; status: string } | null>(null);
@@ -577,8 +686,43 @@ export default function DashboardClient() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [qaWorkspace, setQaWorkspace] = useState<Workspace>("content");
-    const [taskAddToToday, setTaskAddToToday] = useState(true);
-    const [taskBucket, setTaskBucket] = useState<ScheduleBucket>("morning");
+
+    // New Event State
+    const [newEventTitle, setNewEventTitle] = useState("");
+    const [newEventDate, setNewEventDate] = useState(todayYmd);
+
+    // New Task State Extended
+    const [newTaskTitle, setNewTaskTitle] = useState("");
+    const [newTaskWs, setNewTaskWs] = useState<Workspace>("avacrm");
+    const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>("inbox");
+    const [newTaskDate, setNewTaskDate] = useState(todayYmd);
+    const [newTaskPriority, setNewTaskPriority] = useState(2);
+    const [newTaskNotes, setNewTaskNotes] = useState("");
+
+    // Content Specific State
+    const [contentTab, setContentTab] = useState<"details" | "content">("details");
+    const [contentProject, setContentProject] = useState("");
+    const [contentStage, setContentStage] = useState<ContentStage>(STAGE_TAGS[0]);
+    const [contentPlatforms, setContentPlatforms] = useState<string[]>([]);
+
+    const togglePlatform = (p: string) => {
+        setContentPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+    };
+
+    // Active Task for Detail Modal (Link from WorkspaceCard)
+    const taskIdParam = sp.get("taskId");
+    const activeTask = useMemo(() => {
+        if (!taskIdParam) return null;
+        // Search in all loaded tasks
+        return tasks.find(t => t.id === taskIdParam) || null;
+    }, [tasks, taskIdParam]);
+
+    const handleCloseTaskDetail = useCallback(() => {
+        const params = new URLSearchParams(sp.toString());
+        params.delete("taskId");
+        router.replace(params.toString() ? `/dashboard?${params.toString()}` : "/dashboard", { scroll: false });
+    }, [sp, router]);
+
 
     const refreshAll = useCallback(async () => {
         setLoading(true);
@@ -605,7 +749,7 @@ export default function DashboardClient() {
     useEffect(() => { refreshAll(); }, [refreshAll]);
 
     const wsTasks = useMemo(() => {
-        const grouped: Record<string, TaskRow[]> = {};
+        const grouped: Record<string, DashboardTask[]> = {};
         WORKSPACES.forEach(w => grouped[w] = []);
         tasks.forEach(t => {
             if (t.workspace && grouped[t.workspace]) grouped[t.workspace].push(t);
@@ -615,10 +759,81 @@ export default function DashboardClient() {
     }, [tasks]);
 
     const handleQuickAddTask = (w: Workspace) => {
-        setQaWorkspace(w);
-        setQuickAdd("task");
-        setQaTitle("");
-        setQaErr(null);
+        setNewTaskWs(w);
+        // Reset defaults
+        setNewTaskStatus("inbox");
+        setNewTaskDate(todayYmd);
+        setNewTaskPriority(2);
+        setNewTaskNotes("");
+
+        // Reset Content defaults
+        setContentTab("details");
+        setContentProject("");
+        setContentStage(STAGE_TAGS[0]);
+        setContentPlatforms([]);
+
+        // Open
+        setIsNewTaskOpen(true);
+    };
+
+    const handleCreateTask = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newTaskTitle.trim() || isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            let finalTitle = newTaskTitle.trim();
+
+            // Compose Content Title
+            if (newTaskWs === 'content') {
+                const parts = [];
+                if (contentProject.trim()) parts.push(`project:${contentProject.trim()}`);
+                parts.push(finalTitle);
+                if (contentStage && contentStage !== STAGE_TAGS[0]) parts.push(`#${contentStage}`); // contentStage is already like 'stage:script'
+                contentPlatforms.forEach(p => parts.push(`#${p}`));
+                finalTitle = parts.join(" ");
+            }
+
+            await postJson("/api/tasks", {
+                title: finalTitle,
+                workspace: newTaskWs,
+                status: newTaskStatus,
+                scheduled_date: newTaskStatus === 'planned' ? (newTaskDate || todayYmd) : null,
+                priority: newTaskPriority,
+                notes: newTaskNotes
+            });
+            await refreshAll();
+            setIsNewTaskOpen(false);
+            setNewTaskTitle("");
+        } catch (err) {
+            alert("Failed to create task");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleCreateEvent = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newEventTitle.trim()) return;
+        setIsSubmitting(true);
+        try {
+            // Very basic event creation used for POC
+            await fetch("/api/events", {
+                method: "POST",
+                body: JSON.stringify({
+                    title: newEventTitle,
+                    start_time: newEventDate + "T09:00:00Z",
+                    end_time: newEventDate + "T10:00:00Z",
+                    workspace: "personal"
+                })
+            });
+            await refreshAll();
+            setIsNewEventOpen(false);
+            setNewEventTitle("");
+        } catch (e) {
+            alert("Failed to create event");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleCreateContentTemplate = async (e: React.FormEvent) => {
@@ -631,8 +846,9 @@ export default function DashboardClient() {
             await refreshAll();
             setQuickAdd(null);
             setQaTitle("");
-        } catch (err: any) {
-            setQaErr(err.message || "Failed");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            setQaErr(msg || "Failed");
         } finally {
             setIsSubmitting(false);
         }
@@ -645,152 +861,255 @@ export default function DashboardClient() {
     const openGCal = hasGCalEmbed ? () => window.open(process.env.NEXT_PUBLIC_GCAL_EMBED_URL, '_blank') : undefined;
 
     return (
-        <div className="w-full px-4 md:px-6 2xl:px-10 py-6 space-y-6 animate-in fade-in duration-500 flex flex-col min-h-screen">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+        <div className="w-full px-6 2xl:px-10 py-8">
+            {/* Header with Action Bar */}
+            <div className="flex items-start justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold font-display tracking-tight text-neutral-900">Dashboard <span className="text-neutral-300 font-light">v2.1</span></h1>
+                    <h1 className="text-3xl font-bold font-display tracking-tight text-neutral-900">Dashboard</h1>
                     <div className="text-sm text-neutral-500 font-medium mt-1">
                         {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() => refreshAll()} className="p-2.5 bg-white border border-neutral-200 hover:bg-neutral-50 rounded-xl text-neutral-500 hover:text-black transition-colors shadow-sm" title="Refresh">🔄</button>
-                    <Link href="/planner" className="rounded-xl bg-neutral-900 text-white px-5 py-2.5 text-sm font-medium hover:bg-black shadow-lg hover:-translate-y-0.5 transition-all">
-                        Open Planner
-                    </Link>
-                </div>
+                <ActionBar />
             </div>
 
-            {/* Row 1: Timeline (Left) + Calendar (Right) */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start justify-items-stretch">
-                {/* Timeline: 8 Cols */}
-                <div className="xl:col-span-8 h-full flex flex-col min-w-0">
-                    <ProjectTimeline tasks={tasks} todayYmd={todayYmd} />
+            {/* Main Grid Layout - Strict 12 Cols */}
+            <div className="grid grid-cols-12 gap-6">
+
+                {/* Row 1: Timeline (8) + Agenda (4) */}
+                <div className="col-span-12 xl:col-span-8">
+                    <ProjectTimeline tasks={tasks} todayYmd={todayYmd} className="h-full min-h-[360px]" />
+                </div>
+                <div className="col-span-12 xl:col-span-4">
+                    <AgendaCardBig events={events} todayYmd={todayYmd} className="h-full min-h-[360px]" />
                 </div>
 
-                {/* Calendar: 4 Cols */}
-                <div className="xl:col-span-4 h-full flex flex-col min-w-0">
-                    <CalendarWidget events={events} todayYmd={todayYmd} onOpenGCal={openGCal} />
-                </div>
-            </div>
-
-            {/* Row 2: Workspaces */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch justify-items-stretch">
-                {/* Main Cards: 8 Cols */}
-                <div className="xl:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-6 min-w-0 h-full">
-                    <WorkspaceCard workspace="avacrm" tasks={wsTasks['avacrm']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
-                    <WorkspaceCard workspace="ops" tasks={wsTasks['ops']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
-                    <WorkspaceCard workspace="content" tasks={wsTasks['content']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} className="h-full" />
-                </div>
-                {/* Other Workspaces List: 4 Cols */}
-                <div className="xl:col-span-4 h-full flex flex-col min-w-0">
-                    <OtherWorkspacesList tasks={tasks} todayYmd={todayYmd} />
-                </div>
-            </div>
-
-            {/* Row 3: Footer Utils */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
-                <Card title="Quick Access" className="h-full bg-gradient-to-br from-white to-neutral-50/50">
-                    <div className="grid grid-cols-4 gap-4">
-                        <a href="https://gmail.com" target="_blank" className="aspect-square flex flex-col items-center justify-center p-2 rounded-xl border border-neutral-200 bg-white hover:border-red-200 hover:shadow-md transition-all group">
-                            <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">📧</span>
-                            <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-wide">Gmail</span>
-                        </a>
-                        <a href="https://calendar.google.com" target="_blank" className="aspect-square flex flex-col items-center justify-center p-2 rounded-xl border border-neutral-200 bg-white hover:border-blue-200 hover:shadow-md transition-all group">
-                            <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">📅</span>
-                            <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-wide">GCal</span>
-                        </a>
-                        <button disabled className="aspect-square flex flex-col items-center justify-center p-2 rounded-xl border border-neutral-100 bg-neutral-50 opacity-60 cursor-not-allowed">
-                            <span className="text-3xl mb-2 grayscale">💬</span>
-                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">Chat</span>
-                        </button>
+                {/* Row 2: Workspaces Inner Grid (8) + Mini Month (4) */}
+                <div className="col-span-12 xl:col-span-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+                        <WorkspaceCard className="h-full" workspace="avacrm" tasks={wsTasks['avacrm']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} />
+                        <WorkspaceCard className="h-full" workspace="ops" tasks={wsTasks['ops']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} />
+                        <WorkspaceCard className="h-full" workspace="content" tasks={wsTasks['content']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} />
                     </div>
-                </Card>
+                </div>
+                <div className="col-span-12 xl:col-span-4">
+                    <MiniMonthCard events={events} todayYmd={todayYmd} onOpenGCal={openGCal} className="h-full" />
+                </div>
 
-                <Card title="System Status" className="h-full border-l-4 border-l-green-500">
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className={`text-3xl ${health?.ok ? 'text-green-500' : 'text-red-500'}`}>{health?.ok ? '✅' : '⚠️'}</div>
-                        <div>
-                            <div className="text-base font-bold text-neutral-900">{health?.status || "Checking..."}</div>
-                            <div className="text-xs text-neutral-500">Database & API Services</div>
+                {/* Row 3: Other Workspaces (8) + System Status (4) - Strict Alignment */}
+                <div className="col-span-12 xl:col-span-8">
+                    <OtherWorkspacesList tasks={tasks} todayYmd={todayYmd} className="h-full flex flex-col" />
+                </div>
+                <div className="col-span-12 xl:col-span-4">
+                    <Card title="System Status" className="bg-neutral-50/50 h-full flex flex-col">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className={`w-3 h-3 rounded-full ${health?.ok ? 'bg-green-500' : 'bg-red-500'}`} />
+                            <div className="font-bold text-neutral-700">{health?.status || "Checking..."}</div>
                         </div>
-                        <div className="ml-auto text-xs font-mono bg-neutral-100 px-2.5 py-1 rounded text-neutral-500">v2.2.0</div>
-                    </div>
-                    <div className="flex gap-3">
-                        <button onClick={() => window.location.href = "/api/export-zip"} className="flex-1 py-2.5 px-4 rounded-xl bg-neutral-900 text-white text-sm font-medium hover:bg-black hover:shadow-lg transition-all flex items-center justify-center gap-2">
-                            <span>💾</span> Backup
+                        <div className="text-xs text-neutral-500 mb-4">
+                            Database & Services are {health?.ok ? 'operational' : 'degraded'}.
+                        </div>
+                        <button disabled className="w-full py-2 bg-neutral-900 text-white rounded-lg text-xs font-bold opacity-80 hover:opacity-100 flex items-center justify-center gap-2 mt-auto">
+                            🔒 Backup
                         </button>
-                        <Link href="/settings/data" className="flex-1 py-2.5 px-4 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-medium hover:bg-neutral-50 transition-colors flex items-center justify-center gap-2">
-                            <span>⚙️</span> Config
-                        </Link>
-                    </div>
-                </Card>
+                        <div className="mt-2 text-[10px] text-center text-neutral-300">v2.2.0</div>
+                    </Card>
+                </div>
+
             </div>
 
             {/* Modals */}
-            <Modal open={quickAdd === "template"} title="New Content Project" onClose={() => setQuickAdd(null)}>
-                <form onSubmit={handleCreateContentTemplate} className="space-y-5">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-neutral-500">Project Title</label>
-                        <input autoFocus className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none transition-all placeholder:text-neutral-400" placeholder="e.g. iPhone 16 Review" value={qaTitle} onChange={(e) => setQaTitle(e.target.value)} />
+            <BulkTaskDialog
+                isOpen={isBulkOpen}
+                onClose={() => setIsBulkOpen(false)}
+                onSuccess={refreshAll}
+            />
+
+            {/* Quick Add Dialog */}
+            {quickAdd === "task" && (
+                <TaskEditorDialog
+                    isOpen={true}
+                    onClose={() => setQuickAdd(null)}
+                    task={{ id: "new", title: "", workspace: qaWorkspace } as Task}
+                    onUpdate={refreshAll}
+                />
+            )}
+
+            <Modal open={isNewEventOpen} title="New Event" onClose={() => setIsNewEventOpen(false)}>
+                <form onSubmit={handleCreateEvent} className="space-y-4">
+                    <div>
+                        <label className={LABEL_BASE}>Event Title</label>
+                        <input autoFocus className={INPUT_BASE} value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)} placeholder="Meeting with..." />
                     </div>
-                    {qaErr && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 flex items-center gap-2"><span>⚠️</span>{qaErr}</div>}
-                    <div className="flex justify-end gap-3 pt-2">
-                        <button type="button" className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50" onClick={() => setQuickAdd(null)}>Cancel</button>
-                        <button type="submit" disabled={isSubmitting} className="rounded-xl bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700 shadow-sm transition-all">{isSubmitting ? "Generating..." : "Create Project"}</button>
+                    <div>
+                        <label className={LABEL_BASE}>Date</label>
+                        <input type="date" className={INPUT_BASE} value={newEventDate} onChange={e => setNewEventDate(e.target.value)} />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button type="button" onClick={() => setIsNewEventOpen(false)} className={BUTTON_SECONDARY}>Cancel</button>
+                        <button type="submit" disabled={isSubmitting} className={BUTTON_PRIMARY}>{isSubmitting ? 'Saving...' : 'Create Event'}</button>
                     </div>
                 </form>
             </Modal>
 
-            <Modal open={quickAdd === "task"} title={`New Task: ${workspaceLabel(qaWorkspace)}`} onClose={() => setQuickAdd(null)}>
-                <form className="space-y-4" onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!qaTitle.trim() || isSubmitting) return;
-                    setIsSubmitting(true);
-                    setQaErr(null);
-                    try {
-                        const payload: any = { title: qaTitle, workspace: qaWorkspace };
-                        if (taskAddToToday) { payload.status = "planned"; payload.scheduled_date = todayYmd; payload.schedule_bucket = taskBucket; }
-                        else { payload.status = "inbox"; }
-                        await postJson("/api/tasks", payload);
-                        await refreshAll();
-                        setQaTitle("");
-                        setQuickAdd(null);
-                    } catch (err: any) { setQaErr(err.message || "Failed"); } finally { setIsSubmitting(false); }
-                }}>
-                    <div className="space-y-1.5">
-                        <div className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Task Title</div>
-                        <input className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-black focus:outline-none placeholder:text-neutral-400" value={qaTitle} onChange={(e) => setQaTitle(e.target.value)} placeholder="e.g., Follow up with client" autoFocus />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <div className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Workspace</div>
-                            <select className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-black focus:outline-none bg-white" value={qaWorkspace} onChange={(e) => setQaWorkspace(e.target.value as Workspace)}>
-                                {WORKSPACES.map((w) => <option key={w} value={w}>{workspaceLabel(w)}</option>)}
-                            </select>
-                        </div>
-                        <div className="space-y-1.5">
-                            <div className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Schedule</div>
-                            <label className="flex h-[42px] items-center gap-3 cursor-pointer text-sm font-medium border border-neutral-200 rounded-xl px-4 bg-white hover:border-neutral-300 transition-colors">
-                                <input type="checkbox" className="rounded border-neutral-300 text-black focus:ring-black" checked={taskAddToToday} onChange={(e) => setTaskAddToToday(e.target.checked)} /> Add to Today
-                            </label>
-                        </div>
-                    </div>
-                    {taskAddToToday && (
-                        <div className="space-y-1.5">
-                            <div className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Time Slot</div>
-                            <select className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-black focus:outline-none bg-white" value={taskBucket} onChange={(e) => setTaskBucket(e.target.value as any)}>
-                                <option value="morning">Morning</option>
-                                <option value="afternoon">Afternoon</option>
-                                <option value="evening">Evening</option>
-                            </select>
+            <Modal open={isNewTaskOpen} title="New Task" onClose={() => setIsNewTaskOpen(false)}>
+                <form onSubmit={handleCreateTask} className="space-y-4">
+
+                    {newTaskWs === 'content' && (
+                        <div className="flex border-b border-neutral-100 mb-4">
+                            <button type="button" onClick={() => setContentTab("details")} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${contentTab === 'details' ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-700'}`}>
+                                Details
+                            </button>
+                            <button type="button" onClick={() => setContentTab("content")} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${contentTab === 'content' ? 'border-purple-600 text-purple-700' : 'border-transparent text-neutral-500 hover:text-neutral-700'}`}>
+                                Content Fields
+                            </button>
                         </div>
                     )}
-                    {qaErr && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl border-red-100 flex items-center gap-2"><span>⚠️</span>{qaErr}</div>}
-                    <div className="flex justify-end gap-3 pt-3 border-t border-neutral-100">
-                        <button type="button" className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50" onClick={() => setQuickAdd(null)}>Cancel</button>
-                        <button type="submit" disabled={isSubmitting} className="rounded-xl bg-black px-6 py-2 text-sm font-medium text-white hover:bg-neutral-800 shadow-md hover:shadow-lg transition-all">{isSubmitting ? "Creating..." : "Create Task"}</button>
+
+                    <div className={contentTab === 'content' ? 'hidden' : 'space-y-4'}>
+                        <div>
+                            <label className={LABEL_BASE}>Task Title</label>
+                            <input
+                                autoFocus
+                                type="text"
+                                placeholder="What needs to be done?"
+                                className={INPUT_BASE}
+                                value={newTaskTitle}
+                                onChange={e => setNewTaskTitle(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_BASE}>Workspace</label>
+                                <select
+                                    className={INPUT_BASE}
+                                    value={newTaskWs}
+                                    onChange={e => setNewTaskWs(e.target.value as Workspace)}
+                                >
+                                    {WORKSPACES_LIST.map(w => (
+                                        <option key={w.id} value={w.id}>{w.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className={LABEL_BASE}>Status</label>
+                                <select
+                                    className={INPUT_BASE}
+                                    value={newTaskStatus}
+                                    onChange={e => setNewTaskStatus(e.target.value as TaskStatus)}
+                                >
+                                    <option value="inbox">Inbox</option>
+                                    <option value="planned">Planned</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {newTaskStatus === "planned" && (
+                            <div className="animate-in fade-in slide-in-from-top-1">
+                                <label className={LABEL_BASE}>Scheduled Date</label>
+                                <input
+                                    type="date"
+                                    className={INPUT_BASE}
+                                    value={newTaskDate}
+                                    onChange={e => setNewTaskDate(e.target.value)}
+                                />
+                            </div>
+                        )}
+
+                        <div>
+                            <label className={LABEL_BASE}>Priority</label>
+                            <select
+                                className={INPUT_BASE}
+                                value={newTaskPriority}
+                                onChange={e => setNewTaskPriority(Number(e.target.value))}
+                            >
+                                <option value={1}>Low</option>
+                                <option value={2}>Normal</option>
+                                <option value={3}>High</option>
+                                <option value={4}>Urgent</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className={LABEL_BASE}>Notes</label>
+                            <textarea
+                                className={`${INPUT_BASE} min-h-[80px]`}
+                                value={newTaskNotes}
+                                onChange={e => setNewTaskNotes(e.target.value)}
+                                placeholder="Add details..."
+                            />
+                        </div>
+                    </div>
+
+                    {/* Content Tab Content */}
+                    {newTaskWs === 'content' && (
+                        <div className={contentTab === 'content' ? 'space-y-4 animate-in fade-in slide-in-from-right-2' : 'hidden'}>
+                            <div>
+                                <label className={LABEL_BASE}>Project ID</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Tech2024"
+                                    className={INPUT_BASE}
+                                    value={contentProject}
+                                    onChange={e => setContentProject(e.target.value)}
+                                />
+                                <p className="text-[10px] text-neutral-400 mt-1">Will be prefixed as <code>project:ID</code></p>
+                            </div>
+
+                            <div>
+                                <label className={LABEL_BASE}>Stage</label>
+                                <select className={INPUT_BASE} value={contentStage} onChange={e => setContentStage(e.target.value as ContentStage)}>
+                                    {STAGE_TAGS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className={LABEL_BASE}>Platforms</label>
+                                <div className="flex gap-2 mt-1">
+                                    {['fb', 'ig', 'yt', 'tk'].map(p => (
+                                        <button
+                                            key={p}
+                                            type="button"
+                                            onClick={() => togglePlatform(p)}
+                                            className={`px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-all ${contentPlatforms.includes(p)
+                                                ? 'bg-purple-100 border-purple-200 text-purple-700'
+                                                : 'bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300'
+                                                }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-neutral-50 mt-4">
+                        <button type="button" onClick={() => setIsNewTaskOpen(false)} className={BUTTON_SECONDARY}>Cancel</button>
+                        <button type="submit" disabled={isSubmitting} className={BUTTON_PRIMARY}>{isSubmitting ? 'Saving...' : 'Create Task'}</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Task Detail Modal (Controlled by ?taskId) */}
+            <TaskEditorDialog
+                isOpen={!!activeTask}
+                onClose={handleCloseTaskDetail}
+                task={activeTask}
+                onUpdate={refreshAll}
+            />
+
+            <Modal open={quickAdd === "template"} title="New Content Project" onClose={() => setQuickAdd(null)}>
+                <form onSubmit={handleCreateContentTemplate} className="space-y-5">
+                    <div className="space-y-1.5">
+                        <label className={LABEL_BASE}>Project Title</label>
+                        <input autoFocus className={INPUT_BASE} placeholder="e.g. iPhone 16 Review" value={qaTitle} onChange={(e) => setQaTitle(e.target.value)} />
+                    </div>
+                    {qaErr && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 flex items-center gap-2"><span>⚠️</span>{qaErr}</div>}
+                    <div className="flex justify-end gap-3 pt-2">
+                        <button type="button" className={BUTTON_SECONDARY} onClick={() => setQuickAdd(null)}>Cancel</button>
+                        <button type="submit" disabled={isSubmitting} className={BUTTON_PRIMARY}>{isSubmitting ? "Generating..." : "Create Project"}</button>
                     </div>
                 </form>
             </Modal>

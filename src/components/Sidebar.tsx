@@ -17,8 +17,8 @@ function NavItem(props: { href: string; icon: React.ReactNode; label: string; ac
         <Link
             href={props.href}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${props.active
-                    ? "bg-neutral-900 text-white"
-                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                ? "bg-neutral-900 text-white"
+                : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
                 }`}
         >
             {props.icon}
@@ -59,6 +59,12 @@ export function Sidebar() {
                     label="Inbox"
                     icon={<InboxIcon className="w-5 h-5" />}
                     active={pathname === "/inbox"}
+                />
+                <NavItem
+                    href="/workspaces"
+                    label="Workspaces"
+                    icon={<ChartBarIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/workspaces")}
                 />
                 <NavItem
                     href="/docs"

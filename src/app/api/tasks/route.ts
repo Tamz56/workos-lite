@@ -6,7 +6,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { toErrorMessage } from "@/lib/error";
 
-import { WORKSPACES } from "@/lib/workspaces";
+import { WORKSPACES, normalizeWorkspace } from "@/lib/workspaces";
 
 const Workspace = z.enum(WORKSPACES);
 const Status = z.enum(["inbox", "planned", "done"]);
@@ -161,9 +161,9 @@ export async function POST(req: NextRequest) {
     try {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
-        // Normalize workspace to lowercase if present
+        // Normalize workspace using central logic
         if (body && typeof body.workspace === "string") {
-            body.workspace = body.workspace.toLowerCase();
+            body.workspace = normalizeWorkspace(body.workspace);
         }
 
         const parsed = CreateTaskSchema.safeParse(body);

@@ -190,8 +190,12 @@ export async function POST(req: Request) {
                 summary = buildBackupSummary(d.tasks, d.events, d.docs, d.attachments);
             } else {
                 // metadata in ZIP (unusual but handle gracefully)
-                const d = (data as any).data;
-                summary = buildMetadataSummary(d?.tasks || [], d?.docs || [], d?.clips || []);
+                const d = (data as Record<string, unknown>).data as Record<string, unknown> | undefined;
+                summary = buildMetadataSummary(
+                    (d?.tasks ?? []) as unknown[],
+                    (d?.docs ?? []) as unknown[],
+                    (d?.clips ?? []) as unknown[]
+                );
             }
 
             const warnings = [...zipRes.warnings];

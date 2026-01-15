@@ -1,4 +1,5 @@
-export type Workspace = "avacrm" | "ops" | "content";
+import { Workspace } from "./workspaces";
+export { type Workspace };
 export type TaskStatus = "inbox" | "planned" | "done";
 export type ScheduleBucket = "morning" | "afternoon" | "evening" | "none";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 import { WORKSPACES, workspaceLabel, type Workspace } from "@/lib/workspaces";
@@ -70,18 +70,20 @@ const onChangeCheckbox =
         };
 
 
-function mapEventRow(raw: any): CalendarEvent {
+type EventRow = Record<string, unknown>;
+
+function mapEventRow(raw: EventRow): CalendarEvent {
     return {
-        id: String(raw.id || ""),
-        workspace: String(raw.workspace || ""),
-        title: String(raw.title || ""),
+        id: String(raw.id ?? ""),
+        workspace: String(raw.workspace ?? ""),
+        title: String(raw.title ?? ""),
         all_day: raw.all_day === 1 || raw.all_day === true,
-        start_time: String(raw.start_time || ""),
-        end_time: raw.end_time ? String(raw.end_time) : null,
-        kind: raw.kind ? String(raw.kind) : null,
-        description: raw.description ? String(raw.description) : null,
-        created_at: raw.created_at ? String(raw.created_at) : undefined,
-        updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
+        start_time: String(raw.start_time ?? ""),
+        end_time: raw.end_time != null ? String(raw.end_time) : null,
+        kind: raw.kind != null ? String(raw.kind) : null,
+        description: raw.description != null ? String(raw.description) : null,
+        created_at: raw.created_at != null ? String(raw.created_at) : undefined,
+        updated_at: raw.updated_at != null ? String(raw.updated_at) : undefined,
     };
 }
 
@@ -106,7 +108,7 @@ async function fetchEvents(params: {
 
     const j: unknown = await res.json();
     const arr = (isObject(j) && Array.isArray(j.events)) ? j.events : [];
-    return arr.map(mapEventRow);
+    return arr.map(r => mapEventRow(r as EventRow));
 }
 
 async function createEventApi(payload: CreateEventPayload): Promise<CalendarEvent> {
@@ -120,7 +122,7 @@ async function createEventApi(payload: CreateEventPayload): Promise<CalendarEven
 
     const j: unknown = await res.json();
     if (isObject(j) && j.event) {
-        return mapEventRow(j.event);
+        return mapEventRow(j.event as EventRow);
     }
     throw new Error("Invalid API response");
 }
@@ -229,7 +231,7 @@ function sanitizeTimeKeystroke(s: string) {
 
 // --- Component ---
 
-export default function CalendarClient() {
+function CalendarContent() {
     const sp = useSearchParams();
     const router = useRouter();
 
@@ -388,7 +390,7 @@ export default function CalendarClient() {
                             value={workspace}
                             onChange={(e) => {
                                 const v = e.target.value;
-                                setWorkspace(v as any);
+                                setWorkspace(v as Workspace | "all");
                             }}
                         >
                             <option value="all">All</option>
@@ -552,5 +554,13 @@ export default function CalendarClient() {
                 </div>
             ) : null}
         </div>
+    );
+}
+
+export default function CalendarClient() {
+    return (
+        <Suspense fallback={<div className="p-6">Loading calendar...</div>}>
+            <CalendarContent />
+        </Suspense>
     );
 }

@@ -1,5 +1,5 @@
-import DocsPageClient from "./DocsPageClient";
+import DocsClient from "./DocsClient";
 
 export default function DocsPage() {
-    return <DocsPageClient />;
+    return <DocsClient />;
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Task, Workspace, ScheduleBucket } from "@/lib/types";
 import { getTasks, createTask, patchTask } from "@/lib/api";
 import { todayISO, defaultBucketForWorkspace } from "@/lib/planning";
@@ -10,13 +10,10 @@ import TaskDetailDialog from "@/components/TaskDetailDialog";
 import TaskTitleInlineEdit from "@/components/TaskTitleInlineEdit";
 import TaskDeleteButton from "@/components/TaskDeleteButton";
 import { toErrorMessage } from "@/lib/error";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 
-
-const WORKSPACES: { value: Workspace; label: string }[] = [
-    { value: "avacrm", label: "avaCRM" },
-    { value: "ops", label: "Ops" },
-    { value: "content", label: "Content" },
-];
+import { WORKSPACES_LIST } from "@/lib/workspaces";
 
 export default function InboxClient() {
     const [title, setTitle] = useState("");
@@ -29,6 +26,18 @@ export default function InboxClient() {
     const { editingTask, setEditingTask, initialTab, openEditor, closeEditor } = useTaskEditor();
     const [planningIds, setPlanningIds] = useState<Set<string>>(new Set());
     const router = useRouter();
+    const sp = useSearchParams();
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Smart Link: Focus Quick Add if ?newTask=1
+    useEffect(() => {
+        if (sp.get("newTask") === "1") {
+            // Slight delay to ensure render
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
+        }
+    }, [sp]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -54,10 +63,7 @@ export default function InboxClient() {
         try {
             const newTask = await createTask({ title: t, workspace, status: "inbox" });
             setTitle("");
-            // Optimistic update (Instant Refresh)
             setTasks(prev => [newTask, ...prev]);
-
-            // Reload to ensure consistency
             await load();
         } catch (e: unknown) {
             setErr(`createTask failed: ${toErrorMessage(e)}`);
@@ -66,28 +72,19 @@ export default function InboxClient() {
 
     async function planToday(task: Task, bucket?: ScheduleBucket) {
         setErr(null);
-
-        // กันกดซ้ำ
         if (planningIds.has(task.id)) return;
-
         const b = bucket ?? defaultBucketForWorkspace(task.workspace) ?? "afternoon";
-
-        // optimistic remove พร้อม snapshot rollback
         setPlanningIds((prev) => new Set(prev).add(task.id));
         setTasks((prev) => prev.filter((x) => x.id !== task.id));
-
         try {
             await patchTask(task.id, {
                 status: "planned",
                 scheduled_date: todayISO(),
                 schedule_bucket: b,
             });
-
-            // ถ้าต้องการไม่ให้ back แล้วกลับมาหน้า inbox แบบงง ๆ ใช้ replace
             router.replace("/today");
             router.refresh();
         } catch (e: unknown) {
-            // rollback เฉพาะ task เดิมกลับเข้ารายการ (แทนการ load ทั้งหน้า)
             setTasks((prev) => [task, ...prev]);
             setErr(toErrorMessage(e));
         } finally {
@@ -108,36 +105,36 @@ export default function InboxClient() {
         }
     }
 
-
     const count = useMemo(() => tasks.length, [tasks]);
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-                <div>
-                    <h1 style={{ fontSize: 42, margin: 0 }}>Inbox</h1>
-                    <div style={{ marginTop: 6, color: "#555" }}>เก็บงานเข้า แล้วค่อย Plan ลง Today/Planner</div>
-                </div>
-
-                <button
-                    onClick={load}
-                    style={{ border: "1px solid #111", borderRadius: 8, padding: "10px 16px", background: "#fff", cursor: "pointer" }}
-                >
-                    Refresh
-                </button>
-            </div>
+        <PageShell>
+            <PageHeader
+                title="Inbox"
+                subtitle="เก็บงานเข้า แล้วค่อย Plan ลง Today/Planner"
+                actions={
+                    <button
+                        onClick={load}
+                        className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-medium hover:bg-neutral-50 transition-colors bg-white text-neutral-700"
+                    >
+                        Refresh
+                    </button>
+                }
+            />
 
             {/* Quick Add */}
-            <div style={{ marginTop: 18, border: "1px solid #111", borderRadius: 12, padding: 16 }}>
+            <div style={{ marginTop: 0, border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <div style={{ flex: 1, minWidth: 260 }}>
                         <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>Quick Add</div>
                         <input
+                            ref={inputRef}
                             value={title}
+                            autoFocus={true}
                             onChange={(e) => setTitle(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && add()}
                             placeholder='เช่น "Test Inbox"'
-                            style={{ width: "100%", border: "1px solid #111", borderRadius: 8, padding: "10px 12px" }}
+                            className="w-full rounded-lg border border-neutral-200 px-3 py-2.5 text-sm focus:border-black focus:outline-none transition-all placeholder:text-neutral-400"
                         />
                     </div>
 
@@ -146,10 +143,10 @@ export default function InboxClient() {
                         <select
                             value={workspace}
                             onChange={(e) => setWorkspace(e.target.value as Workspace)}
-                            style={{ width: "100%", border: "1px solid #111", borderRadius: 8, padding: "10px 12px" }}
+                            style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}
                         >
-                            {WORKSPACES.map((w) => (
-                                <option key={w.value} value={w.value}>
+                            {WORKSPACES_LIST.map((w) => (
+                                <option key={w.id} value={w.id}>
                                     {w.label}
                                 </option>
                             ))}
@@ -158,7 +155,7 @@ export default function InboxClient() {
 
                     <button
                         onClick={add}
-                        style={{ border: "1px solid #111", borderRadius: 8, padding: "10px 16px", background: "#111827", color: "#fff", cursor: "pointer", marginTop: 18 }}
+                        className="rounded-lg bg-neutral-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-black transition-colors mt-6"
                     >
                         Add
                     </button>
@@ -168,14 +165,14 @@ export default function InboxClient() {
             </div>
 
             {/* List */}
-            <div style={{ marginTop: 14, border: "1px solid #111", borderRadius: 12 }}>
-                <div style={{ padding: 14, borderBottom: "1px solid #111" }}>
-                    <div style={{ fontWeight: 700 }}>Tasks ({loading ? "…" : count})</div>
+            <div style={{ marginTop: 24, border: "1px solid #e5e7eb", borderRadius: 12 }}>
+                <div style={{ padding: 14, borderBottom: "1px solid #e5e7eb", backgroundColor: "#f9fafb", borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>Tasks ({loading ? "…" : count})</div>
                 </div>
 
                 <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
                     {tasks.length === 0 ? (
-                        <div style={{ color: "#777", padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>Inbox ว่างแล้วครับ</div>
+                        <div className="text-center py-10 text-neutral-400 italic">Inbox ว่างแล้วครับ</div>
                     ) : (
                         tasks.map((t) => (
                             <div
@@ -186,8 +183,8 @@ export default function InboxClient() {
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") openEditor(t);
                                 }}
-                                style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12, display: "flex", justifyContent: "space-between", gap: 12, cursor: "pointer" }}
-                                className="hover:bg-gray-50 transition-colors"
+                                style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, display: "flex", justifyContent: "space-between", gap: 12, cursor: "pointer" }}
+                                className="group hover:bg-neutral-50 hover:border-neutral-300 transition-all bg-white"
                             >
                                 <div>
                                     <div className="flex items-center gap-2">
@@ -213,7 +210,7 @@ export default function InboxClient() {
                                             </span>
                                         )}
                                     </div>
-                                    <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>workspace: {t.workspace}</div>
+                                    <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>workspace: {t.workspace}</div>
                                 </div>
 
                                 <div
@@ -228,7 +225,8 @@ export default function InboxClient() {
                                             planToday(t, "morning");
                                         }}
                                         disabled={planningIds.has(t.id)}
-                                        style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 11, opacity: planningIds.has(t.id) ? 0.5 : 1 }}
+                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-100 text-neutral-600"
+                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
                                     >
                                         Morning
                                     </button>
@@ -238,7 +236,8 @@ export default function InboxClient() {
                                             planToday(t, "afternoon");
                                         }}
                                         disabled={planningIds.has(t.id)}
-                                        style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 11, opacity: planningIds.has(t.id) ? 0.5 : 1 }}
+                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-100 text-neutral-600"
+                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
                                     >
                                         Afternoon
                                     </button>
@@ -248,7 +247,8 @@ export default function InboxClient() {
                                             planToday(t, "evening");
                                         }}
                                         disabled={planningIds.has(t.id)}
-                                        style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 11, opacity: planningIds.has(t.id) ? 0.5 : 1 }}
+                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-100 text-neutral-600"
+                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
                                     >
                                         Evening
                                     </button>
@@ -258,7 +258,8 @@ export default function InboxClient() {
                                             planToday(t, defaultBucketForWorkspace(t.workspace) ?? "afternoon");
                                         }}
                                         disabled={planningIds.has(t.id)}
-                                        style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 11, background: "#f3f4f6", opacity: planningIds.has(t.id) ? 0.5 : 1 }}
+                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-100 text-neutral-600 bg-neutral-50"
+                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
                                         title="ใช้ค่าเริ่มต้นตาม Workspace"
                                     >
                                         {planningIds.has(t.id) ? "..." : "Plan"}
@@ -270,7 +271,8 @@ export default function InboxClient() {
                                             markDone(t);
                                         }}
                                         disabled={planningIds.has(t.id)}
-                                        style={{ border: "1px solid #111", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 11, opacity: planningIds.has(t.id) ? 0.5 : 1 }}
+                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-green-50 text-green-700 hover:border-green-200"
+                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
                                     >
                                         Done
                                     </button>
@@ -287,7 +289,7 @@ export default function InboxClient() {
                         ))
                     )}
                 </div>
-            </div>
+            </div >
 
             <TaskDetailDialog
                 key={editingTask?.id}
@@ -300,6 +302,6 @@ export default function InboxClient() {
                     load();
                 }}
             />
-        </div>
+        </PageShell >
     );
 }
