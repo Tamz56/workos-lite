@@ -11,6 +11,40 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
+
+        // --- BULK UPDATE LOGIC ---
+        if (body.ids && Array.isArray(body.ids) && body.patch) {
+            const { ids, patch } = body;
+            if (ids.length === 0) return NextResponse.json({ ok: true, updated: 0 });
+
+            const db = getDb();
+            const now = new Date().toISOString();
+
+            const sets: string[] = [];
+            const bindValues: any[] = [];
+
+            if (patch.status !== undefined) { sets.push(`status = ?`); bindValues.push(patch.status); }
+            if (patch.schedule_bucket !== undefined) { sets.push(`schedule_bucket = ?`); bindValues.push(patch.schedule_bucket); }
+            if (patch.workspace !== undefined) { sets.push(`workspace = ?`); bindValues.push(normalizeWorkspace(patch.workspace as Workspace)); }
+
+            if (patch.notes_append) {
+                sets.push(`notes = COALESCE(notes, '') || ?`);
+                bindValues.push(patch.notes_append);
+            }
+
+            if (sets.length === 0) return NextResponse.json({ ok: true, updated: 0 });
+
+            sets.push(`updated_at = ?`);
+            bindValues.push(now);
+
+            const placeholders = ids.map(() => `?`).join(',');
+            const sql = `UPDATE tasks SET ${sets.join(", ")} WHERE id IN (${placeholders})`;
+            const info = db.prepare(sql).run(...bindValues, ...ids);
+
+            return NextResponse.json({ ok: true, updated: info.changes });
+        }
+
+        // --- EXISTING BATCH CREATE LOGIC ---
         const { tasks, options } = body as {
             tasks: ParsedTask[],
             options: { createContentDocs: boolean }

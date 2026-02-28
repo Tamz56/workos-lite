@@ -16,8 +16,10 @@ const CreateTaskSchema = z.object({
     title: z.string().min(1),
     workspace: Workspace.default("avacrm"),
     status: Status.default("inbox"),
-    scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    schedule_bucket: Bucket.optional(),
+    scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+    schedule_bucket: Bucket.optional().nullable(),
+    priority: z.number().int().optional().nullable(),
+    notes: z.string().optional().nullable(),
 });
 
 function isDateYYYYMMDD(s: string) {
@@ -185,12 +187,14 @@ export async function POST(req: NextRequest) {
       INSERT INTO tasks (
         id, title, workspace, status,
         scheduled_date, schedule_bucket,
+        priority, notes,
         created_at, updated_at,
         done_at
       )
       VALUES (
         @id, @title, @workspace, @status,
         @scheduled_date, @schedule_bucket,
+        @priority, @notes,
         @created_at, @updated_at,
         @done_at
       )
@@ -202,6 +206,8 @@ export async function POST(req: NextRequest) {
             status: t.status,
             scheduled_date: scheduledDate,
             schedule_bucket: bucket,
+            priority: t.priority ?? null,
+            notes: t.notes ?? null,
             created_at: now,
             updated_at: now,
             done_at: t.status === "done" ? now : null,

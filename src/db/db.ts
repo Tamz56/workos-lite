@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -170,9 +171,150 @@ function ensureEvents() {
     `);
 }
 
+// Required for /api/agent/execute functionality
+function ensureAgentTables() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_keys (
+          id          TEXT PRIMARY KEY,
+          name        TEXT NOT NULL UNIQUE,
+          key_hash    TEXT NOT NULL,
+          scopes_json TEXT NOT NULL,
+          is_enabled  INTEGER NOT NULL DEFAULT 1,
+          created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS agent_idempotency (
+          idempotency_key TEXT PRIMARY KEY,
+          agent_key_id    TEXT NOT NULL,
+          request_hash    TEXT NOT NULL,
+          response_json   TEXT NOT NULL,
+          created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(agent_key_id) REFERENCES agent_keys(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS agent_audit_log (
+          id           TEXT PRIMARY KEY,
+          agent_key_id TEXT NOT NULL,
+          action_type  TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          result_json  TEXT NOT NULL,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(agent_key_id) REFERENCES agent_keys(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_agent_audit_log_created_at ON agent_audit_log(created_at);
+        CREATE INDEX IF NOT EXISTS idx_agent_audit_log_action_created ON agent_audit_log(action_type, created_at);
+        CREATE INDEX IF NOT EXISTS idx_agent_audit_log_agent_created ON agent_audit_log(agent_key_id, created_at);
+    `);
+}
+
 // Run migrations on init
 ensureSchema();
 ensureMigrations();
 ensureDocsAndAttachments();
 ensureEvents();
+ensureAgentTables();
+
+function ensureProjectsAndSprints() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS projects (
+          id TEXT PRIMARY KEY,
+          slug TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('inbox', 'planned', 'done')),
+          start_date TEXT NULL,
+          end_date TEXT NULL,
+          owner TEXT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TRIGGER IF NOT EXISTS trg_projects_updated_at
+        AFTER UPDATE ON projects
+        FOR EACH ROW
+        BEGIN
+          UPDATE projects SET updated_at = datetime('now') WHERE id = OLD.id;
+        END;
+        CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+
+        CREATE TABLE IF NOT EXISTS project_items (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('inbox', 'planned', 'done')),
+          priority INTEGER NULL,
+          schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning', 'afternoon', 'evening', 'none') OR schedule_bucket IS NULL),
+          start_date TEXT NULL,
+          end_date TEXT NULL,
+          is_milestone INTEGER NOT NULL DEFAULT 0,
+          workstream TEXT NULL,
+          dod_text TEXT NULL,
+          notes TEXT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        CREATE TRIGGER IF NOT EXISTS trg_project_items_updated_at
+        AFTER UPDATE ON project_items
+        FOR EACH ROW
+        BEGIN
+          UPDATE project_items SET updated_at = datetime('now') WHERE id = OLD.id;
+        END;
+
+        CREATE INDEX IF NOT EXISTS idx_project_items_project_status ON project_items(project_id, status);
+        CREATE INDEX IF NOT EXISTS idx_project_items_project_start_date ON project_items(project_id, start_date);
+        CREATE INDEX IF NOT EXISTS idx_project_items_workstream ON project_items(project_id, workstream, start_date);
+
+        CREATE TABLE IF NOT EXISTS sprints (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'planned',
+          start_date TEXT NULL,
+          end_date TEXT NULL,
+          FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_sprints_project_start_date ON sprints(project_id, start_date);
+
+        CREATE TABLE IF NOT EXISTS sprint_items (
+          sprint_id TEXT NOT NULL,
+          project_item_id TEXT NOT NULL,
+          PRIMARY KEY (sprint_id, project_item_id),
+          FOREIGN KEY(sprint_id) REFERENCES sprints(id) ON DELETE CASCADE,
+          FOREIGN KEY(project_item_id) REFERENCES project_items(id) ON DELETE CASCADE
+        );
+    `);
+}
+
+function ensureSeedProjects() {
+    const defaultProjects = [
+        "avaone-q1",
+        "avaone-q1-sales",
+        "avaone-homeforest-q1",
+        "avafarm888-fb-content-q1",
+        "avaone-fb-content-q1",
+        "avaone-tiktok-q1"
+    ];
+
+    const insertStmt = db.prepare(`
+        INSERT INTO projects (id, slug, name, status, created_at, updated_at)
+        VALUES (@id, @slug, @name, 'planned', datetime('now'), datetime('now'))
+        ON CONFLICT(slug) DO NOTHING
+    `);
+
+    const runTx = db.transaction(() => {
+        for (const slug of defaultProjects) {
+            insertStmt.run({
+                id: crypto.randomUUID(),
+                slug: slug,
+                // Simple formatting for demonstration (e.g., 'avaone-q1' -> 'Avaone Q1')
+                name: slug.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase())
+            });
+        }
+    });
+
+    runTx();
+}
+
+ensureProjectsAndSprints();
+ensureSeedProjects();
 

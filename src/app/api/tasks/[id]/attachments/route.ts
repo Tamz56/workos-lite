@@ -5,9 +5,10 @@ import { db } from "@/db/db";
 import { nanoid } from "nanoid";
 import path from "path";
 import fs from "fs/promises";
+import { ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, getFileExtLower } from "@/lib/uploadRules";
 
-function uploadDir() {
-    return path.join(process.cwd(), ".workos-lite", "uploads");
+function uploadDir(taskId: string) {
+    return path.join(process.cwd(), "data", "uploads", taskId);
 }
 
 async function ensureDir(p: string) {
@@ -43,10 +44,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ error: "Missing file (field name: file)" }, { status: 400 });
     }
 
+    if (file.size > MAX_UPLOAD_BYTES) {
+        return NextResponse.json({ error: "File too large" }, { status: 400 });
+    }
+
+    const ext = getFileExtLower(file.name);
+    if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+        return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
+    }
+
     const id = nanoid();
     const now = new Date().toISOString();
 
-    const dir = uploadDir();
+    const dir = uploadDir(taskId);
     await ensureDir(dir);
 
     // store with safe name: <id>_<original>
@@ -59,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await fs.writeFile(absPath, buf);
 
     // Store RELATIVE path in DB
-    const relativePath = path.join("uploads", storedName);
+    const relativePath = path.join("uploads", taskId, storedName);
 
     db.prepare(
         `
