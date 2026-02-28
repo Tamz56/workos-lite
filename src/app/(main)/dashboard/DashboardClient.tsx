@@ -669,6 +669,7 @@ function ActionBar() {
 // --- Main Dashboard ---
 
 export default function DashboardClient() {
+    console.log("DashboardClient WORKSPACES_LIST:", WORKSPACES_LIST.map(w => w.id).join(","));
     return <DashboardContent />;
 }
 

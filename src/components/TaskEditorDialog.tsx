@@ -146,6 +146,8 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
         }
     };
 
+    console.log("TaskEditorDialog WORKSPACES_LIST:", WORKSPACES_LIST.map(w => w.id).join(","));
+
     return (
         <Modal open={isOpen} title="New Task" onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-4">
