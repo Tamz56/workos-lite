@@ -47,7 +47,7 @@ export default function ProjectDetailClient() {
     };
 
     if (loading) return <div className="p-6 text-sm text-neutral-500">Loading project details...</div>;
-    if (!project) return <div className="p-6 text-sm text-red-500">Project "{slug}" not found.</div>;
+    if (!project) return <div className="p-6 text-sm text-red-500">Project &quot;{slug}&quot; not found.</div>;
 
     const milestones = items.filter(i => i.is_milestone === 1);
     const otherItems = items.filter(i => i.is_milestone === 0);

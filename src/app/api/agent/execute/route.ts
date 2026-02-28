@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
                     throw new Error(`Forbidden scope for action ${a.type}: need ${need}`);
                 }
 
-                let result: any = { ok: true, type: a.type };
+                const result: any = { ok: true, type: a.type };
 
                 if (a.type === "task.create") {
                     const id = isDryRun ? `dry_${nanoid()}` : nanoid();
