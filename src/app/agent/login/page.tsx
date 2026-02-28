@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AgentLoginPage() {
+function AgentLoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [password, setPassword] = useState("");
@@ -12,6 +12,14 @@ export default function AgentLoginPage() {
 
     // Default to /agent or the redirect target
     const [nextUrl, setNextUrl] = useState("/agent");
+
+    const handleBack = () => {
+        if (window.history.length > 1) {
+            router.back();
+        } else {
+            router.push("/dashboard");
+        }
+    };
 
     useEffect(() => {
         const next = searchParams.get("next");
@@ -55,8 +63,13 @@ export default function AgentLoginPage() {
 
     return (
         <div className="w-full min-h-[80vh] flex items-center justify-center p-6 bg-neutral-50/50">
-            <div className="w-full max-w-sm bg-white border border-neutral-200/70 p-8 rounded-2xl shadow-sm">
-                <div className="text-center mb-8">
+            <div className="w-full max-w-sm bg-white border border-neutral-200/70 p-8 rounded-2xl shadow-sm relative">
+                <div className="absolute top-4 left-4">
+                    <button onClick={handleBack} className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200/70 rounded-md px-2 py-1 shadow-sm hover:bg-neutral-50 transition-colors">
+                        <span aria-hidden="true">&larr;</span> Back
+                    </button>
+                </div>
+                <div className="text-center mb-8 mt-4">
                     <div className="w-12 h-12 bg-neutral-900 rounded-xl flex items-center justify-center text-white text-xl mx-auto mb-4 shadow-inner">
                         🔒
                     </div>
@@ -95,5 +108,13 @@ export default function AgentLoginPage() {
                 </form>
             </div>
         </div>
+    );
+}
+
+export default function AgentLoginPage() {
+    return (
+        <Suspense fallback={<div className="w-full min-h-[80vh] flex items-center justify-center text-neutral-500 text-sm">Loading access...</div>}>
+            <AgentLoginContent />
+        </Suspense>
     );
 }

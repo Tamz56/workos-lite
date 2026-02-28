@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type AuditLog = {
     id: string;
@@ -12,6 +13,7 @@ type AuditLog = {
 };
 
 export default function AgentLogsPage() {
+    const router = useRouter();
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -23,6 +25,14 @@ export default function AgentLogsPage() {
 
     // Detail Panel
     const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+    const handleBack = () => {
+        if (window.history.length > 1) {
+            router.back();
+        } else {
+            router.push("/dashboard");
+        }
+    };
 
     const fetchLogs = async () => {
         setLoading(true);
@@ -72,6 +82,9 @@ export default function AgentLogsPage() {
         <div className="w-full px-6 2xl:px-10 py-8 max-w-7xl mx-auto">
             <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
+                    <button onClick={handleBack} className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200/70 rounded-md px-3 py-1.5 shadow-sm hover:bg-neutral-50 transition-colors mb-6 md:mb-4 block w-max">
+                        <span aria-hidden="true">&larr;</span> Back
+                    </button>
                     <h1 className="text-3xl font-bold font-display tracking-tight text-neutral-900">Agent Audit Logs</h1>
                     <div className="text-sm text-neutral-500 font-medium mt-1">
                         View execution history and payloads from <code className="bg-neutral-100 px-1 py-0.5 rounded text-xs text-neutral-700">agent_audit_log</code>

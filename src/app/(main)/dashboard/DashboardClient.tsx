@@ -6,7 +6,7 @@ import Link from "next/link";
 import { WORKSPACES, WORKSPACES_LIST, workspaceLabel, type Workspace } from "@/lib/workspaces";
 import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "@/lib/styles";
 import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
-import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon } from "lucide-react";
+import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List } from "lucide-react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useTaskEditor } from '@/hooks/useTaskEditor';
 import { getTasks, patchTask } from "@/lib/api";
@@ -68,10 +68,21 @@ function pickArray<T>(v: unknown): T[] {
     return [];
 }
 
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, { ...init, signal: controller.signal });
+        return response;
+    } finally {
+        clearTimeout(id);
+    }
+}
+
 async function fetchTasks(params: Record<string, string>) {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) sp.set(k, v);
-    const res = await fetch(`/api/tasks?${sp.toString()}`, { cache: "no-store" });
+    const res = await fetchWithTimeout(`/api/tasks?${sp.toString()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`tasks: HTTP ${res.status} `);
     const data: unknown = await res.json();
     const rows = pickArray<Task>(data);
@@ -102,7 +113,7 @@ function mapEventRow(raw: EventRow): CalendarEvent {
 async function fetchEvents(params: Record<string, string>) {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) sp.set(k, v);
-    const res = await fetch(`/api/events?${sp.toString()}`, { cache: "no-store" });
+    const res = await fetchWithTimeout(`/api/events?${sp.toString()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`events: HTTP ${res.status} `);
     const raw: unknown = await res.json();
     return pickArray<unknown>(raw).map(r => mapEventRow((r ?? {}) as EventRow));
@@ -111,7 +122,7 @@ async function fetchEvents(params: Record<string, string>) {
 async function fetchDocs(params: Record<string, string>) {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) sp.set(k, v);
-    const res = await fetch(`/api/docs?${sp.toString()}`, { cache: "no-store" });
+    const res = await fetchWithTimeout(`/api/docs?${sp.toString()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`docs: HTTP ${res.status}`);
     const raw: unknown = await res.json();
     return pickArray<DocRow>(raw);
@@ -123,7 +134,10 @@ async function postJson<T>(url: string, payload: unknown): Promise<T> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(`POST ${url}: HTTP ${res.status}`);
+    if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Create failed (${res.status}): ${text || res.statusText}`);
+    }
     return (await res.json()) as T;
 }
 
@@ -634,6 +648,20 @@ function ActionBar() {
                 label="Open Planner"
                 onClick={() => router.push("/planner")}
             />
+
+            <div className="w-px h-6 bg-neutral-200 mx-2" />
+
+            <ActionBtn
+                icon={Bot}
+                label="Agent"
+                onClick={() => router.push("/agent")}
+            />
+
+            <ActionBtn
+                icon={List}
+                label="Logs"
+                onClick={() => router.push("/agent/logs")}
+            />
         </div>
     );
 }
@@ -641,11 +669,7 @@ function ActionBar() {
 // --- Main Dashboard ---
 
 export default function DashboardClient() {
-    return (
-        <Suspense fallback={<div>Loading...</div>}>
-            <DashboardContent />
-        </Suspense>
-    );
+    return <DashboardContent />;
 }
 
 function DashboardContent() {
@@ -674,6 +698,7 @@ function DashboardContent() {
     }, [sp, router]);
 
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const [tasks, setTasks] = useState<DashboardTask[]>([]);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -698,6 +723,7 @@ function DashboardContent() {
     const [newTaskDate, setNewTaskDate] = useState(todayYmd);
     const [newTaskPriority, setNewTaskPriority] = useState(2);
     const [newTaskNotes, setNewTaskNotes] = useState("");
+    const [newTaskError, setNewTaskError] = useState<string | null>(null);
 
     // Content Specific State
     const [contentTab, setContentTab] = useState<"details" | "content">("details");
@@ -726,21 +752,26 @@ function DashboardContent() {
 
     const refreshAll = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             const [allTasks, allEvents, allDocs, healthRes] = await Promise.all([
                 fetchTasks({ limit: "1000" }),
                 fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }),
                 fetchDocs({ limit: "100" }),
-                fetch("/api/health").catch(() => ({ ok: false }))
+                fetchWithTimeout("/api/health").then(res => ({ ok: res.ok })).catch(() => ({ ok: false }))
             ]);
 
             setTasks(allTasks);
             setEvents(allEvents);
             setDocs(allDocs);
-            setHealth({ ok: (healthRes as Response).ok, status: (healthRes as Response).ok ? "OK" : "Degraded" });
+            setHealth({ ok: healthRes.ok, status: healthRes.ok ? "OK" : "Degraded" });
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Refresh failed", e);
+            const msg = e?.name === "AbortError"
+                ? "Request timed out (15s). Please retry."
+                : (e?.message || "Failed to load dashboard data");
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -778,6 +809,7 @@ function DashboardContent() {
 
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
+        setNewTaskError(null);
         if (!newTaskTitle.trim() || isSubmitting) return;
         setIsSubmitting(true);
         try {
@@ -799,13 +831,14 @@ function DashboardContent() {
                 status: newTaskStatus,
                 scheduled_date: newTaskStatus === 'planned' ? (newTaskDate || todayYmd) : null,
                 priority: newTaskPriority,
-                notes: newTaskNotes
+                notes: newTaskNotes || null
             });
             await refreshAll();
             setIsNewTaskOpen(false);
             setNewTaskTitle("");
-        } catch (err) {
-            alert("Failed to create task");
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            setNewTaskError(msg);
         } finally {
             setIsSubmitting(false);
         }
@@ -819,6 +852,7 @@ function DashboardContent() {
             // Very basic event creation used for POC
             await fetch("/api/events", {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: newEventTitle,
                     start_time: newEventDate + "T09:00:00Z",
@@ -855,6 +889,21 @@ function DashboardContent() {
     };
 
     if (loading && tasks.length === 0) return <div className="p-10 flex justify-center items-center gap-3 text-neutral-400"><span className="animate-spin text-xl">⏳</span> Loading Command Center...</div>;
+
+    if (error && tasks.length === 0) {
+        return (
+            <div className="w-full px-6 2xl:px-10 py-8 flex justify-center items-center min-h-[50vh]">
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-6 flex flex-col items-center justify-center text-center shadow-sm w-full max-w-md">
+                    <span className="text-4xl mb-4">⚠️</span>
+                    <h2 className="text-xl font-bold text-red-800 mb-2">Failed to load dashboard</h2>
+                    <p className="text-sm text-red-600 mb-6">{error}</p>
+                    <button onClick={() => refreshAll()} className="px-6 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition-colors shadow-sm active:scale-95">
+                        Retry Connection
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     // Check if gcal embed is available
     const hasGCalEmbed = !!process.env.NEXT_PUBLIC_GCAL_EMBED_URL;
@@ -1024,10 +1073,9 @@ function DashboardContent() {
                                 value={newTaskPriority}
                                 onChange={e => setNewTaskPriority(Number(e.target.value))}
                             >
-                                <option value={1}>Low</option>
-                                <option value={2}>Normal</option>
-                                <option value={3}>High</option>
-                                <option value={4}>Urgent</option>
+                                <option value={1}>High</option>
+                                <option value={2}>Medium</option>
+                                <option value={3}>Low</option>
                             </select>
                         </div>
 
@@ -1085,6 +1133,11 @@ function DashboardContent() {
                         </div>
                     )}
 
+                    {newTaskError && (
+                        <div className="text-sm font-medium text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100 mt-2">
+                            {newTaskError}
+                        </div>
+                    )}
                     <div className="flex justify-end gap-2 pt-2 border-t border-neutral-50 mt-4">
                         <button type="button" onClick={() => setIsNewTaskOpen(false)} className={BUTTON_SECONDARY}>Cancel</button>
                         <button type="submit" disabled={isSubmitting} className={BUTTON_PRIMARY}>{isSubmitting ? 'Saving...' : 'Create Task'}</button>

@@ -8,7 +8,10 @@ import {
     FolderIcon,
     HomeIcon,
     InboxIcon, // Changed from ClipboardIcon to InboxIcon for Inbox
-    Cog6ToothIcon // Settings icon
+    Cog6ToothIcon, // Settings icon
+    BriefcaseIcon,
+    ClockIcon,
+    QueueListIcon
 } from "@heroicons/react/24/outline";
 
 // Helper for consistent Nav Items
@@ -47,6 +50,24 @@ export function Sidebar() {
                     label="Command Center"
                     icon={<HomeIcon className="w-5 h-5" />}
                     active={pathname === "/dashboard"}
+                />
+                <NavItem
+                    href="/projects"
+                    label="Projects"
+                    icon={<BriefcaseIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/projects")}
+                />
+                <NavItem
+                    href="/timeline"
+                    label="Timeline"
+                    icon={<ClockIcon className="w-5 h-5" />}
+                    active={pathname === "/timeline"}
+                />
+                <NavItem
+                    href="/sprints"
+                    label="Sprints"
+                    icon={<QueueListIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/sprints")}
                 />
                 <NavItem
                     href="/planner"

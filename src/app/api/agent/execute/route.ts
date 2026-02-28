@@ -23,6 +23,7 @@ const TaskCreate = z.object({
     end_time: z.string().nullable().optional(),
     priority: z.number().int().nullable().optional(),
     notes: z.string().nullable().optional(),
+    doc_id_ref: z.string().optional(),
     doc_id: z.string().nullable().optional(),
 });
 
@@ -76,8 +77,8 @@ const ActionSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("task.update"), data: TaskUpdate }),
     z.object({ type: z.literal("doc.create"), data: DocCreate, saveAs: z.string().optional() }),
     z.object({ type: z.literal("doc.update"), data: DocUpdate }),
-    z.object({ type: z.literal("event.create"), data: EventCreate }),
-    z.object({ type: z.literal("attachment.create"), data: AttachmentCreate }),
+    z.object({ type: z.literal("event.create"), data: EventCreate, saveAs: z.string().optional() }),
+    z.object({ type: z.literal("attachment.create"), data: AttachmentCreate, saveAs: z.string().optional() }),
 ]);
 
 const ExecuteSchema = z.object({
@@ -106,10 +107,8 @@ function sha256(s: string) {
     return crypto.createHash("sha256").update(s).digest("hex");
 }
 
-function getBearer(req: NextRequest) {
-    const h = req.headers.get("authorization") || "";
-    const m = h.match(/^Bearer\s+(.+)$/i);
-    return m?.[1]?.trim() || null;
+function getAgentPassword(req: NextRequest) {
+    return req.headers.get("x-agent-password") || null;
 }
 
 function nowIso() {
@@ -125,16 +124,30 @@ export async function POST(req: NextRequest) {
         const db = getDb();
 
         // --- auth ---
-        const rawKey = getBearer(req);
-        if (!rawKey) return NextResponse.json({ error: "Missing Authorization: Bearer <agent_key>" }, { status: 401 });
+        const uiPassword = process.env.AGENT_UI_PASSWORD;
+        const serverKey = process.env.AGENT_KEY;
 
-        const keyHash = sha256(rawKey);
+        if (!uiPassword || !serverKey) {
+            return NextResponse.json({ error: "Server misconfigured: missing AGENT_UI_PASSWORD or AGENT_KEY" }, { status: 500 });
+        }
+
+        const providedPassword = getAgentPassword(req);
+        if (!providedPassword) {
+            return NextResponse.json({ error: "Missing x-agent-password header. Authorization required." }, { status: 401 });
+        }
+
+        if (providedPassword !== uiPassword) {
+            return NextResponse.json({ error: "Invalid x-agent-password. Access denied." }, { status: 401 });
+        }
+
+        // Hash the server key to match against our DB
+        const keyHash = sha256(serverKey);
         const agent = db.prepare(
             `SELECT id, name, scopes_json, is_enabled FROM agent_keys WHERE key_hash = ? LIMIT 1`
         ).get(keyHash) as any;
 
         if (!agent || agent.is_enabled !== 1) {
-            return NextResponse.json({ error: "Invalid or disabled agent key" }, { status: 403 });
+            return NextResponse.json({ error: "Invalid or disabled agent key on server" }, { status: 403 });
         }
 
         agentIdForLogging = agent.id;
@@ -153,6 +166,7 @@ export async function POST(req: NextRequest) {
         parsedPayloadForLogging = {
             dry_run: parsed.data.dry_run,
             actions_count: parsed.data.actions.length,
+            phase: "validation"
         };
         isDryRun = parsed.data.dry_run;
 
@@ -179,6 +193,8 @@ export async function POST(req: NextRequest) {
         const startedAt = nowIso();
 
         const runTx = db.transaction(() => {
+            if (parsedPayloadForLogging) parsedPayloadForLogging.phase = "execute";
+
             for (const a of parsed.data.actions) {
                 const need = requiredScope(a.type);
                 if (!scopes.includes(need)) {
@@ -188,12 +204,16 @@ export async function POST(req: NextRequest) {
                 let result: any = { ok: true, type: a.type };
 
                 if (a.type === "task.create") {
-                    const id = nanoid();
+                    const id = isDryRun ? `dry_${nanoid()}` : nanoid();
                     const now = nowIso();
                     const t = a.data;
 
-                    const docIdResolved =
-                        (t.doc_id && refMap.get(t.doc_id)) ? refMap.get(t.doc_id)! : (t.doc_id ?? null);
+                    const docIdResolved = t.doc_id_ref
+                        ? (refMap.get(t.doc_id_ref) ?? null)
+                        : (t.doc_id ? (refMap.get(t.doc_id) ?? t.doc_id) : null);
+
+                    const bucket = t.schedule_bucket ?? (t.status === "planned" ? "morning" : "none");
+                    const priority = t.priority ?? 2;
 
                     if (!isDryRun) {
                         db.prepare(`
@@ -212,10 +232,10 @@ export async function POST(req: NextRequest) {
                             workspace: t.workspace,
                             status: t.status,
                             scheduled_date: t.scheduled_date ?? null,
-                            schedule_bucket: t.schedule_bucket ?? null,
+                            schedule_bucket: bucket,
                             start_time: t.start_time ?? null,
                             end_time: t.end_time ?? null,
-                            priority: t.priority ?? null,
+                            priority: priority,
                             notes: t.notes ?? null,
                             doc_id: docIdResolved,
                             created_at: now,
@@ -225,15 +245,19 @@ export async function POST(req: NextRequest) {
 
                     if (a.saveAs) refMap.set(a.saveAs, id);
                     result.id = id;
-                    if (isDryRun) result.doc_id_resolved = docIdResolved;
+                    if (isDryRun) {
+                        result.doc_id_resolved = docIdResolved;
+                        result.schedule_bucket_resolved = bucket;
+                        result.priority_resolved = priority;
+                    }
                 }
 
                 if (a.type === "task.update") {
                     const u = a.data as any;
 
-                    const docIdResolved =
-                        (u.doc_id_ref && refMap.get(u.doc_id_ref)) ? refMap.get(u.doc_id_ref)! :
-                            (u.doc_id ?? undefined);
+                    const docIdResolved = u.doc_id_ref
+                        ? (refMap.get(u.doc_id_ref) ?? null)
+                        : (u.doc_id ? (refMap.get(u.doc_id) ?? u.doc_id) : undefined);
 
                     const sets: string[] = [];
                     const bind: Record<string, unknown> = { id: u.id };
@@ -268,7 +292,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 if (a.type === "doc.create") {
-                    const id = nanoid();
+                    const id = isDryRun ? `dry_${nanoid()}` : nanoid();
                     const now = nowIso();
                     const d = a.data;
 
@@ -307,7 +331,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 if (a.type === "event.create") {
-                    const id = nanoid();
+                    const id = isDryRun ? `dry_${nanoid()}` : nanoid();
                     const now = nowIso();
                     const e = a.data;
 
@@ -337,7 +361,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 if (a.type === "attachment.create") {
-                    const id = nanoid();
+                    const id = isDryRun ? `dry_${nanoid()}` : nanoid();
                     const now = nowIso();
                     const f = a.data;
 
@@ -377,6 +401,10 @@ export async function POST(req: NextRequest) {
                     });
                 }
 
+                if (isDryRun) {
+                    result.would_write = false;
+                }
+
                 results.push(result);
             }
         });
@@ -392,6 +420,7 @@ export async function POST(req: NextRequest) {
 
         if (isDryRun) {
             response.dry_run = true;
+            response.preview_only = true;
         } else if (idempotencyKey) {
             // store idempotency response
             db.prepare(`

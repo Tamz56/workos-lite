@@ -48,3 +48,44 @@ export interface Attachment {
     created_at: string;
 }
 
+export interface Project {
+    id: string;
+    slug: string;
+    name: string;
+    status: "inbox" | "planned" | "done";
+    start_date: string | null;
+    end_date: string | null;
+    owner: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ProjectItem {
+    id: string;
+    project_id: string;
+    title: string;
+    status: "inbox" | "planned" | "done";
+    priority: number | null;
+    schedule_bucket: ScheduleBucket | null;
+    start_date: string | null;
+    end_date: string | null;
+    is_milestone: number;
+    workstream: string | null;
+    dod_text: string | null;
+    notes: string | null;
+    created_at: string;
+    updated_at: string;
+
+    // joined fields from API timeline
+    project_name?: string;
+    project_slug?: string;
+}
+
+export interface Sprint {
+    id: string;
+    project_id: string;
+    name: string;
+    status: "planned" | "active" | "completed";
+    start_date: string | null;
+    end_date: string | null;
+}

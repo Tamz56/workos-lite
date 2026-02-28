@@ -7,7 +7,7 @@ import { listAttachments, uploadAttachment, deleteAttachment } from "../lib/api"
 import { toErrorMessage } from "../lib/error";
 import type { Attachment } from "../lib/types";
 import ConfirmDialog from "./ConfirmDialog";
-import { MAX_UPLOAD_BYTES, BLOCKED_EXTENSIONS, getFileExtLower } from "../lib/uploadRules";
+import { MAX_UPLOAD_BYTES, ALLOWED_EXTENSIONS, getFileExtLower } from "../lib/uploadRules";
 
 type Props = {
     taskId: string;
@@ -60,8 +60,8 @@ export default function TaskAttachmentsPanel({ taskId, onCountChange }: Props) {
         }
 
         const ext = getFileExtLower(file.name);
-        if (ext && BLOCKED_EXTENSIONS.has(ext)) {
-            setErrorMsg(`Blocked file type: .${ext}`);
+        if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+            setErrorMsg(`File type not allowed. Allowed: ${Array.from(ALLOWED_EXTENSIONS).join(", ")}`);
             e.target.value = "";
             return;
         }

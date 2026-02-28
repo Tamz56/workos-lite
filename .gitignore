@@ -31,3 +31,6 @@ uploads/
 data/*.db-wal
 data/*.db-shm
 data/*.db-journal
+
+data/workos.db
+tsconfig.tsbuildinfo

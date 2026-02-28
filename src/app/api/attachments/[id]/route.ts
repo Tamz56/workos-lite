@@ -3,10 +3,17 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
 
 function resolvePath(storedPath: string) {
     if (path.isAbsolute(storedPath)) return storedPath;
+
+    // Check new data directory first
+    const dataPath = path.join(process.cwd(), "data", storedPath);
+    if (fsSync.existsSync(dataPath)) return dataPath;
+
+    // Fallback to .workos-lite directory
     return path.join(process.cwd(), ".workos-lite", storedPath);
 }
 
