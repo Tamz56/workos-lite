@@ -11,11 +11,11 @@ import TaskDeleteButton from "@/components/TaskDeleteButton";
 import { toErrorMessage } from "@/lib/error";
 
 
-const WORKSPACES: { label: string; value: "all" | Workspace }[] = [
+import { WORKSPACES_LIST } from "@/lib/workspaces";
+
+const FILTER_WORKSPACES: { label: string; value: "all" | Workspace }[] = [
     { label: "All", value: "all" },
-    { label: "avaCRM", value: "avacrm" },
-    { label: "Ops", value: "ops" },
-    { label: "Content", value: "content" },
+    ...WORKSPACES_LIST.map(w => ({ label: w.label, value: w.id as Workspace }))
 ];
 
 export default function DoneClient() {
@@ -147,7 +147,7 @@ export default function DoneClient() {
                         onChange={(e) => setWorkspace(e.target.value as "all" | Workspace)}
                         style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #111", minWidth: 160 }}
                     >
-                        {WORKSPACES.map((w) => (
+                        {FILTER_WORKSPACES.map((w) => (
                             <option key={w.value} value={w.value}>
                                 {w.label}
                             </option>
