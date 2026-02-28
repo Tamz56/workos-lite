@@ -29,6 +29,27 @@ export default function InboxClient() {
     const sp = useSearchParams();
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // Bulk selection state
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkStatus, setBulkStatus] = useState<string>("");
+    const [bulkBucket, setBulkBucket] = useState<string>("");
+    const [bulkWorkspace, setBulkWorkspace] = useState<string>("");
+    const [bulkTag, setBulkTag] = useState<string>("project:nanagarden-q1");
+    const [bulkLoading, setBulkLoading] = useState(false);
+    const [bulkError, setBulkError] = useState<string>("");
+
+    const selectedCount = selectedIds.size;
+    const clearSelection = () => setSelectedIds(new Set());
+    const toggleOne = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
     // Smart Link: Focus Quick Add if ?newTask=1
     useEffect(() => {
         if (sp.get("newTask") === "1") {
@@ -105,7 +126,70 @@ export default function InboxClient() {
         }
     }
 
+    async function applyBulk() {
+        setBulkLoading(true);
+        setBulkError("");
+        const ids = Array.from(selectedIds);
+        const patch: any = {};
+        if (bulkStatus) patch.status = bulkStatus;
+        if (bulkBucket) patch.schedule_bucket = bulkBucket;
+        if (bulkWorkspace) patch.workspace = bulkWorkspace;
+        if (bulkTag?.trim()) patch.notes_append = `\n${bulkTag.trim()}\n`;
+
+        try {
+            const res = await fetch("/api/tasks/batch", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ ids, patch }),
+            });
+            if (!res.ok) throw new Error(await res.text() || "Batch update failed");
+            clearSelection();
+            await load();
+        } catch (e: any) {
+            setBulkError(e?.message || "Unknown error");
+        } finally {
+            setBulkLoading(false);
+        }
+    }
+
+    async function sendSelectedToNanagardenBacklog() {
+        setBulkLoading(true);
+        setBulkError("");
+        const ids = Array.from(selectedIds);
+        const patch = {
+            status: "planned",
+            schedule_bucket: "none",
+            workspace: "ops",
+            notes_append: `\n${bulkTag.trim() || 'project:nanagarden-q1'}\n`
+        };
+        try {
+            const res = await fetch("/api/tasks/batch", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ ids, patch }),
+            });
+            if (!res.ok) throw new Error(await res.text() || "Batch update failed");
+            clearSelection();
+            setBulkStatus("planned");
+            setBulkBucket("none");
+            setBulkWorkspace("ops");
+
+            await load();
+        } catch (e: any) {
+            setBulkError(e?.message || "Unknown error");
+        } finally {
+            setBulkLoading(false);
+        }
+    }
+
     const count = useMemo(() => tasks.length, [tasks]);
+    const visibleIds = tasks.map(t => t.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
+
+    const toggleSelectAll = () => {
+        if (allSelected) clearSelection();
+        else setSelectedIds(new Set(visibleIds));
+    };
 
     return (
         <PageShell>
@@ -164,10 +248,82 @@ export default function InboxClient() {
                 {err && <div style={{ marginTop: 10, color: "#dc2626" }}>{err}</div>}
             </div>
 
+            {/* Sticky Bulk Action Bar */}
+            {selectedCount > 0 && (
+                <div className="sticky top-[68px] z-10 bg-white border border-neutral-200 rounded-lg p-3 mt-6 shadow-sm">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <div className="text-sm font-medium text-neutral-800 pr-2 border-r border-neutral-200">
+                            {selectedCount} selected
+                        </div>
+
+                        <select className="border border-neutral-200 bg-neutral-50 rounded px-2 py-1.5 text-sm outline-none" value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+                            <option value="">Set Status…</option>
+                            <option value="inbox">inbox</option>
+                            <option value="planned">planned</option>
+                            <option value="done">done</option>
+                        </select>
+
+                        <select className="border border-neutral-200 bg-neutral-50 rounded px-2 py-1.5 text-sm outline-none" value={bulkBucket} onChange={(e) => setBulkBucket(e.target.value)}>
+                            <option value="">Set Bucket…</option>
+                            <option value="none">none</option>
+                            <option value="morning">morning</option>
+                            <option value="afternoon">afternoon</option>
+                            <option value="evening">evening</option>
+                        </select>
+
+                        <select className="border border-neutral-200 bg-neutral-50 rounded px-2 py-1.5 text-sm outline-none" value={bulkWorkspace} onChange={(e) => setBulkWorkspace(e.target.value)}>
+                            <option value="">Move Workspace…</option>
+                            {WORKSPACES_LIST.map((w) => (
+                                <option key={w.id} value={w.id}>{w.label}</option>
+                            ))}
+                        </select>
+
+                        <input
+                            value={bulkTag}
+                            onChange={(e) => setBulkTag(e.target.value)}
+                            placeholder="Append tag (e.g. project:x)"
+                            className="border border-neutral-200 rounded px-2 py-1 text-sm outline-none bg-neutral-50"
+                        />
+
+                        <button
+                            onClick={applyBulk}
+                            disabled={bulkLoading || (!bulkStatus && !bulkBucket && !bulkWorkspace && !bulkTag.trim())}
+                            className={`px-4 py-1.5 rounded-md text-white font-medium text-sm transition ${bulkLoading || (!bulkStatus && !bulkBucket && !bulkWorkspace && !bulkTag.trim()) ? 'bg-neutral-300 cursor-not-allowed' : 'bg-neutral-900 hover:bg-neutral-800'}`}
+                        >
+                            {bulkLoading ? "Applying..." : "Apply"}
+                        </button>
+
+                        <button
+                            onClick={sendSelectedToNanagardenBacklog}
+                            disabled={bulkLoading}
+                            title="planned + no bucket + ops workspace + tag"
+                            className="px-4 py-1.5 rounded-md bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 transition ml-2"
+                        >
+                            Send &rarr; NanaGarden Backlog
+                        </button>
+
+                        <button onClick={clearSelection} className="ml-auto px-3 py-1.5 text-sm text-neutral-500 hover:text-neutral-900 underline">
+                            Clear
+                        </button>
+                    </div>
+
+                    {bulkError && <div className="text-sm font-medium text-red-600 mt-3">{bulkError}</div>}
+                </div>
+            )}
+
             {/* List */}
             <div style={{ marginTop: 24, border: "1px solid #e5e7eb", borderRadius: 12 }}>
-                <div style={{ padding: 14, borderBottom: "1px solid #e5e7eb", backgroundColor: "#f9fafb", borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>Tasks ({loading ? "…" : count})</div>
+                <div style={{ padding: 14, borderBottom: "1px solid #e5e7eb", backgroundColor: "#f9fafb", borderTopLeftRadius: 12, borderTopRightRadius: 12, display: "flex", gap: "12px", alignItems: "center" }}>
+                    <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        style={{ cursor: "pointer", width: 16, height: 16 }}
+                        className="cursor-pointer"
+                    />
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>
+                        Tasks ({loading ? "…" : count}) {selectedCount > 0 && <span className="text-neutral-500 font-normal ml-2">— {selectedCount} selected</span>}
+                    </div>
                 </div>
 
                 <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -186,32 +342,43 @@ export default function InboxClient() {
                                 style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, display: "flex", justifyContent: "space-between", gap: 12, cursor: "pointer" }}
                                 className="group hover:bg-neutral-50 hover:border-neutral-300 transition-all bg-white"
                             >
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <TaskTitleInlineEdit
-                                            id={t.id}
-                                            title={t.title}
-                                            onSaved={(next) => {
-                                                setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, title: next } : x)));
-                                            }}
+                                <div className="flex gap-4 items-start w-full">
+                                    <div className="pt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(t.id)}
+                                            onChange={(e) => toggleOne(t.id, e as unknown as React.MouseEvent)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{ cursor: "pointer", width: 16, height: 16 }}
+                                            className="cursor-pointer"
                                         />
-                                        {t.doc_id && (
-                                            <span
-                                                style={{ cursor: "pointer" }}
-                                                className="hover:text-blue-600"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    openEditor(t, "doc");
-                                                }}
-                                                title="Open task details"
-                                            >
-                                                📄
-                                            </span>
-                                        )}
                                     </div>
-                                    <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>workspace: {t.workspace}</div>
-                                </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <TaskTitleInlineEdit
+                                                id={t.id}
+                                                title={t.title}
+                                                onSaved={(next) => {
+                                                    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, title: next } : x)));
+                                                }}
+                                            />
+                                            {t.doc_id && (
+                                                <span
+                                                    style={{ cursor: "pointer" }}
+                                                    className="hover:text-blue-600"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        openEditor(t, "doc");
+                                                    }}
+                                                    title="Open task details"
+                                                >
+                                                    📄
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>workspace: {t.workspace}</div>
+                                    </div></div>
 
                                 <div
                                     style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
