@@ -6,8 +6,6 @@ export const WORKSPACES = [
     "travel",
     "admin",
     "marketing",
-    "sales",
-    "marketing_sales",
     "personal",
     "other",
 ] as const;
@@ -19,9 +17,7 @@ export const WORKSPACES_LIST = [
     { id: "finance", label: "Finance" },
     { id: "travel", label: "Travel" },
     { id: "admin", label: "Admin" },
-    { id: "marketing", label: "Marketing" },
-    { id: "sales", label: "Sales" },
-    { id: "marketing_sales", label: "Marketing/Sales" },
+    { id: "marketing", label: "Marketing/Sales" },
     { id: "personal", label: "Personal" },
     { id: "other", label: "Other" },
 ] as const;
@@ -50,10 +46,10 @@ const ALIASES: Record<string, Workspace> = {
     "marketing": "marketing",
     "mkt": "marketing",
     "mktg": "marketing",
-    "sales": "sales",
-    "marketing_sales": "marketing_sales",
-    "mktsales": "marketing_sales",
-    "marketing_and_sales": "marketing_sales",
+    "sales": "marketing",
+    "marketing_sales": "marketing",
+    "mktsales": "marketing",
+    "marketing_and_sales": "marketing",
     "personal": "personal",
     "other": "other",
 };
@@ -70,9 +66,7 @@ export function workspaceLabel(w: Workspace | string): string {
         case "content": return "CONTENT";
         case "personal": return "Personal";
         case "admin": return "Admin";
-        case "marketing": return "Marketing";
-        case "sales": return "Sales";
-        case "marketing_sales": return "Marketing/Sales";
+        case "marketing": return "Marketing/Sales";
         case "finance": return "Finance";
         case "travel": return "Travel";
         case "other": return "Other";

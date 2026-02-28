@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 // 2. Content Docs Logic
-                if (t.workspace === 'content' && options.createContentDocs) {
+                if ((t.workspace === 'content' || t.workspace === 'marketing') && options.createContentDocs) {
                     const briefId = nanoid();
                     const scriptId = nanoid();
                     const storyboardId = nanoid();
