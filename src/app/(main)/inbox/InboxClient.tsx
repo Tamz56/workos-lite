@@ -159,7 +159,7 @@ export default function InboxClient() {
         const patch = {
             status: "planned",
             schedule_bucket: "none",
-            workspace: "ops",
+            workspace: "marketing_sales",
             notes_append: `\n${bulkTag.trim() || 'project:nanagarden-q1'}\n`
         };
         try {
@@ -172,7 +172,7 @@ export default function InboxClient() {
             clearSelection();
             setBulkStatus("planned");
             setBulkBucket("none");
-            setBulkWorkspace("ops");
+            setBulkWorkspace("marketing_sales");
 
             await load();
         } catch (e: any) {
@@ -296,10 +296,10 @@ export default function InboxClient() {
                         <button
                             onClick={sendSelectedToNanagardenBacklog}
                             disabled={bulkLoading}
-                            title="planned + no bucket + ops workspace + tag"
+                            title="planned + no bucket + marketing_sales workspace + tag"
                             className="px-4 py-1.5 rounded-md bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 transition ml-2"
                         >
-                            Send &rarr; NanaGarden Backlog
+                            Send &rarr; Marketing/Sales (NanaGarden)
                         </button>
 
                         <button onClick={clearSelection} className="ml-auto px-3 py-1.5 text-sm text-neutral-500 hover:text-neutral-900 underline">

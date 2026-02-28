@@ -116,6 +116,16 @@ export async function POST(req: NextRequest) {
                     notes += links;
                 }
 
+                // 3. NG_SKU Automation
+                if (t.title.startsWith('NG_SKU:')) {
+                    const docId = nanoid();
+                    db.prepare(`
+                        INSERT INTO docs (id, title, content_md, created_at, updated_at)
+                        VALUES (@id, @title, @content, @now, @now)
+                    `).run({ id: docId, title: `${t.title} - Ad`, content: CONTENT_TEMPLATES.NANAGARDEN_AD, now });
+                    notes += `\n\n[NanaGarden Ad](/docs/${docId})`;
+                }
+
                 // Update notes if they changed (or if just initially set)
                 // We didn't insert notes in step 1 because we might append docs.
                 // Wait, 'tasks' table has 'notes' column?
