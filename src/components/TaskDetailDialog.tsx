@@ -150,7 +150,7 @@ function TaskDetailDialogInner({
     const [stage, setStage] = useState(parseStage(task.title || ""));
     const [platforms, setPlatforms] = useState<string[]>(parsePlatforms(task.title || ""));
 
-    const [status, setStatus] = useState(task.status);
+    const [status, setStatus] = useState<TaskStatus>((task.status?.toLowerCase() as TaskStatus) || "inbox");
     const [scheduledDate, setScheduledDate] = useState(normalizeDate(task.scheduled_date));
     const [priority, setPriority] = useState(task.priority ?? 2);
 
@@ -255,7 +255,8 @@ function TaskDetailDialogInner({
         triggerSave();
     };
 
-    const handleStatusChange = (newStatus: TaskStatus) => {
+    const handleStatusChange = (val: string) => {
+        const newStatus = val.toLowerCase() as TaskStatus;
         setStatus(newStatus);
         // Rules
         if (newStatus === "planned" && !scheduledDate) {
@@ -343,8 +344,8 @@ function TaskDetailDialogInner({
                                     <label className={LABEL_BASE}>Status</label>
                                     <select
                                         className={INPUT_BASE}
-                                        value={status}
-                                        onChange={(e) => handleStatusChange(e.target.value as TaskStatus)}
+                                        value={status?.toLowerCase() || 'inbox'}
+                                        onChange={(e) => handleStatusChange(e.target.value)}
                                         disabled={readOnly}
                                     >
                                         <option value="inbox">Inbox</option>
