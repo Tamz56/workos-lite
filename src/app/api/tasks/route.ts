@@ -16,6 +16,7 @@ const CreateTaskSchema = z.object({
     title: z.string().min(1),
     workspace: Workspace.default("avacrm"),
     status: Status.default("inbox"),
+    list_id: z.string().optional().nullable(),
     scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
     schedule_bucket: Bucket.optional().nullable(),
     priority: z.number().int().optional().nullable(),
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
 
         const status = url.searchParams.get("status");
         const workspace = url.searchParams.get("workspace");
+        const list_id = url.searchParams.get("list_id");
         const q = (url.searchParams.get("q") ?? "").trim();
         const scheduled_date = url.searchParams.get("scheduled_date");
         const schedule_bucket = url.searchParams.get("schedule_bucket");
@@ -85,6 +87,15 @@ export async function GET(req: NextRequest) {
         if (workspaceOk) {
             where.push("workspace = @workspace");
             bind.workspace = workspace;
+        }
+
+        if (list_id) {
+            if (list_id === "unassigned" || list_id === "null") {
+                where.push("list_id IS NULL");
+            } else {
+                where.push("list_id = @list_id");
+                bind.list_id = list_id;
+            }
         }
 
         if (scheduled_date) {
@@ -178,6 +189,17 @@ export async function POST(req: NextRequest) {
         const id = nanoid();
         const now = new Date().toISOString();
 
+        // Validate List Workspace Boundary
+        if (t.list_id) {
+            const tgtList = getDb().prepare("SELECT id, workspace FROM lists WHERE id = ?").get(t.list_id) as { id: string, workspace: string } | undefined;
+            if (!tgtList) {
+                return NextResponse.json({ error: "Provided list_id does not exist." }, { status: 400 });
+            }
+            if (tgtList.workspace !== t.workspace) {
+                return NextResponse.json({ error: "list workspace mismatch" }, { status: 400 });
+            }
+        }
+
         // schedule consistency: if scheduled_date missing -> bucket should be 'none'
         const scheduledDate = t.scheduled_date ?? null;
         const bucket = scheduledDate ? (t.schedule_bucket ?? "none") : "none";
@@ -185,7 +207,7 @@ export async function POST(req: NextRequest) {
         getDb().prepare(
             `
       INSERT INTO tasks (
-        id, title, workspace, status,
+        id, title, workspace, list_id, status,
         scheduled_date, schedule_bucket,
         priority, notes,
         created_at, updated_at,
@@ -203,6 +225,7 @@ export async function POST(req: NextRequest) {
             id,
             title: t.title,
             workspace: t.workspace,
+            list_id: t.list_id ?? null,
             status: t.status,
             scheduled_date: scheduledDate,
             schedule_bucket: bucket,

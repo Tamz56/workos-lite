@@ -23,6 +23,7 @@ const PatchTaskSchema = z
         priority: z.number().int().nullable().optional(),
         notes: z.string().nullable().optional(),
         doc_id: z.string().nullable().optional(),
+        list_id: z.string().nullable().optional(),
     })
     .strict();
 
@@ -61,8 +62,20 @@ export async function PATCH(
         scheduled_date: string | null;
         schedule_bucket: string | null;
         workspace: z.infer<typeof Workspace>;
+        list_id: string | null;
     };
     if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Enforce list rules if list is provided or changed
+    if (patch.list_id !== undefined && patch.list_id !== null) {
+        const list = db.prepare("SELECT id, workspace FROM lists WHERE id = ?").get(patch.list_id) as { id: string, workspace: string } | undefined;
+        if (!list) return NextResponse.json({ error: "Provided list_id does not exist." }, { status: 400 });
+
+        const targetWorkspace = patch.workspace || current.workspace;
+        if (list.workspace !== targetWorkspace) {
+            return NextResponse.json({ error: "list workspace mismatch: cannot assign task to a list from another workspace" }, { status: 400 });
+        }
+    }
 
     const keys = Object.keys(patch) as (keyof typeof patch)[];
     if (keys.length === 0) return NextResponse.json({ task: current });
