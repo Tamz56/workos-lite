@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   id            TEXT PRIMARY KEY,
   title         TEXT NOT NULL,
   workspace     TEXT NOT NULL,
+  list_id       TEXT NULL,
 
   status        TEXT NOT NULL CHECK (status IN ('inbox','planned','done')),
 
@@ -36,9 +37,31 @@ END;
 -- Helpful indexes
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace);
+CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_date ON tasks(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_bucket ON tasks(schedule_bucket);
 CREATE INDEX IF NOT EXISTS idx_tasks_done_at ON tasks(done_at);
+
+-- Lists: grouped tasks for a workspace
+CREATE TABLE IF NOT EXISTS lists (
+  id TEXT PRIMARY KEY,
+  workspace TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lists_workspace_slug ON lists(workspace, slug);
+CREATE INDEX IF NOT EXISTS idx_lists_workspace ON lists(workspace);
+
+CREATE TRIGGER IF NOT EXISTS trg_lists_updated_at
+AFTER UPDATE ON lists
+FOR EACH ROW
+BEGIN
+  UPDATE lists SET updated_at = datetime('now') WHERE id = OLD.id;
+END;
 
 -- Docs: 1 doc can be linked by tasks.doc_id
 CREATE TABLE IF NOT EXISTS docs (

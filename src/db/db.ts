@@ -114,7 +114,73 @@ function ensureMigrations() {
         `);
     }
 
+    // Phase 1: Lists implementation
+    const hasListId = cols.some((c) => c.name === "list_id");
+    if (!hasListId) {
+        db.exec("ALTER TABLE tasks ADD COLUMN list_id TEXT NULL");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id)");
+
+    // Create lists table ensuring it exists during runtime migration safely
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS lists (
+            id TEXT PRIMARY KEY,
+            workspace TEXT NOT NULL,
+            slug TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_lists_workspace_slug ON lists(workspace, slug);
+        CREATE INDEX IF NOT EXISTS idx_lists_workspace ON lists(workspace);
+        
+        CREATE TRIGGER IF NOT EXISTS trg_lists_updated_at
+        AFTER UPDATE ON lists
+        FOR EACH ROW
+        BEGIN
+            UPDATE lists SET updated_at = datetime('now') WHERE id = OLD.id;
+        END;
+    `);
+
     migrated = true;
+}
+
+function auditWorkspaceConstraint() {
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get() as { sql: string } | undefined;
+    if (tableInfo && tableInfo.sql.includes("CHECK (workspace IN")) {
+        // If it does not include marketing, surface a warning logically.
+        if (!tableInfo.sql.includes("'marketing'")) {
+            console.warn("⚠️ DB constraint mismatch: tasks.workspace CHECK missing: marketing. Run DB repair script to rebuild constraint.");
+        }
+    }
+}
+
+function ensureSeedLists() {
+    const defaultLists = [
+        { workspace: 'marketing', slug: 'nanagarden-q1', title: 'NanaGarden Q1', desc: 'Q1 Tasks for NanaGarden' },
+        { workspace: 'marketing', slug: 'sku-ads', title: 'SKU Ads', desc: 'SKU advertisements tracking' }
+    ];
+
+    const insertStmt = db.prepare(`
+        INSERT INTO lists (id, workspace, slug, title, description, created_at, updated_at)
+        VALUES (@id, @workspace, @slug, @title, @description, datetime('now'), datetime('now'))
+        ON CONFLICT(workspace, slug) DO NOTHING
+    `);
+
+    const runTx = db.transaction(() => {
+        for (const list of defaultLists) {
+            insertStmt.run({
+                id: crypto.randomUUID(),
+                workspace: list.workspace,
+                slug: list.slug,
+                title: list.title,
+                description: list.desc
+            });
+        }
+    });
+
+    runTx();
 }
 
 function ensureDocsAndAttachments() {
@@ -211,6 +277,8 @@ function ensureAgentTables() {
 // Run migrations on init
 ensureSchema();
 ensureMigrations();
+auditWorkspaceConstraint();
+ensureSeedLists();
 ensureDocsAndAttachments();
 ensureEvents();
 ensureAgentTables();

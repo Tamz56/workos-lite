@@ -7,6 +7,7 @@ export type Task = {
     id: string;
     title: string;
     workspace: Workspace;
+    list_id: string | null;
 
     status: TaskStatus;
 
