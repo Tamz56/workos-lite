@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
         done_at
       )
       VALUES (
-        @id, @title, @workspace, @status,
+        @id, @title, @workspace, @list_id, @status,
         @scheduled_date, @schedule_bucket,
         @priority, @notes,
         @created_at, @updated_at,
