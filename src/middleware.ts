@@ -10,52 +10,57 @@ const PROTECTED_ROUTES = [
 ]
 
 export function middleware(request: NextRequest) {
-    const { pathname } = request.nextUrl
+    const { pathname: p } = request.nextUrl
 
-    // Skip if not a protected route
+    // 1. Auth Logic for protected routes
     const isProtected = PROTECTED_ROUTES.some(route =>
-        pathname === route || pathname.startsWith(`${route}/`)
+        p === route || p.startsWith(`${route}/`)
     )
 
-    if (!isProtected || pathname.startsWith('/agent/login')) {
-        return NextResponse.next()
-    }
-
-    // Fail-secure: If AGENT_UI_PASSWORD is not set, block access entirely
-    const authPassword = process.env.AGENT_UI_PASSWORD
-    if (!authPassword) {
-        return new NextResponse(
-            JSON.stringify({ error: "Configuration Error: AGENT_UI_PASSWORD is not set. Access Denied." }),
-            { status: 500, headers: { 'content-type': 'application/json' } }
-        )
-    }
-
-    // Check cookie
-    const hasAccess = request.cookies.get('agent_ui')?.value === '1'
-
-    if (!hasAccess) {
-        // For API routes, return 401 Unauthorized
-        if (pathname.startsWith('/api/')) {
+    if (isProtected && !p.startsWith('/agent/login')) {
+        const authPassword = process.env.AGENT_UI_PASSWORD
+        if (!authPassword) {
             return new NextResponse(
-                JSON.stringify({ error: "Unauthorized access" }),
-                { status: 401, headers: { 'content-type': 'application/json' } }
+                JSON.stringify({ error: "Configuration Error: AGENT_UI_PASSWORD is not set. Access Denied." }),
+                { status: 500, headers: { 'content-type': 'application/json' } }
             )
         }
 
-        // For UI routes, redirect to login with the callback URL
-        const url = request.nextUrl.clone()
-        url.pathname = '/agent/login'
-        url.searchParams.set('next', pathname)
-        return NextResponse.redirect(url)
+        const hasAccess = request.cookies.get('agent_ui')?.value === '1'
+        if (!hasAccess) {
+            if (p.startsWith('/api/')) {
+                return new NextResponse(
+                    JSON.stringify({ error: "Unauthorized access" }),
+                    { status: 401, headers: { 'content-type': 'application/json' } }
+                )
+            }
+            const url = request.nextUrl.clone()
+            url.pathname = '/agent/login'
+            url.searchParams.set('next', p)
+            return NextResponse.redirect(url)
+        }
     }
 
-    return NextResponse.next()
+    const res = NextResponse.next()
+
+    // 2. Cache-Control Logic
+    if (
+        p.startsWith("/_next/static") ||
+        p.startsWith("/_next/image") ||
+        p === "/favicon.ico" ||
+        p.startsWith("/icons") ||
+        p.startsWith("/assets")
+    ) {
+        return res;
+    }
+
+    // HTML / app pages: never cache
+    res.headers.set("Cache-Control", "no-store, max-age=0");
+    return res;
 }
 
-// Config ensures middleware only runs on matched paths
 export const config = {
     matcher: [
-        '/agent/:path*',
-        '/api/agent/:path*'
+        '/:path*'
     ]
 }
