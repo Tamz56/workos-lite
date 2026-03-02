@@ -98,6 +98,21 @@ export default function ListDetailClient({ listId }: { listId: string }) {
         router.push(`?newTask=1&workspace=${list.workspace}&list_id=${listId}`);
     };
 
+    const handleDeleteList = async () => {
+        if (!list) return;
+        if (!window.confirm(`Are you sure you want to delete "${list.title}"? All tasks inside will become Unassigned in the ${list.workspace} workspace.`)) return;
+        try {
+            const res = await fetch(`/api/lists/${listId}`, { method: "DELETE" });
+            if (res.ok) {
+                router.push(`/workspaces/${list.workspace}`);
+            } else {
+                alert("Failed to delete list");
+            }
+        } catch (e) {
+            alert("Error deleting list");
+        }
+    };
+
     if (loadingList) return <div className="p-10 animate-pulse text-neutral-400">Loading list...</div>;
     if (!list) return <div className="p-10 text-neutral-400">List not found</div>;
 
@@ -112,7 +127,13 @@ export default function ListDetailClient({ listId }: { listId: string }) {
                     <span className="text-neutral-300">/</span>
                     <h1 className="text-xl font-bold text-neutral-900">{list.title}</h1>
                 </div>
-                <div>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleDeleteList}
+                        className="text-red-500 bg-red-50 px-4 py-2 rounded-lg text-sm font-bold border border-red-100 hover:bg-red-100 transition-colors flex items-center gap-2"
+                    >
+                        Delete List
+                    </button>
                     <button
                         onClick={handleNewTask}
                         className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-800 transition-colors flex items-center gap-2"
