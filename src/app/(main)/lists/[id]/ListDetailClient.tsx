@@ -34,8 +34,14 @@ export default function ListDetailClient(props: { listId: string }) {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<"all" | "inbox" | "planned" | "done">("all");
 
     const title = useMemo(() => list?.title ?? "List", [list?.title]);
+
+    const filteredTasks = useMemo(() => {
+        if (activeTab === "all") return tasks;
+        return tasks.filter(t => t.status === activeTab);
+    }, [tasks, activeTab]);
 
     useEffect(() => {
         let alive = true;
@@ -90,29 +96,59 @@ export default function ListDetailClient(props: { listId: string }) {
                     {list.description && <div className="mt-2 text-sm text-neutral-700">{list.description}</div>}
                 </div>
 
-                <button
-                    className="px-3 py-2 rounded-md bg-neutral-900 text-white text-sm"
-                    onClick={() => router.push(`/workspaces/${list.workspace}`)}
-                >
-                    Back to workspace
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        className="px-3 py-2 rounded-md border border-neutral-300 bg-white text-neutral-700 text-sm hover:bg-neutral-50 transition-colors"
+                        onClick={() => router.push(`/workspaces/${list.workspace}`)}
+                    >
+                        Back
+                    </button>
+                    <button
+                        className="px-3 py-2 rounded-md bg-neutral-900 text-white text-sm hover:bg-black transition-colors"
+                        onClick={() => router.push(`?newTask=1&workspace=${list.workspace}&list_id=${listId}`)}
+                    >
+                        + New Task
+                    </button>
+                </div>
             </div>
 
             <div className="border-t pt-4">
-                <div className="text-sm font-semibold mb-2">Tasks in this list ({tasks.length})</div>
-                {tasks.length === 0 ? (
-                    <div className="text-sm text-neutral-500">No tasks yet</div>
+                <div className="flex gap-6 border-b mb-4">
+                    {(["all", "inbox", "planned", "done"] as const).map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`pb-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
+                                    ? "border-neutral-900 text-neutral-900"
+                                    : "border-transparent text-neutral-500 hover:text-neutral-700"
+                                }`}
+                        >
+                            {tab.charAt(0).toUpperCase() + tab.slice(1)} <span className="text-xs text-neutral-400 ml-1">({tab === "all" ? tasks.length : tasks.filter(t => t.status === tab).length})</span>
+                        </button>
+                    ))}
+                </div>
+
+                {filteredTasks.length === 0 ? (
+                    <div className="text-sm text-neutral-500 py-4">No tasks found in this view</div>
                 ) : (
                     <div className="space-y-2">
-                        {tasks.map((t) => (
-                            <div key={t.id} className="border rounded-lg p-3 flex items-center justify-between">
-                                <div>
-                                    <div className="text-sm font-medium">{t.title}</div>
-                                    <div className="text-xs text-neutral-500">
-                                        {t.status} • bucket:{t.schedule_bucket} • date:{t.scheduled_date ?? "-"}
+                        {filteredTasks.map((t) => (
+                            <div
+                                key={t.id}
+                                className="border rounded-lg p-3 flex items-center justify-between cursor-pointer hover:border-black/20 hover:shadow-sm transition-all group bg-white"
+                                onClick={() => router.push(`?taskId=${t.id}`)}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-2 h-2 shrink-0 rounded-full ${t.status === 'done' ? 'bg-green-500' : t.status === 'inbox' ? 'bg-neutral-300' : 'bg-blue-500'}`} />
+                                    <div>
+                                        <div className={`text-sm font-medium ${t.status === 'done' ? 'text-neutral-400 line-through' : 'text-neutral-900'}`}>{t.title}</div>
+                                        <div className="text-xs text-neutral-500 mt-0.5">
+                                            <span className="uppercase tracking-wide">{t.status}</span>
+                                            {t.scheduled_date && <span className="ml-2 font-mono bg-neutral-100 px-1 py-0.5 rounded">{t.scheduled_date}</span>}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="text-xs text-neutral-400 font-mono">{t.id}</div>
+                                <div className="text-neutral-300 group-hover:text-black transition-colors">→</div>
                             </div>
                         ))}
                     </div>

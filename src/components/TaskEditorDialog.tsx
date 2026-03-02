@@ -83,7 +83,23 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
                 const res = await fetch(`/api/lists?workspace=${workspace}`);
                 if (!res.ok) return;
                 const data = await res.json();
-                if (!cancelled) setAvailableLists(data);
+                if (!cancelled) {
+                    setAvailableLists(data);
+
+                    // Auto-select list logic
+                    if (data.length > 0) {
+                        setListId(prev => {
+                            // 1. If task opened with a specific list_id and it's in this workspace, use it.
+                            if (task.list_id && data.some((l: List) => l.id === task.list_id)) return task.list_id;
+                            // 2. If already chose a list and it's in this workspace, keep it.
+                            if (prev && data.some((l: List) => l.id === prev)) return prev;
+                            // 3. Otherwise default to the first list (no more "Unassigned" default if lists exist)
+                            return data[0].id;
+                        });
+                    } else {
+                        setListId("");
+                    }
+                }
             } catch (e) {
                 console.error(e);
             }
