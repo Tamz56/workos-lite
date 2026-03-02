@@ -5,6 +5,7 @@ import type { Task, TaskStatus } from "../lib/types";
 import { patchTask, listAttachments } from "../lib/api";
 import TaskDocPanel from "./TaskDocPanel";
 import TaskAttachmentsPanel from "./TaskAttachmentsPanel";
+import { List } from "../lib/lists";
 import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "../lib/styles";
 
 // --- Helpers ---
@@ -151,8 +152,11 @@ function TaskDetailDialogInner({
     const [platforms, setPlatforms] = useState<string[]>(parsePlatforms(task.title || ""));
 
     const [status, setStatus] = useState<TaskStatus>((task.status?.toLowerCase() as TaskStatus) || "inbox");
+    const [listId, setListId] = useState<string | null>(task.list_id || null);
     const [scheduledDate, setScheduledDate] = useState(normalizeDate(task.scheduled_date));
     const [priority, setPriority] = useState(task.priority ?? 2);
+
+    const [availableLists, setAvailableLists] = useState<List[]>([]);
 
     // Notes / Subtasks split
     const parsed = parseNotes(task.notes || "");
@@ -182,6 +186,7 @@ function TaskDetailDialogInner({
             const updates: Partial<Task> = {
                 title: finalTitle,
                 status,
+                list_id: listId,
                 scheduled_date: scheduledDate,
                 priority,
                 notes: finalNotes
@@ -198,7 +203,7 @@ function TaskDetailDialogInner({
             console.error(e);
             setSaveStatus("error");
         }
-    }, [task.id, titleRaw, project, stage, platforms, status, scheduledDate, priority, description, subtasks, onUpdate]);
+    }, [task.id, titleRaw, project, stage, platforms, status, listId, scheduledDate, priority, description, subtasks, onUpdate]);
 
     // Debounce Trigger
     const triggerSave = useCallback(() => {
@@ -242,6 +247,23 @@ function TaskDetailDialogInner({
     useEffect(() => {
         listAttachments(task.id).then(files => setFileCount(files?.length || 0)).catch(() => { });
     }, [task.id]);
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!task.workspace) return;
+        async function run() {
+            try {
+                const res = await fetch(`/api/lists?workspace=${task.workspace}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!cancelled) setAvailableLists(data);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        run();
+        return () => { cancelled = true; };
+    }, [task.workspace]);
 
     // --- Handlers ---
 
@@ -339,6 +361,23 @@ function TaskDetailDialogInner({
                                         <span className={`w-2.5 h-2.5 rounded-full bg-neutral-400`} />
                                         {task.workspace}
                                     </div>
+                                </div>
+                                <div>
+                                    <label className={LABEL_BASE}>List</label>
+                                    <select
+                                        className={INPUT_BASE}
+                                        value={listId || ""}
+                                        onChange={(e) => {
+                                            setListId(e.target.value || null);
+                                            triggerSave();
+                                        }}
+                                        disabled={readOnly}
+                                    >
+                                        <option value="">(Unassigned)</option>
+                                        {availableLists.map(l => (
+                                            <option key={l.id} value={l.id}>{l.title}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className={LABEL_BASE}>Status</label>

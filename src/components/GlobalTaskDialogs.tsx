@@ -42,6 +42,7 @@ export function GlobalTaskDialogs() {
     // 2. New Task Dialog (?newTask=1&workspace=...)
     const isNewTaskOpen = sp.get("newTask") === "1";
     const workspaceParam = sp.get("workspace") as Workspace | null;
+    const listIdParam = sp.get("list_id");
 
     // Default dummy task for creation
     const newTaskInitial = useMemo(() => ({
@@ -49,12 +50,14 @@ export function GlobalTaskDialogs() {
         title: "",
         workspace: workspaceParam || "avacrm", // Default or from param
         status: "inbox",
-    } as Task), [workspaceParam]);
+        list_id: listIdParam || null,
+    } as Task), [workspaceParam, listIdParam]);
 
     const closeNewTask = () => {
         const params = new URLSearchParams(sp.toString());
         params.delete("newTask");
         params.delete("workspace");
+        params.delete("list_id");
         router.replace(params.toString() ? `?${params.toString()}` : window.location.pathname, { scroll: false });
     };
 

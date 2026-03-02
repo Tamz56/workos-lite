@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { WORKSPACES_LIST, workspaceLabel, Workspace } from "@/lib/workspaces";
 import { Task } from "@/lib/types";
+import { List } from "@/lib/lists";
 
 // Reusing styles from Dashboard
 function TaskItem({ task }: { task: Task }) {
@@ -45,17 +46,39 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const [statusFilter, setStatusFilter] = useState("all");
     const [search, setSearch] = useState("");
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [lists, setLists] = useState<List[]>([]);
+    const [loadingTasks, setLoadingTasks] = useState(true);
+    const [loadingLists, setLoadingLists] = useState(true);
 
-    // Fetch Logic
-    // Fetch Logic
+    // Fetch Lists
     useEffect(() => {
         let cancelled = false;
-
         async function run() {
+            try {
+                const res = await fetch(`/api/lists?workspace=${workspaceId}`);
+                if (!res.ok) return;
+                const data = await res.json() as List[];
+                if (!cancelled) setLists(data);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                if (!cancelled) setLoadingLists(false);
+            }
+        }
+        run();
+        return () => { cancelled = true; };
+    }, [workspaceId]);
+
+    // Fetch Unassigned Tasks Logic
+    useEffect(() => {
+        let cancelled = false;
+        async function run() {
+            setLoadingTasks(true);
             try {
                 const params = new URLSearchParams();
                 params.set("workspace", workspaceId);
+                // ONLY fetch unassigned initially here to not spam
+                params.set("list_id", "unassigned");
                 params.set("limit", "100"); // Limit for performance
                 if (statusFilter !== "all") params.set("status", statusFilter);
                 if (search) params.set("q", search);
@@ -65,25 +88,42 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
                 if (!cancelled) setTasks(data);
             } catch {
-                // optional: keep silent or setTasks([])
                 if (!cancelled) setTasks([]);
             } finally {
-                if (!cancelled) setLoading(false);
+                if (!cancelled) setLoadingTasks(false);
             }
         }
-
-        // IMPORTANT: do NOT call setLoading(true) inside effect (lint rule)
-        // If you want "loading" on every filter change, setLoading(true) at the event handlers instead.
         run();
-
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [workspaceId, statusFilter, search]);
 
     // Handle New Task
     const handleNewTask = () => {
         router.push(`?newTask=1&workspace=${workspaceId}`);
+    };
+
+    // Handle New List
+    const handleNewList = async () => {
+        const title = window.prompt("Enter new list title:");
+        if (!title) return;
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+        try {
+            const res = await fetch("/api/lists", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workspace: workspaceId, title, slug })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setLists(prev => [data.list, ...prev]);
+            } else {
+                const err = await res.json();
+                alert(`Failed to create list: ${err.error || 'Unknown'}`);
+            }
+        } catch (e) {
+            alert("Error creating list");
+        }
     };
 
     if (!ws) return <div className="p-10">Workspace not found</div>;
@@ -101,10 +141,16 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 </div>
                 <div>
                     <button
-                        onClick={handleNewTask}
-                        className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-800 transition-colors flex items-center gap-2"
+                        onClick={handleNewList}
+                        className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-200 transition-colors flex items-center gap-2 mr-2 inline-flex"
                     >
-                        + New Task
+                        + List
+                    </button>
+                    <button
+                        onClick={handleNewTask}
+                        className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-800 transition-colors items-center gap-2 inline-flex"
+                    >
+                        + Task
                     </button>
                 </div>
             </div>
@@ -133,22 +179,55 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 </div>
             </div>
 
-            {/* List */}
+            {/* Content Body */}
             <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-                {loading ? (
-                    <div className="text-center text-neutral-400 py-10 animate-pulse">Loading tasks...</div>
-                ) : tasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-neutral-400">
-                        <div className="text-4xl mb-2 opacity-30">📭</div>
-                        <div>No tasks found</div>
-                    </div>
-                ) : (
-                    <div className="max-w-4xl mx-auto">
-                        {tasks.map(t => (
-                            <TaskItem key={t.id} task={t} />
-                        ))}
-                    </div>
-                )}
+                <div className="max-w-4xl mx-auto space-y-8">
+
+                    {/* Lists Section */}
+                    <section>
+                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Lists</h2>
+                        {loadingLists ? (
+                            <div className="text-neutral-400 py-4 animate-pulse">Loading lists...</div>
+                        ) : lists.length === 0 ? (
+                            <div className="text-neutral-400 py-4 text-sm bg-neutral-100 border border-neutral-200 border-dashed rounded-xl px-4 inline-block">No lists found. Create one.</div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {lists.map(list => (
+                                    <Link key={list.id} href={`/lists/${list.id}`} className="block group">
+                                        <div className="p-4 bg-white border border-neutral-200 rounded-xl hover:shadow-md hover:border-black/20 transition-all h-full flex flex-col justify-between cursor-pointer">
+                                            <div>
+                                                <h3 className="font-bold text-neutral-900 group-hover:text-black">{list.title}</h3>
+                                                {list.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{list.description}</p>}
+                                            </div>
+                                            <div className="mt-4 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
+                                                <span>{list.slug}</span>
+                                                <span>→</span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Unassigned Tasks Section */}
+                    <section>
+                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Unassigned Tasks</h2>
+                        {loadingTasks ? (
+                            <div className="text-center text-neutral-400 py-10 animate-pulse">Loading tasks...</div>
+                        ) : tasks.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-32 text-neutral-400 bg-neutral-100/50 border border-neutral-200 border-dashed rounded-xl">
+                                <span className="opacity-50">No unassigned tasks</span>
+                            </div>
+                        ) : (
+                            <div>
+                                {tasks.map(t => (
+                                    <TaskItem key={t.id} task={t} />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                </div>
             </div>
         </div>
     );
