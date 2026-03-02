@@ -7,6 +7,14 @@ import { WORKSPACES_LIST, workspaceLabel, Workspace } from "@/lib/workspaces";
 import { Task } from "@/lib/types";
 import { List } from "@/lib/lists";
 
+interface ListStats {
+    list_id: string;
+    total: number;
+    inbox: number;
+    planned: number;
+    done: number;
+}
+
 // Reusing styles from Dashboard
 function TaskItem({ task }: { task: Task }) {
     const router = useRouter();
@@ -47,6 +55,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const [search, setSearch] = useState("");
     const [tasks, setTasks] = useState<Task[]>([]);
     const [lists, setLists] = useState<List[]>([]);
+    const [listStats, setListStats] = useState<Record<string, ListStats>>({});
     const [loadingTasks, setLoadingTasks] = useState(true);
     const [loadingLists, setLoadingLists] = useState(true);
 
@@ -55,10 +64,25 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         let cancelled = false;
         async function run() {
             try {
-                const res = await fetch(`/api/lists?workspace=${workspaceId}`);
-                if (!res.ok) return;
-                const data = await res.json() as List[];
-                if (!cancelled) setLists(data);
+                // Fetch lists and stats concurrently
+                const [resLists, resStats] = await Promise.all([
+                    fetch(`/api/lists?workspace=${workspaceId}`),
+                    fetch(`/api/lists/stats?workspace=${workspaceId}`)
+                ]);
+
+                if (!resLists.ok || !resStats.ok) return;
+
+                const dataLists = await resLists.json() as List[];
+                const dataStats = await resStats.json() as ListStats[];
+
+                if (!cancelled) {
+                    setLists(dataLists);
+                    const statsMap: Record<string, ListStats> = {};
+                    for (const s of dataStats) {
+                        statsMap[s.list_id] = s;
+                    }
+                    setListStats(statsMap);
+                }
             } catch (e) {
                 console.error(e);
             } finally {
@@ -192,20 +216,40 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                             <div className="text-neutral-400 py-4 text-sm bg-neutral-100 border border-neutral-200 border-dashed rounded-xl px-4 inline-block">No lists found. Create one.</div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {lists.map(list => (
-                                    <Link key={list.id} href={`/lists/${list.id}`} className="block group">
-                                        <div className="p-4 bg-white border border-neutral-200 rounded-xl hover:shadow-md hover:border-black/20 transition-all h-full flex flex-col justify-between cursor-pointer">
-                                            <div>
-                                                <h3 className="font-bold text-neutral-900 group-hover:text-black">{list.title}</h3>
-                                                {list.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{list.description}</p>}
+                                {lists.map(list => {
+                                    const stats = listStats[list.id] || { total: 0, inbox: 0, planned: 0, done: 0 };
+                                    return (
+                                        <Link key={list.id} href={`/lists/${list.id}`} className="block group">
+                                            <div className="p-4 bg-white border border-neutral-200 rounded-xl hover:shadow-md hover:border-black/20 transition-all h-full flex flex-col justify-between cursor-pointer">
+                                                <div>
+                                                    <div className="flex items-start justify-between">
+                                                        <h3 className="font-bold text-neutral-900 group-hover:text-black">{list.title}</h3>
+                                                        {stats.total > 0 && (
+                                                            <span className="text-[10px] font-bold bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded-full">
+                                                                {stats.total} tasks
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {list.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{list.description}</p>}
+                                                </div>
+                                                <div className="mt-4 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
+                                                    <div className="flex gap-2">
+                                                        <span title="Inbox" className={`${stats.inbox > 0 ? "text-neutral-600 font-bold" : ""}`}>
+                                                            In: {stats.inbox}
+                                                        </span>
+                                                        <span title="Planned" className={`${stats.planned > 0 ? "text-blue-500 font-bold" : ""}`}>
+                                                            Pl: {stats.planned}
+                                                        </span>
+                                                        <span title="Done" className={`${stats.done > 0 ? "text-green-500 font-bold" : ""}`}>
+                                                            Dn: {stats.done}
+                                                        </span>
+                                                    </div>
+                                                    <span>→</span>
+                                                </div>
                                             </div>
-                                            <div className="mt-4 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
-                                                <span>{list.slug}</span>
-                                                <span>→</span>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                ))}
+                                        </Link>
+                                    );
+                                })}
                             </div>
                         )}
                     </section>
