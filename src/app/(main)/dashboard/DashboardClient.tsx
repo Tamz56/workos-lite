@@ -8,7 +8,7 @@ import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "@/lib/
 import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box, Target } from "lucide-react";
+import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box, Target, Activity, History } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { HomeFirstRunCard } from "@/components/dashboard/HomeFirstRunCard";
 import { ResetDemoDataDialog } from "@/components/ResetDemoDataDialog";
@@ -606,6 +606,7 @@ function DashboardContent() {
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [toastMessage, setToastMessage] = useState("Success!");
+    const [isMoreOpen, setIsMoreOpen] = useState(false);
 
     useEffect(() => {
         if (sp.get("bulkPaste") === "1") {
@@ -988,6 +989,47 @@ function DashboardContent() {
                             <Plus className="w-3.5 h-3.5" />
                             New Note
                         </button>
+
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsMoreOpen(!isMoreOpen)}
+                                className={`h-full px-3 rounded-xl border transition-all active:scale-95 flex items-center gap-1 ${isMoreOpen ? 'bg-neutral-100 border-neutral-300 text-black' : 'bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50'}`}
+                            >
+                                <MoreHorizontal className="w-4 h-4" />
+                            </button>
+
+                            {isMoreOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-30" onClick={() => setIsMoreOpen(false)} />
+                                    <div className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-2xl shadow-2xl py-2 z-40 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                                        <div className="px-3 py-1.5 text-[10px] font-black text-neutral-400 uppercase tracking-widest">Utilities</div>
+                                        <Link href="/agent" className="flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors">
+                                            <Bot className="w-4 h-4 text-purple-600" />
+                                            Agent
+                                        </Link>
+                                        <Link href="/logs" className="flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors">
+                                            <Activity className="w-4 h-4 text-blue-600" />
+                                            System Logs
+                                        </Link>
+                                        <div className="h-px bg-neutral-100 my-1 mx-2" />
+                                        <button 
+                                            onClick={() => { setIsMoreOpen(false); setIsNewEventOpen(true); }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors"
+                                        >
+                                            <CalendarPlus className="w-4 h-4 text-green-600" />
+                                            New Event
+                                        </button>
+                                        <button 
+                                            onClick={() => { setIsMoreOpen(false); setIsBulkOpen(true); }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors"
+                                        >
+                                            <PlusSquare className="w-4 h-4 text-orange-600" />
+                                            Bulk Paste
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 }
             />
