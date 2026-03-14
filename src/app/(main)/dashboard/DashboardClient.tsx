@@ -862,11 +862,20 @@ function DashboardContent() {
         tasks.forEach(task => {
             if (task.status === "done") return;
             
+            // Heuristic for Waiting: title contains #waiting or #followup
+            const isHeuristicWaiting = task.title.toLowerCase().includes('#waiting') || task.title.toLowerCase().includes('#followup');
+
             if (task.scheduled_date) {
                 if (task.scheduled_date < now) overdue++;
-                else if (task.scheduled_date === now) today++;
-            } else if (task.status === "planned") {
+                else if (task.scheduled_date === now) {
+                    if (isHeuristicWaiting) waiting++;
+                    else today++;
+                }
+            } else if (task.status === "planned" || isHeuristicWaiting) {
                 waiting++;
+            } else if (task.status === "inbox") {
+                // optional: count inbox as waiting too if not scheduled?
+                // for now, strict follow-up rule
             }
         });
 
@@ -878,22 +887,37 @@ function DashboardContent() {
         const bucketMap = {
             "avaone": { title: "AVAONE / Brand / Content", description: "Marketing, CRM & Brand management", workspaces: ["content", "avacrm"] as Workspace[], tasks: [] as Task[] },
             "farm": { title: "Farm Operations", description: "Avafarm888 & OPS management", workspaces: ["ops"] as Workspace[], tasks: [] as Task[] },
-            "product": { title: "Website / Product", description: "Travel, Other projects & Website", workspaces: ["other", "travel"] as Workspace[], tasks: [] as Task[] },
-            "sales": { title: "Sales / NanaGarden", description: "Marketing & NanaGarden sales", workspaces: ["marketing"] as Workspace[], tasks: [] as Task[] },
-            "admin": { title: "Admin / Notes", description: "Finance, Admin & Personal notes", workspaces: ["admin", "finance", "personal"] as Workspace[], tasks: [] as Task[] },
-            "other": { title: "Other / Uncategorized", description: "All other tasks", workspaces: [] as Workspace[], tasks: [] as Task[] },
+            "nanagarden": { title: "Website (NanaGarden)", description: "Travel, Project & NanaGarden site", workspaces: ["marketing"] as Workspace[], tasks: [] as Task[] },
+            "marketing": { title: "Marketing & Sales", description: "Marketing & General sales", workspaces: ["marketing"] as Workspace[], tasks: [] as Task[] },
+            "other": { title: "Admin / Other", description: "Finance, Admin & Personal", workspaces: ["admin", "finance", "personal"] as Workspace[], tasks: [] as Task[] },
         };
 
         tasks.forEach(task => {
             if (task.status === "done") return;
             
             const ws = task.workspace as Workspace;
-            if (bucketMap.avaone.workspaces.includes(ws)) bucketMap.avaone.tasks.push(task);
-            else if (bucketMap.farm.workspaces.includes(ws)) bucketMap.farm.tasks.push(task);
-            else if (bucketMap.product.workspaces.includes(ws)) bucketMap.product.tasks.push(task);
-            else if (bucketMap.sales.workspaces.includes(ws)) bucketMap.sales.tasks.push(task);
-            else if (bucketMap.admin.workspaces.includes(ws)) bucketMap.admin.tasks.push(task);
-            else bucketMap.other.tasks.push(task);
+            const titleLower = task.title.toLowerCase();
+
+            // 1. AVAONE: content/avacrm OR title match
+            if (ws === 'content' || ws === 'avacrm' || titleLower.includes('avaone')) {
+                bucketMap.avaone.tasks.push(task);
+            } 
+            // 2. Farm: ops
+            else if (ws === 'ops') {
+                bucketMap.farm.tasks.push(task);
+            }
+            // 3. Website: marketing + keyword
+            else if (ws === 'marketing' && (titleLower.includes('nanagarden') || titleLower.includes('website'))) {
+                bucketMap.nanagarden.tasks.push(task);
+            }
+            // 4. Marketing remaining
+            else if (ws === 'marketing') {
+                bucketMap.marketing.tasks.push(task);
+            }
+            // 5. Admin / Others
+            else {
+                bucketMap.other.tasks.push(task);
+            }
         });
 
         const getBucketStats = (tks: Task[]) => {

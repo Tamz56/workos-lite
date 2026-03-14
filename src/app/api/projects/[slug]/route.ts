@@ -10,10 +10,11 @@ const UpdateProjectSchema = z.object({
     owner: z.string().nullable().optional(),
 });
 
-export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
+        const { slug } = await params;
         const db = getDb();
-        const project = db.prepare("SELECT * FROM projects WHERE slug = ?").get(params.slug);
+        const project = db.prepare("SELECT * FROM projects WHERE slug = ?").get(slug);
 
         if (!project) {
             return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -25,17 +26,18 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
+        const { slug } = await params;
         const db = getDb();
-        const project = db.prepare("SELECT * FROM projects WHERE slug = ?").get(params.slug);
+        const project = db.prepare("SELECT * FROM projects WHERE slug = ?").get(slug);
         if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
         const body = await req.json();
         const parsed = UpdateProjectSchema.parse(body);
 
         const sets: string[] = [];
-        const bind: Record<string, any> = { slug: params.slug };
+        const bind: Record<string, any> = { slug: slug };
 
         if (parsed.name !== undefined) { sets.push("name = @name"); bind.name = parsed.name; }
         if (parsed.status !== undefined) { sets.push("status = @status"); bind.status = parsed.status; }
@@ -50,17 +52,17 @@ export async function PUT(req: NextRequest, { params }: { params: { slug: string
         const sql = `UPDATE projects SET ${sets.join(", ")} WHERE slug = @slug`;
         db.prepare(sql).run(bind);
 
-        const updated = db.prepare("SELECT * FROM projects WHERE slug = ?").get(params.slug);
+        const updated = db.prepare("SELECT * FROM projects WHERE slug = ?").get(slug);
         return NextResponse.json(updated);
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 400 });
     }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
+        const { slug } = await params;
         const db = getDb();
-        const slug = params.slug;
 
         // 1. Protection Check
         const project = db.prepare("SELECT * FROM projects WHERE slug = ?").get(slug);
