@@ -21,6 +21,8 @@ const CreateTaskSchema = z.object({
     schedule_bucket: Bucket.optional().nullable(),
     priority: z.number().int().optional().nullable(),
     notes: z.string().optional().nullable(),
+    parent_task_id: z.string().optional().nullable(),
+    sort_order: z.number().int().optional().nullable(),
 });
 
 function isDateYYYYMMDD(s: string) {
@@ -37,6 +39,7 @@ export async function GET(req: NextRequest) {
         const q = (url.searchParams.get("q") ?? "").trim();
         const scheduled_date = url.searchParams.get("scheduled_date");
         const schedule_bucket = url.searchParams.get("schedule_bucket");
+        const parent_id = url.searchParams.get("parent_id");
 
         const limitRaw = url.searchParams.get("limit");
         const limit = Math.min(Math.max(parseInt(limitRaw ?? "200", 10) || 200, 1), 500);
@@ -98,6 +101,15 @@ export async function GET(req: NextRequest) {
             }
         }
 
+        if (parent_id !== null) {
+            if (parent_id === "unassigned" || parent_id === "null") {
+                where.push("parent_task_id IS NULL");
+            } else {
+                where.push("parent_task_id = @parent_id");
+                bind.parent_id = parent_id;
+            }
+        }
+
         if (scheduled_date) {
             if (scheduled_date === "null") {
                 where.push("scheduled_date IS NULL");
@@ -145,7 +157,15 @@ export async function GET(req: NextRequest) {
                   WHEN 'evening' THEN 3
                   ELSE 9
                 END ASC,
+                sort_order ASC,
                 datetime(updated_at) DESC
+            `;
+        } else {
+            orderSql = `
+              ORDER BY
+                sort_order ASC,
+                datetime(updated_at) DESC,
+                datetime(created_at) DESC
             `;
         }
 
@@ -200,6 +220,24 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Parent task validation
+        if (t.parent_task_id) {
+            const parent = getDb().prepare("SELECT id, workspace, list_id FROM tasks WHERE id = ?").get(t.parent_task_id) as { id: string, workspace: string, list_id: string | null } | undefined;
+            if (!parent) {
+                return NextResponse.json({ error: "Provided parent_task_id does not exist." }, { status: 400 });
+            }
+            if (parent.workspace !== t.workspace) {
+                return NextResponse.json({ error: "parent workspace mismatch" }, { status: 400 });
+            }
+            if (parent.list_id && t.list_id && parent.list_id !== t.list_id) {
+                return NextResponse.json({ error: "parent list_id mismatch" }, { status: 400 });
+            }
+            // Inherit list_id if not provided
+            if (!t.list_id && parent.list_id) {
+                t.list_id = parent.list_id;
+            }
+        }
+
         // schedule consistency: if scheduled_date missing -> bucket should be 'none'
         const scheduledDate = t.scheduled_date ?? null;
         const bucket = scheduledDate ? (t.schedule_bucket ?? "none") : "none";
@@ -210,6 +248,7 @@ export async function POST(req: NextRequest) {
         id, title, workspace, list_id, status,
         scheduled_date, schedule_bucket,
         priority, notes,
+        parent_task_id, sort_order,
         created_at, updated_at,
         done_at
       )
@@ -217,6 +256,7 @@ export async function POST(req: NextRequest) {
         @id, @title, @workspace, @list_id, @status,
         @scheduled_date, @schedule_bucket,
         @priority, @notes,
+        @parent_task_id, @sort_order,
         @created_at, @updated_at,
         @done_at
       )
@@ -231,6 +271,8 @@ export async function POST(req: NextRequest) {
             schedule_bucket: bucket,
             priority: t.priority ?? null,
             notes: t.notes ?? null,
+            parent_task_id: t.parent_task_id ?? null,
+            sort_order: t.sort_order ?? null,
             created_at: now,
             updated_at: now,
             done_at: t.status === "done" ? now : null,

@@ -46,6 +46,7 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
     const [scheduledDate, setScheduledDate] = useState(task.scheduled_date || "");
     const [priority, setPriority] = useState(task.priority || 2);
     const [notes, setNotes] = useState(task.notes || "");
+    const [parentTaskId, setParentTaskId] = useState(task.parent_task_id || "");
 
     const [availableLists, setAvailableLists] = useState<List[]>([]);
 
@@ -65,6 +66,7 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
             setScheduledDate(task.scheduled_date || "");
             setPriority(task.priority || 2);
             setNotes(task.notes || "");
+            setParentTaskId(task.parent_task_id || "");
 
             // Reset Content
             setContentTab("details");
@@ -139,6 +141,7 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
                         title: finalTitle,
                         workspace,
                         list_id: listId || undefined,
+                        parent_task_id: parentTaskId || undefined,
                         status,
                         scheduled_date: scheduledDate || undefined,
                         priority,
@@ -168,6 +171,7 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
                         title,
                         workspace,
                         list_id: listId || undefined,
+                        parent_task_id: parentTaskId || undefined,
                         status,
                         scheduled_date: scheduledDate || undefined, // Send undefined if empty string
                         priority,

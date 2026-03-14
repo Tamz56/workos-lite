@@ -43,6 +43,7 @@ export function GlobalTaskDialogs() {
     const isNewTaskOpen = sp.get("newTask") === "1";
     const workspaceParam = sp.get("workspace") as Workspace | null;
     const listIdParam = sp.get("list_id");
+    const parentTaskIdParam = sp.get("parent_task_id");
 
     // Default dummy task for creation
     const newTaskInitial = useMemo(() => ({
@@ -51,13 +52,16 @@ export function GlobalTaskDialogs() {
         workspace: workspaceParam || "avacrm", // Default or from param
         status: "inbox",
         list_id: listIdParam || null,
-    } as Task), [workspaceParam, listIdParam]);
+        parent_task_id: parentTaskIdParam || null,
+        sort_order: null,
+    } as Task), [workspaceParam, listIdParam, parentTaskIdParam]);
 
     const closeNewTask = () => {
         const params = new URLSearchParams(sp.toString());
         params.delete("newTask");
         params.delete("workspace");
         params.delete("list_id");
+        params.delete("parent_task_id");
         router.replace(params.toString() ? `?${params.toString()}` : window.location.pathname, { scroll: false });
     };
 

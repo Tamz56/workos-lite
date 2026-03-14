@@ -24,6 +24,8 @@ const PatchTaskSchema = z
         notes: z.string().nullable().optional(),
         doc_id: z.string().nullable().optional(),
         list_id: z.string().nullable().optional(),
+        parent_task_id: z.string().nullable().optional(),
+        sort_order: z.number().int().nullable().optional(),
     })
     .strict();
 
@@ -74,6 +76,29 @@ export async function PATCH(
         const targetWorkspace = patch.workspace || current.workspace;
         if (list.workspace !== targetWorkspace) {
             return NextResponse.json({ error: "list workspace mismatch: cannot assign task to a list from another workspace" }, { status: 400 });
+        }
+    }
+
+    // Enforce parent_task_id rules
+    if (patch.parent_task_id !== undefined && patch.parent_task_id !== null) {
+        const parent = db.prepare("SELECT id, workspace, list_id FROM tasks WHERE id = ?").get(patch.parent_task_id) as { id: string, workspace: string, list_id: string | null } | undefined;
+        if (!parent) return NextResponse.json({ error: "Provided parent_task_id does not exist." }, { status: 400 });
+        // Can't be parent to itself
+        if (parent.id === id) return NextResponse.json({ error: "Task cannot be its own parent" }, { status: 400 });
+
+        const targetWorkspace = patch.workspace || current.workspace;
+        if (parent.workspace !== targetWorkspace) {
+            return NextResponse.json({ error: "parent workspace mismatch" }, { status: 400 });
+        }
+
+        const targetListId = patch.list_id !== undefined ? patch.list_id : current.list_id;
+        if (parent.list_id && targetListId && parent.list_id !== targetListId) {
+            return NextResponse.json({ error: "parent list_id mismatch" }, { status: 400 });
+        }
+
+        // Inherit list_id if target doesn't have one
+        if (!targetListId && parent.list_id) {
+            patch.list_id = parent.list_id;
         }
     }
 

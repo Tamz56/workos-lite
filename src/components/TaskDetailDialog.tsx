@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import type { Task, TaskStatus } from "../lib/types";
 import { patchTask, listAttachments } from "../lib/api";
 import TaskDocPanel from "./TaskDocPanel";
@@ -117,7 +118,7 @@ function serializeNotes(description: string, subtasks: Subtask[]) {
     return out;
 }
 
-type TabKey = "details" | "content" | "subtasks" | "doc" | "files";
+type TabKey = "details" | "content" | "subtasks" | "checklist" | "doc" | "files";
 
 interface TaskDetailDialogProps {
     task: Task | null;
@@ -141,6 +142,7 @@ function TaskDetailDialogInner({
     initialTab,
     readOnly,
 }: TaskDetailDialogProps & { task: Task }) {
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState<TabKey>(initialTab || "details");
     const [fileCount, setFileCount] = useState(0);
 
@@ -158,10 +160,13 @@ function TaskDetailDialogInner({
 
     const [availableLists, setAvailableLists] = useState<List[]>([]);
 
-    // Notes / Subtasks split
     const parsed = parseNotes(task.notes || "");
     const [description, setDescription] = useState(parsed.description);
-    const [subtasks, setSubtasks] = useState<Subtask[]>(parsed.subtasks);
+    const [checklistItems, setChecklistItems] = useState<Subtask[]>(parsed.subtasks);
+
+    // REAL Subtasks
+    const [realSubtasks, setRealSubtasks] = useState<Task[]>([]);
+    const [loadingSubtasks, setLoadingSubtasks] = useState(false);
 
     // Save Status
     const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -180,7 +185,7 @@ function TaskDetailDialogInner({
         const finalTitle = constructTitle(cleanT, project, stage, platforms);
 
         // Reconstruct Notes
-        const finalNotes = serializeNotes(description, subtasks);
+        const finalNotes = serializeNotes(description, checklistItems);
 
         try {
             const updates: Partial<Task> = {
@@ -203,7 +208,7 @@ function TaskDetailDialogInner({
             console.error(e);
             setSaveStatus("error");
         }
-    }, [task.id, titleRaw, project, stage, platforms, status, listId, scheduledDate, priority, description, subtasks, onUpdate]);
+    }, [task.id, titleRaw, project, stage, platforms, status, listId, scheduledDate, priority, description, checklistItems, onUpdate]);
 
     // Debounce Trigger
     const triggerSave = useCallback(() => {
@@ -265,6 +270,20 @@ function TaskDetailDialogInner({
         return () => { cancelled = true; };
     }, [task.workspace]);
 
+    // Fetch REAL Subtasks whenever tab is active
+    useEffect(() => {
+        if (activeTab === "subtasks") {
+            setLoadingSubtasks(true);
+            fetch(`/api/tasks?parent_id=${task.id}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (Array.isArray(data)) setRealSubtasks(data);
+                    setLoadingSubtasks(false);
+                })
+                .catch(() => setLoadingSubtasks(false));
+        }
+    }, [activeTab, task.id]);
+
     // --- Handlers ---
 
     const handleTitleChange = (val: string) => {
@@ -289,29 +308,42 @@ function TaskDetailDialogInner({
         triggerSave();
     };
 
-    const handleAddSubtask = (text: string) => {
+    const handleAddChecklist = (text: string) => {
         if (!text.trim()) return;
-        setSubtasks([...subtasks, { id: Date.now().toString(), text, done: false }]);
+        setChecklistItems([...checklistItems, { id: Date.now().toString(), text, done: false }]);
         triggerSave();
     };
 
-    const toggleSubtask = (idx: number) => {
-        const next = [...subtasks];
+    const toggleChecklist = (idx: number) => {
+        const next = [...checklistItems];
         next[idx].done = !next[idx].done;
-        setSubtasks(next);
+        setChecklistItems(next);
         triggerSave();
     };
 
-    const removeSubtask = (idx: number) => {
-        const next = [...subtasks];
+    const removeChecklist = (idx: number) => {
+        const next = [...checklistItems];
         next.splice(idx, 1);
-        setSubtasks(next);
+        setChecklistItems(next);
         triggerSave();
     };
 
-    // Derived Subtask Stats
-    const subtDone = subtasks.filter(s => s.done).length;
-    const subtTotal = subtasks.length;
+    const handleCreateSubtask = () => {
+        // Build url logic to open TaskEditorDialog with parent_task_id
+        // Preserve current taskId so TaskDetailDialog remains open underneath
+        const qs = new URLSearchParams(window.location.search);
+        qs.set("newTask", "1");
+        qs.set("parent_task_id", task.id);
+        qs.set("workspace", task.workspace);
+        if (task.list_id) {
+            qs.set("list_id", task.list_id);
+        }
+        router.replace(`?${qs.toString()}`, { scroll: false });
+    };
+
+    // Derived Checklist Stats
+    const subtDone = checklistItems.filter(s => s.done).length;
+    const subtTotal = checklistItems.length;
     const subtBadge = subtTotal > 0 ? `${subtDone}/${subtTotal}` : undefined;
 
     return (
@@ -345,7 +377,8 @@ function TaskDetailDialogInner({
                 <div className="flex border-b bg-neutral-50 px-2 overflow-x-auto">
                     <TabBtn id="details" label="Details" active={activeTab} onClick={setActiveTab} />
                     {isContentWs && <TabBtn id="content" label="Content" active={activeTab} onClick={setActiveTab} />}
-                    <TabBtn id="subtasks" label="Subtasks" active={activeTab} onClick={setActiveTab} badge={subtBadge} />
+                    <TabBtn id="subtasks" label="Subtasks" active={activeTab} onClick={setActiveTab} badge={realSubtasks.length > 0 ? realSubtasks.length : undefined} badgeColor="blue" />
+                    <TabBtn id="checklist" label="Checklist" active={activeTab} onClick={setActiveTab} badge={subtBadge} />
                     <TabBtn id="doc" label="Doc" active={activeTab} onClick={setActiveTab} badge={task.doc_id ? "OK" : undefined} badgeColor="green" />
                     <TabBtn id="files" label="Files" active={activeTab} onClick={setActiveTab} badge={fileCount > 0 ? fileCount : undefined} badgeColor="blue" />
                 </div>
@@ -516,16 +549,64 @@ function TaskDetailDialogInner({
                         </div>
                     )}
 
+                    {/* REAL SUBTASKS TAB */}
                     {activeTab === "subtasks" && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                            <div className="flex justify-between items-center mb-4">
+                                <div>
+                                    <h3 className="font-bold text-lg text-neutral-800">Child Tasks</h3>
+                                    <p className="text-sm text-neutral-500">Tasks that belong to this task</p>
+                                </div>
+                                <button onClick={handleCreateSubtask} className={BUTTON_PRIMARY}>
+                                    + Subtask
+                                </button>
+                            </div>
+
+                            {loadingSubtasks ? (
+                                <div className="text-center py-10 text-neutral-400">Loading subtasks...</div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {realSubtasks.map(s => (
+                                        <div
+                                            key={s.id}
+                                            className="flex items-center gap-3 p-3 bg-white border border-neutral-100 rounded-xl hover:border-black cursor-pointer shadow-sm group transition-all"
+                                            onClick={() => {
+                                                const qs = new URLSearchParams(window.location.search);
+                                                qs.set("taskId", s.id);
+                                                router.replace(`?${qs.toString()}`, { scroll: false });
+                                            }}
+                                        >
+                                            <div className="font-medium text-neutral-800 flex-1">{s.title || "Untitled Subtask"}</div>
+                                            <div className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-600 capitalize">
+                                                {s.status}
+                                            </div>
+                                            <div className="text-neutral-400 text-xl font-bold p-1 rounded hover:bg-neutral-100">&rsaquo;</div>
+                                        </div>
+                                    ))}
+                                    {realSubtasks.length === 0 && (
+                                        <div className="text-center py-10 border border-dashed rounded-xl border-neutral-200">
+                                            <div className="text-neutral-400 mb-2">No subtasks yet</div>
+                                            <button onClick={handleCreateSubtask} className="text-sm border py-1.5 px-3 rounded text-black font-semibold shadow-sm">
+                                                Add Subtask
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* OLD CHECKLIST TAB */}
+                    {activeTab === "checklist" && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
 
                             <div className="flex gap-2">
                                 <input
                                     className={INPUT_BASE}
-                                    placeholder="Add subtask..."
+                                    placeholder="Add checklist item..."
                                     onKeyDown={e => {
                                         if (e.key === "Enter") {
-                                            handleAddSubtask(e.currentTarget.value);
+                                            handleAddChecklist(e.currentTarget.value);
                                             e.currentTarget.value = "";
                                         }
                                     }}
@@ -533,28 +614,28 @@ function TaskDetailDialogInner({
                             </div>
 
                             <div className="space-y-2">
-                                {subtasks.map((s, idx) => (
+                                {checklistItems.map((s, idx) => (
                                     <div key={s.id} className="flex items-center gap-3 p-3 bg-white border border-neutral-100 rounded-xl hover:border-neutral-200 transition-all group">
                                         <input
                                             type="checkbox"
                                             checked={s.done}
-                                            onChange={() => toggleSubtask(idx)}
+                                            onChange={() => toggleChecklist(idx)}
                                             className="w-5 h-5 rounded-md border-gray-300 text-black focus:ring-black cursor-pointer"
                                         />
                                         <span className={`flex-1 text-sm ${s.done ? "text-gray-400 line-through" : "text-gray-800"}`}>
                                             {s.text}
                                         </span>
                                         <button
-                                            onClick={() => removeSubtask(idx)}
+                                            onClick={() => removeChecklist(idx)}
                                             className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 px-2"
                                         >
                                             &times;
                                         </button>
                                     </div>
                                 ))}
-                                {subtasks.length === 0 && (
+                                {checklistItems.length === 0 && (
                                     <div className="text-center text-neutral-400 py-10">
-                                        No subtasks yet. Add one above!
+                                        No checklist items yet. Add one above!
                                     </div>
                                 )}
                             </div>

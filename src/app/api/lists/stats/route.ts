@@ -23,7 +23,7 @@ export async function GET(req: Request) {
                 SUM(CASE WHEN t.status = 'planned' THEN 1 ELSE 0 END) AS planned,
                 SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS done
             FROM lists l
-            LEFT JOIN tasks t ON l.id = t.list_id AND t.workspace = l.workspace
+            LEFT JOIN tasks t ON l.id = t.list_id AND t.workspace = l.workspace AND t.parent_task_id IS NULL
             WHERE l.workspace = ?
             GROUP BY l.id
         `);

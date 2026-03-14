@@ -9,6 +9,9 @@ export type Task = {
     workspace: Workspace;
     list_id: string | null;
 
+    parent_task_id: string | null;
+    sort_order: number | null;
+
     status: TaskStatus;
 
     // planning

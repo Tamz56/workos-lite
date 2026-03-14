@@ -57,7 +57,7 @@ export default function ListDetailClient(props: { listId: string }) {
                 const l: List = listJson.list ?? listJson; // รองรับทั้ง {list:{...}} และ {...}
 
                 const r2 = await fetch(
-                    `/api/tasks?workspace=${encodeURIComponent(l.workspace)}&list_id=${encodeURIComponent(l.id)}`,
+                    `/api/tasks?workspace=${encodeURIComponent(l.workspace)}&list_id=${encodeURIComponent(l.id)}&parent_id=unassigned`,
                     { cache: "no-store" }
                 );
                 if (!r2.ok) throw new Error(`GET /api/tasks(list) -> ${r2.status}`);
@@ -119,8 +119,8 @@ export default function ListDetailClient(props: { listId: string }) {
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`pb-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
-                                    ? "border-neutral-900 text-neutral-900"
-                                    : "border-transparent text-neutral-500 hover:text-neutral-700"
+                                ? "border-neutral-900 text-neutral-900"
+                                : "border-transparent text-neutral-500 hover:text-neutral-700"
                                 }`}
                         >
                             {tab.charAt(0).toUpperCase() + tab.slice(1)} <span className="text-xs text-neutral-400 ml-1">({tab === "all" ? tasks.length : tasks.filter(t => t.status === tab).length})</span>

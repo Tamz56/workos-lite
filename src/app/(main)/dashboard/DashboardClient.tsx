@@ -6,7 +6,11 @@ import Link from "next/link";
 import { WORKSPACES, WORKSPACES_LIST, workspaceLabel, type Workspace } from "@/lib/workspaces";
 import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "@/lib/styles";
 import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
-import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List } from "lucide-react";
+import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { HomeFirstRunCard } from "@/components/dashboard/HomeFirstRunCard";
+import { ResetDemoDataDialog } from "@/components/ResetDemoDataDialog";
+import { CreateProjectWizard } from "@/components/dashboard/CreateProjectWizard";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useTaskEditor } from '@/hooks/useTaskEditor';
 import { getTasks, patchTask } from "@/lib/api";
@@ -580,88 +584,73 @@ function OtherWorkspacesList(props: { tasks: DashboardTask[]; todayYmd: string; 
     );
 }
 
-function Modal(props: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
-    if (!props.open) return null;
-    return (
-        <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={props.onClose} />
-            <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-200/70 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-                <div className="mb-5 flex items-center justify-between gap-3">
-                    <div className="text-lg font-medium text-neutral-900">{props.title}</div>
-                    <button className="rounded-lg px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-50 hover:text-black transition-colors" onClick={props.onClose}>
-                        Close
-                    </button>
-                </div>
-                {props.children}
-            </div>
-        </div>
-    );
-}
 
 // --- Action Helper ---
-function ActionBtn(props: { icon: LucideIcon; label: string; onClick: () => void; className?: string }) {
-    const Icon = props.icon;
-    return (
-        <button
-            onClick={props.onClick}
-            className={`inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90 transition-all active:scale-95 ${props.className || ""}`}
-        >
-            <Icon className="h-4 w-4" />
-            <span>{props.label}</span>
-        </button>
-    );
-}
-
 function ActionBar() {
     const router = useRouter();
+    const [showMore, setShowMore] = useState(false);
 
     return (
-        <div className="flex flex-wrap items-center gap-2">
-            <ActionBtn
-                icon={PlusSquare}
-                label="New Task"
+        <div className="flex flex-wrap items-center gap-3">
+            <button
+                onClick={() => router.push("/dashboard?newProject=1")}
+                className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 transition-all active:scale-95"
+            >
+                <Layout className="h-4 w-4" />
+                <span>Create Project</span>
+            </button>
+
+            <button
                 onClick={() => router.push("/dashboard?newTask=1")}
-            />
+                className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 transition-all active:scale-95"
+            >
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Quick Task</span>
+            </button>
 
-            <ActionBtn
-                icon={FileText}
-                label="New Doc"
+            <button
                 onClick={() => router.push("/docs?newDoc=1")}
-            />
+                className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-50 shadow-sm transition-all active:scale-95"
+            >
+                <Plus className="h-4 w-4" />
+                <span>New Note</span>
+            </button>
 
-            <ActionBtn
-                icon={CalendarPlus}
-                label="New Event"
-                onClick={() => router.push("/dashboard?newEvent=1")}
-            />
+            <div className="relative">
+                <button
+                    onClick={() => setShowMore(!showMore)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-50 shadow-sm transition-all active:scale-95"
+                >
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span>More</span>
+                    <ChevronDown className={`h-3 w-3 transition-transform ${showMore ? 'rotate-180' : ''}`} />
+                </button>
 
-            <div className="w-px h-6 bg-neutral-200 mx-2" />
-
-            <ActionBtn
-                icon={Zap}
-                label="Bulk Paste"
-                onClick={() => router.push("/dashboard?bulkPaste=1")}
-            />
-
-            <ActionBtn
-                icon={LayoutGrid}
-                label="Open Planner"
-                onClick={() => router.push("/planner")}
-            />
-
-            <div className="w-px h-6 bg-neutral-200 mx-2" />
-
-            <ActionBtn
-                icon={Bot}
-                label="Agent"
-                onClick={() => router.push("/agent")}
-            />
-
-            <ActionBtn
-                icon={List}
-                label="Logs"
-                onClick={() => router.push("/agent/logs")}
-            />
+                {showMore && (
+                    <>
+                        <div className="fixed inset-0 z-30" onClick={() => setShowMore(false)} />
+                        <div className="absolute right-0 mt-2 w-48 rounded-2xl border border-neutral-100 bg-white p-2 shadow-xl z-40 animate-in fade-in slide-in-from-top-2">
+                            <button onClick={() => { router.push("/dashboard?newEvent=1"); setShowMore(false); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors">
+                                <CalendarPlus className="h-4 w-4" />
+                                <span>New Event</span>
+                            </button>
+                            <button onClick={() => { router.push("/dashboard?bulkPaste=1"); setShowMore(false); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors">
+                                <Zap className="h-4 w-4" />
+                                <span>Bulk Paste</span>
+                            </button>
+                            <div className="my-1 border-t border-neutral-50" />
+                            <button onClick={() => { router.push("/agent"); setShowMore(false); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors">
+                                <Bot className="h-4 w-4" />
+                                <span>Agent</span>
+                            </button>
+                            <button onClick={() => { router.push("/agent/logs"); setShowMore(false); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors">
+                                <List className="h-4 w-4" />
+                                <span>Logs</span>
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 }
@@ -682,6 +671,10 @@ function DashboardContent() {
     const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [isNewEventOpen, setIsNewEventOpen] = useState(false);
     const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+    const [isResetOpen, setIsResetOpen] = useState(false);
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [showSuccessToast, setShowSuccessToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState("Success!");
 
     useEffect(() => {
         if (sp.get("bulkPaste") === "1") {
@@ -694,6 +687,14 @@ function DashboardContent() {
         }
         if (sp.get("newTask") === "1") {
             setIsNewTaskOpen(true);
+            router.replace("/dashboard");
+        }
+        if (sp.get("resetDemo") === "1") {
+            setIsResetOpen(true);
+            router.replace("/dashboard");
+        }
+        if (sp.get("newProject") === "1") {
+            setIsWizardOpen(true);
             router.replace("/dashboard");
         }
     }, [sp, router]);
@@ -889,7 +890,37 @@ function DashboardContent() {
         }
     };
 
-    if (loading && tasks.length === 0) return <div className="p-10 flex justify-center items-center gap-3 text-neutral-400"><span className="animate-spin text-xl">⏳</span> Loading Command Center...</div>;
+    // Check if gcal embed is available
+    const hasGCalEmbed = !!process.env.NEXT_PUBLIC_GCAL_EMBED_URL;
+    const openGCal = hasGCalEmbed ? () => window.open(process.env.NEXT_PUBLIC_GCAL_EMBED_URL, '_blank') : undefined;
+
+    // First-run Detection
+    // Show onboarding banner only when workspace is demo-only (no real user content).
+    // Uses two signals:
+    //   1. is_seed flag (deterministic, preferred): all non-empty tasks are seed data
+    //   2. project tag cross-check: no task belongs to a user-created project
+    const isFirstRun = useMemo(() => {
+        if (tasks.length === 0) return true; // empty workspace = first run
+
+        const seedSlugs = new Set(["avaone-q1", "avaone-q1-sales", "avaone-homeforest-q1", "avafarm888-fb-content-q1", "avaone-fb-content-q1", "avaone-tiktok-q1"]);
+
+        const hasUserTask = (tasks as any[]).some((t: any) => {
+            // Prefer is_seed flag if available
+            if (typeof t.is_seed === "number") return t.is_seed === 0;
+            // Fallback: check if task's project tag is not a known seed project
+            const projTag = (t.tags as string[] | null)?.find((tag) => tag.startsWith("project:"));
+            if (projTag) {
+                const slug = projTag.replace("project:", "");
+                return !seedSlugs.has(slug);
+            }
+            // Task with no project tag = user-created
+            return true;
+        });
+
+        return !hasUserTask;
+    }, [tasks]);
+
+    if (loading && tasks.length === 0) return <div className="p-10 flex justify-center items-center gap-3 text-neutral-400"><span className="animate-spin text-xl">⏳</span> Loading Home...</div>;
 
     if (error && tasks.length === 0) {
         return (
@@ -906,12 +937,20 @@ function DashboardContent() {
         );
     }
 
-    // Check if gcal embed is available
-    const hasGCalEmbed = !!process.env.NEXT_PUBLIC_GCAL_EMBED_URL;
-    const openGCal = hasGCalEmbed ? () => window.open(process.env.NEXT_PUBLIC_GCAL_EMBED_URL, '_blank') : undefined;
 
     return (
         <div className="w-full px-6 2xl:px-10 py-8">
+            {/* Onboarding Banner - shown inline for first-run, does NOT replace dashboard */}
+            {isFirstRun && (
+                <div className="mb-6">
+                    <HomeFirstRunCard
+                        onCreateArea={() => router.push("/workspaces?newArea=1")}
+                        onCreateProject={() => setIsWizardOpen(true)}
+                        onResetDemo={() => setIsResetOpen(true)}
+                    />
+                </div>
+            )}
+
             {/* Header with Action Bar */}
             <div className="flex items-start justify-between gap-4 mb-8">
                 <div>
@@ -1167,6 +1206,37 @@ function DashboardContent() {
                     </div>
                 </form>
             </Modal>
+
+            <ResetDemoDataDialog
+                isOpen={isResetOpen}
+                onClose={() => setIsResetOpen(false)}
+                onSuccess={(mode) => {
+                    setIsResetOpen(false);
+                    setShowSuccessToast(true);
+                    refreshAll();
+                    setTimeout(() => setShowSuccessToast(false), 5000);
+                }}
+            />
+
+            {showSuccessToast && (
+                <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+                    <div className="bg-green-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 font-bold">
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>{toastMessage}</span>
+                    </div>
+                </div>
+            )}
+
+            <CreateProjectWizard 
+                isOpen={isWizardOpen}
+                onClose={() => setIsWizardOpen(false)}
+                onSuccess={() => {
+                    setToastMessage("Project Created Successfully!");
+                    setShowSuccessToast(true);
+                    refreshAll();
+                    setTimeout(() => setShowSuccessToast(false), 5000);
+                }}
+            />
         </div>
     );
 }

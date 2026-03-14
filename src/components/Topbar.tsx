@@ -6,15 +6,16 @@ export default function Topbar() {
     const pathname = usePathname();
 
     const getTitle = () => {
-        if (pathname === "/dashboard") return "Dashboard";
+        if (pathname === "/dashboard") return "Home";
         if (pathname === "/inbox") return "Inbox";
         if (pathname === "/today") return "Today";
         if (pathname === "/done") return "Done";
-        if (pathname === "/planner") return "Planner";
-        if (pathname.startsWith("/docs")) return "Docs";
+        if (pathname === "/planner") return "Today";
+        if (pathname.startsWith("/docs")) return "Notes";
         if (pathname.startsWith("/projects")) return "Projects";
         if (pathname.startsWith("/timeline")) return "Timeline";
         if (pathname.startsWith("/sprints")) return "Sprints";
+        if (pathname.startsWith("/workspaces")) return "Areas";
         return "WorkOS";
     };
 

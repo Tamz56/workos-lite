@@ -121,6 +121,37 @@ function ensureMigrations() {
     }
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id)");
 
+    const hasParentTaskId = cols.some((c) => c.name === "parent_task_id");
+    if (!hasParentTaskId) {
+        db.exec("ALTER TABLE tasks ADD COLUMN parent_task_id TEXT NULL");
+        db.exec("ALTER TABLE tasks ADD COLUMN sort_order INTEGER NULL");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_parent_task_id ON tasks(parent_task_id)");
+
+    const hasIsSeed = cols.some((c) => c.name === "is_seed");
+    if (!hasIsSeed) {
+        db.exec("ALTER TABLE tasks ADD COLUMN is_seed INTEGER DEFAULT 0");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_is_seed ON tasks(is_seed)");
+
+    const hasDocIsSeed = db.prepare("PRAGMA table_info(docs)").all().some((c: any) => c.name === "is_seed");
+    if (!hasDocIsSeed) {
+        db.exec("ALTER TABLE docs ADD COLUMN is_seed INTEGER DEFAULT 0");
+    }
+
+    const hasListIsSeed = db.prepare("PRAGMA table_info(lists)").all().some((c: any) => c.name === "is_seed");
+    if (hasListIsSeed === false) { // Table exists but column might be missing if it was created before my changes
+        const listsTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lists'").get();
+        if (listsTableExists) {
+            db.exec("ALTER TABLE lists ADD COLUMN is_seed INTEGER DEFAULT 0");
+        }
+    }
+
+    const hasProjectIsSeed = db.prepare("PRAGMA table_info(projects)").all().some((c: any) => c.name === "is_seed");
+    if (!hasProjectIsSeed) {
+        db.exec("ALTER TABLE projects ADD COLUMN is_seed INTEGER DEFAULT 0");
+    }
+
     // Create lists table ensuring it exists during runtime migration safely
     db.exec(`
         CREATE TABLE IF NOT EXISTS lists (
@@ -129,6 +160,7 @@ function ensureMigrations() {
             slug TEXT NOT NULL,
             title TEXT NOT NULL,
             description TEXT DEFAULT '',
+            is_seed INTEGER DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -163,8 +195,8 @@ function ensureSeedLists() {
     ];
 
     const insertStmt = db.prepare(`
-        INSERT INTO lists (id, workspace, slug, title, description, created_at, updated_at)
-        VALUES (@id, @workspace, @slug, @title, @description, datetime('now'), datetime('now'))
+        INSERT INTO lists (id, workspace, slug, title, description, is_seed, created_at, updated_at)
+        VALUES (@id, @workspace, @slug, @title, @description, 1, datetime('now'), datetime('now'))
         ON CONFLICT(workspace, slug) DO NOTHING
     `);
 
@@ -191,6 +223,7 @@ function ensureDocsAndAttachments() {
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             content_md TEXT NOT NULL DEFAULT '',
+            is_seed INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
           );
@@ -293,6 +326,7 @@ function ensureProjectsAndSprints() {
           start_date TEXT NULL,
           end_date TEXT NULL,
           owner TEXT NULL,
+          is_seed INTEGER DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -364,8 +398,8 @@ function ensureSeedProjects() {
     ];
 
     const insertStmt = db.prepare(`
-        INSERT INTO projects (id, slug, name, status, created_at, updated_at)
-        VALUES (@id, @slug, @name, 'planned', datetime('now'), datetime('now'))
+        INSERT INTO projects (id, slug, name, status, is_seed, created_at, updated_at)
+        VALUES (@id, @slug, @name, 'planned', 1, datetime('now'), datetime('now'))
         ON CONFLICT(slug) DO NOTHING
     `);
 

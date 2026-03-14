@@ -103,6 +103,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 params.set("workspace", workspaceId);
                 // ONLY fetch unassigned initially here to not spam
                 params.set("list_id", "unassigned");
+                params.set("parent_id", "unassigned");
                 params.set("limit", "100"); // Limit for performance
                 if (statusFilter !== "all") params.set("status", statusFilter);
                 if (search) params.set("q", search);

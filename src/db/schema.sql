@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority      INTEGER NULL,
   notes         TEXT NULL,
 
+  parent_task_id TEXT NULL,
+  sort_order     INTEGER NULL,
+
   doc_id        TEXT NULL,
 
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
@@ -38,6 +41,7 @@ END;
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace);
 CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_parent_task_id ON tasks(parent_task_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_date ON tasks(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_bucket ON tasks(schedule_bucket);
 CREATE INDEX IF NOT EXISTS idx_tasks_done_at ON tasks(done_at);

@@ -47,7 +47,7 @@ export function Sidebar() {
             <nav className="flex-1 px-4 space-y-1">
                 <NavItem
                     href="/dashboard"
-                    label="Command Center"
+                    label="Home"
                     icon={<HomeIcon className="w-5 h-5" />}
                     active={pathname === "/dashboard"}
                 />
@@ -71,7 +71,7 @@ export function Sidebar() {
                 />
                 <NavItem
                     href="/planner"
-                    label="Planner"
+                    label="Today"
                     icon={<CalendarIcon className="w-5 h-5" />}
                     active={pathname === "/planner"}
                 />
@@ -83,13 +83,13 @@ export function Sidebar() {
                 />
                 <NavItem
                     href="/workspaces"
-                    label="Workspaces"
+                    label="Areas"
                     icon={<ChartBarIcon className="w-5 h-5" />}
                     active={pathname.startsWith("/workspaces")}
                 />
                 <NavItem
                     href="/docs"
-                    label="Docs"
+                    label="Notes"
                     icon={<FolderIcon className="w-5 h-5" />}
                     active={pathname === "/docs"}
                 />
