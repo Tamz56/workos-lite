@@ -6,7 +6,9 @@ import Link from "next/link";
 import { WORKSPACES, WORKSPACES_LIST, workspaceLabel, type Workspace } from "@/lib/workspaces";
 import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "@/lib/styles";
 import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
-import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box } from "lucide-react";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box, Target } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { HomeFirstRunCard } from "@/components/dashboard/HomeFirstRunCard";
 import { ResetDemoDataDialog } from "@/components/ResetDemoDataDialog";
@@ -14,12 +16,9 @@ import { CreateProjectWizard } from "@/components/dashboard/CreateProjectWizard"
 import { TodayFocusStrip } from "@/components/dashboard/TodayFocusStrip";
 import { WorkBucketCard } from "@/components/dashboard/WorkBucketCard";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useTaskEditor } from '@/hooks/useTaskEditor';
-import { getTasks, patchTask } from "@/lib/api";
 import { Task, TaskStatus } from "@/lib/types";
 import { STAGE_TAGS, ContentStage } from "@/lib/content/templates";
-import { getPipelineStage, listDocsByTaskId } from "@/lib/content/utils";
-import { createContentTask, createMissingContentDocs } from "@/lib/content/createContentTask";
+import { createContentTask } from "@/lib/content/createContentTask";
 
 // --- Types ---
 
@@ -962,33 +961,55 @@ function DashboardContent() {
 
 
     return (
-        <div className="w-full px-6 2xl:px-10 py-8">
-            {/* Onboarding Banner - shown inline for first-run, does NOT replace dashboard */}
-            {isFirstRun && (
-                <div className="mb-6">
-                    <HomeFirstRunCard
-                        onCreateArea={() => router.push("/workspaces?newArea=1")}
-                        onCreateProject={() => setIsWizardOpen(true)}
-                        onResetDemo={() => setIsResetOpen(true)}
-                    />
-                </div>
-            )}
-
-
-            {/* Top Priority Strip */}
-            <TodayFocusStrip 
-                overdueCount={stats.overdue}
-                todayCount={stats.today}
-                waitingCount={stats.waiting}
+        <PageShell>
+            <PageHeader
+                title="Dashboard"
+                subtitle="High-level overview of your active projects and upcoming commitments."
+                actions={
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setIsWizardOpen(true)}
+                            className="bg-black text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg shadow-black/10 hover:bg-neutral-800 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <Layout className="w-3.5 h-3.5" />
+                            Create Project
+                        </button>
+                        <button
+                            onClick={() => setIsNewTaskOpen(true)}
+                            className="bg-neutral-100 text-neutral-900 px-4 py-2 rounded-xl text-xs font-black hover:bg-neutral-200 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Quick Task
+                        </button>
+                        <button
+                            onClick={() => router.push("/docs?newDoc=1")}
+                            className="hidden md:flex bg-white border border-neutral-200 text-neutral-600 px-4 py-2 rounded-xl text-xs font-black hover:bg-neutral-50 transition-all active:scale-95 items-center gap-2"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            New Note
+                        </button>
+                    </div>
+                }
             />
 
-            {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold font-display tracking-tight text-neutral-900">Dashboard</h1>
-                <div className="text-sm text-neutral-500 font-medium mt-1">
-                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </div>
-            </div>
+            <div className="space-y-8 max-w-[1600px] mx-auto pb-24">
+                {/* Onboarding Banner - shown inline for first-run, does NOT replace dashboard */}
+                {isFirstRun && (
+                    <div className="mb-6">
+                        <HomeFirstRunCard
+                            onCreateArea={() => router.push("/workspaces?newArea=1")}
+                            onCreateProject={() => setIsWizardOpen(true)}
+                            onResetDemo={() => setIsResetOpen(true)}
+                        />
+                    </div>
+                )}
+
+                {/* Top Priority Strip */}
+                <TodayFocusStrip 
+                    overdueCount={stats.overdue}
+                    todayCount={stats.today}
+                    waitingCount={stats.waiting}
+                />
 
             {/* Main Grid Layout - Strict 12 Cols */}
             <div className="grid grid-cols-12 gap-6">
@@ -1279,6 +1300,7 @@ function DashboardContent() {
                     setTimeout(() => setShowSuccessToast(false), 5000);
                 }}
             />
-        </div>
+            </div>
+        </PageShell>
     );
 }

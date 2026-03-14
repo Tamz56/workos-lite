@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Project } from "@/lib/types";
-import { MoreVertical, Edit2, Archive, Trash2, ExternalLink } from "lucide-react";
+import { Plus, MoreVertical, Edit2, Archive, Trash2, ExternalLink, CheckCircle2, Search, Filter } from "lucide-react";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { Modal } from "@/components/ui/Modal";
 import { CreateProjectWizard } from "@/components/dashboard/CreateProjectWizard";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, INPUT_BASE } from "@/lib/styles";
 import { useSearchParams, useRouter } from "next/navigation";
-import { CheckCircle2 } from "lucide-react";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export default function ProjectsClient() {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -29,14 +30,7 @@ export default function ProjectsClient() {
     const sp = useSearchParams();
     const router = useRouter();
 
-    useEffect(() => {
-        if (sp.get("newProject") === "1") {
-            setIsWizardOpen(true);
-            router.replace("/projects");
-        }
-    }, [sp]);
-
-    const fetchProjects = async () => {
+    const fetchProjects = useCallback(async () => {
         setLoading(true);
         const url = new URL("/api/projects", window.location.origin);
         if (statusFilter && statusFilter !== "all") {
@@ -50,11 +44,18 @@ export default function ProjectsClient() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [statusFilter]);
 
     useEffect(() => {
         fetchProjects();
-    }, [statusFilter]);
+    }, [fetchProjects]);
+
+    useEffect(() => {
+        if (sp.get("newProject") === "1") {
+            setIsWizardOpen(true);
+            router.replace("/projects");
+        }
+    }, [sp, router]);
 
     const handleArchive = async (project: Project) => {
         if (!confirm(`Archive "${project.name}"?`)) return;
@@ -92,98 +93,118 @@ export default function ProjectsClient() {
     const filteredProjects = projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
     return (
-        <div className="p-6 max-w-5xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">Projects</h1>
-                <div className="flex gap-2">
-                    <select
-                        className="bg-white border border-neutral-200 rounded-md px-3 py-1.5 text-sm outline-none"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
+        <PageShell>
+            <PageHeader
+                title="Projects"
+                subtitle="Your strategic work containers. Group tasks and manage deliverables."
+                actions={
+                   <button
+                        onClick={() => setIsWizardOpen(true)}
+                        className="bg-black text-white px-5 py-2.5 rounded-xl text-sm font-black shadow-lg shadow-black/10 hover:bg-neutral-800 transition-all active:scale-95 flex items-center gap-2"
                     >
-                        <option value="all">All Status</option>
-                        <option value="inbox">Inbox</option>
-                        <option value="planned">Planned</option>
-                        <option value="done">Done</option>
-                    </select>
+                        <Plus className="w-5 h-5" />
+                        Create Project
+                    </button>
+                }
+            />
+
+            <div className="max-w-6xl mx-auto space-y-8">
+                {/* Search & Filter Bar */}
+                <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm">
+                    <div className="relative flex-1 w-full">
+                        <Search className="absolute left-4 top-3 h-5 w-5 text-neutral-400" />
+                        <input
+                            type="text"
+                            placeholder="Search projects..."
+                            className="w-full pl-12 pr-4 py-3 bg-neutral-50 border-transparent focus:bg-white focus:border-neutral-200 rounded-xl text-base transition-all outline-none font-medium"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <Filter className="w-4 h-4 text-neutral-400" />
+                        <select
+                            className="bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none shadow-sm focus:border-neutral-400 flex-1 md:flex-none"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                            <option value="all">Current Projects</option>
+                            <option value="inbox">Inbox Only</option>
+                            <option value="planned">Active/Planned</option>
+                            <option value="done">Archived</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
 
-            <div className="mb-6">
-                <input
-                    type="text"
-                    placeholder="Search projects..."
-                    className="w-full bg-white border border-neutral-200 rounded-md px-4 py-2 text-sm outline-none"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-            </div>
+                {loading ? (
+                    <div className="text-center py-20 bg-white rounded-3xl border border-neutral-100 italic text-neutral-400 font-medium">Loading projects...</div>
+                ) : filteredProjects.length === 0 ? (
+                    <div className="text-center py-20 bg-white rounded-3xl border border-neutral-100 space-y-3">
+                        <div className="text-4xl">🏗️</div>
+                        <p className="text-neutral-400 font-medium italic">No projects found. Create one to get started.</p>
+                    </div>
+                ) : (
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {filteredProjects.map(project => (
+                            <div key={project.id} className="group relative bg-white border border-neutral-200 rounded-[32px] p-6 hover:shadow-2xl hover:shadow-neutral-200 transition-all hover:border-neutral-300 flex flex-col h-full active:scale-[0.98]">
+                                <div className="flex justify-between items-start mb-4">
+                                    <Link href={`/projects/${project.slug}`} className="flex-1">
+                                        <h2 className="font-black text-xl text-neutral-900 group-hover:text-black transition-colors leading-tight tracking-tight">{project.name}</h2>
+                                        <p className="text-[10px] text-neutral-400 font-black uppercase tracking-widest mt-1.5">{project.slug}</p>
+                                    </Link>
+                                    
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                                        <button 
+                                            onClick={() => {
+                                                setActiveProject(project);
+                                                setNewName(project.name);
+                                                setIsRenameOpen(true);
+                                            }}
+                                            className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-400 hover:text-neutral-900 transition-colors"
+                                            title="Rename"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleArchive(project)}
+                                            className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-400 hover:text-neutral-900 transition-colors"
+                                            title="Archive"
+                                        >
+                                            <Archive className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setActiveProject(project);
+                                                setIsDeleteOpen(true);
+                                            }}
+                                            className="p-2 rounded-xl hover:bg-red-50 text-neutral-400 hover:text-red-500 transition-colors"
+                                            title="Delete"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
 
-            {loading ? (
-                <div className="text-neutral-500 text-sm">Loading projects...</div>
-            ) : filteredProjects.length === 0 ? (
-                <div className="text-neutral-500 text-sm">No projects found.</div>
-            ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredProjects.map(project => (
-                        <div key={project.id} className="group relative bg-white border border-neutral-200 rounded-3xl p-5 hover:shadow-xl transition-all hover:border-neutral-300 flex flex-col h-full">
-                            <div className="flex justify-between items-start mb-4">
-                                <Link href={`/projects/${project.slug}`} className="flex-1">
-                                    <h2 className="font-bold text-lg text-neutral-900 group-hover:text-black transition-colors leading-tight">{project.name}</h2>
-                                    <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">{project.slug}</p>
-                                </Link>
-                                
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button 
-                                        onClick={() => {
-                                            setActiveProject(project);
-                                            setNewName(project.name);
-                                            setIsRenameOpen(true);
-                                        }}
-                                        className="p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-900"
-                                        title="Rename"
+                                <div className="mt-auto flex items-center justify-between pt-5 border-t border-neutral-50">
+                                    <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                                        project.status === 'done' ? 'bg-green-100 text-green-700' : 
+                                        project.status === 'planned' ? 'bg-blue-100 text-blue-700' : 
+                                        'bg-neutral-100 text-neutral-600'
+                                    }`}>
+                                        {project.status === 'done' ? 'Archived' : project.status}
+                                    </span>
+                                    <Link 
+                                        href={`/projects/${project.slug}`}
+                                        className="flex items-center gap-1.5 text-xs font-black text-neutral-400 hover:text-black transition-all hover:gap-2 uppercase tracking-wide"
                                     >
-                                        <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleArchive(project)}
-                                        className="p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-900"
-                                        title="Archive"
-                                    >
-                                        <Archive className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button 
-                                        onClick={() => {
-                                            setActiveProject(project);
-                                            setIsDeleteOpen(true);
-                                        }}
-                                        className="p-1.5 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-red-600"
-                                        title="Delete"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                        View Detail <ExternalLink className="w-3.5 h-3.5" />
+                                    </Link>
                                 </div>
                             </div>
-
-                            <div className="mt-auto flex items-center justify-between pt-4 border-t border-neutral-50">
-                                <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                                    project.status === 'done' ? 'bg-green-50 text-green-700' : 
-                                    project.status === 'planned' ? 'bg-blue-50 text-blue-700' : 
-                                    'bg-neutral-50 text-neutral-600'
-                                }`}>
-                                    {project.status}
-                                </span>
-                                <Link 
-                                    href={`/projects/${project.slug}`}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-neutral-400 hover:text-black transition-colors"
-                                >
-                                    Open <ExternalLink className="w-3 h-3" />
-                                </Link>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
+            </div>
 
             {activeProject && (
                 <>
@@ -196,22 +217,22 @@ export default function ProjectsClient() {
                     />
 
                     <Modal isOpen={isRenameOpen} onClose={() => setIsRenameOpen(false)} title="Rename Project">
-                        <div className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Project Name</label>
+                        <div className="p-2 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-neutral-400 uppercase tracking-widest ml-1">New Project Name</label>
                                 <input
                                     type="text"
                                     value={newName}
                                     onChange={(e) => setNewName(e.target.value)}
-                                    className={INPUT_BASE}
+                                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-base font-medium outline-none focus:bg-white focus:border-neutral-900 transition-all"
                                     placeholder="Enter new name..."
                                 />
                             </div>
                             <div className="flex gap-3">
-                                <button onClick={() => setIsRenameOpen(false)} className={`${BUTTON_SECONDARY} flex-1`}>Cancel</button>
+                                <button onClick={() => setIsRenameOpen(false)} className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 text-sm font-bold hover:bg-neutral-50 transition-all">Cancel</button>
                                 <button 
                                     onClick={handleRename} 
-                                    className={`${BUTTON_PRIMARY} flex-1`}
+                                    className="flex-1 px-4 py-3 rounded-xl bg-black text-white text-sm font-black hover:bg-neutral-800 transition-all disabled:opacity-50 shadow-lg shadow-black/10"
                                     disabled={actionLoading || !newName.trim() || newName === activeProject.name}
                                 >
                                     {actionLoading ? "Saving..." : "Save Changes"}
@@ -234,12 +255,12 @@ export default function ProjectsClient() {
 
             {showSuccessToast && (
                 <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
-                    <div className="bg-green-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 font-bold">
-                        <CheckCircle2 className="w-5 h-5" />
+                    <div className="bg-neutral-900 border border-neutral-800 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-black text-sm uppercase tracking-widest">
+                        <CheckCircle2 className="w-5 h-5 text-green-400" />
                         <span>Project Created Successfully!</span>
                     </div>
                 </div>
             )}
-        </div>
+        </PageShell>
     );
 }

@@ -46,15 +46,26 @@ export function GlobalTaskDialogs() {
     const parentTaskIdParam = sp.get("parent_task_id");
 
     // Default dummy task for creation
-    const newTaskInitial = useMemo(() => ({
-        id: "new",
-        title: "",
-        workspace: workspaceParam || "avacrm", // Default or from param
-        status: "inbox",
-        list_id: listIdParam || null,
-        parent_task_id: parentTaskIdParam || null,
-        sort_order: null,
-    } as Task), [workspaceParam, listIdParam, parentTaskIdParam]);
+    const newTaskInitial = useMemo(() => {
+        // Fallback logic: 1. Param, 2. Pathname (if it's a workspace), 3. First available workspace
+        let ws: Workspace = workspaceParam || "avacrm"; // Default fallback
+        if (!workspaceParam) {
+            const parts = window.location.pathname.split("/");
+            if (parts[1] === "workspaces" && parts[2]) {
+                ws = parts[2] as Workspace;
+            }
+        }
+
+        return {
+            id: "new",
+            title: "",
+            workspace: ws,
+            status: "inbox",
+            list_id: listIdParam || null,
+            parent_task_id: parentTaskIdParam || null,
+            sort_order: null,
+        } as Task;
+    }, [workspaceParam, listIdParam, parentTaskIdParam]);
 
     const closeNewTask = () => {
         const params = new URLSearchParams(sp.toString());

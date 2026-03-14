@@ -12,6 +12,7 @@ import TaskDeleteButton from "@/components/TaskDeleteButton";
 import { toErrorMessage } from "@/lib/error";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Inbox, CheckCircle2, Calendar, Target, Plus, Trash2, ArrowRight } from "lucide-react";
 
 import { WORKSPACES_LIST } from "@/lib/workspaces";
 
@@ -53,7 +54,6 @@ export default function InboxClient() {
     // Smart Link: Focus Quick Add if ?newTask=1
     useEffect(() => {
         if (sp.get("newTask") === "1") {
-            // Slight delay to ensure render
             setTimeout(() => {
                 inputRef.current?.focus();
             }, 100);
@@ -85,7 +85,6 @@ export default function InboxClient() {
             const newTask = await createTask({ title: t, workspace, status: "inbox" });
             setTitle("");
             setTasks(prev => [newTask, ...prev]);
-            await load();
         } catch (e: unknown) {
             setErr(`createTask failed: ${toErrorMessage(e)}`);
         }
@@ -103,7 +102,7 @@ export default function InboxClient() {
                 scheduled_date: todayISO(),
                 schedule_bucket: b,
             });
-            router.replace("/today");
+            // Don't auto-redirect, let user review more
             router.refresh();
         } catch (e: unknown) {
             setTasks((prev) => [task, ...prev]);
@@ -120,7 +119,7 @@ export default function InboxClient() {
     async function markDone(task: Task) {
         try {
             await patchTask(task.id, { status: "done" });
-            await load();
+            setTasks(prev => prev.filter(t => t.id !== task.id));
         } catch (e: unknown) {
             setErr(toErrorMessage(e));
         }
@@ -152,36 +151,6 @@ export default function InboxClient() {
         }
     }
 
-    async function sendSelectedToNanagardenBacklog() {
-        setBulkLoading(true);
-        setBulkError("");
-        const ids = Array.from(selectedIds);
-        const patch = {
-            status: "planned",
-            schedule_bucket: "none",
-            workspace: "marketing",
-            notes_append: `\n${bulkTag.trim() || 'project:nanagarden-q1\ntype:sku'}\n`
-        };
-        try {
-            const res = await fetch("/api/tasks/batch", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ ids, patch }),
-            });
-            if (!res.ok) throw new Error(await res.text() || "Batch update failed");
-            clearSelection();
-            setBulkStatus("planned");
-            setBulkBucket("none");
-            setBulkWorkspace("marketing");
-
-            await load();
-        } catch (e: any) {
-            setBulkError(e?.message || "Unknown error");
-        } finally {
-            setBulkLoading(false);
-        }
-    }
-
     const count = useMemo(() => tasks.length, [tasks]);
     const visibleIds = tasks.map(t => t.id);
     const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
@@ -195,227 +164,205 @@ export default function InboxClient() {
         <PageShell>
             <PageHeader
                 title="Inbox"
-                subtitle="เก็บงานเข้า แล้วค่อย Plan ลง Today/Planner"
+                subtitle="Capture ideas, tasks, and notes here. Review and plan them when ready."
                 actions={
                     <button
                         onClick={load}
-                        className="rounded-full border border-neutral-200 px-4 py-2 text-sm font-medium hover:bg-neutral-50 transition-colors bg-white text-neutral-700"
+                        className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-bold hover:bg-neutral-50 transition-colors bg-white text-neutral-700 shadow-sm"
                     >
                         Refresh
                     </button>
                 }
             />
 
-
-            {/* Sticky Bulk Action Bar */}
-            {selectedCount > 0 && (
-                <div className="sticky top-[68px] z-10 bg-white border border-neutral-200 rounded-lg p-3 mt-6 shadow-sm">
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <div className="text-sm font-medium text-neutral-800 pr-2 border-r border-neutral-200">
-                            {selectedCount} selected
+            <div className="max-w-5xl mx-auto space-y-6 pt-6">
+                {/* Quick Add Section */}
+                <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-4">
+                    <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                placeholder="Quick add to inbox..."
+                                className="w-full pl-10 pr-4 py-3 bg-neutral-50 border-transparent focus:bg-white focus:border-neutral-200 rounded-xl text-base transition-all outline-none font-medium"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && add()}
+                            />
+                            <Plus className="absolute left-3 top-3.5 h-5 w-5 text-neutral-400" />
                         </div>
-
-                        <select className="border border-neutral-200 bg-neutral-50 rounded px-2 py-1.5 text-sm outline-none" value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
-                            <option value="">Set Status…</option>
-                            <option value="inbox">inbox</option>
-                            <option value="planned">planned</option>
-                            <option value="done">done</option>
-                        </select>
-
-                        <select className="border border-neutral-200 bg-neutral-50 rounded px-2 py-1.5 text-sm outline-none" value={bulkBucket} onChange={(e) => setBulkBucket(e.target.value)}>
-                            <option value="">Set Bucket…</option>
-                            <option value="none">none</option>
-                            <option value="morning">morning</option>
-                            <option value="afternoon">afternoon</option>
-                            <option value="evening">evening</option>
-                        </select>
-
-                        <select className="border border-neutral-200 bg-neutral-50 rounded px-2 py-1.5 text-sm outline-none" value={bulkWorkspace} onChange={(e) => setBulkWorkspace(e.target.value)}>
-                            <option value="">Move Workspace…</option>
-                            {WORKSPACES_LIST.map((w) => (
+                        <select 
+                            value={workspace}
+                            onChange={(e) => setWorkspace(e.target.value as Workspace)}
+                            className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-bold outline-none shadow-sm focus:border-neutral-400"
+                        >
+                            {WORKSPACES_LIST.map(w => (
                                 <option key={w.id} value={w.id}>{w.label}</option>
                             ))}
                         </select>
-
-                        <input
-                            value={bulkTag}
-                            onChange={(e) => setBulkTag(e.target.value)}
-                            placeholder="Append tag (e.g. project:x)"
-                            className="border border-neutral-200 rounded px-2 py-1 text-sm outline-none bg-neutral-50"
-                        />
-
                         <button
-                            onClick={applyBulk}
-                            disabled={bulkLoading || (!bulkStatus && !bulkBucket && !bulkWorkspace && !bulkTag.trim())}
-                            className={`px-4 py-1.5 rounded-md text-white font-medium text-sm transition ${bulkLoading || (!bulkStatus && !bulkBucket && !bulkWorkspace && !bulkTag.trim()) ? 'bg-neutral-300 cursor-not-allowed' : 'bg-neutral-900 hover:bg-neutral-800'}`}
+                            onClick={add}
+                            disabled={!title.trim()}
+                            className="bg-black text-white px-6 py-3 rounded-xl text-sm font-black disabled:opacity-50 transition-all hover:bg-neutral-800 shadow-lg shadow-black/10 active:scale-95"
                         >
-                            {bulkLoading ? "Applying..." : "Apply"}
+                            Add to Inbox
                         </button>
-
-                        <button
-                            onClick={sendSelectedToNanagardenBacklog}
-                            disabled={bulkLoading}
-                            title="planned + no bucket + marketing workspace + tag"
-                            className="px-4 py-1.5 rounded-md bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 transition ml-2"
-                        >
-                            Send &rarr; Marketing/Sales (NanaGarden)
-                        </button>
-
-                        <button onClick={clearSelection} className="ml-auto px-3 py-1.5 text-sm text-neutral-500 hover:text-neutral-900 underline">
-                            Clear
-                        </button>
-                    </div>
-
-                    {bulkError && <div className="text-sm font-medium text-red-600 mt-3">{bulkError}</div>}
-                </div>
-            )}
-
-            {/* List */}
-            <div style={{ marginTop: 24, border: "1px solid #e5e7eb", borderRadius: 12 }}>
-                <div style={{ padding: 14, borderBottom: "1px solid #e5e7eb", backgroundColor: "#f9fafb", borderTopLeftRadius: 12, borderTopRightRadius: 12, display: "flex", gap: "12px", alignItems: "center" }}>
-                    <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleSelectAll}
-                        style={{ cursor: "pointer", width: 16, height: 16 }}
-                        className="cursor-pointer"
-                    />
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>
-                        Tasks ({loading ? "…" : count}) {selectedCount > 0 && <span className="text-neutral-500 font-normal ml-2">— {selectedCount} selected</span>}
                     </div>
                 </div>
 
-                <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-                    {tasks.length === 0 ? (
-                        <div className="text-center py-10 text-neutral-400 italic">Inbox ว่างแล้วครับ</div>
-                    ) : (
-                        tasks.map((t) => (
-                            <div
-                                key={t.id}
-                                onClick={() => openEditor(t)}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") openEditor(t);
-                                }}
-                                style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, display: "flex", justifyContent: "space-between", gap: 12, cursor: "pointer" }}
-                                className="group hover:bg-neutral-50 hover:border-neutral-300 transition-all bg-white"
-                            >
-                                <div className="flex gap-4 items-start w-full">
-                                    <div className="pt-1">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.has(t.id)}
-                                            onChange={(e) => toggleOne(t.id, e as unknown as React.MouseEvent)}
-                                            onClick={(e) => e.stopPropagation()}
-                                            style={{ cursor: "pointer", width: 16, height: 16 }}
-                                            className="cursor-pointer"
+                {/* Bulk Action Bar */}
+                {selectedCount > 0 && (
+                    <div className="sticky top-[80px] z-10 bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-top-4">
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <div className="flex items-center gap-2 pr-4 border-r border-neutral-800">
+                                <span className="bg-white text-black text-[10px] font-black px-2 py-0.5 rounded-full uppercase">{selectedCount}</span>
+                                <span className="text-sm font-bold text-neutral-400">Selected</span>
+                            </div>
+
+                            <div className="flex gap-2 flex-wrap flex-1">
+                                <select className="bg-neutral-800 border-none text-white rounded-lg px-3 py-1.5 text-xs font-bold outline-none" value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+                                    <option value="">Status...</option>
+                                    <option value="inbox">Inbox</option>
+                                    <option value="planned">Planned</option>
+                                    <option value="done">Done</option>
+                                </select>
+
+                                <select className="bg-neutral-800 border-none text-white rounded-lg px-3 py-1.5 text-xs font-bold outline-none" value={bulkBucket} onChange={(e) => setBulkBucket(e.target.value)}>
+                                    <option value="">Bucket...</option>
+                                    <option value="morning">Morning</option>
+                                    <option value="afternoon">Afternoon</option>
+                                    <option value="evening">Evening</option>
+                                </select>
+
+                                <select className="bg-neutral-800 border-none text-white rounded-lg px-3 py-1.5 text-xs font-bold outline-none" value={bulkWorkspace} onChange={(e) => setBulkWorkspace(e.target.value)}>
+                                    <option value="">Workspace...</option>
+                                    {WORKSPACES_LIST.map((w) => (
+                                        <option key={w.id} value={w.id}>{w.label}</option>
+                                    ))}
+                                </select>
+
+                                <button
+                                    onClick={applyBulk}
+                                    disabled={bulkLoading || (!bulkStatus && !bulkBucket && !bulkWorkspace)}
+                                    className="bg-white text-black px-4 py-1.5 rounded-lg font-black text-xs hover:bg-neutral-200 transition-all disabled:opacity-50"
+                                >
+                                    {bulkLoading ? "Applying..." : "Apply Changes"}
+                                </button>
+                            </div>
+
+                            <button onClick={clearSelection} className="text-xs font-bold text-neutral-500 hover:text-white transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Inbox List */}
+                <div className="bg-white border border-neutral-200 rounded-3xl overflow-hidden shadow-sm">
+                    <div className="bg-neutral-50 border-b border-neutral-100 px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <input
+                                type="checkbox"
+                                checked={allSelected}
+                                onChange={toggleSelectAll}
+                                className="w-5 h-5 rounded-md border-neutral-300 text-black focus:ring-black cursor-pointer"
+                            />
+                            <div className="flex items-center gap-2">
+                                <Inbox className="w-4 h-4 text-neutral-400" />
+                                <span className="text-sm font-black uppercase tracking-widest text-neutral-600">Review Inbox</span>
+                                <span className="text-xs font-bold px-2 py-0.5 bg-neutral-200 rounded-full text-neutral-500">{count}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="divide-y divide-neutral-100">
+                        {loading ? (
+                            <div className="p-20 text-center text-neutral-400 font-medium">Loading inbox...</div>
+                        ) : tasks.length === 0 ? (
+                            <div className="p-20 text-center space-y-3">
+                                <CheckCircle2 className="w-10 h-10 text-neutral-200 mx-auto" />
+                                <p className="text-neutral-400 font-medium italic">Inbox is clear! You are all caught up.</p>
+                            </div>
+                        ) : (
+                            tasks.map((t) => (
+                                <div
+                                    key={t.id}
+                                    onClick={() => openEditor(t)}
+                                    role="button"
+                                    tabIndex={0}
+                                    className="p-5 flex items-center justify-between gap-4 hover:bg-neutral-50 group transition-all"
+                                >
+                                    <div className="flex items-start gap-4 flex-1">
+                                        <div className="pt-1">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(t.id)}
+                                                onChange={(e) => toggleOne(t.id, e as unknown as React.MouseEvent)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-5 h-5 rounded-md border-neutral-300 text-black focus:ring-black cursor-pointer mb-1"
+                                            />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <TaskTitleInlineEdit
+                                                    id={t.id}
+                                                    title={t.title}
+                                                    onSaved={(next) => {
+                                                        setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, title: next } : x)));
+                                                    }}
+                                                />
+                                                {t.doc_id && <span className="text-neutral-300">📄</span>}
+                                            </div>
+                                            <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1">
+                                                {t.workspace}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex border border-neutral-200 rounded-xl overflow-hidden shadow-sm mr-2 bg-white">
+                                            <button
+                                                onClick={() => planToday(t, "morning")}
+                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 border-r border-neutral-100 text-neutral-500"
+                                            >
+                                                Morning
+                                            </button>
+                                            <button
+                                                onClick={() => planToday(t, "afternoon")}
+                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 border-r border-neutral-100 text-neutral-500"
+                                            >
+                                                Afternoon
+                                            </button>
+                                            <button
+                                                onClick={() => planToday(t, "evening")}
+                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 text-neutral-500"
+                                            >
+                                                Evening
+                                            </button>
+                                        </div>
+
+                                        <button 
+                                            onClick={() => markDone(t)}
+                                            className="p-2 rounded-xl border border-green-100 bg-green-50 text-green-600 hover:bg-green-100 transition-all"
+                                            title="Mark Done"
+                                        >
+                                            <CheckCircle2 className="w-4 h-4" />
+                                        </button>
+                                        
+                                        <TaskDeleteButton
+                                            taskId={t.id}
+                                            taskTitle={t.title}
+                                            onDeleted={() => {
+                                                setTasks((prev) => prev.filter((x) => x.id !== t.id));
+                                            }}
                                         />
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <TaskTitleInlineEdit
-                                                id={t.id}
-                                                title={t.title}
-                                                onSaved={(next) => {
-                                                    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, title: next } : x)));
-                                                }}
-                                            />
-                                            {t.doc_id && (
-                                                <span
-                                                    style={{ cursor: "pointer" }}
-                                                    className="hover:text-blue-600"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        openEditor(t, "doc");
-                                                    }}
-                                                    title="Open task details"
-                                                >
-                                                    📄
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>workspace: {t.workspace}</div>
-                                    </div></div>
-
-                                <div
-                                    style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                    }}
-                                >
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            planToday(t, "morning");
-                                        }}
-                                        disabled={planningIds.has(t.id)}
-                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-100 text-neutral-600"
-                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
-                                    >
-                                        Morning
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            planToday(t, "afternoon");
-                                        }}
-                                        disabled={planningIds.has(t.id)}
-                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-100 text-neutral-600"
-                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
-                                    >
-                                        Afternoon
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            planToday(t, "evening");
-                                        }}
-                                        disabled={planningIds.has(t.id)}
-                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-100 text-neutral-600"
-                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
-                                    >
-                                        Evening
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            planToday(t, defaultBucketForWorkspace(t.workspace) ?? "afternoon");
-                                        }}
-                                        disabled={planningIds.has(t.id)}
-                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-100 text-neutral-600 bg-neutral-50"
-                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
-                                        title="ใช้ค่าเริ่มต้นตาม Workspace"
-                                    >
-                                        {planningIds.has(t.id) ? "..." : "Plan"}
-                                    </button>
-                                    <div style={{ width: 1, height: 16, background: "#ddd", margin: "0 4px" }} />
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            markDone(t);
-                                        }}
-                                        disabled={planningIds.has(t.id)}
-                                        className="rounded border border-neutral-200 px-2 py-1 text-xs hover:bg-green-50 text-green-700 hover:border-green-200"
-                                        style={{ opacity: planningIds.has(t.id) ? 0.5 : 1 }}
-                                    >
-                                        Done
-                                    </button>
-                                    <TaskDeleteButton
-                                        taskId={t.id}
-                                        taskTitle={t.title}
-                                        disabled={planningIds.has(t.id)}
-                                        onDeleted={() => {
-                                            setTasks((prev) => prev.filter((x) => x.id !== t.id));
-                                        }}
-                                    />
                                 </div>
-                            </div>
-                        ))
-                    )}
+                            ))
+                        )}
+                    </div>
                 </div>
-            </div >
+            </div>
 
             <TaskDetailDialog
                 key={editingTask?.id}
@@ -428,6 +375,6 @@ export default function InboxClient() {
                     load();
                 }}
             />
-        </PageShell >
+        </PageShell>
     );
 }

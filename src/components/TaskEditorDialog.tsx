@@ -40,7 +40,7 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
 
     // Form State
     const [title, setTitle] = useState(task.title || "");
-    const [workspace, setWorkspace] = useState<Workspace>((task.workspace as Workspace) || "avacrm");
+    const [workspace, setWorkspace] = useState<Workspace>((task.workspace as Workspace));
     const [status, setStatus] = useState<TaskStatus>(task.status === "planned" ? "planned" : "inbox");
     const [listId, setListId] = useState(task.list_id || "");
     const [scheduledDate, setScheduledDate] = useState(task.scheduled_date || "");
