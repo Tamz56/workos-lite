@@ -3,14 +3,14 @@
 import React from "react";
 
 interface ModalProps {
-    open: boolean;
+    isOpen: boolean;
     title: string;
     onClose: () => void;
     children: React.ReactNode;
 }
 
-export function Modal({ open, title, onClose, children }: ModalProps) {
-    if (!open) return null;
+export function Modal({ isOpen, title, onClose, children }: ModalProps) {
+    if (!isOpen) return null;
     return (
         <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />

@@ -64,7 +64,7 @@ export function CreateProjectWizard({ isOpen, onClose, onSuccess }: CreateProjec
     };
 
     return (
-        <Modal open={isOpen} title="Create New Project" onClose={onClose}>
+        <Modal isOpen={isOpen} title="Create New Project" onClose={onClose}>
             <div className="space-y-6">
                 {/* Stepper */}
                 <div className="flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-widest text-neutral-400">

@@ -35,13 +35,6 @@ export function HomeFirstRunCard({ onCreateArea, onCreateProject, onResetDemo }:
                         <Box className="w-3 h-3" />
                         Create Area
                     </button>
-                    <button
-                        onClick={onCreateProject}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-50 transition-colors active:scale-95"
-                    >
-                        <Layout className="w-3 h-3" />
-                        Create Project
-                    </button>
 
                     {/* Expand/collapse steps */}
                     <button

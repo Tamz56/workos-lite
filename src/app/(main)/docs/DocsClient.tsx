@@ -159,13 +159,6 @@ export default function DocsClient() {
                         >
                             Refresh
                         </button>
-                        <div className="w-px h-6 bg-neutral-200 mx-1" />
-                        <button
-                            onClick={() => void createDoc()}
-                            className="rounded-full bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-black shadow-sm transition-all"
-                        >
-                            New Doc
-                        </button>
                     </>
                 }
             />

@@ -206,47 +206,6 @@ export default function InboxClient() {
                 }
             />
 
-            {/* Quick Add */}
-            <div style={{ marginTop: 0, border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
-                <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                    <div style={{ flex: 1, minWidth: 260 }}>
-                        <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>Quick Add</div>
-                        <input
-                            ref={inputRef}
-                            value={title}
-                            autoFocus={true}
-                            onChange={(e) => setTitle(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && add()}
-                            placeholder='เช่น "Test Inbox"'
-                            className="w-full rounded-lg border border-neutral-200 px-3 py-2.5 text-sm focus:border-black focus:outline-none transition-all placeholder:text-neutral-400"
-                        />
-                    </div>
-
-                    <div style={{ minWidth: 180 }}>
-                        <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>Workspace</div>
-                        <select
-                            value={workspace}
-                            onChange={(e) => setWorkspace(e.target.value as Workspace)}
-                            style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}
-                        >
-                            {WORKSPACES_LIST.map((w) => (
-                                <option key={w.id} value={w.id}>
-                                    {w.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <button
-                        onClick={add}
-                        className="rounded-lg bg-neutral-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-black transition-colors mt-6"
-                    >
-                        Add
-                    </button>
-                </div>
-
-                {err && <div style={{ marginTop: 10, color: "#dc2626" }}>{err}</div>}
-            </div>
 
             {/* Sticky Bulk Action Bar */}
             {selectedCount > 0 && (
