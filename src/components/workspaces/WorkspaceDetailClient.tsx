@@ -5,6 +5,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { WORKSPACES_LIST, workspaceLabel, Workspace } from "@/lib/workspaces";
 import { Task } from "@/lib/types";
+import { List } from "@/lib/lists";
+
+interface ListStats {
+    list_id: string;
+    total: number;
+    inbox: number;
+    planned: number;
+    done: number;
+}
 
 // Reusing styles from Dashboard
 function TaskItem({ task }: { task: Task }) {
@@ -45,17 +54,56 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const [statusFilter, setStatusFilter] = useState("all");
     const [search, setSearch] = useState("");
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [lists, setLists] = useState<List[]>([]);
+    const [listStats, setListStats] = useState<Record<string, ListStats>>({});
+    const [loadingTasks, setLoadingTasks] = useState(true);
+    const [loadingLists, setLoadingLists] = useState(true);
 
-    // Fetch Logic
-    // Fetch Logic
+    // Fetch Lists
     useEffect(() => {
         let cancelled = false;
-
         async function run() {
+            try {
+                // Fetch lists and stats concurrently
+                const [resLists, resStats] = await Promise.all([
+                    fetch(`/api/lists?workspace=${workspaceId}`),
+                    fetch(`/api/lists/stats?workspace=${workspaceId}`)
+                ]);
+
+                if (!resLists.ok || !resStats.ok) return;
+
+                const dataLists = await resLists.json() as List[];
+                const dataStats = await resStats.json() as ListStats[];
+
+                if (!cancelled) {
+                    setLists(dataLists);
+                    const statsMap: Record<string, ListStats> = {};
+                    for (const s of dataStats) {
+                        statsMap[s.list_id] = s;
+                    }
+                    setListStats(statsMap);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                if (!cancelled) setLoadingLists(false);
+            }
+        }
+        run();
+        return () => { cancelled = true; };
+    }, [workspaceId]);
+
+    // Fetch Unassigned Tasks Logic
+    useEffect(() => {
+        let cancelled = false;
+        async function run() {
+            setLoadingTasks(true);
             try {
                 const params = new URLSearchParams();
                 params.set("workspace", workspaceId);
+                // ONLY fetch unassigned initially here to not spam
+                params.set("list_id", "unassigned");
+                params.set("parent_id", "unassigned");
                 params.set("limit", "100"); // Limit for performance
                 if (statusFilter !== "all") params.set("status", statusFilter);
                 if (search) params.set("q", search);
@@ -65,25 +113,42 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
                 if (!cancelled) setTasks(data);
             } catch {
-                // optional: keep silent or setTasks([])
                 if (!cancelled) setTasks([]);
             } finally {
-                if (!cancelled) setLoading(false);
+                if (!cancelled) setLoadingTasks(false);
             }
         }
-
-        // IMPORTANT: do NOT call setLoading(true) inside effect (lint rule)
-        // If you want "loading" on every filter change, setLoading(true) at the event handlers instead.
         run();
-
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [workspaceId, statusFilter, search]);
 
     // Handle New Task
     const handleNewTask = () => {
         router.push(`?newTask=1&workspace=${workspaceId}`);
+    };
+
+    // Handle New List
+    const handleNewList = async () => {
+        const title = window.prompt("Enter new list title:");
+        if (!title) return;
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+        try {
+            const res = await fetch("/api/lists", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workspace: workspaceId, title, slug })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setLists(prev => [data.list, ...prev]);
+            } else {
+                const err = await res.json();
+                alert(`Failed to create list: ${err.error || 'Unknown'}`);
+            }
+        } catch (e) {
+            alert("Error creating list");
+        }
     };
 
     if (!ws) return <div className="p-10">Workspace not found</div>;
@@ -101,10 +166,16 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 </div>
                 <div>
                     <button
-                        onClick={handleNewTask}
-                        className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-800 transition-colors flex items-center gap-2"
+                        onClick={handleNewList}
+                        className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-200 transition-colors flex items-center gap-2 mr-2 inline-flex"
                     >
-                        + New Task
+                        + List
+                    </button>
+                    <button
+                        onClick={handleNewTask}
+                        className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-800 transition-colors items-center gap-2 inline-flex"
+                    >
+                        + Task
                     </button>
                 </div>
             </div>
@@ -133,22 +204,75 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 </div>
             </div>
 
-            {/* List */}
+            {/* Content Body */}
             <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-                {loading ? (
-                    <div className="text-center text-neutral-400 py-10 animate-pulse">Loading tasks...</div>
-                ) : tasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-neutral-400">
-                        <div className="text-4xl mb-2 opacity-30">📭</div>
-                        <div>No tasks found</div>
-                    </div>
-                ) : (
-                    <div className="max-w-4xl mx-auto">
-                        {tasks.map(t => (
-                            <TaskItem key={t.id} task={t} />
-                        ))}
-                    </div>
-                )}
+                <div className="max-w-4xl mx-auto space-y-8">
+
+                    {/* Lists Section */}
+                    <section>
+                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Lists</h2>
+                        {loadingLists ? (
+                            <div className="text-neutral-400 py-4 animate-pulse">Loading lists...</div>
+                        ) : lists.length === 0 ? (
+                            <div className="text-neutral-400 py-4 text-sm bg-neutral-100 border border-neutral-200 border-dashed rounded-xl px-4 inline-block">No lists found. Create one.</div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {lists.map(list => {
+                                    const stats = listStats[list.id] || { total: 0, inbox: 0, planned: 0, done: 0 };
+                                    return (
+                                        <Link key={list.id} href={`/lists/${list.id}`} className="block group">
+                                            <div className="p-4 bg-white border border-neutral-200 rounded-xl hover:shadow-md hover:border-black/20 transition-all h-full flex flex-col justify-between cursor-pointer">
+                                                <div>
+                                                    <div className="flex items-start justify-between">
+                                                        <h3 className="font-bold text-neutral-900 group-hover:text-black">{list.title}</h3>
+                                                        {stats.total > 0 && (
+                                                            <span className="text-[10px] font-bold bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded-full">
+                                                                {stats.total} tasks
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {list.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{list.description}</p>}
+                                                </div>
+                                                <div className="mt-4 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
+                                                    <div className="flex gap-2">
+                                                        <span title="Inbox" className={`${stats.inbox > 0 ? "text-neutral-600 font-bold" : ""}`}>
+                                                            In: {stats.inbox}
+                                                        </span>
+                                                        <span title="Planned" className={`${stats.planned > 0 ? "text-blue-500 font-bold" : ""}`}>
+                                                            Pl: {stats.planned}
+                                                        </span>
+                                                        <span title="Done" className={`${stats.done > 0 ? "text-green-500 font-bold" : ""}`}>
+                                                            Dn: {stats.done}
+                                                        </span>
+                                                    </div>
+                                                    <span>→</span>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Unassigned Tasks Section */}
+                    <section>
+                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Unassigned Tasks</h2>
+                        {loadingTasks ? (
+                            <div className="text-center text-neutral-400 py-10 animate-pulse">Loading tasks...</div>
+                        ) : tasks.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-32 text-neutral-400 bg-neutral-100/50 border border-neutral-200 border-dashed rounded-xl">
+                                <span className="opacity-50">No unassigned tasks</span>
+                            </div>
+                        ) : (
+                            <div>
+                                {tasks.map(t => (
+                                    <TaskItem key={t.id} task={t} />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                </div>
             </div>
         </div>
     );

@@ -2,8 +2,11 @@ export type DocRow = {
     id: string;
     title: string;
     content_md: string;
+    project_id: string | null;
+    workspace: string | null;
     created_at: string;
     updated_at: string;
+    attachment_count?: number;
 };
 
 export function isDraft(doc: DocRow) {

@@ -6,14 +6,26 @@ import Link from "next/link";
 import { WORKSPACES, WORKSPACES_LIST, workspaceLabel, type Workspace } from "@/lib/workspaces";
 import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "@/lib/styles";
 import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
-import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List } from "lucide-react";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { 
+    PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, 
+    MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box, Target, 
+    Activity, History, Folder, AlertCircle, Clock 
+} from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import Topbar from "@/components/Topbar";
+import { WorkBucketCard } from "@/components/dashboard/WorkBucketCard";
+import { HomeFirstRunCard } from "@/components/dashboard/HomeFirstRunCard";
+import WorkloadSummaryCard from "@/components/WorkloadSummaryCard";
+import ProjectHealthGrid from "@/components/ProjectHealthGrid";
+import KnowledgeActivityCard from "@/components/KnowledgeActivityCard";
+import { ResetDemoDataDialog } from "@/components/ResetDemoDataDialog";
+import { CreateProjectWizard } from "@/components/dashboard/CreateProjectWizard";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useTaskEditor } from '@/hooks/useTaskEditor';
-import { getTasks, patchTask } from "@/lib/api";
 import { Task, TaskStatus } from "@/lib/types";
 import { STAGE_TAGS, ContentStage } from "@/lib/content/templates";
-import { getPipelineStage, listDocsByTaskId } from "@/lib/content/utils";
-import { createContentTask, createMissingContentDocs } from "@/lib/content/createContentTask";
+import { createContentTask } from "@/lib/content/createContentTask";
 
 // --- Types ---
 
@@ -221,7 +233,7 @@ function WorkspaceCard(props: {
     const theme = colorMap[workspace] || colorMap.default;
 
     return (
-        <Card title={title} right={<button onClick={() => props.onQuickAdd(workspace)} className="text-[10px] bg-neutral-100 hover:bg-neutral-200 px-2 py-1 rounded font-medium text-neutral-600">+ Task</button>} className={props.className}>
+        <Card title={title} className={props.className}>
             <div className="flex-none grid grid-cols-3 gap-2 mb-3">
                 <StatBadge value={stats.overdue} label="Overdue" colorClass="bg-red-50 text-red-600 border-red-100" href={`/planner?filter=overdue&workspace=${workspace}`} compact />
                 <StatBadge value={stats.today} label="Today" colorClass={theme} href={`/planner?workspace=${workspace}`} compact />
@@ -580,95 +592,11 @@ function OtherWorkspacesList(props: { tasks: DashboardTask[]; todayYmd: string; 
     );
 }
 
-function Modal(props: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
-    if (!props.open) return null;
-    return (
-        <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={props.onClose} />
-            <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-200/70 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-                <div className="mb-5 flex items-center justify-between gap-3">
-                    <div className="text-lg font-medium text-neutral-900">{props.title}</div>
-                    <button className="rounded-lg px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-50 hover:text-black transition-colors" onClick={props.onClose}>
-                        Close
-                    </button>
-                </div>
-                {props.children}
-            </div>
-        </div>
-    );
-}
-
-// --- Action Helper ---
-function ActionBtn(props: { icon: LucideIcon; label: string; onClick: () => void; className?: string }) {
-    const Icon = props.icon;
-    return (
-        <button
-            onClick={props.onClick}
-            className={`inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90 transition-all active:scale-95 ${props.className || ""}`}
-        >
-            <Icon className="h-4 w-4" />
-            <span>{props.label}</span>
-        </button>
-    );
-}
-
-function ActionBar() {
-    const router = useRouter();
-
-    return (
-        <div className="flex flex-wrap items-center gap-2">
-            <ActionBtn
-                icon={PlusSquare}
-                label="New Task"
-                onClick={() => router.push("/dashboard?newTask=1")}
-            />
-
-            <ActionBtn
-                icon={FileText}
-                label="New Doc"
-                onClick={() => router.push("/docs?newDoc=1")}
-            />
-
-            <ActionBtn
-                icon={CalendarPlus}
-                label="New Event"
-                onClick={() => router.push("/dashboard?newEvent=1")}
-            />
-
-            <div className="w-px h-6 bg-neutral-200 mx-2" />
-
-            <ActionBtn
-                icon={Zap}
-                label="Bulk Paste"
-                onClick={() => router.push("/dashboard?bulkPaste=1")}
-            />
-
-            <ActionBtn
-                icon={LayoutGrid}
-                label="Open Planner"
-                onClick={() => router.push("/planner")}
-            />
-
-            <div className="w-px h-6 bg-neutral-200 mx-2" />
-
-            <ActionBtn
-                icon={Bot}
-                label="Agent"
-                onClick={() => router.push("/agent")}
-            />
-
-            <ActionBtn
-                icon={List}
-                label="Logs"
-                onClick={() => router.push("/agent/logs")}
-            />
-        </div>
-    );
-}
 
 // --- Main Dashboard ---
 
 export default function DashboardClient() {
+    console.log("DashboardClient WORKSPACES_LIST:", WORKSPACES_LIST.map(w => w.id).join(","));
     return <DashboardContent />;
 }
 
@@ -681,6 +609,11 @@ function DashboardContent() {
     const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [isNewEventOpen, setIsNewEventOpen] = useState(false);
     const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+    const [isResetOpen, setIsResetOpen] = useState(false);
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [showSuccessToast, setShowSuccessToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState("Success!");
+    const [isMoreOpen, setIsMoreOpen] = useState(false);
 
     useEffect(() => {
         if (sp.get("bulkPaste") === "1") {
@@ -695,6 +628,14 @@ function DashboardContent() {
             setIsNewTaskOpen(true);
             router.replace("/dashboard");
         }
+        if (sp.get("resetDemo") === "1") {
+            setIsResetOpen(true);
+            router.replace("/dashboard");
+        }
+        if (sp.get("newProject") === "1") {
+            setIsWizardOpen(true);
+            router.replace("/dashboard");
+        }
     }, [sp, router]);
 
     const [loading, setLoading] = useState(true);
@@ -703,6 +644,7 @@ function DashboardContent() {
     const [tasks, setTasks] = useState<DashboardTask[]>([]);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [docs, setDocs] = useState<DocRow[]>([]);
+    const [analytics, setAnalytics] = useState<any>(null);
     const [health, setHealth] = useState<{ ok: boolean; status: string } | null>(null);
 
     const [quickAdd, setQuickAdd] = useState<"task" | "template" | null>(null);
@@ -754,16 +696,18 @@ function DashboardContent() {
         setLoading(true);
         setError(null);
         try {
-            const [allTasks, allEvents, allDocs, healthRes] = await Promise.all([
+            const [allTasks, allEvents, allDocs, summary, healthRes] = await Promise.all([
                 fetchTasks({ limit: "1000" }),
                 fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }),
                 fetchDocs({ limit: "100" }),
+                fetchWithTimeout("/api/analytics/summary").then(res => res.json()).catch(() => null),
                 fetchWithTimeout("/api/health").then(res => ({ ok: res.ok })).catch(() => ({ ok: false }))
             ]);
 
             setTasks(allTasks);
             setEvents(allEvents);
             setDocs(allDocs);
+            setAnalytics(summary);
             setHealth({ ok: healthRes.ok, status: healthRes.ok ? "OK" : "Degraded" });
 
         } catch (e: any) {
@@ -789,8 +733,8 @@ function DashboardContent() {
         return grouped;
     }, [tasks]);
 
-    const handleQuickAddTask = (w: Workspace) => {
-        setNewTaskWs(w);
+    const handleQuickAddTask = (w: Workspace | undefined) => {
+        if (w) setNewTaskWs(w);
         // Reset defaults
         setNewTaskStatus("inbox");
         setNewTaskDate(todayYmd);
@@ -888,7 +832,128 @@ function DashboardContent() {
         }
     };
 
-    if (loading && tasks.length === 0) return <div className="p-10 flex justify-center items-center gap-3 text-neutral-400"><span className="animate-spin text-xl">⏳</span> Loading Command Center...</div>;
+    // Check if gcal embed is available
+    const hasGCalEmbed = !!process.env.NEXT_PUBLIC_GCAL_EMBED_URL;
+    const openGCal = hasGCalEmbed ? () => window.open(process.env.NEXT_PUBLIC_GCAL_EMBED_URL, '_blank') : undefined;
+
+    // First-run Detection
+    // Show onboarding banner only when workspace is demo-only (no real user content).
+    // Uses two signals:
+    //   1. is_seed flag (deterministic, preferred): all non-empty tasks are seed data
+    //   2. project tag cross-check: no task belongs to a user-created project
+    const isFirstRun = useMemo(() => {
+        if (tasks.length === 0) return true; // empty workspace = first run
+
+        const seedSlugs = new Set(["avaone-q1", "avaone-q1-sales", "avaone-homeforest-q1", "avafarm888-fb-content-q1", "avaone-fb-content-q1", "avaone-tiktok-q1"]);
+
+        const hasUserTask = (tasks as any[]).some((t: any) => {
+            // Prefer is_seed flag if available
+            if (typeof t.is_seed === "number") return t.is_seed === 0;
+            // Fallback: check if task's project tag is not a known seed project
+            const projTag = (t.tags as string[] | null)?.find((tag) => tag.startsWith("project:"));
+            if (projTag) {
+                const slug = projTag.replace("project:", "");
+                return !seedSlugs.has(slug);
+            }
+            // Task with no project tag = user-created
+            return true;
+        });
+
+        return !hasUserTask;
+    }, [tasks]);
+
+    // --- Dashboard Stats Calculations ---
+    const stats = useMemo(() => {
+        const now = todayYmd;
+        let overdue = 0;
+        let today = 0;
+        let waiting = 0;
+
+        tasks.forEach(task => {
+            if (task.status === "done") return;
+            
+            // Heuristic for Waiting: title contains #waiting or #followup
+            const isHeuristicWaiting = task.title.toLowerCase().includes('#waiting') || task.title.toLowerCase().includes('#followup');
+
+            if (task.scheduled_date) {
+                if (task.scheduled_date < now) overdue++;
+                else if (task.scheduled_date === now) {
+                    if (isHeuristicWaiting) waiting++;
+                    else today++;
+                }
+            } else if (task.status === "planned" || isHeuristicWaiting) {
+                waiting++;
+            } else if (task.status === "inbox") {
+                // optional: count inbox as waiting too if not scheduled?
+                // for now, strict follow-up rule
+            }
+        });
+
+        return { overdue, today, waiting };
+    }, [tasks, todayYmd]);
+
+    // --- Bucket Logic ---
+    const buckets = useMemo(() => {
+        const bucketMap = {
+            "avaone": { title: "AVAONE / Brand / Content", description: "Marketing, CRM & Brand management", workspaces: ["content", "avacrm"] as Workspace[], tasks: [] as Task[] },
+            "farm": { title: "Farm Operations", description: "Avafarm888 & OPS management", workspaces: ["ops"] as Workspace[], tasks: [] as Task[] },
+            "nanagarden": { title: "Website (NanaGarden)", description: "Travel, Project & NanaGarden site", workspaces: ["marketing"] as Workspace[], tasks: [] as Task[] },
+            "marketing": { title: "Marketing & Sales", description: "Marketing & General sales", workspaces: ["marketing"] as Workspace[], tasks: [] as Task[] },
+            "other": { title: "Admin / Other", description: "Finance, Admin & Personal", workspaces: ["admin", "finance", "personal"] as Workspace[], tasks: [] as Task[] },
+        };
+
+        tasks.forEach(task => {
+            if (task.status === "done") return;
+            
+            const ws = task.workspace as Workspace;
+            const titleLower = task.title.toLowerCase();
+
+            // 1. AVAONE: content/avacrm OR title match
+            if (ws === 'content' || ws === 'avacrm' || titleLower.includes('avaone')) {
+                bucketMap.avaone.tasks.push(task);
+            } 
+            // 2. Farm: ops
+            else if (ws === 'ops') {
+                bucketMap.farm.tasks.push(task);
+            }
+            // 3. Website: marketing + keyword
+            else if (ws === 'marketing' && (titleLower.includes('nanagarden') || titleLower.includes('website'))) {
+                bucketMap.nanagarden.tasks.push(task);
+            }
+            // 4. Marketing remaining
+            else if (ws === 'marketing') {
+                bucketMap.marketing.tasks.push(task);
+            }
+            // 5. Admin / Others
+            else {
+                bucketMap.other.tasks.push(task);
+            }
+        });
+
+        const getBucketStats = (tks: Task[]) => {
+            const now = todayYmd;
+            let ovd = 0;
+            let tdy = 0;
+            let ibx = 0;
+            tks.forEach(t => {
+                if (t.scheduled_date) {
+                    if (t.scheduled_date < now) ovd++;
+                    else if (t.scheduled_date === now) tdy++;
+                } else if (t.status === "inbox") {
+                    ibx++;
+                }
+            });
+            return { ovd, tdy, ibx };
+        };
+
+        return Object.entries(bucketMap).map(([id, b]) => ({
+            id,
+            ...b,
+            stats: getBucketStats(b.tasks),
+        })).filter(b => b.tasks.length > 0 || b.id !== "other"); // Keep main 5, hide empty "other"
+    }, [tasks, todayYmd]);
+
+    if (loading && tasks.length === 0) return <div className="p-10 flex justify-center items-center gap-3 text-neutral-400"><span className="animate-spin text-xl">⏳</span> Loading Home...</div>;
 
     if (error && tasks.length === 0) {
         return (
@@ -905,22 +970,120 @@ function DashboardContent() {
         );
     }
 
-    // Check if gcal embed is available
-    const hasGCalEmbed = !!process.env.NEXT_PUBLIC_GCAL_EMBED_URL;
-    const openGCal = hasGCalEmbed ? () => window.open(process.env.NEXT_PUBLIC_GCAL_EMBED_URL, '_blank') : undefined;
 
     return (
-        <div className="w-full px-6 2xl:px-10 py-8">
-            {/* Header with Action Bar */}
-            <div className="flex items-start justify-between gap-4 mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold font-display tracking-tight text-neutral-900">Dashboard</h1>
-                    <div className="text-sm text-neutral-500 font-medium mt-1">
-                        {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        <PageShell>
+            <PageHeader
+                title="Dashboard"
+                subtitle="High-level overview of your active projects and upcoming commitments."
+                actions={
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setIsWizardOpen(true)}
+                            className="bg-black text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg shadow-black/10 hover:bg-neutral-800 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <Layout className="w-3.5 h-3.5" />
+                            Create Project
+                        </button>
+                        <button
+                            onClick={() => setIsNewTaskOpen(true)}
+                            className="bg-neutral-100 text-neutral-900 px-4 py-2 rounded-xl text-xs font-black hover:bg-neutral-200 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Quick Task
+                        </button>
+                        <button
+                            onClick={() => router.push("/docs?newDoc=1")}
+                            className="hidden md:flex bg-white border border-neutral-200 text-neutral-600 px-4 py-2 rounded-xl text-xs font-black hover:bg-neutral-50 transition-all active:scale-95 items-center gap-2"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            New Note
+                        </button>
+
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsMoreOpen(!isMoreOpen)}
+                                className={`h-full px-3 rounded-xl border transition-all active:scale-95 flex items-center gap-1 ${isMoreOpen ? 'bg-neutral-100 border-neutral-300 text-black' : 'bg-white border-neutral-200 text-neutral-500 hover:bg-neutral-50'}`}
+                            >
+                                <MoreHorizontal className="w-4 h-4" />
+                            </button>
+
+                            {isMoreOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-30" onClick={() => setIsMoreOpen(false)} />
+                                    <div className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-2xl shadow-2xl py-2 z-40 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                                        <div className="px-3 py-1.5 text-[10px] font-black text-neutral-400 uppercase tracking-widest">Utilities</div>
+                                        <Link href="/agent" className="flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors">
+                                            <Bot className="w-4 h-4 text-purple-600" />
+                                            Agent
+                                        </Link>
+                                        <Link href="/logs" className="flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors">
+                                            <Activity className="w-4 h-4 text-blue-600" />
+                                            System Logs
+                                        </Link>
+                                        <div className="h-px bg-neutral-100 my-1 mx-2" />
+                                        <button 
+                                            onClick={() => { setIsMoreOpen(false); setIsNewEventOpen(true); }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors"
+                                        >
+                                            <CalendarPlus className="w-4 h-4 text-green-600" />
+                                            New Event
+                                        </button>
+                                        <button 
+                                            onClick={() => { setIsMoreOpen(false); setIsBulkOpen(true); }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition-colors"
+                                        >
+                                            <PlusSquare className="w-4 h-4 text-orange-600" />
+                                            Bulk Paste
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
+                }
+            />
+
+            <div className="space-y-8 max-w-[1600px] mx-auto pb-24">
+                {/* Onboarding Banner - shown inline for first-run, does NOT replace dashboard */}
+                {isFirstRun && (
+                    <div className="mb-6">
+                        <HomeFirstRunCard
+                            onCreateArea={() => router.push("/workspaces?newArea=1")}
+                            onCreateProject={() => setIsWizardOpen(true)}
+                            onResetDemo={() => setIsResetOpen(true)}
+                        />
+                    </div>
+                )}
+
+                {/* Decision Hub & Workload Summary */}
+                <div className="space-y-6">
+                    <WorkloadSummaryCard 
+                        overdue={analytics?.kpis?.overdue || 0}
+                        today={analytics?.kpis?.today || 0}
+                        inbox={analytics?.kpis?.inbox || 0}
+                        doneToday={analytics?.kpis?.doneToday || 0}
+                        loading={loading && !analytics}
+                    />
+
+                    {/* Decision Signals (Heuristics) */}
+                    {(analytics?.focus?.mostActiveWorkspace || analytics?.focus?.oldestInboxItemYmd) && (
+                        <div className="flex flex-wrap gap-4">
+                            {analytics.focus.mostActiveWorkspace && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                    <Zap className="w-3 h-3 text-yellow-400" />
+                                    Active: {analytics.focus.mostActiveWorkspace}
+                                </div>
+                            )}
+                            {analytics.focus.oldestInboxItemYmd && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-neutral-200 text-neutral-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                    <Clock className="w-3 h-3 text-neutral-400" />
+                                    Oldest Backlog: {analytics.focus.oldestInboxItemYmd}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
-                <ActionBar />
-            </div>
 
             {/* Main Grid Layout - Strict 12 Cols */}
             <div className="grid grid-cols-12 gap-6">
@@ -933,21 +1096,43 @@ function DashboardContent() {
                     <AgendaCardBig events={events} todayYmd={todayYmd} className="h-full min-h-[360px]" />
                 </div>
 
-                {/* Row 2: Workspaces Inner Grid (8) + Mini Month (4) */}
+                {/* Row 2: Work Buckets Grid (8) + Mini Month (4) */}
                 <div className="col-span-12 xl:col-span-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-                        <WorkspaceCard className="h-full" workspace="avacrm" tasks={wsTasks['avacrm']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} />
-                        <WorkspaceCard className="h-full" workspace="ops" tasks={wsTasks['ops']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} />
-                        <WorkspaceCard className="h-full" workspace="content" tasks={wsTasks['content']} onQuickAdd={handleQuickAddTask} todayYmd={todayYmd} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {buckets.map(bucket => (
+                            <WorkBucketCard 
+                                key={bucket.id}
+                                title={bucket.title}
+                                description={bucket.description}
+                                overdue={bucket.stats.ovd}
+                                today={bucket.stats.tdy}
+                                inbox={bucket.stats.ibx}
+                                workspaces={bucket.workspaces}
+                            />
+                        ))}
                     </div>
                 </div>
                 <div className="col-span-12 xl:col-span-4">
                     <MiniMonthCard events={events} todayYmd={todayYmd} onOpenGCal={openGCal} className="h-full" />
                 </div>
 
-                {/* Row 3: Other Workspaces (8) + System Status (4) - Strict Alignment */}
+                {/* Row 3: Project Health (8) + Knowledge Activity (4) */}
                 <div className="col-span-12 xl:col-span-8">
-                    <OtherWorkspacesList tasks={tasks} todayYmd={todayYmd} className="h-full flex flex-col" />
+                    <ProjectHealthGrid projects={analytics?.projects || []} loading={loading && !analytics} />
+                </div>
+                <div className="col-span-12 xl:col-span-4">
+                    <KnowledgeActivityCard notes={analytics?.knowledge || []} loading={loading && !analytics} />
+                </div>
+
+                {/* Row 4: Other items (8) + System Status (4) */}
+                <div className="col-span-12 xl:col-span-8">
+                    <div className="bg-neutral-50/30 rounded-3xl p-6 border border-dashed border-neutral-200">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-neutral-500 text-sm uppercase tracking-wider italic">Administrative Overview</h3>
+                            {/* Hidden system info or extra links can go here */}
+                        </div>
+                        <OtherWorkspacesList tasks={tasks} todayYmd={todayYmd} className="flex flex-col" />
+                    </div>
                 </div>
                 <div className="col-span-12 xl:col-span-4">
                     <Card title="System Status" className="bg-neutral-50/50 h-full flex flex-col">
@@ -984,7 +1169,7 @@ function DashboardContent() {
                 />
             )}
 
-            <Modal open={isNewEventOpen} title="New Event" onClose={() => setIsNewEventOpen(false)}>
+            <Modal isOpen={isNewEventOpen} title="New Event" onClose={() => setIsNewEventOpen(false)}>
                 <form onSubmit={handleCreateEvent} className="space-y-4">
                     <div>
                         <label className={LABEL_BASE}>Event Title</label>
@@ -1001,7 +1186,7 @@ function DashboardContent() {
                 </form>
             </Modal>
 
-            <Modal open={isNewTaskOpen} title="New Task" onClose={() => setIsNewTaskOpen(false)}>
+            <Modal isOpen={isNewTaskOpen} title="New Task" onClose={() => setIsNewTaskOpen(false)}>
                 <form onSubmit={handleCreateTask} className="space-y-4">
 
                     {newTaskWs === 'content' && (
@@ -1153,7 +1338,7 @@ function DashboardContent() {
                 onUpdate={refreshAll}
             />
 
-            <Modal open={quickAdd === "template"} title="New Content Project" onClose={() => setQuickAdd(null)}>
+            <Modal isOpen={quickAdd === "template"} title="New Content Project" onClose={() => setQuickAdd(null)}>
                 <form onSubmit={handleCreateContentTemplate} className="space-y-5">
                     <div className="space-y-1.5">
                         <label className={LABEL_BASE}>Project Title</label>
@@ -1166,6 +1351,38 @@ function DashboardContent() {
                     </div>
                 </form>
             </Modal>
-        </div>
+
+            <ResetDemoDataDialog
+                isOpen={isResetOpen}
+                onClose={() => setIsResetOpen(false)}
+                onSuccess={(mode) => {
+                    setIsResetOpen(false);
+                    setShowSuccessToast(true);
+                    refreshAll();
+                    setTimeout(() => setShowSuccessToast(false), 5000);
+                }}
+            />
+
+            {showSuccessToast && (
+                <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+                    <div className="bg-green-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 font-bold">
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>{toastMessage}</span>
+                    </div>
+                </div>
+            )}
+
+            <CreateProjectWizard 
+                isOpen={isWizardOpen}
+                onClose={() => setIsWizardOpen(false)}
+                onSuccess={() => {
+                    setToastMessage("Project Created Successfully!");
+                    setShowSuccessToast(true);
+                    refreshAll();
+                    setTimeout(() => setShowSuccessToast(false), 5000);
+                }}
+            />
+            </div>
+        </PageShell>
     );
 }

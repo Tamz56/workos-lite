@@ -32,13 +32,15 @@ export default function CommandPalette({ isOpen, docs, onClose, onOpenDoc, onCre
     // Handle Open/Close effects (External System Sync only)
     useEffect(() => {
         if (isOpen) {
-            document.body.classList.add("overflow-hidden");
+            document.body.style.overflow = "hidden";
             // Auto focus
             setTimeout(() => inputRef.current?.focus(), 50);
         } else {
-            document.body.classList.remove("overflow-hidden");
+            document.body.style.overflow = "";
         }
-        return () => document.body.classList.remove("overflow-hidden");
+        return () => {
+            document.body.style.overflow = "";
+        };
     }, [isOpen]);
 
     // Internal Handlers to avoid setState in effects
@@ -112,7 +114,7 @@ export default function CommandPalette({ isOpen, docs, onClose, onOpenDoc, onCre
 
     return (
         <div
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center pt-[20vh]"
+            className="fixed inset-0 z-50 bg-neutral-900/20 flex items-start justify-center pt-[20vh]"
             onClick={handleClose}
         >
             <div
@@ -143,7 +145,7 @@ export default function CommandPalette({ isOpen, docs, onClose, onOpenDoc, onCre
                             key={doc.id}
                             className={clsx(
                                 "flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm",
-                                i === selectedIndex ? "bg-blue-50 text-blue-900" : "text-gray-700 hover:bg-gray-50"
+                                i === selectedIndex ? "bg-emerald-50 text-emerald-900" : "text-gray-700 hover:bg-gray-50"
                             )}
                             onMouseEnter={() => setSelectedIndex(i)}
                             onClick={() => {
@@ -152,7 +154,7 @@ export default function CommandPalette({ isOpen, docs, onClose, onOpenDoc, onCre
                             }}
                         >
                             <span className="font-medium truncate pr-4">{doc.title || "Untitled"}</span>
-                            <span className={clsx("text-xs shrink-0", i === selectedIndex ? "text-blue-500" : "text-gray-400")}>
+                            <span className={clsx("text-xs shrink-0", i === selectedIndex ? "text-emerald-500" : "text-gray-400")}>
                                 {formatDate(doc.updated_at)}
                             </span>
                         </div>
@@ -162,7 +164,7 @@ export default function CommandPalette({ isOpen, docs, onClose, onOpenDoc, onCre
                         <div
                             className={clsx(
                                 "flex items-center px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium",
-                                selectedIndex === filteredDocs.length ? "bg-blue-50 text-blue-900" : "text-gray-700 hover:bg-gray-50"
+                                selectedIndex === filteredDocs.length ? "bg-emerald-50 text-emerald-900" : "text-gray-700 hover:bg-gray-50"
                             )}
                             onMouseEnter={() => setSelectedIndex(filteredDocs.length)}
                             onClick={() => {

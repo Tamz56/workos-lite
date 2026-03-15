@@ -8,7 +8,7 @@ import fs from "fs/promises";
 import { ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, getFileExtLower } from "@/lib/uploadRules";
 
 function uploadDir(taskId: string) {
-    return path.join(process.cwd(), "data", "uploads", taskId);
+    return path.join(process.cwd(), "data", "uploads", "tasks", taskId);
 }
 
 async function ensureDir(p: string) {
@@ -69,12 +69,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await fs.writeFile(absPath, buf);
 
     // Store RELATIVE path in DB
-    const relativePath = path.join("uploads", taskId, storedName);
+    const relativePath = path.join("uploads", "tasks", taskId, storedName);
 
     db.prepare(
         `
-    INSERT INTO attachments (id, task_id, file_name, mime_type, size_bytes, storage_path, created_at)
-    VALUES (@id, @task_id, @file_name, @mime_type, @size_bytes, @storage_path, @created_at)
+    INSERT INTO attachments (id, task_id, doc_id, file_name, mime_type, size_bytes, storage_path, created_at)
+    VALUES (@id, @task_id, NULL, @file_name, @mime_type, @size_bytes, @storage_path, @created_at)
     `
     ).run({
         id,

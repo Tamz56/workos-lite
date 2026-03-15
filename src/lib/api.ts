@@ -136,6 +136,25 @@ export async function deleteAttachment(id: string): Promise<void> {
     if (!res.ok) throw new Error(`deleteAttachment failed: ${res.status}`);
 }
 
+export async function listDocAttachments(docId: string): Promise<Attachment[]> {
+    const res = await fetch(`/api/docs/${docId}/attachments`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`listDocAttachments failed: ${res.status}`);
+    const data = await res.json();
+    return data.attachments ?? [];
+}
+
+export async function uploadDocAttachment(docId: string, file: File): Promise<Attachment> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`/api/docs/${docId}/attachments`, {
+        method: "POST",
+        body: formData,
+    });
+    if (!res.ok) throw new Error(`uploadDocAttachment failed: ${res.status}`);
+    const data = await res.json();
+    return data.attachment;
+}
+
 // --- EVENTS ---
 
 export type EventKind = "appointment" | "meeting" | "reminder";

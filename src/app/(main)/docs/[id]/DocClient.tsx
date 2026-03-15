@@ -1,20 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toErrorMessage } from "@/lib/error";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { RefreshCw, Trash2, ChevronLeft, Save, Printer, Layout, Briefcase } from "lucide-react";
+import { WORKSPACES_LIST } from "@/lib/workspaces";
+import { Project } from "@/lib/types";
+import AttachmentsPanel from "@/components/AttachmentsPanel";
 
 type DocRow = {
     id: string;
     title: string;
     content_md: string;
+    project_id: string | null;
+    workspace: string | null;
     created_at: string;
     updated_at: string;
 };
 
-function formatThai(dt: string) {
+function formatDateTime(dt: string) {
     try {
-        return new Date(dt).toLocaleString("th-TH", { hour12: false });
+        return new Date(dt).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric"
+        });
     } catch {
         return dt;
     }
@@ -24,6 +36,7 @@ export default function DocClient({ id }: { id: string }) {
     const router = useRouter();
 
     const [doc, setDoc] = useState<DocRow | null>(null);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [err, setErr] = useState<string | null>(null);
 
     const [saving, setSaving] = useState(false);
@@ -31,28 +44,38 @@ export default function DocClient({ id }: { id: string }) {
     const [lastSaved, setLastSaved] = useState<string | null>(null);
 
     const tRef = useRef<number | null>(null);
-    const pendingRef = useRef<Partial<Pick<DocRow, "title" | "content_md">>>({});
+    const pendingRef = useRef<Partial<DocRow>>({});
     const mountedRef = useRef(true);
 
-    async function load() {
+    const load = useCallback(async () => {
         setErr(null);
-        const res = await fetch(`/api/docs/${id}`, { cache: "no-store" });
-        if (!res.ok) {
-            const text = await res.text().catch(() => "");
-            throw new Error(`Load doc failed (${res.status}): ${text || res.statusText}`);
-        }
-        const row = (await res.json()) as DocRow;
-        return row;
-    }
+        try {
+            const [docRes, projectsRes] = await Promise.all([
+                fetch(`/api/docs/${id}`, { cache: "no-store" }),
+                fetch("/api/projects", { cache: "no-store" })
+            ]);
 
-    async function patch(next: Partial<Pick<DocRow, "title" | "content_md">>) {
+            if (!docRes.ok) throw new Error("Load doc failed");
+            const docData = await docRes.json();
+            setDoc(docData.doc);
+
+            if (projectsRes.ok) {
+                const projectsData = await projectsRes.json();
+                setProjects(projectsData);
+            }
+        } catch (e: unknown) {
+            setErr(toErrorMessage(e));
+        }
+    }, [id]);
+
+    async function patch(next: Partial<DocRow>) {
         setSaving(true);
         setSaved(false);
         setErr(null);
 
         try {
             const payload = { ...next };
-            if (typeof payload.title === "string") {
+            if (payload.title !== undefined) {
                 payload.title = payload.title.trim() || "Untitled";
             }
 
@@ -62,12 +85,10 @@ export default function DocClient({ id }: { id: string }) {
                 body: JSON.stringify(payload),
             });
 
-            if (!res.ok) {
-                const text = await res.text().catch(() => "");
-                throw new Error(`Save failed (${res.status}): ${text || res.statusText}`);
-            }
+            if (!res.ok) throw new Error("Save failed");
 
-            const updated = (await res.json()) as DocRow;
+            const data = await res.json();
+            const updated = data.doc;
             if (!mountedRef.current) return;
 
             setDoc(updated);
@@ -82,7 +103,7 @@ export default function DocClient({ id }: { id: string }) {
         }
     }
 
-    function scheduleSave(next: Partial<Pick<DocRow, "title" | "content_md">>) {
+    function scheduleSave(next: Partial<DocRow>) {
         pendingRef.current = { ...pendingRef.current, ...next };
 
         if (tRef.current) window.clearTimeout(tRef.current);
@@ -90,7 +111,7 @@ export default function DocClient({ id }: { id: string }) {
             const payload = pendingRef.current;
             pendingRef.current = {};
             patch(payload);
-        }, 600); // debounce 600ms
+        }, 800);
     }
 
     async function flushPending() {
@@ -103,34 +124,18 @@ export default function DocClient({ id }: { id: string }) {
 
     useEffect(() => {
         mountedRef.current = true;
-
-        load()
-            .then((row) => setDoc(row))
-            .catch((e) => setErr(toErrorMessage(e)));
-
+        load();
         return () => {
             mountedRef.current = false;
             if (tRef.current) window.clearTimeout(tRef.current);
-            pendingRef.current = {};
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id]);
-
-    // const title = doc?.title ?? "Untitled"; // Unused
-
-    const updatedAtText = useMemo(() => (doc ? formatThai(doc.updated_at) : ""), [doc]);
+    }, [load]);
 
     async function onDelete() {
-        const name = (doc?.title || "Untitled").trim() || "Untitled";
-        const ok = window.confirm(`ลบเอกสาร "${name}" ถาวร? (กู้คืนไม่ได้)`);
-        if (!ok) return;
-
+        if (!confirm(`Delete document "${doc?.title || 'Untitled'}" permanently?`)) return;
         try {
             const res = await fetch(`/api/docs/${id}`, { method: "DELETE" });
-            if (!res.ok) {
-                const text = await res.text().catch(() => "");
-                throw new Error(`Delete failed (${res.status}): ${text || res.statusText}`);
-            }
+            if (!res.ok) throw new Error("Delete failed");
             router.push("/docs");
         } catch (e: unknown) {
             setErr(toErrorMessage(e));
@@ -139,90 +144,123 @@ export default function DocClient({ id }: { id: string }) {
 
     if (err) {
         return (
-            <div className="mx-auto max-w-4xl px-6 py-10">
-                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {err}
+            <PageShell>
+                <div className="p-20 text-center">
+                    <div className="text-red-500 font-bold mb-4">{err}</div>
+                    <button onClick={() => router.push("/docs")} className="text-sm font-bold underline">Back to Docs</button>
                 </div>
-                <button className="mt-4 text-sm underline" onClick={() => router.push("/docs")}>
-                    กลับไป Docs
-                </button>
-            </div>
+            </PageShell>
         );
     }
 
     if (!doc) {
-        return (
-            <div className="mx-auto max-w-4xl px-6 py-10">
-                <div className="text-sm text-neutral-600">กำลังโหลด...</div>
-            </div>
-        );
+        return <PageShell><div className="p-20 text-center text-neutral-400 italic">Finding document...</div></PageShell>;
     }
 
     return (
-        <div className="mx-auto max-w-5xl px-6 py-10">
-            <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                    <input
-                        className="w-full rounded-md border px-4 py-3 text-2xl font-semibold"
-                        value={doc.title}
-                        onChange={(e) => {
-                            const nextTitle = e.target.value;
-                            setDoc((prev) => (prev ? { ...prev, title: nextTitle } : prev));
-                            scheduleSave({ title: nextTitle });
-                        }}
-                    />
-                    <div className="mt-2 text-xs text-neutral-600">อัปเดตล่าสุด: {updatedAtText}</div>
-                </div>
+        <PageShell>
+            <div className="flex items-center gap-2 mb-6 text-neutral-400 hover:text-black transition-colors cursor-pointer group w-fit" onClick={() => router.push("/docs")}>
+                <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span className="text-xs font-black uppercase tracking-widest">Docs & Knowledge</span>
+            </div>
 
-                <div className="flex items-center gap-2">
-                    <div className="text-xs text-neutral-500">
-                        {saving ? "Saving..." : saved ? "Saved" : ""}
+            <PageHeader
+                title={doc.title || "Untitled"}
+                subtitle={`Updated: ${formatDateTime(doc.updated_at)}`}
+                actions={
+                    <div className="flex items-center gap-2">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mr-2">
+                            {saving ? "Saving..." : saved ? "All changes saved" : ""}
+                        </div>
+                        <button
+                            onClick={() => router.push(`/docs/${id}/print`)}
+                            className="p-2.5 rounded-2xl bg-white border border-neutral-200 text-neutral-400 hover:text-neutral-900 hover:border-neutral-300 transition-all active:scale-95 shadow-sm"
+                            title="Print"
+                        >
+                            <Printer className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={onDelete}
+                            className="p-2.5 rounded-2xl bg-white border border-neutral-200 text-neutral-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all active:scale-95 shadow-sm"
+                            title="Delete"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    </div>
+                }
+            />
+
+            <div className="max-w-5xl mx-auto mt-8 space-y-8 pb-20">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3 px-1">
+                            <Layout className="w-3.5 h-3.5 text-neutral-400" />
+                            <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Linked Project</label>
+                        </div>
+                        <select
+                            value={doc.project_id || ""}
+                            onChange={(e) => {
+                                const val = e.target.value || null;
+                                setDoc(prev => prev ? { ...prev, project_id: val } : null);
+                                scheduleSave({ project_id: val });
+                            }}
+                            className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:bg-white focus:border-neutral-300 transition-all"
+                        >
+                            <option value="">None (Unlinked)</option>
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
                     </div>
 
-                    <button
-                        className="rounded-md border px-4 py-2 text-sm hover:bg-neutral-50"
-                        onClick={async () => {
-                            await flushPending();
-                            router.push("/docs");
-                        }}
-                    >
-                        Back
-                    </button>
+                    <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3 px-1">
+                            <Briefcase className="w-3.5 h-3.5 text-neutral-400" />
+                            <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Workspace Category</label>
+                        </div>
+                        <select
+                            value={doc.workspace || ""}
+                            onChange={(e) => {
+                                const val = e.target.value || null;
+                                setDoc(prev => prev ? { ...prev, workspace: val } : null);
+                                scheduleSave({ workspace: val });
+                            }}
+                            className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:bg-white focus:border-neutral-300 transition-all"
+                        >
+                            <option value="">None (General)</option>
+                            {WORKSPACES_LIST.map(w => (
+                                <option key={w.id} value={w.id}>{w.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
 
-                    <button
-                        className="rounded-md border px-4 py-2 text-sm hover:bg-neutral-50"
-                        onClick={async () => {
-                            await flushPending();
-                            router.push(`/docs/${id}/print`);
+                <div className="space-y-4">
+                    <input
+                        className="w-full bg-transparent border-none text-4xl font-black tracking-tight outline-none placeholder:text-neutral-100"
+                        placeholder="Untitled Note"
+                        value={doc.title}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setDoc(prev => prev ? { ...prev, title: val } : null);
+                            scheduleSave({ title: val });
                         }}
-                    >
-                        Print
-                    </button>
+                    />
+                    
+                    <textarea
+                        className="w-full min-h-[600px] bg-white border border-neutral-200 rounded-3xl p-8 text-lg font-medium outline-none focus:shadow-xl transition-all shadow-sm leading-relaxed"
+                        placeholder="Start writing your thoughts, documentation, or knowledge here..."
+                        value={doc.content_md}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setDoc(prev => prev ? { ...prev, content_md: val } : null);
+                            scheduleSave({ content_md: val });
+                        }}
+                    />
 
-                    <button
-                        className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100"
-                        onClick={onDelete}
-                    >
-                        Delete
-                    </button>
+                    <AttachmentsPanel kind="doc" entityId={id} />
                 </div>
             </div>
-
-            <div className="mt-6">
-                <textarea
-                    className="min-h-[560px] w-full rounded-md border px-4 py-3 text-sm"
-                    placeholder="เขียน Markdown ที่นี่..."
-                    value={doc.content_md}
-                    onChange={(e) => {
-                        const nextMd = e.target.value;
-                        setDoc((prev) => (prev ? { ...prev, content_md: nextMd } : prev));
-                        scheduleSave({ content_md: nextMd });
-                    }}
-                />
-                <div className="mt-2 text-right text-xs text-neutral-500">
-                    {lastSaved ? `LAST SAVED: ${formatThai(lastSaved)}` : ""}
-                </div>
-            </div>
-        </div>
+        </PageShell>
     );
 }

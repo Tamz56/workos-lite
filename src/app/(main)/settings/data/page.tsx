@@ -1,5 +1,6 @@
 import BackupRestorePanel from "@/components/backup/BackupRestorePanel";
 import Link from "next/link";
+import DataManagementClient from "./DataManagementClient";
 
 export const metadata = {
     title: "Data Management | WorkOS-Lite",
@@ -63,6 +64,8 @@ export default function DataPage() {
                 </p>
                 <BackupRestorePanel />
             </Card>
+
+            <DataManagementClient />
 
             {/* Info */}
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

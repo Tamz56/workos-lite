@@ -51,4 +51,11 @@ export const CONTENT_TEMPLATES = {
 | 2     |        |             |                |        |       |
 | 3     |        |             |                |        |       |
 `.trim(),
+
+    NANAGARDEN_AD: `
+# NanaGarden SKU Ad
+* **Target Audience**:
+* **Benefit highlights**:
+* **Call to Action**:
+`.trim(),
 };

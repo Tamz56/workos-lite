@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 // 2. Content Docs Logic
-                if (t.workspace === 'content' && options.createContentDocs) {
+                if ((t.workspace === 'content' || t.workspace === 'marketing') && options.createContentDocs) {
                     const briefId = nanoid();
                     const scriptId = nanoid();
                     const storyboardId = nanoid();
@@ -114,6 +114,16 @@ export async function POST(req: NextRequest) {
 - [Storyboard](/docs/${storyboardId})
 `;
                     notes += links;
+                }
+
+                // 3. NG_SKU Automation
+                if (t.title.startsWith('NG_SKU:')) {
+                    const docId = nanoid();
+                    db.prepare(`
+                        INSERT INTO docs (id, title, content_md, created_at, updated_at)
+                        VALUES (@id, @title, @content, @now, @now)
+                    `).run({ id: docId, title: `${t.title} - Ad`, content: CONTENT_TEMPLATES.NANAGARDEN_AD, now });
+                    notes += `\n\n[NanaGarden Ad](/docs/${docId})`;
                 }
 
                 // Update notes if they changed (or if just initially set)

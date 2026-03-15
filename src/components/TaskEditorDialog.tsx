@@ -5,6 +5,7 @@ import { WORKSPACES_LIST, Workspace } from "@/lib/workspaces";
 import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "@/lib/styles";
 import { STAGE_TAGS, ContentStage } from "@/lib/content/templates";
 import { Task, TaskStatus } from "@/lib/types";
+import { List } from "@/lib/lists";
 import { postJson } from "@/lib/api"; // Need to ensure postJson is available or copy it
 import { createMissingContentDocs } from "@/lib/content/createContentTask";
 
@@ -39,11 +40,15 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
 
     // Form State
     const [title, setTitle] = useState(task.title || "");
-    const [workspace, setWorkspace] = useState<Workspace>((task.workspace as Workspace) || "avacrm");
+    const [workspace, setWorkspace] = useState<Workspace>((task.workspace as Workspace));
     const [status, setStatus] = useState<TaskStatus>(task.status === "planned" ? "planned" : "inbox");
+    const [listId, setListId] = useState(task.list_id || "");
     const [scheduledDate, setScheduledDate] = useState(task.scheduled_date || "");
     const [priority, setPriority] = useState(task.priority || 2);
     const [notes, setNotes] = useState(task.notes || "");
+    const [parentTaskId, setParentTaskId] = useState(task.parent_task_id || "");
+
+    const [availableLists, setAvailableLists] = useState<List[]>([]);
 
     // Content Specific
     const [contentTab, setContentTab] = useState<"details" | "content">("details");
@@ -57,9 +62,11 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
             setTitle(task.title || "");
             setWorkspace((task.workspace as Workspace) || "avacrm");
             setStatus(task.status === "planned" ? "planned" : "inbox");
+            setListId(task.list_id || "");
             setScheduledDate(task.scheduled_date || "");
             setPriority(task.priority || 2);
             setNotes(task.notes || "");
+            setParentTaskId(task.parent_task_id || "");
 
             // Reset Content
             setContentTab("details");
@@ -68,6 +75,40 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
             setContentPlatforms([]);
         }
     }, [isOpen, task]);
+
+    // Fetch lists when workspace changes
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+        async function run() {
+            try {
+                const res = await fetch(`/api/lists?workspace=${workspace}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!cancelled) {
+                    setAvailableLists(data);
+
+                    // Auto-select list logic
+                    if (data.length > 0) {
+                        setListId(prev => {
+                            // 1. If task opened with a specific list_id and it's in this workspace, use it.
+                            if (task.list_id && data.some((l: List) => l.id === task.list_id)) return task.list_id;
+                            // 2. If already chose a list and it's in this workspace, keep it.
+                            if (prev && data.some((l: List) => l.id === prev)) return prev;
+                            // 3. Otherwise default to the first list (no more "Unassigned" default if lists exist)
+                            return data[0].id;
+                        });
+                    } else {
+                        setListId("");
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        run();
+        return () => { cancelled = true; };
+    }, [workspace, isOpen]);
 
     const togglePlatform = (p: string) => {
         if (contentPlatforms.includes(p)) {
@@ -99,6 +140,8 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
                     body: JSON.stringify({
                         title: finalTitle,
                         workspace,
+                        list_id: listId || undefined,
+                        parent_task_id: parentTaskId || undefined,
                         status,
                         scheduled_date: scheduledDate || undefined,
                         priority,
@@ -127,6 +170,8 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
                     body: JSON.stringify({
                         title,
                         workspace,
+                        list_id: listId || undefined,
+                        parent_task_id: parentTaskId || undefined,
                         status,
                         scheduled_date: scheduledDate || undefined, // Send undefined if empty string
                         priority,
@@ -145,6 +190,8 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
             setIsSubmitting(false);
         }
     };
+
+    console.log("TaskEditorDialog WORKSPACES_LIST:", WORKSPACES_LIST.map(w => w.id).join(","));
 
     return (
         <Modal open={isOpen} title="New Task" onClose={onClose}>
@@ -183,6 +230,19 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
                             >
                                 {WORKSPACES_LIST.map(w => (
                                     <option key={w.id} value={w.id}>{w.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={LABEL_BASE}>List</label>
+                            <select
+                                className={INPUT_BASE}
+                                value={listId}
+                                onChange={e => setListId(e.target.value)}
+                            >
+                                <option value="">(Unassigned)</option>
+                                {availableLists.map(l => (
+                                    <option key={l.id} value={l.id}>{l.title}</option>
                                 ))}
                             </select>
                         </div>
