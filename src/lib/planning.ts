@@ -4,6 +4,12 @@ export function todayISO() {
     return new Date().toISOString().slice(0, 10);
 }
 
+export function tomorrowISO() {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+}
+
 export function defaultBucketForWorkspace(workspace: string): ScheduleBucket | undefined {
     const w = String(workspace).toLowerCase();
 

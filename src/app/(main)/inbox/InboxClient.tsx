@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Task, Workspace, ScheduleBucket } from "@/lib/types";
 import { getTasks, createTask, patchTask } from "@/lib/api";
-import { todayISO, defaultBucketForWorkspace } from "@/lib/planning";
+import { todayISO, tomorrowISO, defaultBucketForWorkspace } from "@/lib/planning";
 import { useTaskEditor } from "@/hooks/useTaskEditor";
 import TaskDetailDialog from "@/components/TaskDetailDialog";
 import TaskTitleInlineEdit from "@/components/TaskTitleInlineEdit";
@@ -21,11 +21,14 @@ export default function InboxClient() {
     const [workspace, setWorkspace] = useState<Workspace>("avacrm");
 
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [projects, setProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState<string | null>(null);
+    const [isCelebrating, setIsCelebrating] = useState(false);
 
     const { editingTask, setEditingTask, initialTab, openEditor, closeEditor } = useTaskEditor();
     const [planningIds, setPlanningIds] = useState<Set<string>>(new Set());
+    const [focusedIndex, setFocusedIndex] = useState<number>(0);
     const router = useRouter();
     const sp = useSearchParams();
     const inputRef = useRef<HTMLInputElement>(null);
@@ -64,8 +67,12 @@ export default function InboxClient() {
         setLoading(true);
         setErr(null);
         try {
-            const rows = await getTasks({ status: "inbox", scheduled_date: "null", limit: 300 });
+            const [rows, projRows] = await Promise.all([
+                getTasks({ status: "inbox", limit: 300 }),
+                fetch("/api/projects").then(res => res.json())
+            ]);
             setTasks(rows);
+            setProjects(projRows);
         } catch (e: unknown) {
             setErr(toErrorMessage(e));
         } finally {
@@ -90,22 +97,26 @@ export default function InboxClient() {
         }
     }
 
-    async function planToday(task: Task, bucket?: ScheduleBucket) {
+    async function plan(task: Task, date: string | null, bucket?: ScheduleBucket) {
         setErr(null);
         if (planningIds.has(task.id)) return;
         const b = bucket ?? defaultBucketForWorkspace(task.workspace) ?? "afternoon";
         setPlanningIds((prev) => new Set(prev).add(task.id));
+        
+        // Optimistic UI
         setTasks((prev) => prev.filter((x) => x.id !== task.id));
+        if (tasks.length === 1) setIsCelebrating(true);
+
         try {
             await patchTask(task.id, {
-                status: "planned",
-                scheduled_date: todayISO(),
-                schedule_bucket: b,
+                status: date ? "planned" : "inbox",
+                scheduled_date: date,
+                schedule_bucket: date ? b : null,
             });
-            // Don't auto-redirect, let user review more
             router.refresh();
         } catch (e: unknown) {
             setTasks((prev) => [task, ...prev]);
+            setIsCelebrating(false);
             setErr(toErrorMessage(e));
         } finally {
             setPlanningIds((prev) => {
@@ -113,6 +124,15 @@ export default function InboxClient() {
                 next.delete(task.id);
                 return next;
             });
+        }
+    }
+
+    async function setTaskProject(taskId: string, listId: string | null) {
+        try {
+            const updated = await patchTask(taskId, { list_id: listId });
+            setTasks(prev => prev.map(t => t.id === taskId ? updated : t));
+        } catch (e: any) {
+            setErr(toErrorMessage(e));
         }
     }
 
@@ -160,18 +180,67 @@ export default function InboxClient() {
         else setSelectedIds(new Set(visibleIds));
     };
 
+    // Keyboard Navigation
+    useEffect(() => {
+        const handleKv = (e: KeyboardEvent) => {
+            if (editingTask || isNewTaskOpen || isBulkOpen) return; // modals/editors open
+            const target = e.target as HTMLElement;
+            if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+
+            if (e.key === "j") { setFocusedIndex(prev => Math.min(prev + 1, tasks.length - 1)); }
+            else if (e.key === "k") { setFocusedIndex(prev => Math.max(prev - 1, 0)); }
+            else if (e.key === "t" && tasks[focusedIndex]) { plan(tasks[focusedIndex], todayISO()); }
+            else if (e.key === "w" && tasks[focusedIndex]) { plan(tasks[focusedIndex], tomorrowISO()); }
+            else if (e.key === "d" && tasks[focusedIndex]) { markDone(tasks[focusedIndex]); }
+            else if (e.key === "x" || e.key === "Delete") { 
+                const t = tasks[focusedIndex];
+                if (t && confirm(`Delete "${t.title}"?`)) {
+                    patchTask(t.id, { status: "done" }); // Simple way to clear it for now or use deleteTask
+                    setTasks(prev => prev.filter(x => x.id !== t.id));
+                }
+            }
+            else if (e.key === "Enter" && tasks[focusedIndex]) { openEditor(tasks[focusedIndex]); }
+            else if (e.key === " ") { 
+                e.preventDefault();
+                const t = tasks[focusedIndex];
+                if (t) {
+                    setSelectedIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(t.id)) next.delete(t.id);
+                        else next.add(t.id);
+                        return next;
+                    });
+                }
+            }
+        };
+        window.addEventListener("keydown", handleKv);
+        return () => window.removeEventListener("keydown", handleKv);
+    }, [tasks, focusedIndex, editingTask]);
+
+    const isNewTaskOpen = sp.get("newTask") === "1"; // Mocking this for the check above
+    const isBulkOpen = selectedCount > 0;
+
     return (
         <PageShell>
             <PageHeader
                 title="Inbox"
                 subtitle="Capture ideas, tasks, and notes here. Review and plan them when ready."
                 actions={
-                    <button
-                        onClick={load}
-                        className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-bold hover:bg-neutral-50 transition-colors bg-white text-neutral-700 shadow-sm"
-                    >
-                        Refresh
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="hidden md:flex items-center gap-4 mr-4 text-[10px] font-bold text-neutral-400 uppercase tracking-widest border-r border-neutral-200 pr-6">
+                            <div className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded border border-neutral-200 bg-white">J/K</kbd> NAV</div>
+                            <div className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded border border-neutral-200 bg-white">T</kbd> TODAY</div>
+                            <div className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded border border-neutral-200 bg-white">W</kbd> TMW</div>
+                            <div className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded border border-neutral-200 bg-white">↵</kbd> EDIT</div>
+                            <div className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded border border-neutral-200 bg-white">SPACE</kbd> SELECT</div>
+                        </div>
+                        <button
+                            onClick={load}
+                            className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-bold hover:bg-neutral-50 transition-colors bg-white text-neutral-700 shadow-sm"
+                        >
+                            Refresh
+                        </button>
+                    </div>
                 }
             />
 
@@ -279,19 +348,40 @@ export default function InboxClient() {
                         {loading ? (
                             <div className="p-20 text-center text-neutral-400 font-medium">Loading inbox...</div>
                         ) : tasks.length === 0 ? (
-                            <div className="p-20 text-center space-y-3">
-                                <CheckCircle2 className="w-10 h-10 text-neutral-200 mx-auto" />
-                                <p className="text-neutral-400 font-medium italic">Inbox is clear! You are all caught up.</p>
+                            <div className="p-20 text-center space-y-6 animate-in fade-in zoom-in duration-500">
+                                <div className="relative inline-block">
+                                    <div className="absolute inset-0 bg-emerald-400 blur-2xl opacity-20 animate-pulse" />
+                                    <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto relative z-10" />
+                                </div>
+                                <div className="space-y-2">
+                                    <h3 className="text-xl font-black text-neutral-900">Inbox Zero Achievement!</h3>
+                                    <p className="text-neutral-400 font-medium max-w-sm mx-auto">Your mind is clear and your inbox is empty. Time to focus on executing your plan.</p>
+                                </div>
+                                <div className="pt-4">
+                                    <button 
+                                        onClick={() => router.push("/planner")}
+                                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-black text-white text-sm font-black hover:bg-neutral-800 transition-all shadow-xl shadow-black/10 active:scale-95"
+                                    >
+                                        Go to Planner <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         ) : (
-                            tasks.map((t) => (
+                            tasks.map((t, idx) => (
                                 <div
                                     key={t.id}
                                     onClick={() => openEditor(t)}
+                                    onMouseEnter={() => setFocusedIndex(idx)}
                                     role="button"
                                     tabIndex={0}
-                                    className="p-5 flex items-center justify-between gap-4 hover:bg-neutral-50 group transition-all"
+                                    className={`p-5 flex items-center justify-between gap-4 group transition-all relative ${
+                                        idx === focusedIndex ? "bg-neutral-50" : "hover:bg-neutral-50/50"
+                                    }`}
                                 >
+                                    {/* Focus Indicator */}
+                                    {idx === focusedIndex && (
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-black animate-in fade-in slide-in-from-left-1 duration-300" />
+                                    )}
                                     <div className="flex items-start gap-4 flex-1">
                                         <div className="pt-1">
                                             <input
@@ -319,43 +409,63 @@ export default function InboxClient() {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex border border-neutral-200 rounded-xl overflow-hidden shadow-sm mr-2 bg-white">
-                                            <button
-                                                onClick={() => planToday(t, "morning")}
-                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 border-r border-neutral-100 text-neutral-500"
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex flex-col items-end gap-1 px-4">
+                                            <select 
+                                                className="text-[10px] font-bold text-neutral-400 bg-transparent border-none outline-none focus:text-neutral-900 cursor-pointer text-right uppercase tracking-widest max-w-[120px] truncate"
+                                                value={t.list_id || ""}
+                                                onChange={(e) => {
+                                                    e.stopPropagation();
+                                                    setTaskProject(t.id, e.target.value || null);
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
                                             >
-                                                Morning
+                                                <option value="">No Project</option>
+                                                {projects.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="flex border border-neutral-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); plan(t, todayISO()); }}
+                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 border-r border-neutral-100 text-neutral-700 bg-emerald-50/50"
+                                            >
+                                                Today
                                             </button>
                                             <button
-                                                onClick={() => planToday(t, "afternoon")}
+                                                onClick={(e) => { e.stopPropagation(); plan(t, tomorrowISO()); }}
                                                 className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 border-r border-neutral-100 text-neutral-500"
                                             >
-                                                Afternoon
+                                                Tomorrow
                                             </button>
                                             <button
-                                                onClick={() => planToday(t, "evening")}
-                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 text-neutral-500"
+                                                onClick={(e) => { e.stopPropagation(); plan(t, null); }}
+                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 text-neutral-400"
+                                                title="Keep in Inbox"
                                             >
-                                                Evening
+                                                Someday
                                             </button>
                                         </div>
 
-                                        <button 
-                                            onClick={() => markDone(t)}
-                                            className="p-2 rounded-xl border border-green-100 bg-green-50 text-green-600 hover:bg-green-100 transition-all"
-                                            title="Mark Done"
-                                        >
-                                            <CheckCircle2 className="w-4 h-4" />
-                                        </button>
-                                        
-                                        <TaskDeleteButton
-                                            taskId={t.id}
-                                            taskTitle={t.title}
-                                            onDeleted={() => {
-                                                setTasks((prev) => prev.filter((x) => x.id !== t.id));
-                                            }}
-                                        />
+                                        <div className="flex gap-1 pl-2 border-l border-neutral-100">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); markDone(t); }}
+                                                className="p-2 rounded-xl text-neutral-300 hover:text-green-600 hover:bg-green-50 transition-all"
+                                                title="Mark Done"
+                                            >
+                                                <CheckCircle2 className="w-4 h-4" />
+                                            </button>
+                                            
+                                            <TaskDeleteButton
+                                                taskId={t.id}
+                                                taskTitle={t.title}
+                                                onDeleted={() => {
+                                                    setTasks((prev) => prev.filter((x) => x.id !== t.id));
+                                                }}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             ))
