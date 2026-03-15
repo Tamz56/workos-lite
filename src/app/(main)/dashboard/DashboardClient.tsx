@@ -8,13 +8,20 @@ import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "@/lib/
 import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box, Target, Activity, History } from "lucide-react";
+import { 
+    PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, 
+    MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box, Target, 
+    Activity, History, Folder, AlertCircle, Clock 
+} from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import Topbar from "@/components/Topbar";
+import { WorkBucketCard } from "@/components/dashboard/WorkBucketCard";
 import { HomeFirstRunCard } from "@/components/dashboard/HomeFirstRunCard";
+import WorkloadSummaryCard from "@/components/WorkloadSummaryCard";
+import ProjectHealthGrid from "@/components/ProjectHealthGrid";
+import KnowledgeActivityCard from "@/components/KnowledgeActivityCard";
 import { ResetDemoDataDialog } from "@/components/ResetDemoDataDialog";
 import { CreateProjectWizard } from "@/components/dashboard/CreateProjectWizard";
-import { TodayFocusStrip } from "@/components/dashboard/TodayFocusStrip";
-import { WorkBucketCard } from "@/components/dashboard/WorkBucketCard";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Task, TaskStatus } from "@/lib/types";
 import { STAGE_TAGS, ContentStage } from "@/lib/content/templates";
@@ -637,6 +644,7 @@ function DashboardContent() {
     const [tasks, setTasks] = useState<DashboardTask[]>([]);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [docs, setDocs] = useState<DocRow[]>([]);
+    const [analytics, setAnalytics] = useState<any>(null);
     const [health, setHealth] = useState<{ ok: boolean; status: string } | null>(null);
 
     const [quickAdd, setQuickAdd] = useState<"task" | "template" | null>(null);
@@ -688,16 +696,18 @@ function DashboardContent() {
         setLoading(true);
         setError(null);
         try {
-            const [allTasks, allEvents, allDocs, healthRes] = await Promise.all([
+            const [allTasks, allEvents, allDocs, summary, healthRes] = await Promise.all([
                 fetchTasks({ limit: "1000" }),
                 fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }),
                 fetchDocs({ limit: "100" }),
+                fetchWithTimeout("/api/analytics/summary").then(res => res.json()).catch(() => null),
                 fetchWithTimeout("/api/health").then(res => ({ ok: res.ok })).catch(() => ({ ok: false }))
             ]);
 
             setTasks(allTasks);
             setEvents(allEvents);
             setDocs(allDocs);
+            setAnalytics(summary);
             setHealth({ ok: healthRes.ok, status: healthRes.ok ? "OK" : "Degraded" });
 
         } catch (e: any) {
@@ -1046,12 +1056,34 @@ function DashboardContent() {
                     </div>
                 )}
 
-                {/* Top Priority Strip */}
-                <TodayFocusStrip 
-                    overdueCount={stats.overdue}
-                    todayCount={stats.today}
-                    waitingCount={stats.waiting}
-                />
+                {/* Decision Hub & Workload Summary */}
+                <div className="space-y-6">
+                    <WorkloadSummaryCard 
+                        overdue={analytics?.kpis?.overdue || 0}
+                        today={analytics?.kpis?.today || 0}
+                        inbox={analytics?.kpis?.inbox || 0}
+                        doneToday={analytics?.kpis?.doneToday || 0}
+                        loading={loading && !analytics}
+                    />
+
+                    {/* Decision Signals (Heuristics) */}
+                    {(analytics?.focus?.mostActiveWorkspace || analytics?.focus?.oldestInboxItemYmd) && (
+                        <div className="flex flex-wrap gap-4">
+                            {analytics.focus.mostActiveWorkspace && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                    <Zap className="w-3 h-3 text-yellow-400" />
+                                    Active: {analytics.focus.mostActiveWorkspace}
+                                </div>
+                            )}
+                            {analytics.focus.oldestInboxItemYmd && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-neutral-200 text-neutral-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                    <Clock className="w-3 h-3 text-neutral-400" />
+                                    Oldest Backlog: {analytics.focus.oldestInboxItemYmd}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
 
             {/* Main Grid Layout - Strict 12 Cols */}
             <div className="grid grid-cols-12 gap-6">
@@ -1084,7 +1116,15 @@ function DashboardContent() {
                     <MiniMonthCard events={events} todayYmd={todayYmd} onOpenGCal={openGCal} className="h-full" />
                 </div>
 
-                {/* Row 3: Other items (8) + System Status (4) */}
+                {/* Row 3: Project Health (8) + Knowledge Activity (4) */}
+                <div className="col-span-12 xl:col-span-8">
+                    <ProjectHealthGrid projects={analytics?.projects || []} loading={loading && !analytics} />
+                </div>
+                <div className="col-span-12 xl:col-span-4">
+                    <KnowledgeActivityCard notes={analytics?.knowledge || []} loading={loading && !analytics} />
+                </div>
+
+                {/* Row 4: Other items (8) + System Status (4) */}
                 <div className="col-span-12 xl:col-span-8">
                     <div className="bg-neutral-50/30 rounded-3xl p-6 border border-dashed border-neutral-200">
                         <div className="flex items-center justify-between mb-4">
