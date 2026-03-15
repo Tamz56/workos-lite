@@ -236,8 +236,10 @@ export default function ProjectsClient() {
                                 <label className="text-xs font-black text-neutral-400 uppercase tracking-widest ml-1">New Project Name</label>
                                 <input
                                     type="text"
+                                    autoFocus
                                     value={newName}
                                     onChange={(e) => setNewName(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && handleRename()}
                                     className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-base font-medium outline-none focus:bg-white focus:border-neutral-900 transition-all"
                                     placeholder="Enter new name..."
                                 />

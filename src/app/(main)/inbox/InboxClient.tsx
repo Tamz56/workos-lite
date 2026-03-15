@@ -436,7 +436,7 @@ export default function InboxClient() {
                                             </button>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); plan(t, tomorrowISO()); }}
-                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 border-r border-neutral-100 text-neutral-500"
+                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter hover:bg-neutral-50 border-r border-neutral-100 text-neutral-700 bg-blue-50/50"
                                             >
                                                 Tomorrow
                                             </button>

@@ -462,20 +462,48 @@ function MiniMonthCard(props: { events: CalendarEvent[]; todayYmd: string; onOpe
     );
 }
 
-function ProjectTimeline(props: { tasks: DashboardTask[]; todayYmd: string; className?: string }) {
+function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists: any[]; todayYmd: string; className?: string }) {
     const projects = useMemo(() => {
-        const map = new Map<string, DashboardTask[]>();
+        const result: [string, DashboardTask[]][] = [];
+        
+        // 1. Group by existing projects from database
+        props.projects.forEach(p => {
+            const projectLists = props.lists.filter(l => l.slug.startsWith(`${p.slug}-`));
+            const listIds = new Set(projectLists.map(l => l.id));
+            
+            const tasks = props.tasks.filter(t => 
+                t.status !== 'done' && 
+                (listIds.has(t.list_id || '') || (t.tags && t.tags.includes(`project:${p.slug}`)))
+            );
+            
+            if (tasks.length > 0) {
+                result.push([p.name, tasks]);
+            }
+        });
+        
+        // 2. Catch-all for tasks with project: tags that DON'T match a known project slug
+        // (Legacy/Ad-hoc projects)
+        const recognizedSlugs = new Set(props.projects.map(p => p.slug));
+        const adhocMap = new Map<string, DashboardTask[]>();
+        
         props.tasks.forEach(t => {
             if (t.status === 'done') return;
             const projTag = t.tags?.find(tag => tag.startsWith("project:"));
             if (projTag) {
-                const key = projTag.replace("project:", "");
-                if (!map.has(key)) map.set(key, []);
-                map.get(key)!.push(t);
+                const slug = projTag.replace("project:", "");
+                if (!recognizedSlugs.has(slug)) {
+                    if (!adhocMap.has(slug)) adhocMap.set(slug, []);
+                    adhocMap.get(slug)!.push(t);
+                }
             }
         });
-        return Array.from(map.entries());
-    }, [props.tasks]);
+        
+        adhocMap.forEach((tasks, slug) => {
+            result.push([slug, tasks]);
+        });
+
+        return result;
+    }, [props.tasks, props.projects, props.lists]);
 
     const days = useMemo(() => {
         const d = [];
@@ -644,6 +672,8 @@ function DashboardContent() {
     const [tasks, setTasks] = useState<DashboardTask[]>([]);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [docs, setDocs] = useState<DocRow[]>([]);
+    const [allProjects, setAllProjects] = useState<any[]>([]);
+    const [allLists, setAllLists] = useState<any[]>([]);
     const [analytics, setAnalytics] = useState<any>(null);
     const [health, setHealth] = useState<{ ok: boolean; status: string } | null>(null);
 
@@ -696,17 +726,24 @@ function DashboardContent() {
         setLoading(true);
         setError(null);
         try {
-            const [allTasks, allEvents, allDocs, summary, healthRes] = await Promise.all([
+            const [allTasks, allEvents, allDocs, allProjs, allLst, summary, healthRes] = await Promise.all([
                 fetchTasks({ limit: "1000" }),
                 fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }),
                 fetchDocs({ limit: "100" }),
+                fetch("/api/projects").then(res => res.json()).catch(() => []),
+                fetch("/api/lists").then(res => res.json()).catch(() => []),
                 fetchWithTimeout("/api/analytics/summary").then(res => res.json()).catch(() => null),
                 fetchWithTimeout("/api/health").then(res => ({ ok: res.ok })).catch(() => ({ ok: false }))
             ]);
+            
+            // Filter out projects that are archived/done for timeline
+            const activeProjects = (allProjs as any[]).filter(p => p.status !== 'done');
 
             setTasks(allTasks);
             setEvents(allEvents);
             setDocs(allDocs);
+            setAllProjects(activeProjects);
+            setAllLists(allLst);
             setAnalytics(summary);
             setHealth({ ok: healthRes.ok, status: healthRes.ok ? "OK" : "Degraded" });
 
@@ -1090,7 +1127,7 @@ function DashboardContent() {
 
                 {/* Row 1: Timeline (8) + Agenda (4) */}
                 <div className="col-span-12 xl:col-span-8">
-                    <ProjectTimeline tasks={tasks} todayYmd={todayYmd} className="h-full min-h-[360px]" />
+                    <ProjectTimeline tasks={tasks} projects={allProjects} lists={allLists} todayYmd={todayYmd} className="h-full min-h-[360px]" />
                 </div>
                 <div className="col-span-12 xl:col-span-4">
                     <AgendaCardBig events={events} todayYmd={todayYmd} className="h-full min-h-[360px]" />

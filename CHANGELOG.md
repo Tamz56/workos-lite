@@ -1,15 +1,14 @@
 # Changelog
 
-## [Unreleased]
-### Added
-- Phase 8: Consolidated Analytics Dashboard with KPI Cards, Project Health Grid, and Knowledge Activity.
-- Phase 9: Enhanced Inbox Review Flow with high-speed triage actions (Today/Tomorrow/Someday) and keyboard-first navigation (J/K/T/W).
-- Inbox Zero achievement celebration UI.
-
+## [0.1.1] - 2026-03-15 (RC1 Stabilization & Patch)
 ### Fixed
-- UX: Reduced Global Search overlay visual weight by removing heavy backdrop blur and lightening the dim effect for better context readability.
+- **Inbox**: Fixed "Tomorrow" button marking tasks as Done.
+- **Project Detail**: Added auto-focus and Enter support for renaming.
+- **Search**: Improved navigation reliability using Enter/Click.
+- **Dashboard**: Fixed Project Timeline missing active projects by linking database lists and tags.
+- **Security**: Rotated Agent Access password after exposure.
 
-## [0.1.0] - 2026-01-12
+## [0.1.0] - 2026-03-14 (Release Candidate 1)
 ### Added
 - Dashboard (Today by bucket, hygiene/unscheduled/unbucketed, inbox by workspace)
 - Docs (markdown, print)
