@@ -39,8 +39,44 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ doc });
 }
 
+import fs from "fs/promises";
+import path from "path";
+
+async function safeUnlink(
+    absPath: string,
+    ctx: { docId: string; attachmentId?: string; storagePath?: string }
+) {
+    try {
+        await fs.unlink(absPath);
+    } catch (err: unknown) {
+        const e = err as { code?: string; message?: string };
+        if (e?.code === "ENOENT") return; // ignore missing file
+
+        console.error("[delete-doc] unlink failed", {
+            ...ctx,
+            absPath,
+            code: e?.code,
+            message: e?.message,
+        });
+    }
+}
+
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+
+    // Cleanup files before DB cascade deletes the rows
+    const attachments = db.prepare("SELECT id, storage_path FROM attachments WHERE doc_id = ?").all(id) as { id: string; storage_path: string }[];
+
+    for (const a of attachments) {
+        if (a.storage_path) {
+            const absPath = path.isAbsolute(a.storage_path)
+                ? a.storage_path
+                : path.join(process.cwd(), "data", a.storage_path);
+
+            await safeUnlink(absPath, { docId: id, attachmentId: a.id, storagePath: a.storage_path });
+        }
+    }
+
     db.prepare("DELETE FROM docs WHERE id = ?").run(id);
     return NextResponse.json({ ok: true });
 }

@@ -78,19 +78,26 @@ CREATE TABLE IF NOT EXISTS docs (
 
 CREATE INDEX IF NOT EXISTS idx_docs_updated_at ON docs(updated_at);
 
--- Attachments: many per task
+-- Attachments: many per task OR doc (XOR)
 CREATE TABLE IF NOT EXISTS attachments (
-  id TEXT PRIMARY KEY,
-  task_id TEXT NOT NULL,
-  file_name TEXT NOT NULL,
-  mime_type TEXT,
-  size_bytes INTEGER,
-  storage_path TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+  id            TEXT PRIMARY KEY,
+  task_id       TEXT NULL,
+  doc_id        TEXT NULL,
+  file_name     TEXT NOT NULL,
+  mime_type     TEXT,
+  size_bytes    INTEGER,
+  storage_path  TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  FOREIGN KEY(doc_id) REFERENCES docs(id) ON DELETE CASCADE,
+  CHECK (
+    (task_id IS NOT NULL AND doc_id IS NULL) OR 
+    (task_id IS NULL AND doc_id IS NOT NULL)
+  )
 );
 
 CREATE INDEX IF NOT EXISTS idx_attachments_task_id ON attachments(task_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_doc_id ON attachments(doc_id);
 
 -- Projects
 CREATE TABLE IF NOT EXISTS projects (

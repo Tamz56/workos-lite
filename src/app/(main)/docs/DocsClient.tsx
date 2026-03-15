@@ -8,7 +8,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { toErrorMessage } from "@/lib/error";
 import { type DocRow, isDraft } from "./types";
-import { Plus, Book, FileText, Layout, RefreshCw, Trash2, Clock } from "lucide-react";
+import { Plus, Book, FileText, Layout, RefreshCw, Trash2, Clock, Paperclip } from "lucide-react";
 
 function formatThai(dt: string) {
     try {
@@ -258,8 +258,16 @@ function DocCard({ doc, onClick, onDelete }: { doc: DocRow, onClick: () => void,
                     {doc.content_md || "No content yet..."}
                 </div>
             </div>
-            <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest mt-4">
-                {formatThai(doc.updated_at)}
+            <div className="flex items-center justify-between mt-4">
+                <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest">
+                    {formatThai(doc.updated_at)}
+                </div>
+                {(doc.attachment_count ?? 0) > 0 && (
+                    <div className="flex items-center gap-1 text-[10px] font-black text-neutral-400">
+                        <Paperclip className="w-3 h-3" />
+                        {doc.attachment_count}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -278,6 +286,12 @@ function DocListItem({ doc, onClick }: { doc: DocRow, onClick: () => void }) {
                     <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg bg-neutral-100 text-neutral-500">
                         {doc.workspace}
                     </span>
+                )}
+                {(doc.attachment_count ?? 0) > 0 && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-600 text-[9px] font-black">
+                        <Paperclip className="w-3 h-3" />
+                        {doc.attachment_count}
+                    </div>
                 )}
             </div>
             <span className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest ml-4">

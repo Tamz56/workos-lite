@@ -29,29 +29,34 @@ export async function GET(req: NextRequest) {
 
         const db = getDb();
 
-        let sql = `SELECT * FROM docs WHERE 1=1`;
+        let sql = `
+            SELECT d.*, 
+                   (SELECT COUNT(*) FROM attachments a WHERE a.doc_id = d.id) as attachment_count
+            FROM docs d 
+            WHERE 1=1
+        `;
         const params: any[] = [];
 
         if (hasQ) {
-            sql += ` AND (title LIKE ? ESCAPE '\\' OR content_md LIKE ? ESCAPE '\\')`;
+            sql += ` AND (d.title LIKE ? ESCAPE '\\' OR d.content_md LIKE ? ESCAPE '\\')`;
             const escapedQ = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
             params.push(escapedQ, escapedQ);
         }
 
         if (project_id) {
-            sql += ` AND project_id = ?`;
+            sql += ` AND d.project_id = ?`;
             params.push(project_id);
         }
 
         if (workspace) {
-            sql += ` AND workspace = ?`;
+            sql += ` AND d.workspace = ?`;
             params.push(workspace);
         }
 
-        sql += ` ORDER BY updated_at DESC LIMIT ? OFFSET ?`;
+        sql += ` ORDER BY d.updated_at DESC LIMIT ? OFFSET ?`;
         params.push(limit, offset);
 
-        const docs = db.prepare(sql).all(...params) as {
+        const docs = db.prepare(sql).all(...params) as ({
             id: string;
             title: string;
             content_md: string;
@@ -59,7 +64,8 @@ export async function GET(req: NextRequest) {
             workspace: string | null;
             created_at: string;
             updated_at: string;
-        }[];
+            attachment_count: number;
+        })[];
 
         return NextResponse.json({ docs });
     } catch (e: unknown) {

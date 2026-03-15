@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Task, TaskStatus } from "../lib/types";
 import { patchTask, listAttachments } from "../lib/api";
 import TaskDocPanel from "./TaskDocPanel";
-import TaskAttachmentsPanel from "./TaskAttachmentsPanel";
+import AttachmentsPanel from "./AttachmentsPanel";
 import { List } from "../lib/lists";
 import { INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "../lib/styles";
 
@@ -643,7 +643,7 @@ function TaskDetailDialogInner({
                     )}
 
                     {activeTab === "doc" && <TaskDocPanel task={task} onUpdate={onUpdate} />}
-                    {activeTab === "files" && <TaskAttachmentsPanel taskId={task.id} onCountChange={setFileCount} />}
+                    {activeTab === "files" && <AttachmentsPanel kind="task" entityId={task.id} onCountChange={setFileCount} />}
                 </div>
             </div>
         </div>

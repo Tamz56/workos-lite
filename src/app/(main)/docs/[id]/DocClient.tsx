@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { RefreshCw, Trash2, ChevronLeft, Save, Printer, Layout, Briefcase } from "lucide-react";
 import { WORKSPACES_LIST } from "@/lib/workspaces";
 import { Project } from "@/lib/types";
+import AttachmentsPanel from "@/components/AttachmentsPanel";
 
 type DocRow = {
     id: string;
@@ -258,6 +259,8 @@ export default function DocClient({ id }: { id: string }) {
                             scheduleSave({ content_md: val });
                         }}
                     />
+
+                    <AttachmentsPanel kind="doc" entityId={id} />
                 </div>
             </div>
         </PageShell>
