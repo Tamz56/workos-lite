@@ -30,15 +30,20 @@ export default function GlobalSearch() {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
-    // Focus input when open
+    // Focus input when open and handle body scroll lock
     useEffect(() => {
         if (isOpen) {
             inputRef.current?.focus();
             fetchResults(""); // Load recent items
+            document.body.style.overflow = "hidden";
         } else {
             setQuery("");
             setResults([]);
+            document.body.style.overflow = "";
         }
+        return () => {
+            document.body.style.overflow = "";
+        };
     }, [isOpen]);
 
     const fetchResults = async (q: string) => {

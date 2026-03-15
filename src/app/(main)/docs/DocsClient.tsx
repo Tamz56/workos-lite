@@ -10,14 +10,12 @@ import { toErrorMessage } from "@/lib/error";
 import { type DocRow, isDraft } from "./types";
 import { Plus, Book, FileText, Layout, RefreshCw, Trash2, Clock, Paperclip } from "lucide-react";
 
-function formatThai(dt: string) {
+function formatDateTime(dt: string) {
     try {
-        return new Date(dt).toLocaleString("th-TH", {
-            year: "numeric",
-            month: "numeric",
+        return new Date(dt).toLocaleString("en-US", {
+            month: "short",
             day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
+            year: "numeric"
         });
     } catch {
         return dt;
@@ -91,7 +89,7 @@ export default function DocsClient() {
 
     async function cleanupDrafts() {
         if (cleanupBusy) return;
-        if (!confirm(`ยืนยันลบ Draft ทั้งหมด ${draftsCount} รายการ?`)) return;
+        if (!confirm(`Are you sure you want to delete all ${draftsCount} drafts?`)) return;
 
         setCleanupBusy(true);
         try {
@@ -130,7 +128,7 @@ export default function DocsClient() {
         <PageShell>
             <PageHeader
                 title="Docs & Knowledge"
-                subtitle="จัดการบันทึก เอกสาร และความรู้องค์กร"
+                subtitle="Manage collective knowledge, notes, and documentation."
                 actions={
                     <div className="flex items-center gap-2">
                         <button
@@ -173,8 +171,23 @@ export default function DocsClient() {
                 {loading ? (
                     <div className="text-center py-20 italic text-neutral-400 text-sm">Loading knowledge bank...</div>
                 ) : filteredDocs.length === 0 ? (
-                    <div className="text-center py-20 border border-dashed border-neutral-200 rounded-3xl bg-neutral-50/30">
-                        <p className="text-neutral-400 italic text-sm">No notes found matching your search.</p>
+                    <div className="text-center py-24 border border-dashed border-neutral-200 rounded-[2.5rem] bg-neutral-50/30 flex flex-col items-center justify-center">
+                        <div className="w-16 h-16 bg-neutral-100 rounded-3xl flex items-center justify-center text-neutral-400 mb-4">
+                            <Book className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-lg font-bold text-neutral-900">No notes found</h3>
+                        <p className="text-neutral-500 max-w-xs mx-auto mt-2 text-sm">
+                            {q ? `We couldn't find any results for "${q}".` : "Your knowledge base is waiting to be filled."}
+                        </p>
+                        {!q && (
+                            <button 
+                                onClick={createDoc}
+                                className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/10 active:scale-95"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Create First Note
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <>
@@ -260,7 +273,7 @@ function DocCard({ doc, onClick, onDelete }: { doc: DocRow, onClick: () => void,
             </div>
             <div className="flex items-center justify-between mt-4">
                 <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest">
-                    {formatThai(doc.updated_at)}
+                    {formatDateTime(doc.updated_at)}
                 </div>
                 {(doc.attachment_count ?? 0) > 0 && (
                     <div className="flex items-center gap-1 text-[10px] font-black text-neutral-400">
@@ -295,7 +308,7 @@ function DocListItem({ doc, onClick }: { doc: DocRow, onClick: () => void }) {
                 )}
             </div>
             <span className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest ml-4">
-                {formatThai(doc.updated_at)}
+                {formatDateTime(doc.updated_at)}
             </span>
         </div>
     );

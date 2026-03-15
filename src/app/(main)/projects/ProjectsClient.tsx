@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Project } from "@/lib/types";
-import { Plus, MoreVertical, Edit2, Archive, Trash2, ExternalLink, CheckCircle2, Search, Filter } from "lucide-react";
+import { Plus, MoreVertical, Edit2, Archive, Trash2, ExternalLink, CheckCircle2, Search, Filter, Layout } from "lucide-react";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { Modal } from "@/components/ui/Modal";
 import { CreateProjectWizard } from "@/components/dashboard/CreateProjectWizard";
@@ -139,9 +139,23 @@ export default function ProjectsClient() {
                 {loading ? (
                     <div className="text-center py-20 bg-white rounded-3xl border border-neutral-100 italic text-neutral-400 font-medium">Loading projects...</div>
                 ) : filteredProjects.length === 0 ? (
-                    <div className="text-center py-20 bg-white rounded-3xl border border-neutral-100 space-y-3">
-                        <div className="text-4xl">🏗️</div>
-                        <p className="text-neutral-400 font-medium italic">No projects found. Create one to get started.</p>
+                    <div className="text-center py-24 border border-dashed border-neutral-200 rounded-[2.5rem] bg-white flex flex-col items-center justify-center">
+                        <div className="w-16 h-16 bg-neutral-100 rounded-3xl flex items-center justify-center text-neutral-400 mb-4">
+                            <Layout className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-lg font-bold text-neutral-900">No projects found</h3>
+                        <p className="text-neutral-500 max-w-xs mx-auto mt-2 text-sm">
+                            {search ? `Your search for "${search}" didn't return any projects.` : "Organization is the key to focus. Start by creating a project container."}
+                        </p>
+                        {!search && (
+                            <button 
+                                onClick={() => setIsWizardOpen(true)}
+                                className="mt-6 flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/10 active:scale-95"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Create New Project
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
