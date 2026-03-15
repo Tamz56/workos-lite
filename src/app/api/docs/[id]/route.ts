@@ -23,15 +23,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const title = body.title !== undefined ? String(body.title).trim() : existing.title;
     const content_md = body.content_md !== undefined ? String(body.content_md) : existing.content_md;
+    const project_id = body.project_id !== undefined ? (body.project_id ? String(body.project_id) : null) : (existing as any).project_id;
+    const workspace = body.workspace !== undefined ? (body.workspace ? String(body.workspace) : null) : (existing as any).workspace;
 
-    db.prepare("UPDATE docs SET title = ?, content_md = ?, updated_at = ? WHERE id = ?").run(
+    db.prepare("UPDATE docs SET title = ?, content_md = ?, project_id = ?, workspace = ?, updated_at = ? WHERE id = ?").run(
         title,
         content_md,
+        project_id,
+        workspace,
         now(),
         id
     );
 
-    const doc = db.prepare("SELECT * FROM docs WHERE id = ?").get(id) as { id: string; title: string; content_md: string; updated_at: string; created_at: string };
+    const doc = db.prepare("SELECT * FROM docs WHERE id = ?").get(id);
     return NextResponse.json({ doc });
 }
 

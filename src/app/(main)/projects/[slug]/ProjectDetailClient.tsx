@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { Project, ProjectItem } from "@/lib/types";
-import { MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, Plus, CheckCircle2, Layout, Calendar } from "lucide-react";
+import { MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, Plus, CheckCircle2, Layout, Calendar, FileText } from "lucide-react";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { Modal } from "@/components/ui/Modal";
 import { PageShell } from "@/components/layout/PageShell";
@@ -211,6 +211,8 @@ export default function ProjectDetailClient() {
                         </div>
                     )}
                 </section>
+
+                <RelatedNotesSection projectId={project.id} />
             </div>
 
             <DeleteProjectDialog
@@ -297,5 +299,84 @@ function ItemCard({ item }: { item: ProjectItem }) {
                 </button>
             </div>
         </div>
+    );
+}
+
+function RelatedNotesSection({ projectId }: { projectId: string }) {
+    const router = useRouter();
+    const [notes, setNotes] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const loadNotes = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/docs?project_id=${projectId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setNotes(data.docs || []);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [projectId]);
+
+    useEffect(() => {
+        loadNotes();
+    }, [loadNotes]);
+
+    async function handleCreateNote() {
+        try {
+            const res = await fetch("/api/docs", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ project_id: projectId, title: "New Project Note" })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                router.push(`/docs/${data.doc.id}`);
+            }
+        } catch (e) {
+            alert("Failed to create note");
+        }
+    }
+
+    return (
+        <section>
+            <div className="flex items-center justify-between mb-4 px-2">
+                <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-neutral-400" />
+                    <h2 className="text-xs font-black uppercase tracking-widest text-neutral-500">Related Notes & Knowledge</h2>
+                </div>
+                <button 
+                    onClick={handleCreateNote}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-neutral-200 text-[10px] font-black uppercase tracking-widest hover:border-neutral-900 transition-all shadow-sm active:scale-95"
+                >
+                    <Plus className="w-3 h-3" />
+                    Create Note
+                </button>
+            </div>
+
+            {loading ? (
+                <div className="text-center py-10 text-neutral-400 italic text-xs font-medium">Loading related bytes...</div>
+            ) : notes.length === 0 ? (
+                <div className="text-center py-10 bg-neutral-50/50 rounded-3xl border border-dashed border-neutral-200">
+                    <p className="text-neutral-400 font-medium italic text-xs">No linked notes. Document your process.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {notes.map(note => (
+                        <div 
+                            key={note.id} 
+                            onClick={() => router.push(`/docs/${note.id}`)}
+                            className="bg-white border border-neutral-200 rounded-2xl p-4 hover:border-neutral-900 transition-all group cursor-pointer shadow-sm hover:shadow-md active:scale-[0.98]"
+                        >
+                            <div className="font-bold text-neutral-900 line-clamp-1 group-hover:text-black">{note.title || "Untitled"}</div>
+                            <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest mt-1">
+                                Modified {new Date(note.updated_at).toLocaleDateString()}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </section>
     );
 }
