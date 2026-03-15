@@ -80,7 +80,7 @@ export function GlobalTaskDialogs() {
             parent_task_id: parentTaskIdParam || null,
             sort_order: null,
         } as Task;
-    }, [workspaceParam, listIdParam, parentTaskIdParam]);
+    }, [workspaceParam, listIdParam, parentTaskIdParam, pathname]);
 
     const closeNewTask = () => {
         const params = new URLSearchParams(sp.toString());

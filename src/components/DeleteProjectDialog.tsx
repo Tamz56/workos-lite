@@ -103,7 +103,7 @@ export function DeleteProjectDialog({ isOpen, onClose, projectSlug, projectName,
                                 <span className="font-bold">Caution: High Impact Action</span>
                             </div>
                             <p className="text-sm text-amber-700 leading-relaxed">
-                                You are about to delete <span className="font-bold text-amber-900">"{summary.name}"</span>. 
+                                You are about to delete <span className="font-bold text-amber-900">&quot;{summary.name}&quot;</span>. 
                                 This operation cannot be undone. The following items will be permanently removed:
                             </p>
                             <div className="grid grid-cols-2 gap-3 pt-2">
@@ -126,7 +126,7 @@ export function DeleteProjectDialog({ isOpen, onClose, projectSlug, projectName,
                             <div className="space-y-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
-                                        Type <span className="text-neutral-900">"{summary.name}"</span> to confirm
+                                        Type <span className="text-neutral-900">&quot;{summary.name}&quot;</span> to confirm
                                     </label>
                                     <input
                                         className={INPUT_BASE}

@@ -177,7 +177,7 @@ export default function DocsClient() {
                         </div>
                         <h3 className="text-lg font-bold text-neutral-900">No notes found</h3>
                         <p className="text-neutral-500 max-w-xs mx-auto mt-2 text-sm">
-                            {q ? `We couldn't find any results for "${q}".` : "Your knowledge base is waiting to be filled."}
+                            {q ? `We couldn&apos;t find any results for &quot;${q}&quot;.` : "Your knowledge base is waiting to be filled."}
                         </p>
                         {!q && (
                             <button 

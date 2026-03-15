@@ -177,7 +177,7 @@ export default function GlobalSearch() {
                             <div className="inline-flex p-4 rounded-full bg-neutral-50 text-neutral-400 mb-2">
                                 <Search className="w-8 h-8" />
                             </div>
-                            <p className="text-neutral-500 font-medium">No results found for "{query}"</p>
+                            <p className="text-neutral-500 font-medium">No results found for &quot;{query}&quot;</p>
                             <p className="text-sm text-neutral-400 mt-1">Try a different keyword</p>
                         </div>
                     ) : isLoading ? (

@@ -133,7 +133,7 @@ export function CreateProjectWizard({ isOpen, onClose, onSuccess }: CreateProjec
                                 <div>
                                     <h4 className="text-xs font-bold text-blue-900">Wait, where is the Area?</h4>
                                     <p className="text-xs text-blue-700 mt-0.5 leading-relaxed">
-                                        We'll automatically create this project in your "Inbox" area. You can move it to a specific Area later.
+                                        We&apos;ll automatically create this project in your &quot;Inbox&quot; area. You can move it to a specific Area later.
                                     </p>
                                 </div>
                             </div>
