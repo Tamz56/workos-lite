@@ -239,7 +239,7 @@ export default function ProjectDetailClient() {
                         <button onClick={() => setIsRenameOpen(false)} className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 text-sm font-bold hover:bg-neutral-50 transition-all">Cancel</button>
                         <button 
                             onClick={handleRename} 
-                            className="flex-1 px-4 py-3 rounded-xl bg-black text-white text-sm font-black hover:bg-neutral-800 transition-all disabled:opacity-50 shadow-lg shadow-black/10 shadow shadow shadow shadow shadow"
+                            className="flex-1 px-4 py-3 rounded-xl bg-black text-white text-sm font-black hover:bg-neutral-800 transition-all disabled:opacity-50 shadow-lg shadow-black/10"
                             disabled={actionLoading || !newName.trim() || newName === project.name}
                         >
                             {actionLoading ? "Saving..." : "Save Changes"}

@@ -20,14 +20,12 @@ type DocRow = {
     updated_at: string;
 };
 
-function formatThai(dt: string) {
+function formatDateTime(dt: string) {
     try {
-        return new Date(dt).toLocaleString("th-TH", {
-            year: "numeric",
-            month: "numeric",
+        return new Date(dt).toLocaleString("en-US", {
+            month: "short",
             day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
+            year: "numeric"
         });
     } catch {
         return dt;
@@ -134,7 +132,7 @@ export default function DocClient({ id }: { id: string }) {
     }, [load]);
 
     async function onDelete() {
-        if (!confirm(`ลบเอกสาร "${doc?.title || 'Untitled'}" ถาวร?`)) return;
+        if (!confirm(`Delete document "${doc?.title || 'Untitled'}" permanently?`)) return;
         try {
             const res = await fetch(`/api/docs/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error("Delete failed");
@@ -168,7 +166,7 @@ export default function DocClient({ id }: { id: string }) {
 
             <PageHeader
                 title={doc.title || "Untitled"}
-                subtitle={`Updated: ${formatThai(doc.updated_at)}`}
+                subtitle={`Updated: ${formatDateTime(doc.updated_at)}`}
                 actions={
                     <div className="flex items-center gap-2">
                         <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mr-2">
