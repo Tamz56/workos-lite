@@ -11,8 +11,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { 
     PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, 
     MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box, Target, 
-    Activity, History, Folder, AlertCircle, Clock 
+    Activity, History, Folder, AlertCircle, Clock, RefreshCw, ChevronRight, Trash2
 } from "lucide-react";
+import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import Topbar from "@/components/Topbar";
 import { WorkBucketCard } from "@/components/dashboard/WorkBucketCard";
@@ -464,8 +465,11 @@ function MiniMonthCard(props: { events: CalendarEvent[]; todayYmd: string; onOpe
 
 function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists: any[]; todayYmd: string; className?: string }) {
     const projects = useMemo(() => {
-        const result: [string, DashboardTask[]][] = [];
+        const result: [string, DashboardTask[], string | null][] = [];
         
+        // Helper to slugify a name for comparison
+        const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
         // 1. Group by existing projects from database
         props.projects.forEach(p => {
             const projectLists = props.lists.filter(l => l.slug.startsWith(`${p.slug}-`));
@@ -477,7 +481,7 @@ function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists
             );
             
             if (tasks.length > 0) {
-                result.push([p.name, tasks]);
+                result.push([p.name, tasks, p.slug]);
             }
         });
         
@@ -490,20 +494,41 @@ function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists
             if (t.status === 'done') return;
             const projTag = t.tags?.find(tag => tag.startsWith("project:"));
             if (projTag) {
-                const slug = projTag.replace("project:", "");
-                if (!recognizedSlugs.has(slug)) {
-                    if (!adhocMap.has(slug)) adhocMap.set(slug, []);
-                    adhocMap.get(slug)!.push(t);
+                const untaggedName = projTag.replace("project:", "");
+                const adhocSlug = slugify(untaggedName);
+                
+                // Try to find if this "adhoc" slug matches an actual project slug
+                const matchingProject = props.projects.find(p => p.slug === adhocSlug || p.name.toLowerCase() === untaggedName.toLowerCase());
+                
+                if (matchingProject) {
+                    // This belongs to an existing project but used an ad-hoc tag format
+                    // We already handled existing projects in step 1, but this task might have been missed
+                    // if it only relied on the tag. However, step 1 handles both list_id and tags already.
+                    // So we only add if it's truly not recognized yet.
+                    if (!recognizedSlugs.has(matchingProject.slug)) {
+                         // This case is unlikely if props.projects is complete, but let's be safe
+                    }
+                    return;
+                }
+
+                if (!recognizedSlugs.has(adhocSlug)) {
+                    if (!adhocMap.has(untaggedName)) adhocMap.set(untaggedName, []);
+                    adhocMap.get(untaggedName)!.push(t);
                 }
             }
         });
         
-        adhocMap.forEach((tasks, slug) => {
-            result.push([slug, tasks]);
+        adhocMap.forEach((tasks, name) => {
+            result.push([name, tasks, null]);
         });
 
         return result;
     }, [props.tasks, props.projects, props.lists]);
+
+    const totalLines = props.tasks.length;
+    const sortedProjects = useMemo(() => {
+        return [...projects].sort((a, b) => b[1].length - a[1].length);
+    }, [projects]);
 
     const days = useMemo(() => {
         const d = [];
@@ -543,9 +568,13 @@ function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists
                     </div>
                 </div>
                 <div className="space-y-3">
-                    {projects.map(([projName, items]) => (
+                    {projects.map(([projName, items, projSlug]) => (
                         <div key={projName} className="grid grid-cols-[100px_1fr] gap-3 items-center group">
-                            <Link href={`/planner?q=project:${projName}`} className="text-xs font-semibold text-neutral-700 truncate hover:text-blue-600 hover:underline" title={projName}>
+                            <Link 
+                                href={projSlug ? `/projects/${projSlug}` : `/planner?q=project:${projName}`} 
+                                className="text-xs font-semibold text-neutral-700 truncate hover:text-blue-600 hover:underline" 
+                                title={projName}
+                            >
                                 {projName}
                                 <span className="block text-[8px] font-normal text-neutral-400">{items.length} tasks</span>
                             </Link>
@@ -1394,20 +1423,17 @@ function DashboardContent() {
                 onClose={() => setIsResetOpen(false)}
                 onSuccess={(mode) => {
                     setIsResetOpen(false);
+                    setToastMessage("Database reset successfully");
                     setShowSuccessToast(true);
                     refreshAll();
-                    setTimeout(() => setShowSuccessToast(false), 5000);
                 }}
             />
 
-            {showSuccessToast && (
-                <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
-                    <div className="bg-green-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 font-bold">
-                        <CheckCircle2 className="w-5 h-5" />
-                        <span>{toastMessage}</span>
-                    </div>
-                </div>
-            )}
+            <Toast 
+                isVisible={showSuccessToast} 
+                message={toastMessage} 
+                onClose={() => setShowSuccessToast(false)} 
+            />
 
             <CreateProjectWizard 
                 isOpen={isWizardOpen}
@@ -1416,7 +1442,6 @@ function DashboardContent() {
                     setToastMessage("Project Created Successfully!");
                     setShowSuccessToast(true);
                     refreshAll();
-                    setTimeout(() => setShowSuccessToast(false), 5000);
                 }}
             />
             </div>

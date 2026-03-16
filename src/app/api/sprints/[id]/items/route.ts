@@ -6,8 +6,9 @@ const AttachSprintItemSchema = z.object({
     project_item_id: z.string().min(1)
 });
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const db = getDb();
         const query = `
             SELECT pi.* 
@@ -16,15 +17,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
             WHERE si.sprint_id = ?
             ORDER BY pi.status ASC, pi.priority DESC
         `;
-        const items = db.prepare(query).all(params.id);
+        const items = db.prepare(query).all(id);
         return NextResponse.json(items);
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const db = getDb();
         const body = await req.json();
         const parsed = AttachSprintItemSchema.parse(body);
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             INSERT OR IGNORE INTO sprint_items (sprint_id, project_item_id)
             VALUES (?, ?)
         `);
-        stmt.run(params.id, parsed.project_item_id);
+        stmt.run(id, parsed.project_item_id);
 
         return NextResponse.json({ success: true });
     } catch (e: any) {
@@ -41,8 +43,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const db = getDb();
         const url = new URL(req.url);
         const itemId = url.searchParams.get("item_id");
@@ -51,7 +54,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
             return NextResponse.json({ error: "item_id is required" }, { status: 400 });
         }
 
-        db.prepare("DELETE FROM sprint_items WHERE sprint_id = ? AND project_item_id = ?").run(params.id, itemId);
+        db.prepare("DELETE FROM sprint_items WHERE sprint_id = ? AND project_item_id = ?").run(id, itemId);
 
         return NextResponse.json({ success: true });
     } catch (e: any) {

@@ -10,14 +10,27 @@ function now() {
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const doc = db.prepare("SELECT * FROM docs WHERE id = ?").get(id) as { id: string; title: string; content_md: string; updated_at: string; created_at: string };
+    const doc = db.prepare("SELECT * FROM docs WHERE id = ?").get(id) as { 
+        id: string; 
+        title: string; 
+        content_md: string; 
+        project_id: string | null; 
+        workspace: string | null; 
+        updated_at: string; 
+        created_at: string 
+    };
     if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ doc });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const existing = db.prepare("SELECT * FROM docs WHERE id = ?").get(id) as { title: string; content_md: string };
+    const existing = db.prepare("SELECT * FROM docs WHERE id = ?").get(id) as { 
+        title: string; 
+        content_md: string; 
+        project_id: string | null; 
+        workspace: string | null 
+    };
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;

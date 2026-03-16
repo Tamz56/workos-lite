@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { ResetDemoDataDialog } from "@/components/ResetDemoDataDialog";
 import { BUTTON_DANGER } from "@/lib/styles";
-import { RefreshCcw, CheckCircle2 } from "lucide-react";
+import { RefreshCcw } from "lucide-react";
+import { Toast } from "@/components/ui/Toast";
 
 export default function DataManagementClient() {
     const [isResetOpen, setIsResetOpen] = useState(false);
@@ -34,20 +35,16 @@ export default function DataManagementClient() {
                     setIsResetOpen(false);
                     setShowSuccessToast(true);
                     setTimeout(() => {
-                        setShowSuccessToast(false);
                         window.location.href = "/dashboard";
-                    }, 2000);
+                    }, 2500);
                 }}
             />
 
-            {showSuccessToast && (
-                <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
-                    <div className="bg-green-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 font-bold">
-                        <CheckCircle2 className="w-5 h-5" />
-                        <span>Reset Successful! Redirecting...</span>
-                    </div>
-                </div>
-            )}
+            <Toast 
+                isVisible={showSuccessToast} 
+                message="Reset Successful! Redirecting..." 
+                onClose={() => setShowSuccessToast(false)} 
+            />
         </div>
     );
 }

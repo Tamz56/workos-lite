@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Project } from "@/lib/types";
 import { Plus, MoreVertical, Edit2, Archive, Trash2, ExternalLink, CheckCircle2, Search, Filter, Layout } from "lucide-react";
+import { Toast } from "@/components/ui/Toast";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { CreateProjectWizard } from "@/components/dashboard/CreateProjectWizard";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, INPUT_BASE } from "@/lib/styles";
@@ -22,10 +24,12 @@ export default function ProjectsClient() {
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [isRenameOpen, setIsRenameOpen] = useState(false);
     const [activeProject, setActiveProject] = useState<Project | null>(null);
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
     const [newName, setNewName] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
-    const [showSuccessToast, setShowSuccessToast] = useState(false);
+    const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState("");
     
     const sp = useSearchParams();
     const router = useRouter();
@@ -37,7 +41,7 @@ export default function ProjectsClient() {
             url.searchParams.set("status", statusFilter);
         }
         try {
-            const res = await fetch(url.toString());
+            const res = await fetch(url.toString(), { cache: 'no-store' });
             if (res.ok) {
                 setProjects(await res.json());
             }
@@ -57,16 +61,21 @@ export default function ProjectsClient() {
         }
     }, [sp, router]);
 
-    const handleArchive = async (project: Project) => {
-        if (!confirm(`Archive "${project.name}"?`)) return;
+    const handleArchive = async () => {
+        if (!activeProject) return;
         setActionLoading(true);
         try {
-            const res = await fetch(`/api/projects/${project.slug}`, {
+            const res = await fetch(`/api/projects/${activeProject.slug}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "done" })
             });
-            if (res.ok) fetchProjects();
+            if (res.ok) {
+                setToastMessage(`Project "${activeProject.name}" archived successfully`);
+                setShowToast(true);
+                setIsArchiveOpen(false);
+                fetchProjects();
+            }
         } finally {
             setActionLoading(false);
         }
@@ -180,7 +189,10 @@ export default function ProjectsClient() {
                                             <Edit2 className="w-4 h-4" />
                                         </button>
                                         <button 
-                                            onClick={() => handleArchive(project)}
+                                            onClick={() => {
+                                                setActiveProject(project);
+                                                setIsArchiveOpen(true);
+                                            }}
                                             className="p-2 rounded-xl hover:bg-neutral-100 text-neutral-400 hover:text-neutral-900 transition-colors"
                                             title="Archive"
                                         >
@@ -258,25 +270,30 @@ export default function ProjectsClient() {
                     </Modal>
                 </>
             )}
-
             <CreateProjectWizard 
                 isOpen={isWizardOpen}
                 onClose={() => setIsWizardOpen(false)}
                 onSuccess={() => {
-                    setShowSuccessToast(true);
+                    setToastMessage("Project created successfully");
+                    setShowToast(true);
                     fetchProjects();
-                    setTimeout(() => setShowSuccessToast(false), 5000);
                 }}
             />
 
-            {showSuccessToast && (
-                <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
-                    <div className="bg-neutral-900 border border-neutral-800 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-black text-sm uppercase tracking-widest">
-                        <CheckCircle2 className="w-5 h-5 text-green-400" />
-                        <span>Project Created Successfully!</span>
-                    </div>
-                </div>
-            )}
+            <ConfirmDialog
+                isOpen={isArchiveOpen}
+                title="Archive Project"
+                message={`Are you sure you want to archive "${activeProject?.name}"? It will be moved to the Archived list.`}
+                confirmText="Archive Project"
+                onConfirm={handleArchive}
+                onCancel={() => setIsArchiveOpen(false)}
+            />
+
+            <Toast 
+                isVisible={showToast} 
+                message={toastMessage} 
+                onClose={() => setShowToast(false)} 
+            />
         </PageShell>
     );
 }

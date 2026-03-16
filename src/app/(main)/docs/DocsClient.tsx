@@ -8,6 +8,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { toErrorMessage } from "@/lib/error";
 import { type DocRow, isDraft } from "./types";
+import { workspaceLabel } from "@/lib/workspaces";
 import { Plus, Book, FileText, Layout, RefreshCw, Trash2, Clock, Paperclip } from "lucide-react";
 
 function formatDateTime(dt: string) {
@@ -28,6 +29,7 @@ export default function DocsClient() {
 
     const [docs, setDocs] = useState<DocRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [cleanupBusy, setCleanupBusy] = useState(false);
 
     const [q, setQ] = useState("");
@@ -38,15 +40,29 @@ export default function DocsClient() {
 
     const load = useCallback(async () => {
         setLoading(true);
+        setError(null);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
         try {
-            const res = await fetch("/api/docs", { cache: "no-store" });
+            const res = await fetch("/api/docs", { 
+                cache: "no-store",
+                signal: controller.signal 
+            });
+            clearTimeout(timeoutId);
+            
             if (!res.ok) throw new Error(`Load docs failed (${res.status})`);
             const data = await res.json();
             const list: DocRow[] = Array.isArray(data) ? data : (data.docs ?? []);
             setDocs(list);
         } catch (e: unknown) {
+            clearTimeout(timeoutId);
             console.error("Load failed", e);
-            alert(toErrorMessage(e));
+            const msg = (e instanceof Error && e.name === "AbortError") 
+                ? "Request timed out. Please check your connection." 
+                : toErrorMessage(e);
+            setError(msg);
             setDocs([]);
         } finally {
             setLoading(false);
@@ -169,7 +185,26 @@ export default function DocsClient() {
                 </div>
 
                 {loading ? (
-                    <div className="text-center py-20 italic text-neutral-400 text-sm">Loading knowledge bank...</div>
+                    <div className="text-center py-20 flex flex-col items-center gap-4">
+                        <div className="w-10 h-10 border-4 border-neutral-200 border-t-black rounded-full animate-spin"></div>
+                        <p className="italic text-neutral-400 text-sm font-medium">Loading knowledge bank...</p>
+                    </div>
+                ) : error ? (
+                    <div className="text-center py-20 border border-red-100 bg-red-50/30 rounded-[2.5rem] flex flex-col items-center gap-4">
+                        <div className="bg-red-100 p-4 rounded-3xl text-red-600">
+                             <RefreshCw className="w-8 h-8" />
+                        </div>
+                        <div>
+                             <h3 className="text-lg font-bold text-neutral-900">Failed to load Docs</h3>
+                             <p className="text-red-600 text-sm mt-1">{error}</p>
+                        </div>
+                        <button 
+                            onClick={() => void load()}
+                            className="mt-2 px-6 py-2.5 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all active:scale-95 shadow-lg shadow-black/10"
+                        >
+                            Retry Loading
+                        </button>
+                    </div>
                 ) : filteredDocs.length === 0 ? (
                     <div className="text-center py-24 border border-dashed border-neutral-200 rounded-[2.5rem] bg-neutral-50/30 flex flex-col items-center justify-center">
                         <div className="w-16 h-16 bg-neutral-100 rounded-3xl flex items-center justify-center text-neutral-400 mb-4">
@@ -294,12 +329,23 @@ function DocListItem({ doc, onClick }: { doc: DocRow, onClick: () => void }) {
         >
             <div className="flex items-center gap-4 flex-1 truncate">
                 <FileText className="w-4 h-4 text-neutral-400 group-hover:text-neutral-900" />
-                <span className="font-bold text-neutral-900 truncate">{doc.title || "Untitled"}</span>
-                {doc.workspace && (
-                    <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg bg-neutral-100 text-neutral-500">
-                        {doc.workspace}
-                    </span>
-                )}
+                <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-neutral-900 truncate">{doc.title || "Untitled"}</span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                        {doc.project_name ? (
+                            <span className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 text-blue-600">
+                                <Layout className="w-2.5 h-2.5" />
+                                {doc.project_name}
+                            </span>
+                        ) : doc.workspace ? (
+                            <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500">
+                                {workspaceLabel(doc.workspace as any)}
+                            </span>
+                        ) : (
+                            <span className="text-[9px] font-black uppercase tracking-widest text-neutral-300">Unlinked</span>
+                        )}
+                    </div>
+                </div>
                 {(doc.attachment_count ?? 0) > 0 && (
                     <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-600 text-[9px] font-black">
                         <Paperclip className="w-3 h-3" />
