@@ -14,6 +14,17 @@ type WorkspaceStat = {
     recent: { id: string; title: string; status: string; updated_at: string }[];
 };
 
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, { ...init, signal: controller.signal });
+        return response;
+    } finally {
+        clearTimeout(id);
+    }
+}
+
 function WorkspaceCard({ stat }: { stat: WorkspaceStat }) {
     const router = useRouter();
 
@@ -67,15 +78,46 @@ function WorkspaceCard({ stat }: { stat: WorkspaceStat }) {
 export default function WorkspacesClient() {
     const [stats, setStats] = useState<WorkspaceStat[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        fetch("/api/workspaces/summary")
-            .then(res => res.json())
-            .then(data => setStats(data))
-            .finally(() => setLoading(false));
+        const loadStats = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await fetchWithTimeout("/api/workspaces/summary");
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                setStats(data);
+            } catch (err: any) {
+                console.error("Failed to load workspaces", err);
+                setError(err.name === 'AbortError' ? "Request timed out" : "Failed to load data");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadStats();
     }, []);
 
-    if (loading) return <div className="p-10 flex justify-center text-neutral-400 animate-pulse">Loading workspaces...</div>;
+    if (loading) return (
+        <div className="p-20 flex flex-col items-center justify-center text-neutral-400 gap-4">
+            <div className="w-8 h-8 border-2 border-neutral-200 border-t-neutral-800 rounded-full animate-spin"></div>
+            <div className="font-medium animate-pulse">Loading workspaces...</div>
+        </div>
+    );
+
+    if (error) return (
+        <div className="p-20 text-center">
+            <div className="text-red-500 mb-4">{error}</div>
+            <button 
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-neutral-100 rounded-lg hover:bg-neutral-200 text-sm font-bold"
+            >
+                Retry
+            </button>
+        </div>
+    );
 
     return (
         <div className="p-6 2xl:p-10 max-w-7xl mx-auto">

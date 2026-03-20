@@ -156,6 +156,8 @@ function TaskDetailDialogInner({
     const [status, setStatus] = useState<TaskStatus>((task.status?.toLowerCase() as TaskStatus) || "inbox");
     const [listId, setListId] = useState<string | null>(task.list_id || null);
     const [scheduledDate, setScheduledDate] = useState(normalizeDate(task.scheduled_date));
+    const [startTime, setStartTime] = useState(task.start_time || "");
+    const [endTime, setEndTime] = useState(task.end_time || "");
     const [priority, setPriority] = useState(task.priority ?? 2);
 
     const [availableLists, setAvailableLists] = useState<List[]>([]);
@@ -193,6 +195,8 @@ function TaskDetailDialogInner({
                 status,
                 list_id: listId,
                 scheduled_date: scheduledDate,
+                start_time: startTime || null,
+                end_time: endTime || null,
                 priority,
                 notes: finalNotes
             };
@@ -387,76 +391,107 @@ function TaskDetailDialogInner({
                 <div className="p-6 overflow-y-auto flex-1">
                     {activeTab === "details" && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                            <div className="grid grid-cols-2 gap-6 bg-neutral-50 p-5 rounded-xl border border-neutral-100">
-                                <div>
-                                    <label className={LABEL_BASE}>Workspace</label>
-                                    <div className="text-sm font-semibold text-neutral-700 flex items-center gap-2 capitalize">
-                                        <span className={`w-2.5 h-2.5 rounded-full bg-neutral-400`} />
-                                        {task.workspace}
+                                <div className="grid grid-cols-1 gap-4 bg-orange-50/30 p-3 rounded-xl border border-orange-100/50">
+                                    <div>
+                                        <label className={LABEL_BASE}>Scheduled Date</label>
+                                        <input
+                                            type="date"
+                                            className={`${INPUT_BASE} ${status === 'planned' && !scheduledDate ? 'border-red-300 ring-1 ring-red-200' : ''}`}
+                                            value={scheduledDate || ""}
+                                            onChange={(e) => {
+                                                setScheduledDate(normalizeDate(e.target.value));
+                                                triggerSave();
+                                            }}
+                                            disabled={readOnly}
+                                        />
+                                        {status === 'planned' && !scheduledDate && <div className="text-[10px] text-red-500 mt-1 font-medium">Required for Planned tasks</div>}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className={LABEL_BASE}>Start Time</label>
+                                            <input
+                                                type="time"
+                                                className={INPUT_BASE}
+                                                value={startTime}
+                                                onChange={(e) => {
+                                                    setStartTime(e.target.value);
+                                                    triggerSave();
+                                                }}
+                                                disabled={readOnly}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={LABEL_BASE}>End Time</label>
+                                            <input
+                                                type="time"
+                                                className={INPUT_BASE}
+                                                value={endTime}
+                                                onChange={(e) => {
+                                                    setEndTime(e.target.value);
+                                                    triggerSave();
+                                                }}
+                                                disabled={readOnly}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className={LABEL_BASE}>List</label>
-                                    <select
-                                        className={INPUT_BASE}
-                                        value={listId || ""}
-                                        onChange={(e) => {
-                                            setListId(e.target.value || null);
-                                            triggerSave();
-                                        }}
-                                        disabled={readOnly}
-                                    >
-                                        <option value="">(Unassigned)</option>
-                                        {availableLists.map(l => (
-                                            <option key={l.id} value={l.id}>{l.title}</option>
-                                        ))}
-                                    </select>
+
+                                <div className="grid grid-cols-2 gap-6 bg-neutral-50 p-5 rounded-xl border border-neutral-100">
+                                    <div>
+                                        <label className={LABEL_BASE}>Workspace</label>
+                                        <div className="text-sm font-semibold text-neutral-700 flex items-center gap-2 capitalize">
+                                            <span className={`w-2.5 h-2.5 rounded-full bg-neutral-400`} />
+                                            {task.workspace}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_BASE}>Priority</label>
+                                        <select
+                                            className={INPUT_BASE}
+                                            value={priority}
+                                            onChange={(e) => {
+                                                setPriority(Number(e.target.value));
+                                                triggerSave();
+                                            }}
+                                            disabled={readOnly}
+                                        >
+                                            <option value={1}>Low</option>
+                                            <option value={2}>Normal</option>
+                                            <option value={3}>High</option>
+                                            <option value={4}>Urgent</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_BASE}>List</label>
+                                        <select
+                                            className={INPUT_BASE}
+                                            value={listId || ""}
+                                            onChange={(e) => {
+                                                setListId(e.target.value || null);
+                                                triggerSave();
+                                            }}
+                                            disabled={readOnly}
+                                        >
+                                            <option value="">(Unassigned)</option>
+                                            {availableLists.map(l => (
+                                                <option key={l.id} value={l.id}>{l.title}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_BASE}>Status</label>
+                                        <select
+                                            className={INPUT_BASE}
+                                            value={status?.toLowerCase() || 'inbox'}
+                                            onChange={(e) => handleStatusChange(e.target.value)}
+                                            disabled={readOnly}
+                                        >
+                                            <option value="inbox">Inbox</option>
+                                            <option value="planned">Planned</option>
+                                            <option value="done">Done</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className={LABEL_BASE}>Status</label>
-                                    <select
-                                        className={INPUT_BASE}
-                                        value={status?.toLowerCase() || 'inbox'}
-                                        onChange={(e) => handleStatusChange(e.target.value)}
-                                        disabled={readOnly}
-                                    >
-                                        <option value="inbox">Inbox</option>
-                                        <option value="planned">Planned</option>
-                                        <option value="done">Done</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className={LABEL_BASE}>Scheduled Date</label>
-                                    <input
-                                        type="date"
-                                        className={`${INPUT_BASE} ${status === 'planned' && !scheduledDate ? 'border-red-300 ring-1 ring-red-200' : ''}`}
-                                        value={scheduledDate || ""}
-                                        onChange={(e) => {
-                                            setScheduledDate(normalizeDate(e.target.value));
-                                            triggerSave();
-                                        }}
-                                        disabled={readOnly}
-                                    />
-                                    {status === 'planned' && !scheduledDate && <div className="text-[10px] text-red-500 mt-1 font-medium">Required for Planned tasks</div>}
-                                </div>
-                                <div>
-                                    <label className={LABEL_BASE}>Priority</label>
-                                    <select
-                                        className={INPUT_BASE}
-                                        value={priority}
-                                        onChange={(e) => {
-                                            setPriority(Number(e.target.value));
-                                            triggerSave();
-                                        }}
-                                        disabled={readOnly}
-                                    >
-                                        <option value={1}>Low</option>
-                                        <option value={2}>Normal</option>
-                                        <option value={3}>High</option>
-                                        <option value={4}>Urgent</option>
-                                    </select>
-                                </div>
-                            </div>
 
                             <div>
                                 <label className={LABEL_BASE}>Notes / Description</label>

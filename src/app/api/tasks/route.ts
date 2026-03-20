@@ -19,6 +19,8 @@ const CreateTaskSchema = z.object({
     list_id: z.string().optional().nullable(),
     scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
     schedule_bucket: Bucket.optional().nullable(),
+    start_time: z.string().optional().nullable(),
+    end_time: z.string().optional().nullable(),
     priority: z.number().int().optional().nullable(),
     notes: z.string().optional().nullable(),
     parent_task_id: z.string().optional().nullable(),
@@ -40,6 +42,8 @@ export async function GET(req: NextRequest) {
         const scheduled_date = url.searchParams.get("scheduled_date");
         const schedule_bucket = url.searchParams.get("schedule_bucket");
         const parent_id = url.searchParams.get("parent_id");
+        const start = url.searchParams.get("start");
+        const end = url.searchParams.get("end");
 
         const limitRaw = url.searchParams.get("limit");
         const limit = Math.min(Math.max(parseInt(limitRaw ?? "200", 10) || 200, 1), 500);
@@ -117,6 +121,15 @@ export async function GET(req: NextRequest) {
                 where.push("scheduled_date = @scheduled_date");
                 bind.scheduled_date = scheduled_date;
             }
+        }
+
+        if (start && isDateYYYYMMDD(start)) {
+            where.push("scheduled_date >= @start");
+            bind.start = start;
+        }
+        if (end && isDateYYYYMMDD(end)) {
+            where.push("scheduled_date <= @end");
+            bind.end = end;
         }
 
         if (bucketOk) {
@@ -247,6 +260,7 @@ export async function POST(req: NextRequest) {
       INSERT INTO tasks (
         id, title, workspace, list_id, status,
         scheduled_date, schedule_bucket,
+        start_time, end_time,
         priority, notes,
         parent_task_id, sort_order,
         created_at, updated_at,
@@ -255,6 +269,7 @@ export async function POST(req: NextRequest) {
       VALUES (
         @id, @title, @workspace, @list_id, @status,
         @scheduled_date, @schedule_bucket,
+        @start_time, @end_time,
         @priority, @notes,
         @parent_task_id, @sort_order,
         @created_at, @updated_at,
@@ -269,6 +284,8 @@ export async function POST(req: NextRequest) {
             status: t.status,
             scheduled_date: scheduledDate,
             schedule_bucket: bucket,
+            start_time: t.start_time ?? null,
+            end_time: t.end_time ?? null,
             priority: t.priority ?? null,
             notes: t.notes ?? null,
             parent_task_id: t.parent_task_id ?? null,

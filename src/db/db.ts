@@ -311,7 +311,11 @@ function ensureAgentTables() {
 ensureSchema();
 ensureMigrations();
 auditWorkspaceConstraint();
-ensureSeedLists();
+const shouldSkipSeed = process.env.SKIP_SEED === 'true';
+
+if (!shouldSkipSeed) {
+    ensureSeedLists();
+}
 ensureDocsAndAttachments();
 ensureEvents();
 ensureAgentTables();
@@ -418,5 +422,7 @@ function ensureSeedProjects() {
 }
 
 ensureProjectsAndSprints();
-ensureSeedProjects();
+if (!shouldSkipSeed) {
+    ensureSeedProjects();
+}
 
