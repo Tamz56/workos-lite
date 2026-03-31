@@ -320,6 +320,9 @@ function CalendarContent() {
 
     useEffect(() => {
         load();
+        const onTaskUpdated = () => load();
+        window.addEventListener("task-updated", onTaskUpdated);
+        return () => window.removeEventListener("task-updated", onTaskUpdated);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

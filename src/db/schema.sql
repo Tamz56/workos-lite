@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   title           TEXT NOT NULL,
   workspace       TEXT NOT NULL,
   list_id         TEXT NULL,
-  status          TEXT NOT NULL DEFAULT 'inbox' CHECK (status IN ('inbox','planned','done')),
+  status          TEXT NOT NULL DEFAULT 'inbox' CHECK (status IN ('inbox','planned','in_progress','done')),
   scheduled_date  TEXT NULL, -- YYYY-MM-DD
   schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning','afternoon','evening','none') OR schedule_bucket IS NULL),
   start_time      TEXT NULL, -- HH:MM
@@ -22,7 +22,11 @@ CREATE TABLE IF NOT EXISTS tasks (
   is_seed         INTEGER DEFAULT 0,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  done_at         TEXT NULL
+  done_at         TEXT NULL,
+  sprint_id       TEXT NULL,
+  published_at    TEXT NULL,
+  distribution_channels TEXT NULL,
+  performance_metrics TEXT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
@@ -33,6 +37,13 @@ CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_date ON tasks(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_bucket ON tasks(schedule_bucket);
 CREATE INDEX IF NOT EXISTS idx_tasks_done_at ON tasks(done_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_is_seed ON tasks(is_seed);
+CREATE INDEX IF NOT EXISTS idx_tasks_sprint_id ON tasks(sprint_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_published_at ON tasks(published_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_distribution_channels ON tasks(distribution_channels);
+CREATE INDEX IF NOT EXISTS idx_tasks_performance_metrics ON tasks(performance_metrics);
+
+
+
 
 CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
 AFTER UPDATE ON tasks
@@ -198,4 +209,31 @@ CREATE TABLE IF NOT EXISTS agent_audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_agent_audit_log_created_at ON agent_audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_agent_audit_log_action_created ON agent_audit_log(action_type, created_at);
-CREATE INDEX IF NOT EXISTS idx_agent_audit_log_agent_created ON agent_audit_log(agent_key_id, created_at);
+-- Notes
+CREATE TABLE IF NOT EXISTS notes (
+  id           TEXT PRIMARY KEY,
+  title        TEXT NOT NULL,
+  content_json TEXT NOT NULL, -- JSON string for Tiptap
+  content_html TEXT NOT NULL, -- Rendered HTML
+  plain_text   TEXT NOT NULL, -- Plain text for search
+  project_id   TEXT NULL,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_project_id ON notes(project_id);
+CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at);
+
+-- Note Links
+CREATE TABLE IF NOT EXISTS note_links (
+  id                 TEXT PRIMARY KEY,
+  note_id            TEXT NOT NULL,
+  linked_entity_type TEXT NOT NULL, -- 'task', 'project', etc.
+  linked_entity_id   TEXT NOT NULL,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_note_links_note_id ON note_links(note_id);
+CREATE INDEX IF NOT EXISTS idx_note_links_entity ON note_links(linked_entity_type, linked_entity_id);

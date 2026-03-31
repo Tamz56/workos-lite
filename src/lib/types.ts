@@ -1,6 +1,6 @@
 import { Workspace } from "./workspaces";
 export { type Workspace };
-export type TaskStatus = "inbox" | "planned" | "done";
+export type TaskStatus = "inbox" | "planned" | "in_progress" | "done";
 export type ScheduleBucket = "morning" | "afternoon" | "evening" | "none";
 
 export type Task = {
@@ -11,6 +11,7 @@ export type Task = {
 
     parent_task_id: string | null;
     sort_order: number | null;
+    sprint_id: string | null;
 
     status: TaskStatus;
 
@@ -32,7 +33,23 @@ export type Task = {
     created_at: string; // ISO-ish string from sqlite
     updated_at: string; // ISO-ish string from sqlite
     done_at: string | null;
+
+    // joined fields from API views
+    list_name?: string;
+    sprint_name?: string;
+    template_key?: string | null;
+    topic_id?: string | null;
+    package_id?: string | null;
+    step_key?: string | null;
+    package_total?: number;
+    package_done?: number;
+    review_status?: string; // RC26
+    published_at?: string | null; // RC28
+    distribution_channels?: string | null; // RC29
+    performance_metrics?: string | null; // RC30
 };
+
+
 
 export interface Doc {
     id: string;
@@ -93,4 +110,22 @@ export interface Sprint {
     status: "planned" | "active" | "completed";
     start_date: string | null;
     end_date: string | null;
+}
+export interface Note {
+    id: string;
+    title: string;
+    content_json: string;
+    content_html: string;
+    plain_text: string;
+    project_id: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface NoteLink {
+    id: string;
+    note_id: string;
+    linked_entity_type: "task" | "project";
+    linked_entity_id: string;
+    created_at: string;
 }

@@ -24,3 +24,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom Minimal Scrollbar */
+.scrollbar-hide-until-hover::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-hide-until-hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-hide-until-hover::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 10px;
+}
+.scrollbar-hide-until-hover:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(163, 163, 163, 0.4);
+}

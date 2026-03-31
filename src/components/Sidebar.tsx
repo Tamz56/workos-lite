@@ -88,10 +88,10 @@ export function Sidebar() {
                     active={pathname.startsWith("/workspaces")}
                 />
                 <NavItem
-                    href="/docs"
+                    href="/notes"
                     label="Notes"
                     icon={<FolderIcon className="w-5 h-5" />}
-                    active={pathname === "/docs"}
+                    active={pathname.startsWith("/notes")}
                 />
             </nav>
 

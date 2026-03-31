@@ -801,7 +801,12 @@ function DashboardContent() {
         }
     }, []);
 
-    useEffect(() => { refreshAll(); }, [refreshAll]);
+    useEffect(() => {
+        refreshAll();
+        const onTaskUpdated = () => refreshAll();
+        window.addEventListener("task-updated", onTaskUpdated);
+        return () => window.removeEventListener("task-updated", onTaskUpdated);
+    }, [refreshAll]);
 
     const wsTasks = useMemo(() => {
         const grouped: Record<string, DashboardTask[]> = {};

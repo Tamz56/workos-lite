@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { useRouter } from "next/navigation";
+import { Home, RefreshCw, Layers } from "lucide-react";
+
+import { AGENT_TEMPLATES, getTemplatePayload } from "@/lib/agent/templates";
 
 const DEFAULT_PAYLOAD_RAW = `{
   "actions": [
@@ -26,80 +29,20 @@ const DEFAULT_PAYLOAD_RAW = `{
   ]
 }`;
 
-const getTemplates = (): Record<string, any> => {
-    const today = new Date().toISOString().split("T")[0];
-    return {
-        "Daily Brief + 3 Tasks": {
-            dry_run: true,
-            actions: [
-                {
-                    type: "doc.create",
-                    saveAs: "doc_brief",
-                    data: {
-                        title: "Daily Brief: <Topic>",
-                        content_md: "# Objective\\n\\nOutline goals for the day..."
-                    }
-                },
-                {
-                    type: "task.create",
-                    data: { title: "Task 1", workspace: "avacrm", status: "planned", scheduled_date: today, schedule_bucket: "morning", priority: 1, doc_id_ref: "doc_brief" }
-                },
-                {
-                    type: "task.create",
-                    data: { title: "Task 2", workspace: "avacrm", status: "planned", scheduled_date: today, schedule_bucket: "afternoon", priority: 2 }
-                },
-                {
-                    type: "task.create",
-                    data: { title: "Task 3", workspace: "avacrm", status: "inbox", schedule_bucket: "none", priority: 3 }
-                }
-            ]
-        },
-        "Customer Call Note + Follow-up": {
-            dry_run: true,
-            actions: [
-                {
-                    type: "doc.create",
-                    saveAs: "doc_call",
-                    data: {
-                        title: "Call: <Customer Name>",
-                        content_md: "# Notes\\n\\nDiscussed X, Y, Z..."
-                    }
-                },
-                {
-                    type: "task.create",
-                    data: { title: "Send follow-up email to <Customer Name>", workspace: "avacrm", status: "inbox", doc_id_ref: "doc_call", priority: 2, schedule_bucket: "none" }
-                }
-            ]
-        },
-        "Content Brief + Script Task": {
-            dry_run: true,
-            actions: [
-                {
-                    type: "doc.create",
-                    saveAs: "doc_script",
-                    data: {
-                        title: "Content: <Topic>",
-                        content_md: "# Script Outline\\n\\nIntro -> Body -> Outro"
-                    }
-                },
-                {
-                    type: "task.create",
-                    data: { title: "Record video for <Topic>", workspace: "content", status: "planned", scheduled_date: today, doc_id_ref: "doc_script", priority: 1, schedule_bucket: "morning" }
-                }
-            ]
-        }
-    };
-};
-
 const DEFAULT_PAYLOAD = DEFAULT_PAYLOAD_RAW;
 
 export default function AgentDebuggerPage() {
     const router = useRouter();
     const [jsonInput, setJsonInput] = useState(DEFAULT_PAYLOAD);
+    const [selectedTemplate, setSelectedTemplate] = useState("");
     const [result, setResult] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [uiPassword, setUiPassword] = useState("");
+
+    // RC14: Dynamic Topic Input
+    const [topicId, setTopicId] = useState("TOPIC-001");
+    const [topicTitle, setTopicTitle] = useState("Untitled Topic");
 
     useEffect(() => {
         const saved = localStorage.getItem("agent_ui_password");
@@ -196,9 +139,14 @@ export default function AgentDebuggerPage() {
     return (
         <div className="w-full px-6 2xl:px-10 py-8 max-w-7xl mx-auto">
             <div className="mb-8">
-                <button onClick={handleBack} className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200/70 rounded-md px-3 py-1.5 shadow-sm hover:bg-neutral-50 transition-colors mb-6">
-                    <span aria-hidden="true">&larr;</span> Back
-                </button>
+                <div className="flex items-center gap-2 mb-6">
+                    <button onClick={handleBack} className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200/70 rounded-md px-3 py-1.5 shadow-sm hover:bg-neutral-50 transition-colors">
+                        <span aria-hidden="true">&larr;</span> Back
+                    </button>
+                    <button onClick={() => router.push("/dashboard")} className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-neutral-900 bg-white border border-neutral-200/50 rounded-md px-3 py-1.5 shadow-sm hover:bg-neutral-50 transition-colors">
+                        <Home size={14} /> Home
+                    </button>
+                </div>
                 <h1 className="text-3xl font-bold font-display tracking-tight text-neutral-900">Agent Debugger</h1>
                 <div className="text-sm text-neutral-500 font-medium mt-1">
                     Securely preview and execute JSON payloads against <code className="bg-neutral-100 px-1 py-0.5 rounded text-xs text-neutral-700">/api/agent/execute</code>
@@ -222,25 +170,78 @@ export default function AgentDebuggerPage() {
 
                 {/* Editor Column */}
                 <div className="flex flex-col h-full rounded-2xl border border-neutral-200/70 bg-white shadow-sm overflow-hidden">
-                    <div className="flex items-center justify-between p-4 border-b border-neutral-100 bg-neutral-50/50">
-                        <div className="flex items-center gap-3">
-                            <div className="text-sm font-semibold uppercase tracking-wide text-neutral-800">Payload Builder</div>
-                            <select
-                                className="text-xs bg-white border border-neutral-200 rounded-md px-2 py-1 text-neutral-700 outline-none focus:ring-1 focus:ring-blue-500 max-w-[150px] truncate"
-                                onChange={(e) => {
-                                    if (e.target.value) {
-                                        const templates = getTemplates();
-                                        setJsonInput(JSON.stringify(templates[e.target.value], null, 2));
-                                        e.target.value = ""; // reset so they can repeatedly select same template
-                                    }
-                                }}
-                                defaultValue=""
-                            >
-                                <option value="" disabled>Load Template...</option>
-                                {Object.keys(getTemplates()).map(key => (
-                                    <option key={key} value={key}>{key}</option>
-                                ))}
-                            </select>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-neutral-100 bg-neutral-50/50 gap-4">
+                        <div className="flex flex-col gap-3">
+                            <div className="flex items-center gap-2">
+                                <Layers size={16} className="text-blue-500" />
+                                <div className="text-sm font-bold uppercase tracking-wide text-neutral-800">Payload Builder</div>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] font-black uppercase tracking-tight text-neutral-400">Template</label>
+                                    <select
+                                        className="text-xs bg-white border border-neutral-200 rounded-md px-2 py-1.5 text-neutral-700 outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] font-medium"
+                                        value={selectedTemplate}
+                                        onChange={(e) => setSelectedTemplate(e.target.value)}
+                                    >
+                                        <option value="" disabled>Select Template...</option>
+                                        {Object.keys(AGENT_TEMPLATES).map(key => (
+                                            <option key={key} value={key}>{key}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] font-black uppercase tracking-tight text-neutral-400">Topic ID</label>
+                                    <input
+                                        type="text"
+                                        placeholder="TOPIC-001"
+                                        value={topicId}
+                                        onChange={(e) => setTopicId(e.target.value)}
+                                        className="text-xs bg-white border border-neutral-200 rounded-md px-2 py-1.5 text-neutral-700 outline-none focus:ring-1 focus:ring-blue-500 w-[100px] font-mono"
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] font-black uppercase tracking-tight text-neutral-400">Topic Title</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Untitled Topic"
+                                        value={topicTitle}
+                                        onChange={(e) => setTopicTitle(e.target.value)}
+                                        className="text-xs bg-white border border-neutral-200 rounded-md px-2 py-1.5 text-neutral-700 outline-none focus:ring-1 focus:ring-blue-500 min-w-[200px] font-medium"
+                                    />
+                                </div>
+
+                                <div className="flex items-end h-full gap-2 pt-5">
+                                    <button 
+                                        onClick={() => {
+                                            if (selectedTemplate) {
+                                                const payload = getTemplatePayload(selectedTemplate, { topicId, topicTitle });
+                                                if (payload) {
+                                                    setJsonInput(JSON.stringify(payload, null, 2));
+                                                }
+                                            }
+                                        }}
+                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg transition-all uppercase tracking-tight shadow-md shadow-blue-100 flex items-center gap-1.5 active:scale-95"
+                                    >
+                                        Load
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            setJsonInput(DEFAULT_PAYLOAD);
+                                            setSelectedTemplate("");
+                                            setTopicId("TOPIC-001");
+                                            setTopicTitle("Untitled Topic");
+                                        }}
+                                        className="px-3 py-1.5 bg-white border border-neutral-200 hover:bg-neutral-100 text-neutral-500 text-[10px] font-bold rounded-lg transition-colors uppercase tracking-tight flex items-center gap-1.5"
+                                    >
+                                        <RefreshCw size={10} />
+                                        Reset
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                             <div className="flex items-center gap-2">

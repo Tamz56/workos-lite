@@ -8,7 +8,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const Workspace = z.enum(["avacrm", "ops", "content"]);
-const Status = z.enum(["inbox", "planned", "done"]);
+const Status = z.enum(["inbox", "planned", "in_progress", "done"]);
 const Bucket = z.enum(["none", "morning", "afternoon", "evening"]);
 
 const PatchTaskSchema = z
@@ -24,8 +24,10 @@ const PatchTaskSchema = z
         notes: z.string().nullable().optional(),
         doc_id: z.string().nullable().optional(),
         list_id: z.string().nullable().optional(),
+        sprint_id: z.string().nullable().optional(),
         parent_task_id: z.string().nullable().optional(),
         sort_order: z.number().int().nullable().optional(),
+        review_status: z.enum(["draft", "in_review", "approved", "published"]).optional(), // RC26
     })
     .strict();
 

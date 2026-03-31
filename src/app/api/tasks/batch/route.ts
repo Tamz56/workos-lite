@@ -1,153 +1,153 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
-import { nanoid } from "nanoid";
-import { WORKSPACES, Workspace, normalizeWorkspace } from "@/lib/workspaces";
-import { CONTENT_TEMPLATES } from "@/lib/content/templates";
-import { ParsedTask } from "@/lib/bulkParser";
+import { toErrorMessage } from "@/lib/error";
 
 export const runtime = "nodejs";
 
-export async function POST(req: NextRequest) {
+export async function PATCH(req: NextRequest) {
     try {
-        const body = await req.json();
+        const { topicId, newPublishDate, newReviewStatus, isPublishing, distributionChannels, performanceMetrics } = await req.json();
 
-        // --- BULK UPDATE LOGIC ---
-        if (body.ids && Array.isArray(body.ids) && body.patch) {
-            const { ids, patch } = body;
-            if (ids.length === 0) return NextResponse.json({ ok: true, updated: 0 });
 
-            const db = getDb();
-            const now = new Date().toISOString();
-
-            const sets: string[] = [];
-            const bindValues: any[] = [];
-
-            if (patch.status !== undefined) { sets.push(`status = ?`); bindValues.push(patch.status); }
-            if (patch.schedule_bucket !== undefined) { sets.push(`schedule_bucket = ?`); bindValues.push(patch.schedule_bucket); }
-            if (patch.workspace !== undefined) { sets.push(`workspace = ?`); bindValues.push(normalizeWorkspace(patch.workspace as Workspace)); }
-
-            if (patch.notes_append) {
-                sets.push(`notes = COALESCE(notes, '') || ?`);
-                bindValues.push(patch.notes_append);
-            }
-
-            if (sets.length === 0) return NextResponse.json({ ok: true, updated: 0 });
-
-            sets.push(`updated_at = ?`);
-            bindValues.push(now);
-
-            const placeholders = ids.map(() => `?`).join(',');
-            const sql = `UPDATE tasks SET ${sets.join(", ")} WHERE id IN (${placeholders})`;
-            const info = db.prepare(sql).run(...bindValues, ...ids);
-
-            return NextResponse.json({ ok: true, updated: info.changes });
-        }
-
-        // --- EXISTING BATCH CREATE LOGIC ---
-        const { tasks, options } = body as {
-            tasks: ParsedTask[],
-            options: { createContentDocs: boolean }
-        };
-
-        if (!Array.isArray(tasks) || tasks.length === 0) {
-            return NextResponse.json({ error: "No tasks provided" }, { status: 400 });
+        if (!topicId) {
+            return NextResponse.json({ error: "Missing topicId" }, { status: 400 });
         }
 
         const db = getDb();
-        const results: Array<{ id: string; title: string }> = [];
+        const topicPattern = `%topic_id: ${topicId}%`;
         const now = new Date().toISOString();
+        let updatedCount = 0;
 
-        // Transaction
-        const insertTransaction = db.transaction((taskList: ParsedTask[]) => {
-            for (const t of taskList) {
-                const id = nanoid();
-                let notes = t.notes || "";
 
-                const normalizedWs = normalizeWorkspace(t.workspace);
+        // --- PART 1: Reschedule Logic ---
+        let deltaDays = 0;
+        if (newPublishDate) {
+            const publishTask = db.prepare(`
+                SELECT id, scheduled_date 
+                FROM tasks 
+                WHERE notes LIKE @pattern 
+                AND title LIKE '%Publish%'
+                LIMIT 1
+            `).get({ pattern: topicPattern }) as { id: string, scheduled_date: string | null } | undefined;
 
-                // 1. Insert Task
-                db.prepare(`
-                    INSERT INTO tasks (
-                        id, title, workspace, status, 
-                        scheduled_date, schedule_bucket, 
-                        created_at, updated_at
-                    ) VALUES (
-                        @id, @title, @workspace, 'inbox',
-                        @scheduled_date, 'none',
-                        @now, @now
-                    )
-                `).run({
-                    id,
-                    title: t.title,
-                    workspace: normalizedWs,
-                    scheduled_date: t.scheduled_date || null,
-                    now
-                });
+            if (publishTask && publishTask.scheduled_date) {
+                const oldDate = new Date(publishTask.scheduled_date);
+                const newDate = new Date(newPublishDate);
+                const deltaMs = newDate.getTime() - oldDate.getTime();
+                deltaDays = Math.round(deltaMs / (1000 * 60 * 60 * 24));
 
-                // 2. Content Docs Logic
-                if ((t.workspace === 'content' || t.workspace === 'marketing') && options.createContentDocs) {
-                    const briefId = nanoid();
-                    const scriptId = nanoid();
-                    const storyboardId = nanoid();
+                if (deltaDays !== 0) {
+                    const tasksToReschedule = db.prepare(`
+                        SELECT id, scheduled_date 
+                        FROM tasks 
+                        WHERE notes LIKE @pattern 
+                        AND scheduled_date IS NOT NULL
+                    `).all({ pattern: topicPattern }) as { id: string, scheduled_date: string } [];
 
-                    // Insert Docs
-                    const insertDoc = db.prepare(`
-                        INSERT INTO docs (id, title, content_md, created_at, updated_at)
-                        VALUES (@id, @title, @content, @now, @now)
+                    const updateDateStmt = db.prepare(`
+                        UPDATE tasks 
+                        SET scheduled_date = date(scheduled_date, @delta), 
+                            updated_at = @now 
+                        WHERE id = @id
                     `);
 
-                    insertDoc.run({ id: briefId, title: `${t.title} - Brief`, content: CONTENT_TEMPLATES.BRIEF, now });
-                    insertDoc.run({ id: scriptId, title: `${t.title} - Script`, content: CONTENT_TEMPLATES.SCRIPT, now });
-                    insertDoc.run({ id: storyboardId, title: `${t.title} - Storyboard`, content: CONTENT_TEMPLATES.STORYBOARD, now });
-
-                    // Link Docs (via task_docs mapping table IF exists, OR append to Notes)
-                    // We don't have task_docs join table visible in types.ts. We assume 'notes' linking or single 'doc_id'.
-                    // User said: "docs (future) doc_id string | null". Single doc.
-                    // But here we generate 3.
-                    // We will append links to Notes.
-                    const links = `
-\n---
-**Auto-Generated Docs:**
-- [Brief](/docs/${briefId})
-- [Script](/docs/${scriptId})
-- [Storyboard](/docs/${storyboardId})
-`;
-                    notes += links;
+                    const deltaStr = `${deltaDays >= 0 ? '+' : ''}${deltaDays} days`;
+                    const rescheduleTx = db.transaction(() => {
+                        for (const task of tasksToReschedule) {
+                            updateDateStmt.run({ delta: deltaStr, now, id: task.id });
+                        }
+                    });
+                    rescheduleTx();
+                    updatedCount += tasksToReschedule.length;
                 }
-
-                // 3. NG_SKU Automation
-                if (t.title.startsWith('NG_SKU:')) {
-                    const docId = nanoid();
-                    db.prepare(`
-                        INSERT INTO docs (id, title, content_md, created_at, updated_at)
-                        VALUES (@id, @title, @content, @now, @now)
-                    `).run({ id: docId, title: `${t.title} - Ad`, content: CONTENT_TEMPLATES.NANAGARDEN_AD, now });
-                    notes += `\n\n[NanaGarden Ad](/docs/${docId})`;
-                }
-
-                // Update notes if they changed (or if just initially set)
-                // We didn't insert notes in step 1 because we might append docs.
-                // Wait, 'tasks' table has 'notes' column?
-                // Checking types.ts: `notes: string | null`.
-                // Checking previous `POST` route: it didn't insert notes! 
-                // Let's check schema. If needed, I'll update the task with notes.
-                // Assuming `notes` column exists. If not, I'll check.
-
-                // Let's assume it exists and update it.
-                if (notes) {
-                    db.prepare("UPDATE tasks SET notes = ? WHERE id = ?").run(notes, id);
-                }
-
-                results.push({ id, title: t.title });
             }
+        }
+
+        // --- PART 2: Review Status Logic (RC26) ---
+        if (newReviewStatus) {
+            const reviewStmt = db.prepare(`
+                UPDATE tasks 
+                SET review_status = @status, 
+                    updated_at = @now 
+                WHERE notes LIKE @pattern
+            `);
+            const info = reviewStmt.run({ 
+                status: newReviewStatus, 
+                now, 
+                pattern: topicPattern 
+            });
+            updatedCount = Math.max(updatedCount, info.changes);
+        }
+        
+        // --- PART 3: Publish Logic (RC28) ---
+        if (isPublishing) {
+            const publishStmt = db.prepare(`
+                UPDATE tasks 
+                SET review_status = 'published',
+                    published_at = @now,
+                    updated_at = @now 
+                WHERE (notes LIKE @pattern) 
+                AND (review_status IS NULL OR review_status != 'published')
+            `);
+            const info = publishStmt.run({ 
+                now, 
+                pattern: topicPattern 
+            });
+            updatedCount = Math.max(updatedCount, info.changes);
+        }
+
+        // --- PART 4: Distribution Channels (RC29) ---
+        if (distributionChannels) {
+            const channelsStr = JSON.stringify(
+                Array.from(new Set(
+                    distributionChannels.map((c: any) => String(c).toLowerCase())
+                )).sort()
+            );
+
+            const channelStmt = db.prepare(`
+                UPDATE tasks 
+                SET distribution_channels = @channels, 
+                    updated_at = @now 
+                WHERE notes LIKE @pattern
+            `);
+            const info = channelStmt.run({ 
+                channels: channelsStr,
+                now, 
+                pattern: topicPattern 
+            });
+            updatedCount = Math.max(updatedCount, info.changes);
+        }
+
+        // --- PART 5: Performance Metrics (RC30) ---
+        if (performanceMetrics) {
+            const metricsStr = JSON.stringify(performanceMetrics);
+            const metricsStmt = db.prepare(`
+                UPDATE tasks 
+                SET performance_metrics = @metrics, 
+                    updated_at = @now 
+                WHERE notes LIKE @pattern
+            `);
+            const info = metricsStmt.run({ 
+                metrics: metricsStr,
+                now, 
+                pattern: topicPattern 
+            });
+            updatedCount = Math.max(updatedCount, info.changes);
+        }
+
+        if (updatedCount === 0 && !newPublishDate && !newReviewStatus && !isPublishing && !distributionChannels && !performanceMetrics) {
+            return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+        }
+
+
+
+        return NextResponse.json({ 
+            ok: true, 
+            deltaDays, 
+            updatedCount 
         });
 
-        insertTransaction(tasks);
-
-        return NextResponse.json({ created: results.length, details: results });
     } catch (e: unknown) {
-        console.error("Batch create error", e);
-        return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+        return NextResponse.json({ error: toErrorMessage(e) }, { status: 500 });
     }
 }

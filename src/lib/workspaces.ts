@@ -7,19 +7,23 @@ export const WORKSPACES = [
     "admin",
     "marketing",
     "personal",
+    "system",
+    "inbox",
     "other",
 ] as const;
 
 export const WORKSPACES_LIST = [
-    { id: "avacrm", label: "AVACRM" },
-    { id: "ops", label: "OPS" },
-    { id: "content", label: "CONTENT" },
-    { id: "finance", label: "Finance" },
-    { id: "travel", label: "Travel" },
-    { id: "admin", label: "Admin" },
-    { id: "marketing", label: "Marketing/Sales" },
-    { id: "personal", label: "Personal" },
-    { id: "other", label: "Other" },
+    { id: "avacrm", label: "AVACRM", type: "admin" },
+    { id: "ops", label: "OPS", type: "ops" },
+    { id: "content", label: "CONTENT", type: "content" },
+    { id: "finance", label: "Finance", type: "admin" },
+    { id: "travel", label: "Travel", type: "admin" },
+    { id: "admin", label: "Admin", type: "admin" },
+    { id: "marketing", label: "Marketing/Sales", type: "ops" },
+    { id: "personal", label: "Personal", type: "other" },
+    { id: "system", label: "System/Archive", type: "system" },
+    { id: "inbox", label: "Inbox", type: "inbox" },
+    { id: "other", label: "Other", type: "other" },
 ] as const;
 
 export type Workspace = (typeof WORKSPACES)[number];
@@ -51,6 +55,10 @@ const ALIASES: Record<string, Workspace> = {
     "mktsales": "marketing",
     "marketing_and_sales": "marketing",
     "personal": "personal",
+    "system": "system",
+    "sys": "system",
+    "inbox": "inbox",
+    "ib": "inbox",
     "other": "other",
 };
 
@@ -69,6 +77,8 @@ export function workspaceLabel(w: Workspace | string): string {
         case "marketing": return "Marketing/Sales";
         case "finance": return "Finance";
         case "travel": return "Travel";
+        case "system": return "System/Archive";
+        case "inbox": return "Inbox";
         case "other": return "Other";
         default: return typeof w === "string" ? w.toUpperCase() : "UNKNOWN";
     }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Home } from "lucide-react";
 
 function AgentLoginContent() {
     const router = useRouter();
@@ -64,9 +65,12 @@ function AgentLoginContent() {
     return (
         <div className="w-full min-h-[80vh] flex items-center justify-center p-6 bg-neutral-50/50">
             <div className="w-full max-w-sm bg-white border border-neutral-200/70 p-8 rounded-2xl shadow-sm relative">
-                <div className="absolute top-4 left-4">
+                <div className="absolute top-4 left-4 flex gap-2">
                     <button onClick={handleBack} className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 bg-white border border-neutral-200/70 rounded-md px-2 py-1 shadow-sm hover:bg-neutral-50 transition-colors">
                         <span aria-hidden="true">&larr;</span> Back
+                    </button>
+                    <button onClick={() => router.push("/dashboard")} className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-neutral-900 bg-white border border-neutral-200/50 rounded-md px-2 py-1 shadow-sm hover:bg-neutral-50 transition-colors">
+                        <Home size={12} /> Home
                     </button>
                 </div>
                 <div className="text-center mb-8 mt-4">

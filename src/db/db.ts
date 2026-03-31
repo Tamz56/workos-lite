@@ -139,6 +139,32 @@ function ensureMigrations() {
         db.exec("ALTER TABLE docs ADD COLUMN is_seed INTEGER DEFAULT 0");
     }
 
+    const hasReviewStatus = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "review_status");
+    if (!hasReviewStatus) {
+        db.exec("ALTER TABLE tasks ADD COLUMN review_status TEXT DEFAULT 'draft'");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_review_status ON tasks(review_status)");
+
+    const hasPublishedAt = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "published_at");
+    if (!hasPublishedAt) {
+        db.exec("ALTER TABLE tasks ADD COLUMN published_at TEXT NULL");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_published_at ON tasks(published_at)");
+
+    const hasDistributionChannels = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "distribution_channels");
+    if (!hasDistributionChannels) {
+        db.exec("ALTER TABLE tasks ADD COLUMN distribution_channels TEXT NULL");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_distribution_channels ON tasks(distribution_channels)");
+
+    const hasPerformanceMetrics = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "performance_metrics");
+    if (!hasPerformanceMetrics) {
+        db.exec("ALTER TABLE tasks ADD COLUMN performance_metrics TEXT NULL");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_performance_metrics ON tasks(performance_metrics)");
+
+
+
     const hasListIsSeed = db.prepare("PRAGMA table_info(lists)").all().some((c: any) => c.name === "is_seed");
     if (hasListIsSeed === false) { // Table exists but column might be missing if it was created before my changes
         const listsTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lists'").get();
@@ -421,7 +447,37 @@ function ensureSeedProjects() {
     runTx();
 }
 
+function ensureNotes() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS notes (
+          id           TEXT PRIMARY KEY,
+          title        TEXT NOT NULL,
+          content_json TEXT NOT NULL,
+          content_html TEXT NOT NULL,
+          plain_text   TEXT NOT NULL,
+          project_id   TEXT NULL,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_notes_project_id ON notes(project_id);
+        CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at);
+
+        CREATE TABLE IF NOT EXISTS note_links (
+          id                 TEXT PRIMARY KEY,
+          note_id            TEXT NOT NULL,
+          linked_entity_type TEXT NOT NULL,
+          linked_entity_id   TEXT NOT NULL,
+          created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_note_links_note_id ON note_links(note_id);
+        CREATE INDEX IF NOT EXISTS idx_note_links_entity ON note_links(linked_entity_type, linked_entity_id);
+    `);
+}
+
 ensureProjectsAndSprints();
+ensureNotes();
 if (!shouldSkipSeed) {
     ensureSeedProjects();
 }

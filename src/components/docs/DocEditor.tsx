@@ -22,6 +22,7 @@ interface DocEditorProps {
     onMeta?: (doc: Doc) => void;
     onLoadError?: (status: number) => void;
     className?: string;
+    isDrawer?: boolean;
 }
 
 export default function DocEditor({
@@ -30,9 +31,10 @@ export default function DocEditor({
     autoFocus = false,
     onMeta,
     onLoadError,
-    className
+    className,
+    isDrawer = false
 }: DocEditorProps) {
-    const [viewMode, setViewMode] = useState<ViewMode>("split");
+    const [viewMode, setViewMode] = useState<ViewMode>(isDrawer ? "preview" : "split");
     const [content, setContent] = useState<string>("");
     const [dirty, setDirty] = useState(false);
 
@@ -265,8 +267,14 @@ export default function DocEditor({
     return (
         <div className={clsx("flex flex-col gap-2", className)}>
             {/* Toolbar */}
-            <div className="flex items-center justify-between gap-2 border-b pb-2">
-                <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+            <div className={clsx(
+                "flex items-center justify-between gap-2 border-b pb-2",
+                isDrawer && "border-neutral-100 pb-1"
+            )}>
+                <div className={clsx(
+                    "flex bg-neutral-100 p-0.5 rounded-lg border border-neutral-200",
+                    isDrawer && "bg-transparent border-none p-0 gap-1"
+                )}>
                     {(["write", "split", "preview"] as ViewMode[]).map((m) => (
                         <button
                             key={m}
@@ -276,8 +284,10 @@ export default function DocEditor({
                                 setViewMode(m);
                             }}
                             className={clsx(
-                                "px-3 py-1 text-xs font-medium rounded-md capitalize transition-colors",
-                                viewMode === m ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                                "px-3 py-1 text-xs font-medium rounded-md capitalize transition-all",
+                                viewMode === m 
+                                    ? (isDrawer ? "bg-blue-600 text-white shadow-sm scale-105" : "bg-white text-gray-900 shadow-sm")
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
                             )}
                         >
                             {m}
@@ -302,7 +312,10 @@ export default function DocEditor({
             </div>
 
             {/* Editor Area */}
-            <div className="border rounded-md overflow-hidden bg-white shadow-sm flex relative" style={{ height }}>
+            <div className={clsx(
+                "border rounded-xl overflow-hidden bg-white flex relative transition-all",
+                isDrawer ? "border-neutral-200 shadow-none" : "shadow-sm",
+            )} style={{ height }}>
                 {/* Write Pane */}
                 {(viewMode === "write" || viewMode === "split") && (
                     <div className={clsx("flex-1 h-full relative", viewMode === "split" && "border-r")}>
@@ -358,10 +371,16 @@ export default function DocEditor({
 
                 {/* Preview Pane */}
                 {(viewMode === "preview" || viewMode === "split") && (
-                    <div className="flex-1 h-full overflow-auto bg-gray-50/50 p-4">
-                        <article className="prose prose-sm prose-slate max-w-none">
+                    <div className={clsx(
+                        "flex-1 h-full overflow-auto p-4 transition-colors",
+                        isDrawer ? "bg-white" : "bg-gray-50/50"
+                    )}>
+                        <article className={clsx(
+                            "prose prose-slate max-w-none",
+                            isDrawer ? "prose-sm leading-relaxed" : "prose-sm"
+                        )}>
                             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-                                {previewContent || "*No content*"}
+                                {previewContent || (isDrawer ? "*Start writing in the full note editor...*" : "*No content*")}
                             </ReactMarkdown>
                         </article>
                     </div>

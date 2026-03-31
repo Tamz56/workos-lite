@@ -5,6 +5,9 @@ import type { Task } from "../lib/types";
 import { patchTask } from "../lib/api";
 import DocEditor from "./docs/DocEditor";
 import { toErrorMessage } from "../lib/error";
+import { ExternalLink, Link as LinkIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { clsx } from "clsx";
 
 type Props = {
     task: Task;
@@ -12,6 +15,7 @@ type Props = {
 };
 
 export default function TaskDocPanel({ task, onUpdate }: Props) {
+    const router = useRouter();
     const docId = task.doc_id || null;
 
     const [loading, setLoading] = useState(false);
@@ -186,13 +190,43 @@ export default function TaskDocPanel({ task, onUpdate }: Props) {
     }
 
     return (
-        <div className="h-full flex flex-col">
-            <DocEditor
-                docId={docId}
-                height="100%"
-                className="flex-1"
-            // No need to handle onLoadError here as we handle it in loadDoc
-            />
+        <div className="h-full flex flex-col gap-4">
+            {/* Action Bar / Header */}
+            <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                        <LinkIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+                        Primary Content Hub
+                    </span>
+                </div>
+                <button 
+                    onClick={() => unlinkDoc()}
+                    className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 hover:text-red-500 transition-colors"
+                >
+                    Unlink
+                </button>
+            </div>
+
+            {/* Preview Area */}
+            <div className="flex-1 relative group">
+                <DocEditor
+                    docId={docId}
+                    height="100%"
+                    className="flex-1"
+                    isDrawer={true}
+                />
+            </div>
+
+            {/* Primary Action */}
+            <button 
+                onClick={() => router.push(`/docs/${docId}`)}
+                className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-100 hover:shadow-blue-200 hover:-translate-y-0.5 active:translate-y-0"
+            >
+                <ExternalLink className="w-4 h-4" />
+                Open Full Note Editor
+            </button>
         </div>
     );
 }

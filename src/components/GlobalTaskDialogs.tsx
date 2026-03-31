@@ -7,6 +7,21 @@ import TaskEditorDialog from "@/components/TaskEditorDialog";
 import { Workspace, WORKSPACES_LIST } from "@/lib/workspaces";
 import { Task } from "@/lib/types";
 
+export const PREFETCH_CACHE = new Map<string, { data: any; timestamp: number }>();
+
+export function prefetchTaskDetail(taskId: string) {
+    if (PREFETCH_CACHE.has(taskId)) return;
+    fetch(`/api/tasks/${taskId}`, { cache: "no-store", headers: { 'Pragma': 'no-cache' } })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.task) {
+                // Cache exclusively for 15 seconds to cover the hover-to-click gap
+                PREFETCH_CACHE.set(taskId, { data, timestamp: Date.now() });
+            }
+        })
+        .catch(() => {});
+}
+
 export function GlobalTaskDialogs() {
     const sp = useSearchParams();
     const router = useRouter();
@@ -24,10 +39,19 @@ export function GlobalTaskDialogs() {
         }
         // Fetch task
         setLoading(true);
-        fetch(`/api/tasks?id=${taskId}`, { cache: "no-store", headers: { 'Pragma': 'no-cache' } })
+
+        const cached = PREFETCH_CACHE.get(taskId);
+        if (cached && (Date.now() - cached.timestamp < 15000)) {
+            if (cached.data && cached.data.task) setTask(cached.data.task);
+            else setTask(null);
+            setLoading(false);
+            return;
+        }
+
+        fetch(`/api/tasks/${taskId}`, { cache: "no-store", headers: { 'Pragma': 'no-cache' } })
             .then(res => res.json())
             .then(data => {
-                if (Array.isArray(data) && data.length > 0) setTask(data[0]);
+                if (data && data.task) setTask(data.task);
                 else setTask(null); // Not found
             })
             .catch(() => setTask(null))
@@ -93,13 +117,17 @@ export function GlobalTaskDialogs() {
 
     const handleSuccess = () => {
         router.refresh();
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("task-updated"));
+        }
     };
 
     return (
         <>
-            {taskId && !loading && task && (
+            {taskId && task && (
                 <TaskDetailDialog
-                    isOpen={!!task}
+                    isOpen={true}
+                    isLoading={loading}
                     onClose={closeDetail}
                     task={task}
                     onUpdate={handleSuccess}

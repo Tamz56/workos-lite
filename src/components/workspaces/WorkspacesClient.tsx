@@ -1,132 +1,201 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { Task } from "@/lib/types";
 import { WORKSPACES_LIST } from "@/lib/workspaces";
+import { Play, X } from "lucide-react";
 
-type WorkspaceStat = {
-    key: string;
-    label: string;
-    total: number;
-    overdue: number;
-    inbox: number;
-    recent: { id: string; title: string; status: string; updated_at: string }[];
-};
-
-async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 15000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-        const response = await fetch(url, { ...init, signal: controller.signal });
-        return response;
-    } finally {
-        clearTimeout(id);
-    }
-}
-
-function WorkspaceCard({ stat }: { stat: WorkspaceStat }) {
-    const router = useRouter();
-
-    return (
-        <div
-            className="group flex flex-col bg-white border border-neutral-200 rounded-2xl p-5 hover:shadow-lg transition-all cursor-pointer h-full"
-            onClick={() => router.push(`/workspaces/${stat.key}`)}
-        >
-            <div className="flex items-center justify-between mb-4">
-                <div className="font-bold text-lg text-neutral-800">{stat.label}</div>
-                <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">{stat.total} Active</div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mb-5">
-                <div className="bg-red-50 text-red-700 rounded-lg p-3 text-center border border-red-100">
-                    <div className="text-lg font-bold leading-none">{stat.overdue}</div>
-                    <div className="text-[10px] uppercase font-bold opacity-70 mt-1">Overdue</div>
-                </div>
-                <div className="bg-neutral-100 text-neutral-700 rounded-lg p-3 text-center border border-neutral-200">
-                    <div className="text-lg font-bold leading-none">{stat.inbox}</div>
-                    <div className="text-[10px] uppercase font-bold opacity-70 mt-1">Inbox</div>
-                </div>
-            </div>
-
-            <div className="space-y-2 flex-1">
-                {stat.recent.length === 0 && (
-                    <div className="text-center text-xs text-neutral-400 italic py-4">No active tasks</div>
-                )}
-                {stat.recent.map(t => (
-                    <div
-                        key={t.id}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/workspaces?taskId=${t.id}`);
-                        }}
-                        className="flex items-center gap-2 text-xs py-1.5 border-b border-neutral-50 last:border-0 hover:bg-neutral-50 -mx-2 px-2 rounded cursor-pointer group/item"
-                    >
-                        <span className={`w-1.5 h-1.5 rounded-full ${t.status === 'inbox' ? 'bg-neutral-300' : 'bg-green-500'}`} />
-                        <span className="truncate flex-1 text-neutral-600 group-hover/item:text-black transition-colors">{t.title}</span>
-                    </div>
-                ))}
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-neutral-100 text-center">
-                <span className="text-xs font-bold text-blue-600 group-hover:underline">Open Workspace →</span>
-            </div>
-        </div>
-    );
-}
+// Areas Components
+import { useAreasState } from "./areas/useAreasState";
+import AreasToolbar from "./areas/AreasToolbar";
+import AreasFilterBar from "./areas/AreasFilterBar";
+import AreasTaskList from "./areas/AreasTaskList";
 
 export default function WorkspacesClient() {
-    const [stats, setStats] = useState<WorkspaceStat[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
+    const { state, updateState } = useAreasState("global");
+    const [tasks, setTasks] = useState<Task[]>([]);
+
+    const [loadingTasks, setLoadingTasks] = useState(true);
+    const [lists, setLists] = useState<any[]>([]);
+    const [sprints, setSprints] = useState<any[]>([]);
+
+    // RC42A: Resume State
+    const [resumeData, setResumeData] = useState<{ id: string; name: string } | null>(null);
 
     useEffect(() => {
-        const loadStats = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const res = await fetchWithTimeout("/api/workspaces/summary");
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                setStats(data);
-            } catch (err: any) {
-                console.error("Failed to load workspaces", err);
-                setError(err.name === 'AbortError' ? "Request timed out" : "Failed to load data");
-            } finally {
-                setLoading(false);
+        if (typeof window !== "undefined") {
+            const lastWsId = localStorage.getItem("workos-last-workspace");
+            const isDismissed = sessionStorage.getItem("workos-resume-dismissed");
+            
+            if (lastWsId && !isDismissed) {
+                const ws = WORKSPACES_LIST.find(w => w.id === lastWsId);
+                if (ws) {
+                    setResumeData({ id: ws.id, name: ws.label });
+                }
             }
-        };
-
-        loadStats();
+        }
     }, []);
 
-    if (loading) return (
-        <div className="p-20 flex flex-col items-center justify-center text-neutral-400 gap-4">
-            <div className="w-8 h-8 border-2 border-neutral-200 border-t-neutral-800 rounded-full animate-spin"></div>
-            <div className="font-medium animate-pulse">Loading workspaces...</div>
-        </div>
-    );
+    const handleResume = () => {
+        if (resumeData) {
+            router.push(`/workspaces/${resumeData.id}`);
+        }
+    };
 
-    if (error) return (
-        <div className="p-20 text-center">
-            <div className="text-red-500 mb-4">{error}</div>
-            <button 
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-neutral-100 rounded-lg hover:bg-neutral-200 text-sm font-bold"
-            >
-                Retry
-            </button>
-        </div>
-    );
+    const handleDismissResume = () => {
+        sessionStorage.setItem("workos-resume-dismissed", "true");
+        setResumeData(null);
+    };
+
+    // Fetch Metadata (Lists/Sprints)
+    useEffect(() => {
+        async function fetchMetadata() {
+            try {
+                const [lRes, sRes] = await Promise.all([
+                    fetch(`/api/lists`),
+                    fetch(`/api/sprints`)
+                ]);
+                const lData = await lRes.json();
+                const sData = await sRes.json();
+                setLists(lData);
+                setSprints(sData);
+            } catch (e) {
+                console.error("Failed to fetch metadata", e);
+            }
+        }
+        fetchMetadata();
+    }, []);
+
+    // Fetch All Tasks across all workspaces
+    useEffect(() => {
+        let cancelled = false;
+        async function run() {
+            setLoadingTasks(true);
+            try {
+                const params = new URLSearchParams();
+                
+                // RC8A: Pass multi-value filters to API
+                if (state.statusFilter.length > 0) params.set("statuses", state.statusFilter.join(","));
+                if (state.workspaceFilter.length > 0) params.set("workspaces", state.workspaceFilter.join(","));
+                if (state.listFilter.length > 0) params.set("list_ids", state.listFilter.join(","));
+                if (state.sprintFilter.length > 0) params.set("sprint_ids", state.sprintFilter.join(","));
+                
+                params.set("limit", "1000"); // Fetch all active tasks globally
+                const res = await fetch(`/api/tasks?${params.toString()}`);
+                const data = (await res.json()) as Task[];
+
+                if (!cancelled) setTasks(data);
+            } catch (e) {
+                console.error("Failed to fetch tasks", e);
+                if (!cancelled) setTasks([]);
+            } finally {
+                if (!cancelled) setLoadingTasks(false);
+            }
+        }
+        run();
+        return () => { cancelled = true; };
+    }, [state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter]);
+
+    const handleTaskUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
+        // Optimistic Update
+        const prevTasks = [...tasks];
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+
+        try {
+            const res = await fetch(`/api/tasks/${taskId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updates),
+            });
+            if (!res.ok) throw new Error("Update failed");
+            
+            const { task: updatedFromServer } = await res.json();
+            // Sync with server response
+            setTasks(prev => prev.map(t => t.id === taskId ? updatedFromServer : t));
+        } catch (e) {
+            console.error("Failed to update task", e);
+            // Revert on error
+            setTasks(prevTasks);
+            alert("Failed to update status. Please try again.");
+        }
+    }, [tasks]);
+
+    // Handle Quick Add Placeholder (Full implementation in Phase C)
+    const handleNewList = () => {
+        alert("Global list creation not supported yet. Please navigate to a specific workspace to create a list.");
+    };
 
     return (
-        <div className="p-6 2xl:p-10 max-w-7xl mx-auto">
-            <h1 className="text-3xl font-bold font-display tracking-tight text-neutral-900 mb-8">Workspaces</h1>
+        <div className="flex h-screen flex-col overflow-hidden bg-gray-50/50">
+            {/* Toolbar acts as Header */}
+            <AreasToolbar
+                title="All Areas"
+                state={state}
+                updateState={updateState}
+                onNewList={handleNewList}
+            />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-                {stats.map(s => (
-                    <WorkspaceCard key={s.key} stat={s} />
-                ))}
+            {/* Filters Row */}
+            <AreasFilterBar
+                tasks={tasks}
+                lists={lists}
+                sprints={sprints}
+                state={state}
+                updateState={updateState}
+            />
+
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden relative flex flex-col">
+                {/* RC42A: Resume CTA */}
+                {resumeData && (
+                    <div className="px-6 py-3 bg-indigo-600 text-white flex items-center justify-between shadow-sm animate-in slide-in-from-top-4 duration-300">
+                        <div className="flex items-center gap-3">
+                            <div className="p-1.5 bg-white/20 rounded-lg">
+                                <Play size={16} className="fill-current" />
+                            </div>
+                            <div>
+                                <span className="text-sm font-medium opacity-90">ทำงานค้างไว้ที่</span>
+                                <span className="ml-1.5 font-bold">{resumeData.name}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={handleResume}
+                                className="px-4 py-1.5 bg-white text-indigo-600 rounded-lg text-sm font-bold hover:bg-neutral-100 transition-colors shadow-sm"
+                            >
+                                ทำงานต่อ
+                            </button>
+                            <button 
+                                onClick={handleDismissResume}
+                                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {loadingTasks ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-neutral-400 font-bold uppercase tracking-widest text-sm animate-pulse flex items-center gap-3">
+                            <span className="animate-spin text-xl">⌛</span> Syncing Everything...
+                        </div>
+                    </div>
+                ) : (
+                    <AreasTaskList
+                        workspaceId={state.workspaceFilter.length > 0 ? state.workspaceFilter[0] : "personal"}
+                        tasks={tasks}
+                        state={state}
+                        onTaskClick={(t) => router.push(`?taskId=${t.id}`)}
+                        onTaskUpdate={handleTaskUpdate}
+                        onTaskCreated={(newTask) => {
+                            setTasks(prev => [newTask, ...prev]);
+                        }}
+                        updateState={updateState}
+                    />
+                )}
             </div>
         </div>
     );
