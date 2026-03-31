@@ -1,5 +1,5 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+import Database from 'better-sqlite3';
+import path from 'path';
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const db = new Database(dbPath);
 

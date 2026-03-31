@@ -1,0 +1,442 @@
+
+> workos-lite@0.1.1 lint
+> eslint
+
+
+/Users/tamz/projects/workos-lite/src/app/(main)/calendar/CalendarClient.tsx
+  130:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/(main)/dashboard/DashboardClient.tsx
+     8:53  warning  'Suspense' is defined but never used                     @typescript-eslint/no-unused-vars
+    12:17  warning  'FileText' is defined but never used                     @typescript-eslint/no-unused-vars
+    12:46  warning  'LayoutGrid' is defined but never used                   @typescript-eslint/no-unused-vars
+    12:58  warning  'LucideIcon' is defined but never used                   @typescript-eslint/no-unused-vars
+    12:75  warning  'List' is defined but never used                         @typescript-eslint/no-unused-vars
+    13:21  warning  'ChevronDown' is defined but never used                  @typescript-eslint/no-unused-vars
+    13:62  warning  'Box' is defined but never used                          @typescript-eslint/no-unused-vars
+    13:67  warning  'Target' is defined but never used                       @typescript-eslint/no-unused-vars
+    14:15  warning  'History' is defined but never used                      @typescript-eslint/no-unused-vars
+    14:24  warning  'Folder' is defined but never used                       @typescript-eslint/no-unused-vars
+    14:32  warning  'AlertCircle' is defined but never used                  @typescript-eslint/no-unused-vars
+    14:52  warning  'RefreshCw' is defined but never used                    @typescript-eslint/no-unused-vars
+    14:63  warning  'ChevronRight' is defined but never used                 @typescript-eslint/no-unused-vars
+    14:77  warning  'Trash2' is defined but never used                       @typescript-eslint/no-unused-vars
+    18:8   warning  'Topbar' is defined but never used                       @typescript-eslint/no-unused-vars
+    26:38  warning  'usePathname' is defined but never used                  @typescript-eslint/no-unused-vars
+    33:6   warning  'ScheduleBucket' is defined but never used               @typescript-eslint/no-unused-vars
+   194:10  warning  'WorkspaceCard' is defined but never used                @typescript-eslint/no-unused-vars
+   466:69  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   466:83  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   528:11  warning  'totalLines' is assigned a value but never used          @typescript-eslint/no-unused-vars
+   529:11  warning  'sortedProjects' is assigned a value but never used      @typescript-eslint/no-unused-vars
+   546:51  warning  '_' is defined but never used                            @typescript-eslint/no-unused-vars
+   715:12  warning  'docs' is assigned a value but never used                @typescript-eslint/no-unused-vars
+   716:52  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   717:46  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   718:48  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   726:25  warning  'setQaWorkspace' is assigned a value but never used      @typescript-eslint/no-unused-vars
+   783:49  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   793:21  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   811:11  warning  'wsTasks' is assigned a value but never used             @typescript-eslint/no-unused-vars
+   841:11  warning  'handleQuickAddTask' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   917:18  warning  'e' is defined but never used                            @typescript-eslint/no-unused-vars
+   956:39  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   956:55  warning  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   973:11  warning  'stats' is assigned a value but never used               @typescript-eslint/no-unused-vars
+  1486:29  warning  'mode' is defined but never used                         @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/(main)/docs/DocsClient.tsx
+    5:8   warning  'DangerIconButton' is defined but never used  @typescript-eslint/no-unused-vars
+   28:11  warning  'sp' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  342:66  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/(main)/docs/[id]/DocClient.tsx
+    3:21  warning  'useMemo' is defined but never used                                                                    @typescript-eslint/no-unused-vars
+    8:10  warning  'RefreshCw' is defined but never used                                                                  @typescript-eslint/no-unused-vars
+    8:42  warning  'Save' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+    8:76  warning  'ExternalLink' is defined but never used                                                               @typescript-eslint/no-unused-vars
+    8:90  warning  'Box' is defined but never used                                                                        @typescript-eslint/no-unused-vars
+    9:27  warning  'workspaceLabel' is defined but never used                                                             @typescript-eslint/no-unused-vars
+   12:10  warning  'Toast' is defined but never used                                                                      @typescript-eslint/no-unused-vars
+   46:12  warning  'lastSaved' is assigned a value but never used                                                         @typescript-eslint/no-unused-vars
+   48:12  warning  'showToast' is assigned a value but never used                                                         @typescript-eslint/no-unused-vars
+   49:12  warning  'toastMsg' is assigned a value but never used                                                          @typescript-eslint/no-unused-vars
+  141:20  warning  'flushPending' is defined but never used                                                               @typescript-eslint/no-unused-vars
+  169:8   warning  React Hook useEffect has a missing dependency: 'id'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/tamz/projects/workos-lite/src/app/(main)/inbox/InboxClient.tsx
+   15:31  warning  'Calendar' is defined but never used                                                                                                                        @typescript-eslint/no-unused-vars
+   15:41  warning  'Target' is defined but never used                                                                                                                          @typescript-eslint/no-unused-vars
+   15:55  warning  'Trash2' is defined but never used                                                                                                                          @typescript-eslint/no-unused-vars
+   24:46  warning  Unexpected any. Specify a different type                                                                                                                    @typescript-eslint/no-explicit-any
+   26:12  warning  'err' is assigned a value but never used                                                                                                                    @typescript-eslint/no-unused-vars
+   27:12  warning  'isCelebrating' is assigned a value but never used                                                                                                          @typescript-eslint/no-unused-vars
+   41:21  warning  'setBulkTag' is assigned a value but never used                                                                                                             @typescript-eslint/no-unused-vars
+   43:12  warning  'bulkError' is assigned a value but never used                                                                                                              @typescript-eslint/no-unused-vars
+  134:21  warning  Unexpected any. Specify a different type                                                                                                                    @typescript-eslint/no-explicit-any
+  152:22  warning  Unexpected any. Specify a different type                                                                                                                    @typescript-eslint/no-explicit-any
+  167:21  warning  Unexpected any. Specify a different type                                                                                                                    @typescript-eslint/no-explicit-any
+  218:8   warning  React Hook useEffect has missing dependencies: 'isBulkOpen', 'isNewTaskOpen', 'openEditor', and 'plan'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/tamz/projects/workos-lite/src/app/(main)/lists/[id]/ListDetailClient.tsx
+  69:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/(main)/notes/NotesClient.tsx
+  12:5  warning  'MoreVertical' is defined but never used  @typescript-eslint/no-unused-vars
+  13:5  warning  'Trash2' is defined but never used        @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/(main)/notes/edit/[id]/NoteEditorClient.tsx
+  6:37  warning  'LinkIcon' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/(main)/notes/edit/[id]/page.tsx
+  8:13  warning  'id' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/(main)/projects/ProjectsClient.tsx
+   6:16  warning  'MoreVertical' is defined but never used      @typescript-eslint/no-unused-vars
+   6:68  warning  'CheckCircle2' is defined but never used      @typescript-eslint/no-unused-vars
+  12:10  warning  'BUTTON_PRIMARY' is defined but never used    @typescript-eslint/no-unused-vars
+  12:26  warning  'BUTTON_SECONDARY' is defined but never used  @typescript-eslint/no-unused-vars
+  12:44  warning  'INPUT_BASE' is defined but never used        @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/(main)/projects/[slug]/ProjectDetailClient.tsx
+    5:8   warning  'Link' is defined but never used          @typescript-eslint/no-unused-vars
+  322:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  352:18  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/(main)/sprints/SprintsClient.tsx
+   17:5   warning  'DragOverEvent' is defined but never used                    @typescript-eslint/no-unused-vars
+   19:5   warning  'defaultDropAnimationSideEffects' is defined but never used  @typescript-eslint/no-unused-vars
+   22:5   warning  'arrayMove' is defined but never used                        @typescript-eslint/no-unused-vars
+  151:11  warning  'router' is assigned a value but never used                  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/(main)/timeline/page.tsx
+   88:107  warning  'isOverAny' is defined but never used                                                                              @typescript-eslint/no-unused-vars
+  132:12   warning  'loading' is assigned a value but never used                                                                       @typescript-eslint/no-unused-vars
+  158:8    warning  React Hook useEffect has a missing dependency: 'fetchWeekTasks'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/tamz/projects/workos-lite/src/app/agent/login/page.tsx
+  59:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/agent/logs/page.tsx
+  53:21  warning  Unexpected any. Specify a different type                                                                      @typescript-eslint/no-explicit-any
+  62:8   warning  React Hook useEffect has a missing dependency: 'fetchLogs'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/tamz/projects/workos-lite/src/app/agent/page.tsx
+   38:42  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   75:22  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  116:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/admin/create-project-from-template/route.ts
+  49:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/admin/reset-demo-data/route.ts
+  23:109  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  24:115  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  25:109  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  26:107  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  28:91   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  29:97   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  30:91   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  31:89   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  32:93   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  67:21   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/agent/execute/route.ts
+  120:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  181:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  193:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  205:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  257:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  415:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/agent/login/route.ts
+  40:14  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/api/agent/logs/route.ts
+  45:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/agent/proxy/route.ts
+  18:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  67:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  68:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/analytics/summary/route.ts
+   7:27  warning  'req' is defined but never used           @typescript-eslint/no-unused-vars
+  36:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  46:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/backup/restore/route.ts
+  4:32  warning  'ZIP_LIMITS' is defined but never used   @typescript-eslint/no-unused-vars
+  5:10  warning  'readAllDocs' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/app/api/content/package/route.ts
+  25:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/docs/[id]/route.ts
+  39:122  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  40:118  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/docs/route.ts
+  38:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/lists/[id]/route.ts
+  70:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/lists/route.ts
+  82:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/lists/stats/route.ts
+  34:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/notes/[id]/route.ts
+  23:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/notes/links/route.ts
+  13:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/notes/route.ts
+  13:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/project_items/[id]/route.ts
+  29:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  53:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  67:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/projects/[slug]/dry-run/route.ts
+  25:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  26:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  33:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/projects/[slug]/execute/route.ts
+  13:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  34:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/projects/[slug]/items/route.ts
+  31:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  47:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  90:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/projects/[slug]/route.ts
+  24:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  40:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  57:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  71:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  92:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/projects/route.ts
+  22:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  31:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  60:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/search/route.ts
+  41:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  49:59  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  56:51  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  69:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/sprints/[id]/items/route.ts
+  22:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  41:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  60:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/sprints/route.ts
+  21:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  30:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  58:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/tasks/batch/route.ts
+  103:50  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/tasks/route.ts
+  252:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/timeline/route.ts
+  21:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  53:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/app/api/workspaces/summary/route.ts
+  8:27  warning  'req' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/BulkTaskDialog.tsx
+  3:30  warning  'useEffect' is defined but never used   @typescript-eslint/no-unused-vars
+  7:26  warning  'ParsedTask' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/DeleteProjectDialog.tsx
+  27:69  warning  'projectName' is defined but never used                                                                          @typescript-eslint/no-unused-vars
+  42:8   warning  React Hook useEffect has a missing dependency: 'fetchSummary'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  52:23  warning  Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  76:23  warning  Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/components/GlobalSearch.tsx
+  4:61  warning  'X' is defined but never used     @typescript-eslint/no-unused-vars
+  7:8   warning  'Link' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/GlobalTaskDialogs.tsx
+  10:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/components/ResetDemoDataDialog.tsx
+   4:10  warning  'Modal' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+   5:10  warning  'BUTTON_PRIMARY' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+   5:26  warning  'BUTTON_SECONDARY' is defined but never used                                                                     @typescript-eslint/no-unused-vars
+   5:44  warning  'BUTTON_DANGER' is defined but never used                                                                        @typescript-eslint/no-unused-vars
+  37:8   warning  React Hook useEffect has a missing dependency: 'handleDryRun'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  51:23  warning  Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  80:23  warning  Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/components/TaskDetailDialog.tsx
+   11:24  warning  '_OLD_INPUT_BASE' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   11:53  warning  'BUTTON_PRIMARY' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+   11:69  warning  'BUTTON_SECONDARY' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+   92:9   warning  'inSubtasks' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  142:80  warning  'isOpen' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  170:12  warning  'loadingSubtasks' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  182:5   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+/Users/tamz/projects/workos-lite/src/components/TaskDetailDialog.tsx:182:5
+  180 |     // Maintain a ref with the latest data to avoid closure stale-state bugs within setTimeout
+  181 |     const payloadRef = useRef<Partial<Task>>({});
+> 182 |     payloadRef.current = {
+      |     ^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  183 |         title: constructTitle(cleanTitle(titleRaw), project, stage, platforms),
+  184 |         status,
+  185 |         list_id: listId,  react-hooks/refs
+  223:11  warning  The 'handleClose' function makes the dependencies of useEffect Hook (at line 245) change on every render. To fix this, wrap the definition of 'handleClose' in its own useCallback() Hook                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react-hooks/exhaustive-deps
+  297:11  warning  'handleTitleChange' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  355:11  warning  'subtBadge' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/TaskDocPanel.tsx
+  10:10  warning  'clsx' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/TaskEditorDialog.tsx
+    9:10  warning  'postJson' is defined but never used                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  111:8   warning  React Hook useEffect has a missing dependency: 'task.list_id'. Either include it or remove the dependency array. If 'setListId' needs the current value of 'task.list_id', you can also switch to useReducer instead of useState and read 'task.list_id' in the reducer  react-hooks/exhaustive-deps
+
+/Users/tamz/projects/workos-lite/src/components/TaskRelatedNotes.tsx
+  22:52  warning  'workspace' is defined but never used         @typescript-eslint/no-unused-vars
+  26:12  warning  'linking' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/Topbar.tsx
+   4:10  warning  'Plus' is defined but never used                  @typescript-eslint/no-unused-vars
+   4:16  warning  'Layout' is defined but never used                @typescript-eslint/no-unused-vars
+   4:24  warning  'CheckCircle2' is defined but never used          @typescript-eslint/no-unused-vars
+   4:38  warning  'MoreHorizontal' is defined but never used        @typescript-eslint/no-unused-vars
+   4:54  warning  'ChevronDown' is defined but never used           @typescript-eslint/no-unused-vars
+   4:67  warning  'CalendarPlus' is defined but never used          @typescript-eslint/no-unused-vars
+   4:81  warning  'Zap' is defined but never used                   @typescript-eslint/no-unused-vars
+   4:86  warning  'Bot' is defined but never used                   @typescript-eslint/no-unused-vars
+   4:91  warning  'List' is defined but never used                  @typescript-eslint/no-unused-vars
+   9:11  warning  'router' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  10:12  warning  'showMore' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  10:22  warning  'setShowMore' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/dashboard/CreateProjectWizard.tsx
+   11:32  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+   29:11  warning  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   59:23  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  159:76  warning  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/components/dashboard/HomeFirstRunCard.tsx
+   3:10  warning  'Layout' is defined but never used           @typescript-eslint/no-unused-vars
+   3:18  warning  'Plus' is defined but never used             @typescript-eslint/no-unused-vars
+  12:50  warning  'onCreateProject' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/dashboard/WorkBucketCard.tsx
+  5:10  warning  'BUTTON_SECONDARY' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/ui/Toast.tsx
+  3:21  warning  'useState' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/FocusModeToggle.tsx
+  3:18  warning  'Eye' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/WorkspaceDetailClient.tsx
+   27:48  warning  'setLastUsedList' is defined but never used                                                                                               @typescript-eslint/no-unused-vars
+   31:10  warning  'workspaceLabel' is defined but never used                                                                                                @typescript-eslint/no-unused-vars
+   45:40  warning  Unexpected any. Specify a different type                                                                                                  @typescript-eslint/no-explicit-any
+   46:44  warning  Unexpected any. Specify a different type                                                                                                  @typescript-eslint/no-explicit-any
+  246:8   warning  React Hook useEffect has missing dependencies: 'handleFlowDone' and 'handleFlowNext'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  288:41  warning  'isSkip' is assigned a value but never used                                                                                               @typescript-eslint/no-unused-vars
+  331:8   warning  React Hook useEffect has a missing dependency: 'tasks'. Either include it or remove the dependency array                                  react-hooks/exhaustive-deps
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/WorkspacesClient.tsx
+  21:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  22:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/areas/AreasFilterBar.tsx
+  77:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  78:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/areas/CommandPalette.tsx
+  149:37  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  149:46  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/areas/CreateContentPackageModal.tsx
+  55:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/areas/PackageGroupHeader.tsx
+   65:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   67:48  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  119:61  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  571:50  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/areas/QuickStatusPicker.tsx
+  5:10  warning  'ChevronDown' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/areas/TaskRow.tsx
+    3:10  warning  'CheckSquare' is defined but never used   @typescript-eslint/no-unused-vars
+    3:66  warning  'Circle' is defined but never used        @typescript-eslint/no-unused-vars
+   83:48  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  179:48  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/areas/areasSelectors.ts
+   22:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   82:30  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  121:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  217:22  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  286:22  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  320:22  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/components/workspaces/areas/useAreasState.ts
+   71:43  warning  Unexpected any. Specify a different type                                                                  @typescript-eslint/no-explicit-any
+  106:32  warning  Unexpected any. Specify a different type                                                                  @typescript-eslint/no-explicit-any
+  182:8   warning  React Hook useEffect has a missing dependency: 'state'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  189:23  warning  Unexpected any. Specify a different type                                                                  @typescript-eslint/no-explicit-any
+  196:8   warning  React Hook useEffect has a missing dependency: 'state'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/tamz/projects/workos-lite/src/db/db.ts
+  137:79  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  142:83  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:82  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  154:91  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  160:89  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  168:81  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  176:87  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/lib/agent/templates.ts
+   14:9   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  180:13  warning  'params' is defined but never used        @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/lib/backup/housekeeping.ts
+  99:18  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/lib/bulkParser.ts
+   1:10  warning  'WORKSPACES' is defined but never used   @typescript-eslint/no-unused-vars
+  25:10  warning  'getTodayYMD' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/lib/content/createContentTask.ts
+  1:29  warning  'STAGE_TAGS' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/tamz/projects/workos-lite/src/lib/smart/defaults/resolveSmartCreateDefaults.ts
+  42:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/tamz/projects/workos-lite/src/lib/templates.ts
+  1:10  warning  'Megaphone' is defined but never used     @typescript-eslint/no-unused-vars
+  1:21  warning  'Leaf' is defined but never used          @typescript-eslint/no-unused-vars
+  1:27  warning  'Code' is defined but never used          @typescript-eslint/no-unused-vars
+  7:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 268 problems (3 errors, 265 warnings)
+

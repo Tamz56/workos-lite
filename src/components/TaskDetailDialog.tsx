@@ -179,17 +179,20 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
     // --- Save Logic ---
     // Maintain a ref with the latest data to avoid closure stale-state bugs within setTimeout
     const payloadRef = useRef<Partial<Task>>({});
-    payloadRef.current = {
-        title: constructTitle(cleanTitle(titleRaw), project, stage, platforms),
-        status,
-        list_id: listId,
-        sprint_id: sprintId,
-        scheduled_date: scheduledDate,
-        start_time: startTime || null,
-        end_time: endTime || null,
-        priority,
-        notes: serializeNotes(description, checklistItems)
-    };
+
+    useEffect(() => {
+        payloadRef.current = {
+            title: constructTitle(cleanTitle(titleRaw), project, stage, platforms),
+            status,
+            list_id: listId,
+            sprint_id: sprintId,
+            scheduled_date: scheduledDate,
+            start_time: startTime || null,
+            end_time: endTime || null,
+            priority,
+            notes: serializeNotes(description, checklistItems)
+        };
+    }, [titleRaw, project, stage, platforms, status, listId, sprintId, scheduledDate, startTime, endTime, priority, description, checklistItems]);
 
     const doSave = useCallback(async () => {
         if (!dirtyRef.current) return;

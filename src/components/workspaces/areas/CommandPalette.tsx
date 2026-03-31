@@ -146,7 +146,7 @@ export default function CommandPalette({ isOpen, onClose, commands }: CommandPal
             })
           ) : (
             <div className="px-6 py-10 text-center text-neutral-400 text-sm">
-              No commands found for "{search}"
+              No commands found for &quot;{search}&quot;
             </div>
           )}
         </div>
