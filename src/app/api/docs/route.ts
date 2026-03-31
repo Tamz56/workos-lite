@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-        const title = String(body?.title ?? "Untitled").trim() || "Untitled";
+        const title = body.title !== undefined ? String(body.title).trim() : "";
         const content_md = String(body?.content_md ?? "");
         const project_id = body?.project_id ? String(body.project_id) : null;
         const workspace = body?.workspace ? String(body.workspace) : null;

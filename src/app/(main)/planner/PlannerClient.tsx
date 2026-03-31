@@ -120,6 +120,9 @@ export default function PlannerClient() {
 
     useEffect(() => {
         load();
+        const onTaskUpdated = () => load();
+        window.addEventListener("task-updated", onTaskUpdated);
+        return () => window.removeEventListener("task-updated", onTaskUpdated);
     }, [load]);
 
     const plannedByBucket = useMemo(() => {

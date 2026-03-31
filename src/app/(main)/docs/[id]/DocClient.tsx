@@ -5,16 +5,18 @@ import { useRouter } from "next/navigation";
 import { toErrorMessage } from "@/lib/error";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { RefreshCw, Trash2, ChevronLeft, Save, Printer, Layout, Briefcase } from "lucide-react";
-import { WORKSPACES_LIST } from "@/lib/workspaces";
+import { RefreshCw, Trash2, ChevronLeft, Save, Printer, Layout, Briefcase, ExternalLink, Box } from "lucide-react";
+import { WORKSPACES_LIST, workspaceLabel } from "@/lib/workspaces";
 import { Project } from "@/lib/types";
 import AttachmentsPanel from "@/components/AttachmentsPanel";
+import { Toast } from "@/components/ui/Toast";
 
 type DocRow = {
     id: string;
     title: string;
     content_md: string;
     project_id: string | null;
+    project_name?: string | null; // Added for UI display
     workspace: string | null;
     created_at: string;
     updated_at: string;
@@ -43,6 +45,9 @@ export default function DocClient({ id }: { id: string }) {
     const [saved, setSaved] = useState(false);
     const [lastSaved, setLastSaved] = useState<string | null>(null);
 
+    const [showToast, setShowToast] = useState(false);
+    const [toastMsg, setToastMsg] = useState("");
+
     const tRef = useRef<number | null>(null);
     const pendingRef = useRef<Partial<DocRow>>({});
     const mountedRef = useRef(true);
@@ -57,18 +62,26 @@ export default function DocClient({ id }: { id: string }) {
 
             if (!docRes.ok) throw new Error("Load doc failed");
             const docData = await docRes.json();
-            setDoc(docData.doc);
+            const loadedDoc = docData.doc;
 
             if (projectsRes.ok) {
                 const projectsData = await projectsRes.json();
                 setProjects(projectsData);
+                
+                // Enrich doc with project name for the initial view
+                if (loadedDoc.project_id) {
+                    const p = (projectsData as Project[]).find(p => p.id === loadedDoc.project_id);
+                    if (p) loadedDoc.project_name = p.name;
+                }
             }
+            
+            setDoc(loadedDoc);
         } catch (e: unknown) {
             setErr(toErrorMessage(e));
         }
     }, [id]);
 
-    async function patch(next: Partial<DocRow>) {
+    async function patch(next: Partial<DocRow>, quiet = true) {
         setSaving(true);
         setSaved(false);
         setErr(null);
@@ -76,7 +89,7 @@ export default function DocClient({ id }: { id: string }) {
         try {
             const payload = { ...next };
             if (payload.title !== undefined) {
-                payload.title = payload.title.trim() || "Untitled";
+                payload.title = payload.title.trim();
             }
 
             const res = await fetch(`/api/docs/${id}`, {
@@ -91,9 +104,20 @@ export default function DocClient({ id }: { id: string }) {
             const updated = data.doc;
             if (!mountedRef.current) return;
 
+            // Re-enrich with project name if project_id changed
+            if (updated.project_id) {
+                const p = projects.find(p => p.id === updated.project_id);
+                if (p) updated.project_name = p.name;
+            }
+
             setDoc(updated);
             setLastSaved(new Date().toISOString());
             setSaved(true);
+            
+            if (!quiet) {
+                setToastMsg("Changes saved");
+                setShowToast(true);
+            }
         } catch (e: unknown) {
             if (!mountedRef.current) return;
             setErr(toErrorMessage(e));
@@ -127,6 +151,19 @@ export default function DocClient({ id }: { id: string }) {
         load();
         return () => {
             mountedRef.current = false;
+            // Flush pending changes (like titles/content) before unmounting
+            const payload = pendingRef.current;
+            if (Object.keys(payload).length > 0) {
+                // We use a sync-like approach or just trigger it. 
+                // Since this is a client component moving to another page, 
+                // a background fetch might still complete.
+                fetch(`/api/docs/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                    keepalive: true // Important for unmount saves
+                });
+            }
             if (tRef.current) window.clearTimeout(tRef.current);
         };
     }, [load]);
@@ -202,7 +239,7 @@ export default function DocClient({ id }: { id: string }) {
                             onChange={(e) => {
                                 const val = e.target.value || null;
                                 setDoc(prev => prev ? { ...prev, project_id: val } : null);
-                                scheduleSave({ project_id: val });
+                                patch({ project_id: val }); // Immediate save for metadata
                             }}
                             className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:bg-white focus:border-neutral-300 transition-all"
                         >
@@ -223,7 +260,7 @@ export default function DocClient({ id }: { id: string }) {
                             onChange={(e) => {
                                 const val = e.target.value || null;
                                 setDoc(prev => prev ? { ...prev, workspace: val } : null);
-                                scheduleSave({ workspace: val });
+                                patch({ workspace: val }); // Immediate save for metadata
                             }}
                             className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:bg-white focus:border-neutral-300 transition-all"
                         >
@@ -237,7 +274,7 @@ export default function DocClient({ id }: { id: string }) {
 
                 <div className="space-y-4">
                     <input
-                        className="w-full bg-transparent border-none text-4xl font-black tracking-tight outline-none placeholder:text-neutral-100"
+                        className="w-full bg-transparent border-none text-4xl font-black tracking-tight outline-none placeholder:text-neutral-200"
                         placeholder="Untitled Note"
                         value={doc.title}
                         onChange={(e) => {

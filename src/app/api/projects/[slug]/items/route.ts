@@ -16,10 +16,11 @@ const CreateProjectItemSchema = z.object({
     notes: z.string().nullable().optional()
 });
 
-export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
+        const { slug } = await params;
         const db = getDb();
-        const project = db.prepare("SELECT id FROM projects WHERE slug = ?").get(params.slug) as { id: string } | undefined;
+        const project = db.prepare("SELECT id FROM projects WHERE slug = ?").get(slug) as { id: string } | undefined;
         if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
         const url = new URL(req.url);
@@ -48,10 +49,11 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
+        const { slug } = await params;
         const db = getDb();
-        const project = db.prepare("SELECT id FROM projects WHERE slug = ?").get(params.slug) as { id: string } | undefined;
+        const project = db.prepare("SELECT id FROM projects WHERE slug = ?").get(slug) as { id: string } | undefined;
         if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
         const body = await req.json();

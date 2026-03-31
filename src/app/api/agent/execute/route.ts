@@ -158,6 +158,7 @@ export async function POST(req: NextRequest) {
 
         // --- parse payload ---
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+
         const parsed = ExecuteSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json({ error: "Invalid payload", details: parsed.error.flatten() }, { status: 400 });

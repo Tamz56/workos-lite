@@ -15,17 +15,18 @@ const UpdateProjectItemSchema = z.object({
     notes: z.string().nullable().optional()
 });
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const db = getDb();
-        const item = db.prepare("SELECT * FROM project_items WHERE id = ?").get(params.id);
+        const item = db.prepare("SELECT * FROM project_items WHERE id = ?").get(id);
         if (!item) return NextResponse.json({ error: "Project item not found" }, { status: 404 });
 
         const body = await req.json();
         const parsed = UpdateProjectItemSchema.parse(body);
 
         const sets: string[] = [];
-        const bind: Record<string, any> = { id: params.id };
+        const bind: Record<string, any> = { id: id };
 
         const maybeSet = (k: string, v: unknown) => { sets.push(`${k} = @${k}`); bind[k] = v; };
 
@@ -47,17 +48,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         const sql = `UPDATE project_items SET ${sets.join(", ")} WHERE id = @id`;
         db.prepare(sql).run(bind);
 
-        const updated = db.prepare("SELECT * FROM project_items WHERE id = ?").get(params.id);
+        const updated = db.prepare("SELECT * FROM project_items WHERE id = ?").get(id);
         return NextResponse.json(updated);
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 400 });
     }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const db = getDb();
-        const info = db.prepare("DELETE FROM project_items WHERE id = ?").run(params.id);
+        const info = db.prepare("DELETE FROM project_items WHERE id = ?").run(id);
         if (info.changes === 0) {
             return NextResponse.json({ error: "Project item not found" }, { status: 404 });
         }

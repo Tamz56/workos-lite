@@ -111,6 +111,35 @@ async function fetchEvents(params: {
     return arr.map(r => mapEventRow(r as EventRow));
 }
 
+async function fetchTasks(params: {
+    start?: string;
+    end?: string;
+    workspace?: string;
+    q?: string;
+}): Promise<CalendarEvent[]> {
+    const sp = new URLSearchParams();
+    sp.set("status", "planned");
+    if (params.start) sp.set("start", params.start);
+    if (params.end) sp.set("end", params.end);
+    if (params.workspace && params.workspace !== "all") sp.set("workspace", params.workspace);
+    if (params.q) sp.set("q", params.q);
+
+    const res = await fetch(`/api/tasks?${sp.toString()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(await readErrorMessage(res));
+
+    const arr: any[] = await res.json();
+    return arr.map(t => ({
+        id: t.id,
+        title: t.title,
+        workspace: t.workspace,
+        all_day: !t.start_time,
+        start_time: t.start_time ? `${t.scheduled_date}T${t.start_time}` : `${t.scheduled_date}T00:00:00`,
+        end_time: t.end_time ? `${t.scheduled_date}T${t.end_time}` : null,
+        kind: "task",
+        description: t.notes || null,
+    }));
+}
+
 async function createEventApi(payload: CreateEventPayload): Promise<CalendarEvent> {
     const res = await fetch("/api/events", {
         method: "POST",
@@ -276,8 +305,11 @@ function CalendarContent() {
         setLoading(true);
         setErr(null);
         try {
-            const data = await fetchEvents({ start, end, workspace, q, limit: 300 });
-            setRows(data);
+            const [evs, tsk] = await Promise.all([
+                fetchEvents({ start, end, workspace, q, limit: 300 }),
+                fetchTasks({ start, end, workspace, q })
+            ]);
+            setRows([...evs, ...tsk]);
         } catch (e: unknown) {
             if (e instanceof Error) setErr(e.message);
             else setErr("Load failed");
@@ -288,6 +320,9 @@ function CalendarContent() {
 
     useEffect(() => {
         load();
+        const onTaskUpdated = () => load();
+        window.addEventListener("task-updated", onTaskUpdated);
+        return () => window.removeEventListener("task-updated", onTaskUpdated);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

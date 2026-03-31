@@ -3,6 +3,7 @@ export type DocRow = {
     title: string;
     content_md: string;
     project_id: string | null;
+    project_name?: string | null;
     workspace: string | null;
     created_at: string;
     updated_at: string;

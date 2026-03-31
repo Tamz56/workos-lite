@@ -11,8 +11,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { 
     PlusSquare, FileText, CalendarPlus, Zap, LayoutGrid, LucideIcon, Bot, List, 
     MoreHorizontal, ChevronDown, CheckCircle2, Layout, Plus, Box, Target, 
-    Activity, History, Folder, AlertCircle, Clock 
+    Activity, History, Folder, AlertCircle, Clock, RefreshCw, ChevronRight, Trash2
 } from "lucide-react";
+import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import Topbar from "@/components/Topbar";
 import { WorkBucketCard } from "@/components/dashboard/WorkBucketCard";
@@ -464,8 +465,11 @@ function MiniMonthCard(props: { events: CalendarEvent[]; todayYmd: string; onOpe
 
 function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists: any[]; todayYmd: string; className?: string }) {
     const projects = useMemo(() => {
-        const result: [string, DashboardTask[]][] = [];
+        const result: [string, DashboardTask[], string | null][] = [];
         
+        // Helper to slugify a name for comparison
+        const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
         // 1. Group by existing projects from database
         props.projects.forEach(p => {
             const projectLists = props.lists.filter(l => l.slug.startsWith(`${p.slug}-`));
@@ -477,7 +481,7 @@ function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists
             );
             
             if (tasks.length > 0) {
-                result.push([p.name, tasks]);
+                result.push([p.name, tasks, p.slug]);
             }
         });
         
@@ -490,20 +494,41 @@ function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists
             if (t.status === 'done') return;
             const projTag = t.tags?.find(tag => tag.startsWith("project:"));
             if (projTag) {
-                const slug = projTag.replace("project:", "");
-                if (!recognizedSlugs.has(slug)) {
-                    if (!adhocMap.has(slug)) adhocMap.set(slug, []);
-                    adhocMap.get(slug)!.push(t);
+                const untaggedName = projTag.replace("project:", "");
+                const adhocSlug = slugify(untaggedName);
+                
+                // Try to find if this "adhoc" slug matches an actual project slug
+                const matchingProject = props.projects.find(p => p.slug === adhocSlug || p.name.toLowerCase() === untaggedName.toLowerCase());
+                
+                if (matchingProject) {
+                    // This belongs to an existing project but used an ad-hoc tag format
+                    // We already handled existing projects in step 1, but this task might have been missed
+                    // if it only relied on the tag. However, step 1 handles both list_id and tags already.
+                    // So we only add if it's truly not recognized yet.
+                    if (!recognizedSlugs.has(matchingProject.slug)) {
+                         // This case is unlikely if props.projects is complete, but let's be safe
+                    }
+                    return;
+                }
+
+                if (!recognizedSlugs.has(adhocSlug)) {
+                    if (!adhocMap.has(untaggedName)) adhocMap.set(untaggedName, []);
+                    adhocMap.get(untaggedName)!.push(t);
                 }
             }
         });
         
-        adhocMap.forEach((tasks, slug) => {
-            result.push([slug, tasks]);
+        adhocMap.forEach((tasks, name) => {
+            result.push([name, tasks, null]);
         });
 
         return result;
     }, [props.tasks, props.projects, props.lists]);
+
+    const totalLines = props.tasks.length;
+    const sortedProjects = useMemo(() => {
+        return [...projects].sort((a, b) => b[1].length - a[1].length);
+    }, [projects]);
 
     const days = useMemo(() => {
         const d = [];
@@ -543,9 +568,13 @@ function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists
                     </div>
                 </div>
                 <div className="space-y-3">
-                    {projects.map(([projName, items]) => (
+                    {projects.map(([projName, items, projSlug]) => (
                         <div key={projName} className="grid grid-cols-[100px_1fr] gap-3 items-center group">
-                            <Link href={`/planner?q=project:${projName}`} className="text-xs font-semibold text-neutral-700 truncate hover:text-blue-600 hover:underline" title={projName}>
+                            <Link 
+                                href={projSlug ? `/projects/${projSlug}` : `/planner?q=project:${projName}`} 
+                                className="text-xs font-semibold text-neutral-700 truncate hover:text-blue-600 hover:underline" 
+                                title={projName}
+                            >
                                 {projName}
                                 <span className="block text-[8px] font-normal text-neutral-400">{items.length} tasks</span>
                             </Link>
@@ -572,20 +601,32 @@ function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists
     );
 }
 
-function OtherWorkspacesList(props: { tasks: DashboardTask[]; todayYmd: string; className?: string }) {
-    const workspaces: Workspace[] = ['finance', 'travel', 'admin', 'personal', 'other'];
+const WORKSPACE_DISPLAY_ORDER: Workspace[] = ['avacrm', 'content', 'marketing', 'admin', 'ops', 'other', 'personal', 'finance', 'travel'];
 
-    const rows = workspaces.map(w => {
-        const wsTasks = props.tasks.filter(t => t.workspace === w && t.status !== 'done');
-        const activeCount = wsTasks.length;
-        // Find next task: sort by scheduled_date (asc), then by id (pseudo-created)
-        const nextTask = wsTasks.sort((a, b) => {
-            const da = a.scheduled_date || '9999-99-99';
-            const db = b.scheduled_date || '9999-99-99';
-            return da.localeCompare(db);
-        })[0];
-        return { w, activeCount, nextTask };
-    });
+function OtherWorkspacesList(props: { tasks: DashboardTask[]; todayYmd: string; className?: string }) {
+    const rows = useMemo(() => {
+        // 1. Identify all unique workspaces present in tasks (to capture unknown ones)
+        const taskWorkspaces = Array.from(new Set(props.tasks.map(t => t.workspace)));
+        
+        // 2. Combine fixed ones with any extra ones found in tasks
+        const allToDisplay = [...WORKSPACE_DISPLAY_ORDER];
+        taskWorkspaces.forEach(ws => {
+            if (!allToDisplay.includes(ws as Workspace)) {
+                allToDisplay.push(ws as Workspace);
+            }
+        });
+
+        return allToDisplay.map(w => {
+            const wsTasks = props.tasks.filter(t => t.workspace === w && t.status !== 'done');
+            const activeCount = wsTasks.length;
+            const nextTask = [...wsTasks].sort((a, b) => {
+                const da = a.scheduled_date || '9999-99-99';
+                const db = b.scheduled_date || '9999-99-99';
+                return da.localeCompare(db);
+            })[0];
+            return { w, activeCount, nextTask };
+        });
+    }, [props.tasks]);
 
     return (
         <Card title="Other Workspaces" className={`flex flex-col ${props.className || ""}`}>
@@ -693,6 +734,8 @@ function DashboardContent() {
     const [newTaskWs, setNewTaskWs] = useState<Workspace>("avacrm");
     const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>("inbox");
     const [newTaskDate, setNewTaskDate] = useState(todayYmd);
+    const [newTaskStartTime, setNewTaskStartTime] = useState("");
+    const [newTaskEndTime, setNewTaskEndTime] = useState("");
     const [newTaskPriority, setNewTaskPriority] = useState(2);
     const [newTaskNotes, setNewTaskNotes] = useState("");
     const [newTaskError, setNewTaskError] = useState<string | null>(null);
@@ -758,7 +801,12 @@ function DashboardContent() {
         }
     }, []);
 
-    useEffect(() => { refreshAll(); }, [refreshAll]);
+    useEffect(() => {
+        refreshAll();
+        const onTaskUpdated = () => refreshAll();
+        window.addEventListener("task-updated", onTaskUpdated);
+        return () => window.removeEventListener("task-updated", onTaskUpdated);
+    }, [refreshAll]);
 
     const wsTasks = useMemo(() => {
         const grouped: Record<string, DashboardTask[]> = {};
@@ -769,6 +817,26 @@ function DashboardContent() {
         });
         return grouped;
     }, [tasks]);
+
+    // Unified Calendar Feed: Merges events + dated tasks
+    const unifiedEvents = useMemo(() => {
+        const taskEvents: CalendarEvent[] = tasks
+            .filter(t => t.scheduled_date && t.status !== 'done')
+            .map(t => ({
+                id: t.id,
+                workspace: t.workspace,
+                title: t.title,
+                all_day: !t.start_time,
+                start_time: t.start_time ? `${t.scheduled_date}T${t.start_time}:00` : `${t.scheduled_date}T00:00:00`,
+                end_time: t.end_time ? `${t.scheduled_date}T${t.end_time}:00` : null,
+                kind: 'task',
+                description: t.notes || null,
+            }));
+
+        const all = [...events, ...taskEvents];
+        // Ensure consistent sorting
+        return all.sort((a, b) => a.start_time.localeCompare(b.start_time));
+    }, [tasks, events]);
 
     const handleQuickAddTask = (w: Workspace | undefined) => {
         if (w) setNewTaskWs(w);
@@ -811,6 +879,8 @@ function DashboardContent() {
                 workspace: newTaskWs,
                 status: newTaskStatus,
                 scheduled_date: newTaskStatus === 'planned' ? (newTaskDate || todayYmd) : null,
+                start_time: newTaskStatus === 'planned' ? (newTaskStartTime || null) : null,
+                end_time: newTaskStatus === 'planned' ? (newTaskEndTime || null) : null,
                 priority: newTaskPriority,
                 notes: newTaskNotes || null
             });
@@ -1130,10 +1200,43 @@ function DashboardContent() {
                     <ProjectTimeline tasks={tasks} projects={allProjects} lists={allLists} todayYmd={todayYmd} className="h-full min-h-[360px]" />
                 </div>
                 <div className="col-span-12 xl:col-span-4">
-                    <AgendaCardBig events={events} todayYmd={todayYmd} className="h-full min-h-[360px]" />
+                    <AgendaCardBig events={unifiedEvents} todayYmd={todayYmd} className="h-full min-h-[360px]" />
                 </div>
 
-                {/* Row 2: Work Buckets Grid (8) + Mini Month (4) */}
+                {/* Row 2: Operational Overview (8) + Calendar (4) */}
+                <div className="col-span-12 xl:col-span-8">
+                    <div className="bg-neutral-50/30 rounded-3xl p-6 border border-dashed border-neutral-200 h-full">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-neutral-500 text-sm uppercase tracking-wider italic">Operational Overview</h3>
+                        </div>
+                        <OtherWorkspacesList tasks={tasks} todayYmd={todayYmd} className="flex flex-col" />
+                    </div>
+                </div>
+                <div className="col-span-12 xl:col-span-4">
+                    <MiniMonthCard events={unifiedEvents} todayYmd={todayYmd} onOpenGCal={openGCal} className="h-full" />
+                </div>
+
+                {/* Row 3: Project Health (8) + System Status (4) */}
+                <div className="col-span-12 xl:col-span-8">
+                    <ProjectHealthGrid projects={analytics?.projects || []} loading={loading && !analytics} />
+                </div>
+                <div className="col-span-12 xl:col-span-4">
+                    <Card title="System Status" className="bg-neutral-50/50 h-full flex flex-col">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className={`w-3 h-3 rounded-full ${health?.ok ? 'bg-green-500' : 'bg-red-500'}`} />
+                            <div className="font-bold text-neutral-700">{health?.status || "Checking..."}</div>
+                        </div>
+                        <div className="text-xs text-neutral-500 mb-4">
+                            Database & Services are {health?.ok ? 'operational' : 'degraded'}.
+                        </div>
+                        <button disabled className="w-full py-2 bg-neutral-900 text-white rounded-lg text-xs font-bold opacity-80 hover:opacity-100 flex items-center justify-center gap-2 mt-auto">
+                            🔒 Backup
+                        </button>
+                        <div className="mt-2 text-[10px] text-center text-neutral-300">v2.1.0</div>
+                    </Card>
+                </div>
+
+                {/* Row 4: Workspace Cards Grid (8) + Knowledge Activity (4) */}
                 <div className="col-span-12 xl:col-span-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {buckets.map(bucket => (
@@ -1150,41 +1253,7 @@ function DashboardContent() {
                     </div>
                 </div>
                 <div className="col-span-12 xl:col-span-4">
-                    <MiniMonthCard events={events} todayYmd={todayYmd} onOpenGCal={openGCal} className="h-full" />
-                </div>
-
-                {/* Row 3: Project Health (8) + Knowledge Activity (4) */}
-                <div className="col-span-12 xl:col-span-8">
-                    <ProjectHealthGrid projects={analytics?.projects || []} loading={loading && !analytics} />
-                </div>
-                <div className="col-span-12 xl:col-span-4">
                     <KnowledgeActivityCard notes={analytics?.knowledge || []} loading={loading && !analytics} />
-                </div>
-
-                {/* Row 4: Other items (8) + System Status (4) */}
-                <div className="col-span-12 xl:col-span-8">
-                    <div className="bg-neutral-50/30 rounded-3xl p-6 border border-dashed border-neutral-200">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-neutral-500 text-sm uppercase tracking-wider italic">Administrative Overview</h3>
-                            {/* Hidden system info or extra links can go here */}
-                        </div>
-                        <OtherWorkspacesList tasks={tasks} todayYmd={todayYmd} className="flex flex-col" />
-                    </div>
-                </div>
-                <div className="col-span-12 xl:col-span-4">
-                    <Card title="System Status" className="bg-neutral-50/50 h-full flex flex-col">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className={`w-3 h-3 rounded-full ${health?.ok ? 'bg-green-500' : 'bg-red-500'}`} />
-                            <div className="font-bold text-neutral-700">{health?.status || "Checking..."}</div>
-                        </div>
-                        <div className="text-xs text-neutral-500 mb-4">
-                            Database & Services are {health?.ok ? 'operational' : 'degraded'}.
-                        </div>
-                        <button disabled className="w-full py-2 bg-neutral-900 text-white rounded-lg text-xs font-bold opacity-80 hover:opacity-100 flex items-center justify-center gap-2 mt-auto">
-                            🔒 Backup
-                        </button>
-                        <div className="mt-2 text-[10px] text-center text-neutral-300">v2.2.0</div>
-                    </Card>
                 </div>
 
             </div>
@@ -1277,14 +1346,36 @@ function DashboardContent() {
                         </div>
 
                         {newTaskStatus === "planned" && (
-                            <div className="animate-in fade-in slide-in-from-top-1">
-                                <label className={LABEL_BASE}>Scheduled Date</label>
-                                <input
-                                    type="date"
-                                    className={INPUT_BASE}
-                                    value={newTaskDate}
-                                    onChange={e => setNewTaskDate(e.target.value)}
-                                />
+                            <div className="animate-in fade-in slide-in-from-top-1 space-y-4">
+                                <div>
+                                    <label className={LABEL_BASE}>Scheduled Date</label>
+                                    <input
+                                        type="date"
+                                        className={INPUT_BASE}
+                                        value={newTaskDate}
+                                        onChange={e => setNewTaskDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className={LABEL_BASE}>Start Time</label>
+                                        <input
+                                            type="time"
+                                            className={INPUT_BASE}
+                                            value={newTaskStartTime}
+                                            onChange={e => setNewTaskStartTime(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_BASE}>End Time</label>
+                                        <input
+                                            type="time"
+                                            className={INPUT_BASE}
+                                            value={newTaskEndTime}
+                                            onChange={e => setNewTaskEndTime(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -1394,20 +1485,17 @@ function DashboardContent() {
                 onClose={() => setIsResetOpen(false)}
                 onSuccess={(mode) => {
                     setIsResetOpen(false);
+                    setToastMessage("Database reset successfully");
                     setShowSuccessToast(true);
                     refreshAll();
-                    setTimeout(() => setShowSuccessToast(false), 5000);
                 }}
             />
 
-            {showSuccessToast && (
-                <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
-                    <div className="bg-green-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 font-bold">
-                        <CheckCircle2 className="w-5 h-5" />
-                        <span>{toastMessage}</span>
-                    </div>
-                </div>
-            )}
+            <Toast 
+                isVisible={showSuccessToast} 
+                message={toastMessage} 
+                onClose={() => setShowSuccessToast(false)} 
+            />
 
             <CreateProjectWizard 
                 isOpen={isWizardOpen}
@@ -1416,7 +1504,6 @@ function DashboardContent() {
                     setToastMessage("Project Created Successfully!");
                     setShowSuccessToast(true);
                     refreshAll();
-                    setTimeout(() => setShowSuccessToast(false), 5000);
                 }}
             />
             </div>

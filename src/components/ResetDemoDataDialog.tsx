@@ -65,10 +65,20 @@ export function ResetDemoDataDialog({ isOpen, onClose, onSuccess }: ResetDemoDat
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ mode, dry_run: false }),
             });
+            
             const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            onSuccess(mode);
+            
+            if (!res.ok) {
+                throw new Error(data.error || `Server responded with ${res.status}`);
+            }
+
+            if (data.success) {
+                onSuccess(mode);
+            } else {
+                throw new Error("Reset failed for unknown reason");
+            }
         } catch (err: any) {
+            console.error("Reset execution error:", err);
             setError(err.message);
         } finally {
             setLoading(false);

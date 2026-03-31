@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Project, ProjectItem } from "@/lib/types";
 import { MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, Plus, CheckCircle2, Layout, Calendar, FileText } from "lucide-react";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
+import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -26,6 +27,8 @@ export default function ProjectDetailClient() {
     const [isRenameOpen, setIsRenameOpen] = useState(false);
     const [newName, setNewName] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
+    const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState("");
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -54,7 +57,11 @@ export default function ProjectDetailClient() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "done" })
             });
-            if (res.ok) loadData();
+            if (res.ok) {
+                setToastMessage(`Project "${project.name}" archived successfully`);
+                setShowToast(true);
+                loadData();
+            }
         } finally {
             setActionLoading(false);
         }
@@ -70,6 +77,8 @@ export default function ProjectDetailClient() {
                 body: JSON.stringify({ name: newName.trim() })
             });
             if (res.ok) {
+                setToastMessage("Project renamed successfully");
+                setShowToast(true);
                 setIsRenameOpen(false);
                 loadData();
             }
@@ -247,6 +256,12 @@ export default function ProjectDetailClient() {
                     </div>
                 </div>
             </Modal>
+
+            <Toast 
+                isVisible={showToast} 
+                message={toastMessage} 
+                onClose={() => setShowToast(false)} 
+            />
         </PageShell>
     );
 }

@@ -1,279 +1,736 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { WORKSPACES_LIST, workspaceLabel, Workspace } from "@/lib/workspaces";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { WORKSPACES_LIST } from "@/lib/workspaces";
 import { Task } from "@/lib/types";
-import { List } from "@/lib/lists";
 
-interface ListStats {
-    list_id: string;
-    total: number;
-    inbox: number;
-    planned: number;
-    done: number;
-}
+// New Areas Components
+import { useAreasState } from "./areas/useAreasState";
+import AreasToolbar from "./areas/AreasToolbar";
+import AreasFilterBar from "./areas/AreasFilterBar";
+import AreasTaskList from "./areas/AreasTaskList";
+import CreateContentPackageModal from "./areas/CreateContentPackageModal";
+import CommandPalette, { CommandOption } from "./areas/CommandPalette";
+import QuickAddTask from "./areas/QuickAddTask";
+import { Toast } from "../ui/Toast";
 
-// Reusing styles from Dashboard
-function TaskItem({ task }: { task: Task }) {
-    const router = useRouter();
-    return (
-        <div
-            onClick={() => router.push(`?taskId=${task.id}`)}
-            className="group flex items-center gap-3 p-3 bg-white border border-neutral-200 rounded-xl hover:shadow-md hover:border-black/10 transition-all cursor-pointer mb-2"
-        >
-            {/* Status Dot */}
-            <div className={`w-2 h-2 shrink-0 rounded-full ${task.status === 'done' ? 'bg-green-500' : task.status === 'inbox' ? 'bg-neutral-300' : 'bg-blue-500'}`} />
-
-            <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium truncate ${task.status === 'done' ? 'text-neutral-400 line-through' : 'text-neutral-900'}`}>{task.title}</div>
-                <div className="flex items-center gap-2 mt-0.5">
-                    {task.scheduled_date && (
-                        <span className="text-[10px] bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded font-mono">
-                            {task.scheduled_date}
-                        </span>
-                    )}
-                    <span className="text-[10px] text-neutral-400 uppercase tracking-wide">{task.status}</span>
-                </div>
-            </div>
-
-            {/* Arrow */}
-            <div className="text-neutral-300 group-hover:text-black transition-colors">
-                →
-            </div>
-        </div>
-    );
-}
+// RC39: Smart Suggestions
+import { SmartViewHint } from "./SmartViewHint";
+import { SmartQueueStrip } from "./SmartQueueStrip";
+import { resolveWorkspaceSmartQueue, QueueItem } from "../../lib/smart/queue/resolveWorkspaceSmartQueue";
+import { getAllQueueFeedback, recordQueueShow, recordQueueClick, FeedbackStore } from "../../lib/smart/queue/queueFeedbackMemory";
+import { buildCreationContext } from "../../lib/smart/context/buildCreationContext";
+import { resolveSmartCreateDefaults } from "../../lib/smart/defaults/resolveSmartCreateDefaults";
+import { resolveSuggestedView } from "../../lib/smart/view/resolveSuggestedView";
+import { scoreSuggestionConfidence } from "../../lib/smart/confidence/scoreSuggestionConfidence";
+import { getViewHintMemory, setViewHintMemory, setLastUsedList } from "../../lib/workspaceMemory/smartMemory";
+import { resolveNextTask } from "../../lib/smart/queue/resolveNextTask";
+import { SingleFlowBar } from "./SingleFlowBar";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { workspaceLabel } from "@/lib/workspaces";
+import { ChevronRight, LayoutGrid } from "lucide-react";
 
 export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: string }) {
     const router = useRouter();
     const ws = WORKSPACES_LIST.find(w => w.id === workspaceId);
-
-    // Filters
-    const [statusFilter, setStatusFilter] = useState("all");
-    const [search, setSearch] = useState("");
+ 
+    const { state, updateState } = useAreasState(workspaceId);
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [lists, setLists] = useState<List[]>([]);
-    const [listStats, setListStats] = useState<Record<string, ListStats>>({});
+    const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
+
     const [loadingTasks, setLoadingTasks] = useState(true);
-    const [loadingLists, setLoadingLists] = useState(true);
+    const [offset, setOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [lists, setLists] = useState<any[]>([]);
+    const [sprints, setSprints] = useState<any[]>([]);
+    const LIMIT = 50;
 
-    // Fetch Lists
+    // Feedback state for RC16
+    const [toast, setToast] = useState<{
+        isVisible: boolean;
+        message: string;
+        action?: { label: string; onClick: () => void };
+    }>({ isVisible: false, message: "" });
+    const [highlightedTaskIds, setHighlightedTaskIds] = useState<string[]>([]);
+
+    // RC38: Command Palette State
+    const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+    const lastActiveElement = useRef<HTMLElement | null>(null);
+
+    // RC40A: Smart Queue State
+    const [isQueueDismissed, setIsQueueDismissed] = useState(false);
+
+    // RC39: View Hint State
+    const [viewHintDismissed, setViewHintDismissed] = useState(false);
+    const [viewHintAccepted, setViewHintAccepted] = useState(false);
+
+    // RC41: Feedback & Focus
+    const [feedbackStore, setFeedbackStore] = useState<FeedbackStore>({});
+    const [isFocusMode, setIsFocusMode] = useState(false);
+    const toggleFocusMode = () => setIsFocusMode(!isFocusMode);
+
     useEffect(() => {
-        let cancelled = false;
-        async function run() {
-            try {
-                // Fetch lists and stats concurrently
-                const [resLists, resStats] = await Promise.all([
-                    fetch(`/api/lists?workspace=${workspaceId}`),
-                    fetch(`/api/lists/stats?workspace=${workspaceId}`)
-                ]);
-
-                if (!resLists.ok || !resStats.ok) return;
-
-                const dataLists = await resLists.json() as List[];
-                const dataStats = await resStats.json() as ListStats[];
-
-                if (!cancelled) {
-                    setLists(dataLists);
-                    const statsMap: Record<string, ListStats> = {};
-                    for (const s of dataStats) {
-                        statsMap[s.list_id] = s;
-                    }
-                    setListStats(statsMap);
-                }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                if (!cancelled) setLoadingLists(false);
-            }
+        if (typeof window !== 'undefined' && workspaceId) {
+            const memory = getViewHintMemory(workspaceId);
+            if (memory.dismissed) setViewHintDismissed(true);
+            if (memory.accepted) setViewHintAccepted(true);
+            setFeedbackStore(getAllQueueFeedback());
         }
-        run();
-        return () => { cancelled = true; };
     }, [workspaceId]);
 
-    // Fetch Unassigned Tasks Logic
+    // Fetch Metadata (Lists/Sprints) once for the workspace
     useEffect(() => {
-        let cancelled = false;
-        async function run() {
-            setLoadingTasks(true);
+        async function fetchMetadata() {
             try {
-                const params = new URLSearchParams();
-                params.set("workspace", workspaceId);
-                // ONLY fetch unassigned initially here to not spam
-                params.set("list_id", "unassigned");
-                params.set("parent_id", "unassigned");
-                params.set("limit", "100"); // Limit for performance
-                if (statusFilter !== "all") params.set("status", statusFilter);
-                if (search) params.set("q", search);
-
-                const res = await fetch(`/api/tasks?${params.toString()}`);
-                const data = (await res.json()) as Task[];
-
-                if (!cancelled) setTasks(data);
-            } catch {
-                if (!cancelled) setTasks([]);
-            } finally {
-                if (!cancelled) setLoadingTasks(false);
+                const [lRes, sRes] = await Promise.all([
+                    fetch(`/api/lists?workspace=${workspaceId}`),
+                    fetch(`/api/sprints`) // Sprints are cross-project but we can filter if needed. For now fetch all or simple.
+                ]);
+                const lData = await lRes.json();
+                const sData = await sRes.json();
+                setLists(lData);
+                setSprints(sData);
+            } catch (e) {
+                console.error("Failed to fetch metadata", e);
             }
         }
-        run();
-        return () => { cancelled = true; };
-    }, [workspaceId, statusFilter, search]);
+        fetchMetadata();
+    }, [workspaceId]);
 
-    // Handle New Task
-    const handleNewTask = () => {
-        router.push(`?newTask=1&workspace=${workspaceId}`);
+    // Fetch Tasks with Server-side Filtering & Pagination
+    const fetchTasks = useCallback(async (isLoadMore = false) => {
+        const currentOffset = isLoadMore ? offset + LIMIT : 0;
+        if (!isLoadMore) setLoadingTasks(true);
+
+        try {
+            const params = new URLSearchParams();
+            
+            // RC8A: Pass multi-value filters to API
+            if (state.statusFilter.length > 0) params.set("statuses", state.statusFilter.join(","));
+            if (state.workspaceFilter.length > 0) params.set("workspaces", state.workspaceFilter.join(","));
+            else params.set("workspace", workspaceId); // Default to current workspace if no specific filter
+            
+            if (state.listFilter.length > 0) params.set("list_ids", state.listFilter.join(","));
+            if (state.sprintFilter.length > 0) params.set("sprint_ids", state.sprintFilter.join(","));
+            
+            // RC19/RC20: Content specific filters
+            if (state.templateFilter.length > 0) params.set("template_keys", state.templateFilter.join(","));
+            if (state.reviewStatusFilter.length > 0) params.set("review_statuses", state.reviewStatusFilter.join(",")); // RC26
+            if (state.scheduleFilter !== "all") params.set("schedule_state", state.scheduleFilter);
+            
+            // RC20: Date Range
+            if (state.dateRange.start) params.set("start", state.dateRange.start);
+            if (state.dateRange.end) params.set("end", state.dateRange.end);
+
+            if (state.search) params.set("q", state.search);
+            
+            params.set("limit", LIMIT.toString());
+            params.set("offset", currentOffset.toString());
+
+            const res = await fetch(`/api/tasks?${params.toString()}`);
+            const data = (await res.json()) as Task[];
+
+            if (isLoadMore) {
+                setTasks(prev => [...prev, ...data]);
+            } else {
+                setTasks(data);
+            }
+            
+            setOffset(currentOffset);
+            setHasMore(data.length === LIMIT);
+        } catch (e) {
+            console.error("Failed to fetch tasks", e);
+        } finally {
+            setLoadingTasks(false);
+        }
+    }, [workspaceId, state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter, state.templateFilter, state.reviewStatusFilter, state.scheduleFilter, state.dateRange.start, state.dateRange.end, state.search, offset]);
+
+    // RC37: Keyboard-First Flow
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // 1. Command Palette: Cmd/Ctrl + K
+            if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+                e.preventDefault();
+                lastActiveElement.current = document.activeElement as HTMLElement;
+                setIsCommandPaletteOpen(true);
+                return;
+            }
+
+            // Safety Guard: Check if user is typing in any input/textarea/editable
+            const target = e.target as HTMLElement;
+            const isTyping = 
+                target.tagName === "INPUT" || 
+                target.tagName === "TEXTAREA" || 
+                target.tagName === "SELECT" || 
+                target.isContentEditable ||
+                target.closest('[role="combobox"]');
+
+            if (isTyping && !isCommandPaletteOpen) return;
+
+            // 1. Global Quick Add (RC37): n or /
+            if (e.key === "n" || e.key === "/") {
+                e.preventDefault();
+                updateState({ isQuickAddOpen: true });
+                return;
+            }
+
+            // 2. Esc: Layered closing (one at a time)
+            if (e.key === "Escape") {
+                // Priority 0: Command Palette (RC38)
+                if (isCommandPaletteOpen) {
+                    setIsCommandPaletteOpen(false);
+                    lastActiveElement.current?.focus();
+                    return;
+                }
+
+                // Priority A: Inline Popovers/Composers in Table/Package mode
+                if (state.isTableQuickAddOpen || state.inlineQuickAddTopicId) {
+                    updateState({ 
+                        isTableQuickAddOpen: false, 
+                        inlineQuickAddTopicId: null 
+                    });
+                    return;
+                }
+
+                // Priority B: Global Quick Add
+                if (state.isQuickAddOpen) {
+                    updateState({ isQuickAddOpen: false });
+                    return;
+                }
+
+                // Priority C: Task Drawer
+                // Task drawer is closed via removing taskId from URL or setting selectedTaskId
+                const searchParams = new URLSearchParams(window.location.search);
+                if (searchParams.has("taskId")) {
+                    router.push(window.location.pathname);
+                    return;
+                }
+
+                // Priority D: Flow Mode Exit
+                if (state.isFlowMode) {
+                    updateState({ isFlowMode: false });
+                    return;
+                }
+            }
+
+            // RC43: Switcher Shortcut (Cmd+Shift+W)
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "w") {
+                e.preventDefault();
+                setIsSwitcherOpen(true);
+                return;
+            }
+
+            // RC42: Flow Mode Shortcuts
+            if (state.isFlowMode && (e.metaKey || e.ctrlKey)) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleFlowDone();
+                    return;
+                }
+                if (e.key === "ArrowRight") {
+                    e.preventDefault();
+                    handleFlowNext(true); // Skip
+                    return;
+                }
+                if (e.key === "o") {
+                    e.preventDefault();
+                    if (state.selectedTaskId) router.push(`?taskId=${state.selectedTaskId}`);
+                    return;
+                }
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isCommandPaletteOpen, state.isQuickAddOpen, state.isTableQuickAddOpen, state.inlineQuickAddTopicId, state.isFlowMode, state.selectedTaskId, updateState, router]);
+
+    // Initial fetch and fetch on filter change
+    useEffect(() => {
+        fetchTasks(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceId, state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter, state.templateFilter, state.reviewStatusFilter, state.scheduleFilter, state.dateRange.start, state.dateRange.end, state.search]);
+
+    // Handle Task Update
+    const handleTaskUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
+        // Optimistic Update
+        const prevTasks = [...tasks];
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+
+        try {
+            const res = await fetch(`/api/tasks/${taskId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updates),
+            });
+            if (!res.ok) throw new Error("Update failed");
+            
+            const { task: updatedFromServer } = await res.json();
+            // Sync with server response
+            setTasks(prev => prev.map(t => t.id === taskId ? updatedFromServer : t));
+        } catch (e) {
+            console.error("Failed to update task", e);
+            // Revert on error
+            setTasks(prevTasks);
+            alert("Failed to update status. Please try again.");
+        }
+    }, [tasks]);
+
+    // RC42: Single Flow Logic
+    const currentTask = useMemo(() => {
+        return tasks.find(t => t.id === state.selectedTaskId) || null;
+    }, [tasks, state.selectedTaskId]);
+
+    const nextTask = useMemo(() => {
+        return resolveNextTask(tasks, state.selectedTaskId);
+    }, [tasks, state.selectedTaskId]);
+
+    const handleFlowNext = useCallback((isSkip = false) => {
+        if (nextTask) {
+            updateState({ 
+                selectedTaskId: nextTask.id,
+                lastActiveTaskId: nextTask.id
+            });
+            // If skip, we might want a small transition here in the UI
+        } else {
+            // No more tasks
+            setToast({ isVisible: true, message: "🎉 ทุกอย่างสำเร็จครบถ้วนแล้ว! (All tasks complete)" });
+            updateState({ isFlowMode: false });
+        }
+    }, [nextTask, updateState]);
+
+    const handleFlowDone = useCallback(async () => {
+        if (!currentTask) return;
+        await handleTaskUpdate(currentTask.id, { status: "done" });
+        handleFlowNext(false); // Move to next
+    }, [currentTask, handleTaskUpdate, handleFlowNext]);
+
+    const handleWorkspaceSelect = useCallback((newId: string) => {
+        setIsSwitcherOpen(false);
+        if (newId === workspaceId) return;
+        
+        // Navigation triggers refetch and sticky task restore in Next.js
+        router.push(`/workspaces/${newId}`);
+    }, [workspaceId, router]);
+
+    // Sync lastActiveTaskId to state.selectedTaskId on Load
+    useEffect(() => {
+        if (state.lastActiveTaskId && !state.selectedTaskId && tasks.length > 0) {
+            // Validate if task exists and is not done
+            const task = tasks.find(t => t.id === state.lastActiveTaskId);
+            if (task && task.status !== 'done') {
+                updateState({ selectedTaskId: task.id });
+            } else {
+                // Fallback to next best
+                const fallback = resolveNextTask(tasks, null);
+                if (fallback) {
+                    updateState({ selectedTaskId: fallback.id, lastActiveTaskId: fallback.id });
+                }
+            }
+        }
+    }, [tasks.length, state.lastActiveTaskId, state.selectedTaskId, updateState]);
+
+    // Update lastActiveTaskId when selection changes
+    useEffect(() => {
+        if (state.selectedTaskId && state.selectedTaskId !== state.lastActiveTaskId) {
+            updateState({ lastActiveTaskId: state.selectedTaskId });
+        }
+    }, [state.selectedTaskId, state.lastActiveTaskId, updateState]);
+
+    // RC25: Quick Complete with Auto-focus
+    const handleQuickComplete = useCallback(async (taskId: string) => {
+        const t = tasks.find(x => x.id === taskId);
+        if (!t || t.status === "done") return;
+
+        // 1. Update status to done
+        await handleTaskUpdate(taskId, { status: "done" });
+
+        // 2. Auto-focus next logic (only for packages)
+        if (t.topic_id) {
+            // We need the updated tasks to find the next one
+            // Since setTasks is async, we use a timeout or calculate from the "would be" state
+            setTimeout(() => {
+                setTasks(currentTasks => {
+                    const pkgTasks = currentTasks.filter(x => x.topic_id === t.topic_id);
+                    const doneCount = pkgTasks.filter(x => x.status === "done").length;
+                    const totalCount = pkgTasks.length;
+
+                    // Success Feedback: Package Complete
+                    if (doneCount === totalCount && totalCount > 0) {
+                        setToast({
+                            isVisible: true,
+                            message: `🎉 แพ็กเกจ ${t.topic_id} สำเร็จครบถ้วนแล้ว!`,
+                        });
+                    } else {
+                        // Success Feedback: Step Complete
+                        setToast({
+                            isVisible: true,
+                            message: `✅ บันทึกความคืบหน้าของ ${t.topic_id} เรียบร้อย`,
+                        });
+                    }
+
+                    // Auto-focus Next Step
+                    const stepOrder = ["Brief Approved", "Script & Caption", "Assets / Canva", "Publish", "Archive"];
+                    const remaining = pkgTasks.filter(x => x.status !== "done");
+                    
+                    if (remaining.length > 0) {
+                        let bestTask = remaining[0];
+                        let bestIdx = 99;
+                        remaining.forEach(rt => {
+                            const idx = stepOrder.findIndex(s => rt.title.toLowerCase().includes(s.toLowerCase()));
+                            if (idx !== -1 && idx < bestIdx) {
+                                bestIdx = idx;
+                                bestTask = rt;
+                            }
+                        });
+                        
+                        // Select the next task
+                        router.push(`?taskId=${bestTask.id}`);
+                    }
+
+                    return currentTasks;
+                });
+            }, 100);
+        }
+    }, [tasks, handleTaskUpdate, router]);
+
+    // RC38: Dynamic Command Registry
+    const commands = useMemo<CommandOption[]>(() => {
+        const pool: CommandOption[] = [
+            // Navigation
+            { id: "nav-inbox", label: "Go to Inbox", action: () => router.push("/workspaces/inbox"), category: "navigation" },
+            { id: "nav-content", label: "Go to Content Workspace", action: () => router.push("/workspaces/content"), category: "navigation" },
+            { id: "nav-ops", label: "Go to Operations", action: () => router.push("/workspaces/ops"), category: "navigation" },
+            { id: "nav-system", label: "Go to System", action: () => router.push("/workspaces/system"), category: "navigation" },
+            
+            // Actions
+            { id: "act-new-task", label: "New Task", description: "Open global quick add", action: () => updateState({ isQuickAddOpen: true }), category: "actions" },
+        ];
+
+        // Context-aware Views
+        if (state.viewMode === "package") {
+            pool.push({ id: "view-table", label: "Switch to Table Mode", description: "Condensed execution view", action: () => updateState({ viewMode: "list" }), category: "view" });
+        } else {
+            pool.push({ id: "view-package", label: "Switch to Package View", description: "Structured grouping by topic", action: () => updateState({ viewMode: "package" }), category: "view" });
+        }
+
+        // Context-aware Selection
+        if (state.selectedTaskId) {
+            pool.push({ id: "act-open-task", label: "Open Selected Task", description: "Open task details in drawer", action: () => router.push(`?taskId=${state.selectedTaskId}`), category: "actions" });
+        }
+
+        // Context-aware Filters
+        const hasFilters = state.statusFilter.length > 0 || state.scheduleFilter !== "all" || state.search;
+        if (hasFilters) {
+            pool.push({ 
+                id: "filter-clear", 
+                label: "Clear All Filters", 
+                action: () => updateState({ statusFilter: [], scheduleFilter: "all", search: "", listFilter: [], sprintFilter: [] }),
+                category: "filters" 
+            });
+        }
+        
+        if (!state.statusFilter.includes("done")) {
+            pool.push({ id: "filter-done", label: "Show Completed Tasks", action: () => updateState({ statusFilter: ["done"] }), category: "filters" });
+        }
+
+        if (state.scheduleFilter !== "scheduled") {
+            pool.push({ id: "filter-scheduled", label: "Show Scheduled This Week", action: () => updateState({ scheduleFilter: "scheduled" }), category: "filters" });
+        }
+
+        return pool;
+    }, [state, router, updateState]);
+
+    // RC39: Computed Suggested View
+    const suggestedView = useMemo(() => {
+        if (viewHintDismissed || viewHintAccepted) return null;
+        
+        return resolveSuggestedView({
+            workspaceId,
+            workspaceType: ws?.type,
+            currentMode: state.viewMode,
+            hasAnyTasks: tasks.length > 0,
+            packageLinkedTaskCount: tasks.filter(t => t.package_id).length,
+        });
+    }, [workspaceId, ws?.type, state.viewMode, tasks, viewHintDismissed, viewHintAccepted]);
+
+    const handleAcceptViewHint = (mode: 'package' | 'list') => {
+        updateState({ viewMode: mode });
+        setViewHintAccepted(true);
+        setViewHintMemory(workspaceId, { accepted: true });
+        setToast({
+            isVisible: true,
+            message: `Switched to ${mode} mode based on suggestion 🚀`,
+        });
     };
 
-    // Handle New List
-    const handleNewList = async () => {
+    const handleDismissViewHint = () => {
+        setViewHintDismissed(true);
+        setViewHintMemory(workspaceId, { dismissed: true });
+    };
+
+    // RC39: Global Quick Add Defaults
+    const creationDefaults = useMemo(() => {
+        const ctx = buildCreationContext({
+            workspaceId,
+            workspaceType: ws?.type,
+            mode: state.viewMode,
+            launchSource: 'global',
+        });
+        return resolveSmartCreateDefaults(ctx);
+    }, [workspaceId, ws?.type, state.viewMode]);
+
+    const handleNewList = () => {
         const title = window.prompt("Enter new list title:");
         if (!title) return;
         const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        fetch("/api/lists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ workspace: workspaceId, title, slug })
+        }).then(res => {
+            if (!res.ok) alert("Failed to create list");
+            else alert("List created!");
+        });
+    };
 
-        try {
-            const res = await fetch("/api/lists", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ workspace: workspaceId, title, slug })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setLists(prev => [data.list, ...prev]);
-            } else {
-                const err = await res.json();
-                alert(`Failed to create list: ${err.error || 'Unknown'}`);
+    // RC40A: Smart Queue Logic
+    const smartQueueItems = useMemo(() => {
+        if (isQueueDismissed || tasks.length === 0) return [];
+        return resolveWorkspaceSmartQueue(tasks, feedbackStore);
+    }, [tasks, isQueueDismissed, feedbackStore]);
+
+    const handleQueueItemClick = (item: QueueItem) => {
+        // RC41A: Record click
+        recordQueueClick(item.identity);
+        setFeedbackStore(getAllQueueFeedback()); // Refresh
+
+        if (item.taskId) {
+            router.push(`?taskId=${item.taskId}`);
+            // If the task is likely in the current list, the router.push will handle highlighting via taskId query param
+            // and AreasTaskList already reacts to router.query.taskId
+        } else if (item.topicId) {
+            // If it's a package cue, expand it
+            if (state.collapsedTopicIds.includes(item.topicId)) {
+                updateState({
+                    collapsedTopicIds: state.collapsedTopicIds.filter(id => id !== item.topicId)
+                });
             }
-        } catch (e) {
-            alert("Error creating list");
         }
     };
 
-    if (!ws) return <div className="p-10">Workspace not found</div>;
+    const handleQueueItemShown = (identity: string) => {
+        recordQueueShow(identity);
+        // We don't refresh state here to avoid rerender loops while rendering the strip
+    };
+
+    if (!ws) return <div className="p-10 text-neutral-500 font-medium">Workspace not found</div>;
 
     return (
         <div className="flex h-screen flex-col overflow-hidden bg-gray-50/50">
-            {/* Header */}
-            <div className="px-6 py-4 bg-white border-b border-neutral-200 flex items-center justify-between shadow-sm z-10">
-                <div className="flex items-center gap-2">
-                    <Link href="/workspaces" className="text-sm font-bold text-neutral-400 hover:text-black transition-colors uppercase tracking-wide">
-                        Workspaces
-                    </Link>
-                    <span className="text-neutral-300">/</span>
-                    <h1 className="text-xl font-bold text-neutral-900">{ws.label}</h1>
-                </div>
-                <div>
-                    <button
-                        onClick={handleNewList}
-                        className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-200 transition-colors flex items-center gap-2 mr-2 inline-flex"
-                    >
-                        + List
-                    </button>
-                    <button
-                        onClick={handleNewTask}
-                        className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-800 transition-colors items-center gap-2 inline-flex"
-                    >
-                        + Task
-                    </button>
-                </div>
-            </div>
+            {/* Toolbar acts as Header */}
+            <AreasToolbar
+                title={ws.label}
+                state={state}
+                updateState={updateState}
+                onNewList={handleNewList}
+                workspaceId={workspaceId}
+                onNewPackage={() => updateState({ isPackageModalOpen: true })}
+                isFocusMode={isFocusMode}
+                onToggleFocusMode={toggleFocusMode}
+            />
 
-            {/* Toolbar */}
-            <div className="px-6 py-3 border-b border-neutral-200 bg-white/50 flex items-center gap-4">
-                <select
-                    className="bg-white border border-neutral-300 text-sm rounded-lg px-3 py-1.5 focus:ring-black focus:border-black"
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                >
-                    <option value="all">All Status</option>
-                    <option value="inbox">Inbox</option>
-                    <option value="planned">Planned</option>
-                    <option value="done">Done</option>
-                </select>
+            {/* RC43A: Breadcrumb Bar */}
+            {!isFocusMode && (
+                <div className="bg-white px-6 py-2 border-b border-neutral-100 flex items-center gap-2 text-xs font-medium text-neutral-500 overflow-x-auto whitespace-nowrap">
+                    <button 
+                        onClick={() => router.push('/workspaces')}
+                        className="hover:text-neutral-900 flex items-center gap-1 transition-colors"
+                    >
+                        <LayoutGrid size={12} className="text-neutral-400" />
+                        Areas
+                    </button>
+                    <ChevronRight size={12} className="text-neutral-300" />
+                    <button 
+                        onClick={() => setIsSwitcherOpen(true)}
+                        className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md hover:bg-indigo-100 transition-all font-bold flex items-center gap-1.5 group"
+                        title="คลิกเพื่อสลับ Workspace (Cmd+Shift+W)"
+                    >
+                        {ws.label}
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover:scale-125 transition-transform" />
+                    </button>
+                </div>
+            )}
 
-                <div className="relative flex-1 max-w-md">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">🔍</span>
-                    <input
-                        className="w-full bg-white border border-neutral-300 text-sm rounded-lg pl-9 pr-3 py-1.5 focus:ring-black focus:border-black"
-                        placeholder="Search tasks..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
+            {/* Filters Row - Compact slightly in focus mode if needed, but keeping for now per constraints */}
+            {!isFocusMode && !state.isFlowMode && (
+                <AreasFilterBar
+                    tasks={tasks}
+                    lists={lists}
+                    sprints={sprints}
+                    state={state}
+                    updateState={updateState}
+                />
+            )}
+
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden relative flex flex-col px-4">
+                {smartQueueItems.length > 0 && (
+                    <SmartQueueStrip 
+                        items={smartQueueItems} 
+                        onItemClick={handleQueueItemClick}
+                        onItemShown={handleQueueItemShown}
+                        onDismiss={() => setIsQueueDismissed(true)}
                     />
+                )}
+
+                {suggestedView && !isFocusMode && !state.isFlowMode && (
+                    <div className="mt-4">
+                        <SmartViewHint 
+                            label={suggestedView.mode === 'package' ? 'Package View' : 'Table Mode'}
+                            reason={suggestedView.reason}
+                            confidence={scoreSuggestionConfidence({
+                                workspaceType: ws?.type,
+                                suggestedMode: suggestedView.mode
+                            })}
+                            onAccept={() => handleAcceptViewHint(suggestedView.mode)}
+                            onDismiss={handleDismissViewHint}
+                        />
+                    </div>
+                )}
+                
+                <div className="flex-1 overflow-hidden relative flex flex-col">
+                    <div className="flex-1 overflow-y-auto relative custom-scrollbar">
+                        {loadingTasks && tasks.length === 0 ? (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="text-neutral-400 font-bold uppercase tracking-widest text-sm animate-pulse flex items-center gap-3">
+                                    <span className="animate-spin text-xl">⌛</span> Syncing Workspace...
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {state.isQuickAddOpen && (
+                                    <div className="max-w-4xl mx-auto w-full py-4 animate-in slide-in-from-top-4 duration-300">
+                                        <QuickAddTask 
+                                            workspaceId={workspaceId}
+                                            initialStatus={creationDefaults.status}
+                                            initialListId={creationDefaults.listId}
+                                            initialPackageId={creationDefaults.packageId}
+                                            initialTopicId={creationDefaults.topicId}
+                                            initialStepKey={creationDefaults.packageStepKey}
+                                            launchSource="global"
+                                            onCreated={(task) => {
+                                                // 1. Local update for immediate feedback
+                                                setTasks(prev => [task, ...prev]);
+                                                
+                                                // 2. Select the new task immediately if in flow or if requested
+                                                updateState({ 
+                                                    isQuickAddOpen: false,
+                                                    selectedTaskId: task.id,
+                                                    lastActiveTaskId: task.id
+                                                });
+
+                                                // 3. Full Revalidation (RC42C)
+                                                fetchTasks(false);
+
+                                                setToast({
+                                                    isVisible: true,
+                                                    message: `Task created: ${task.title}`,
+                                                });
+                                            }}
+                                            onCancel={() => updateState({ isQuickAddOpen: false })}
+                                        />
+                                    </div>
+                                )}
+
+                                <AreasTaskList
+                                    workspaceId={workspaceId}
+                                    tasks={tasks}
+                                    state={state}
+                                    onTaskClick={(t) => router.push(`?taskId=${t.id}`)}
+                                    onTaskUpdate={handleTaskUpdate}
+                                    onQuickComplete={handleQuickComplete}
+                                    onTaskCreated={(newTask) => {
+                                        setTasks(prev => [newTask, ...prev]);
+                                        fetchTasks(false); // RC42C
+                                    }}
+                                    updateState={updateState}
+                                    highlightedTaskIds={highlightedTaskIds}
+                                    refresh={() => fetchTasks(false)}
+                                />
+                                
+                                <Toast 
+                                    isVisible={toast.isVisible}
+                                    message={toast.message}
+                                    action={toast.action}
+                                    onClose={() => setToast({ ...toast, isVisible: false })}
+                                />
+
+                                <CreateContentPackageModal
+                                    isOpen={state.isPackageModalOpen}
+                                    onClose={() => updateState({ isPackageModalOpen: false })}
+                                    onSuccess={(data) => {
+                                        fetchTasks(false);
+                                        setHighlightedTaskIds(data.taskIds);
+                                        setToast({
+                                            isVisible: true,
+                                            message: `Created ${data.topicId} — 1 note + 5 tasks`,
+                                            action: {
+                                                label: "Open Note",
+                                                onClick: () => router.push(`/notes/edit/${data.noteId}`)
+                                            }
+                                        });
+                                        // Clear highlights after 5s
+                                        setTimeout(() => setHighlightedTaskIds([]), 5000);
+                                    }}
+                                />
+
+                                <CommandPalette 
+                                    isOpen={isCommandPaletteOpen}
+                                    onClose={() => {
+                                        setIsCommandPaletteOpen(false);
+                                        lastActiveElement.current?.focus();
+                                    }}
+                                    commands={commands}
+                                />
+
+                                {/* Load More Button */}
+                                {hasMore && (
+                                    <div className="p-8 flex justify-center pb-32">
+                                        <button
+                                            onClick={() => fetchTasks(true)}
+                                            disabled={loadingTasks}
+                                            className="px-6 py-2 bg-white border border-neutral-200 rounded-full text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                        >
+                                            {loadingTasks ? "Loading..." : "Load More Tasks"}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-                <div className="max-w-4xl mx-auto space-y-8">
+            {/* RC42: Single Flow UI */}
+            {state.isFlowMode && (
+                <SingleFlowBar 
+                    currentTask={currentTask}
+                    nextTask={nextTask}
+                    onDone={handleFlowDone}
+                    onSkip={() => handleFlowNext(true)}
+                    onOpenDetail={() => currentTask && router.push(`?taskId=${currentTask.id}`)}
+                    onClose={() => updateState({ isFlowMode: false })}
+                />
+            )}
 
-                    {/* Lists Section */}
-                    <section>
-                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Lists</h2>
-                        {loadingLists ? (
-                            <div className="text-neutral-400 py-4 animate-pulse">Loading lists...</div>
-                        ) : lists.length === 0 ? (
-                            <div className="text-neutral-400 py-4 text-sm bg-neutral-100 border border-neutral-200 border-dashed rounded-xl px-4 inline-block">No lists found. Create one.</div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {lists.map(list => {
-                                    const stats = listStats[list.id] || { total: 0, inbox: 0, planned: 0, done: 0 };
-                                    return (
-                                        <Link key={list.id} href={`/lists/${list.id}`} className="block group">
-                                            <div className="p-4 bg-white border border-neutral-200 rounded-xl hover:shadow-md hover:border-black/20 transition-all h-full flex flex-col justify-between cursor-pointer">
-                                                <div>
-                                                    <div className="flex items-start justify-between">
-                                                        <h3 className="font-bold text-neutral-900 group-hover:text-black">{list.title}</h3>
-                                                        {stats.total > 0 && (
-                                                            <span className="text-[10px] font-bold bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded-full">
-                                                                {stats.total} tasks
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {list.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{list.description}</p>}
-                                                </div>
-                                                <div className="mt-4 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
-                                                    <div className="flex gap-2">
-                                                        <span title="Inbox" className={`${stats.inbox > 0 ? "text-neutral-600 font-bold" : ""}`}>
-                                                            In: {stats.inbox}
-                                                        </span>
-                                                        <span title="Planned" className={`${stats.planned > 0 ? "text-blue-500 font-bold" : ""}`}>
-                                                            Pl: {stats.planned}
-                                                        </span>
-                                                        <span title="Done" className={`${stats.done > 0 ? "text-green-500 font-bold" : ""}`}>
-                                                            Dn: {stats.done}
-                                                        </span>
-                                                    </div>
-                                                    <span>→</span>
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </section>
-
-                    {/* Unassigned Tasks Section */}
-                    <section>
-                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-4">Unassigned Tasks</h2>
-                        {loadingTasks ? (
-                            <div className="text-center text-neutral-400 py-10 animate-pulse">Loading tasks...</div>
-                        ) : tasks.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-32 text-neutral-400 bg-neutral-100/50 border border-neutral-200 border-dashed rounded-xl">
-                                <span className="opacity-50">No unassigned tasks</span>
-                            </div>
-                        ) : (
-                            <div>
-                                {tasks.map(t => (
-                                    <TaskItem key={t.id} task={t} />
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                </div>
-            </div>
+            {/* RC43B: Switcher Component */}
+            <WorkspaceSwitcher
+                isOpen={isSwitcherOpen}
+                currentWorkspaceId={workspaceId}
+                onClose={() => setIsSwitcherOpen(false)}
+                onSelect={handleWorkspaceSelect}
+            />
         </div>
     );
 }

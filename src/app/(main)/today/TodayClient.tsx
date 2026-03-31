@@ -51,6 +51,9 @@ export default function TodayClient() {
 
     useEffect(() => {
         refresh();
+        const onTaskUpdated = () => refresh();
+        window.addEventListener("task-updated", onTaskUpdated);
+        return () => window.removeEventListener("task-updated", onTaskUpdated);
     }, [refresh]);
 
     const grouped = useMemo(() => {
