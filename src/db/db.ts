@@ -108,8 +108,9 @@ function ensureMigrations() {
             CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
             AFTER UPDATE ON tasks
             FOR EACH ROW
+            WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
             BEGIN
-                UPDATE tasks SET updated_at = datetime('now') WHERE id = OLD.id;
+                UPDATE tasks SET updated_at = datetime('now') WHERE id = NEW.id;
             END;
         `);
     }
@@ -196,8 +197,9 @@ function ensureMigrations() {
         CREATE TRIGGER IF NOT EXISTS trg_lists_updated_at
         AFTER UPDATE ON lists
         FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
         BEGIN
-            UPDATE lists SET updated_at = datetime('now') WHERE id = OLD.id;
+            UPDATE lists SET updated_at = datetime('now') WHERE id = NEW.id;
         END;
     `);
 
@@ -363,8 +365,9 @@ function ensureProjectsAndSprints() {
         CREATE TRIGGER IF NOT EXISTS trg_projects_updated_at
         AFTER UPDATE ON projects
         FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
         BEGIN
-          UPDATE projects SET updated_at = datetime('now') WHERE id = OLD.id;
+          UPDATE projects SET updated_at = datetime('now') WHERE id = NEW.id;
         END;
         CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 
@@ -388,8 +391,9 @@ function ensureProjectsAndSprints() {
         CREATE TRIGGER IF NOT EXISTS trg_project_items_updated_at
         AFTER UPDATE ON project_items
         FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
         BEGIN
-          UPDATE project_items SET updated_at = datetime('now') WHERE id = OLD.id;
+          UPDATE project_items SET updated_at = datetime('now') WHERE id = NEW.id;
         END;
 
         CREATE INDEX IF NOT EXISTS idx_project_items_project_status ON project_items(project_id, status);

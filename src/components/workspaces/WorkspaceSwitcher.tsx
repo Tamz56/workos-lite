@@ -1,6 +1,6 @@
 // src/components/workspaces/WorkspaceSwitcher.tsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, History, Globe, Check, X } from 'lucide-react';
+import { Search, History, Globe, Check, X, Command } from 'lucide-react';
 import { WORKSPACES_LIST } from '@/lib/workspaces';
 
 interface WorkspaceSwitcherProps {
@@ -60,10 +60,15 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                     <input 
                         autoFocus
                         className="flex-1 bg-transparent border-none outline-none text-base font-medium text-neutral-800 placeholder:text-neutral-400"
-                        placeholder="Search workspaces... (Cmd+Shift+W)"
+                        placeholder="Search workspaces... (Cmd+Shift+J)"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        onKeyDown={e => e.key === 'Escape' && onClose()}
+                        onKeyDown={e => {
+                            if (e.key === 'Escape') onClose();
+                            if (e.key === 'Enter' && filteredWorkspaces.length > 0) {
+                                onSelect(filteredWorkspaces[0].id);
+                            }
+                        }}
                     />
                     <button onClick={onClose} className="p-1 hover:bg-neutral-100 rounded-lg text-neutral-400 Transition-colors">
                         <X size={18} />
@@ -142,9 +147,16 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                     )}
                 </div>
 
-                {/* Footer Hint */}
-                <div className="p-3 bg-neutral-50 border-t border-neutral-100 text-[10px] text-neutral-400 font-medium text-center italic">
-                    Press <span className="font-bold">↑ ↓</span> to navigate, <span className="font-bold">Enter</span> to select
+                <div className="p-3 bg-neutral-50 border-t border-neutral-100 text-[10px] text-neutral-400 font-medium flex items-center justify-center gap-4 italic uppercase tracking-wider">
+                    <div className="flex items-center gap-1">
+                        <kbd className="bg-white border border-neutral-200 px-1 rounded text-[9px] font-bold">↑↓</kbd> navigate
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <kbd className="bg-white border border-neutral-200 px-1 rounded text-[9px] font-bold">Enter</kbd> select
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <kbd className="bg-white border border-neutral-200 px-1 rounded text-[9px] font-bold">⌘⇧J</kbd> switcher
+                    </div>
                 </div>
             </div>
         </div>

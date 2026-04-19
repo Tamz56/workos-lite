@@ -13,6 +13,8 @@ interface TaskRowProps {
     isHighlighted?: boolean;
     isNextStep?: boolean; // RC25
     mode?: "package" | "table"; // RC33
+    isFlowModeActive?: boolean; // RC46
+    isCurrentlyWorking?: boolean; // RC46
 }
 
 export default function TaskRow({ 
@@ -23,7 +25,9 @@ export default function TaskRow({
     isSelected, 
     isHighlighted,
     isNextStep,
-    mode = "package"
+    mode = "package",
+    isFlowModeActive,
+    isCurrentlyWorking
 }: TaskRowProps) {
 
 
@@ -40,7 +44,11 @@ export default function TaskRow({
     const priorityColor = ["text-neutral-400", "text-blue-500", "text-neutral-600", "text-orange-500", "text-red-600"];
     const pIdx = task.priority ?? 2;
 
-    // RC25: Visual Priority Logic (Modified for RC32)
+    // RC46: Execution Engine Visuals
+    const isActiveExecution = isCurrentlyWorking && isFlowModeActive;
+    const dimmingClass = (isFlowModeActive && !isCurrentlyWorking) ? "opacity-30 grayscale pointer-events-none scale-[0.98] blur-[0.5px]" : "opacity-100 grayscale-0 scale-100 blur-0";
+
+    // RC25: Visual Priority Logic (Modified for RC32/RC46)
     const activeNextStep = mode === "package" && isNextStep;
     const rowClass = isSelected ? "bg-blue-50/40 border-blue-100 z-10" : 
                     isHighlighted ? "bg-blue-50 border-blue-200 z-10" : 
@@ -54,21 +62,33 @@ export default function TaskRow({
                 id={`task-row-${task.id}`}
                 onClick={onClick}
                 onMouseEnter={() => prefetchTaskDetail(task.id)}
-                className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-1.5 px-4 border-b hover:bg-indigo-50/30 transition-all duration-200 cursor-pointer ${
-                    isSelected ? "bg-indigo-50/50 border-blue-100" : "bg-white border-neutral-100"
-                } ${isDone ? "opacity-60" : ""}`}
+                className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-1.5 px-4 border-b hover:bg-indigo-50/30 transition-all duration-300 cursor-pointer ${
+                    isSelected ? "bg-indigo-50/50 border-blue-100 ring-1 ring-blue-500/20 shadow-md z-10" : "bg-white border-neutral-100"
+                } ${isDone ? "opacity-60" : ""} ${dimmingClass}`}
             >
                 {/* Column 1: Task Name & Topic Cue */}
                 <div className="flex items-center gap-3 min-w-0 pr-4">
-                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                        task.status === 'done' ? 'bg-emerald-500' : 
-                        task.status === 'inbox' ? 'bg-neutral-300' : 
-                        'bg-blue-500'
-                    }`} />
+                    {isActiveExecution ? (
+                         <div className="w-5 h-5 flex items-center justify-center relative shrink-0">
+                            <Circle size={10} className="text-blue-500 fill-blue-500 animate-pulse" />
+                            <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20" />
+                         </div>
+                    ) : (
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            task.status === 'done' ? 'bg-emerald-500' : 
+                            task.status === 'inbox' ? 'bg-neutral-300' : 
+                            'bg-blue-500'
+                        }`} />
+                    )}
                     <div className="flex flex-col min-w-0">
-                        <span className={`text-[12px] font-bold truncate leading-tight ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-indigo-600'}`}>
-                            {task.title}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[12px] font-bold truncate leading-tight ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-indigo-600'}`}>
+                                {task.title}
+                            </span>
+                            {isActiveExecution && (
+                                <span className="text-[8px] bg-blue-600 text-white px-1.5 py-0.5 rounded-sm font-black uppercase tracking-widest whitespace-nowrap">Execution Mode</span>
+                            )}
+                        </div>
                         {task.topic_id && (
                             <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest leading-none mt-0.5">
                                 {task.topic_id}
@@ -110,10 +130,15 @@ export default function TaskRow({
             onMouseEnter={() => prefetchTaskDetail(task.id)}
             className={`relative group w-full flex flex-col sm:flex-row sm:items-center py-2 px-3 sm:px-4 border-b hover:bg-neutral-50 cursor-pointer transition-all duration-300 ${rowClass} ${
                 isDone ? "opacity-60 hover:opacity-100" : ""
-            }`}
+            } ${dimmingClass} ${isActiveExecution ? "ring-2 ring-blue-500/20 shadow-lg z-20 scale-[1.01] -mx-1 px-5 rounded-md" : ""}`}
         >
 
             {isSelected && <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-blue-500 rounded-r-sm z-20" />}
+            {isActiveExecution && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-lg z-30 uppercase tracking-[0.2em] whitespace-nowrap border-2 border-white">
+                    Currently Working On
+                </div>
+            )}
             {activeNextStep && !isSelected && !isHighlighted && <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-amber-400/60 rounded-r-sm z-20" />}
             
             {/* Mobile Top Row: Check/Status + Title */}

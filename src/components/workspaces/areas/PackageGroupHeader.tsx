@@ -184,12 +184,31 @@ export default function PackageGroupHeader({
                     )}
 
                     {packageTotal !== undefined && (
-                        <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-sm flex items-center gap-1 ${
-                            isFullyComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-neutral-200/50 text-neutral-500'
-                        }`}>
-                            {isFullyComplete && <Check size={10} strokeWidth={4} />}
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (isCollapsed) onToggle();
+                                
+                                // RC46C: Resolve next actionable task in group
+                                const targetId = suggestedAction?.taskId || tasks.find(t => t.status !== 'done')?.id;
+                                if (targetId && onNextStep) {
+                                    onNextStep(targetId);
+                                }
+                            }}
+                            title={isFullyComplete ? "ครบถ้วนแล้ว!" : "คลิกเพื่อไปที่ขั้นตอนถัดไปในกลุ่มนี้"}
+                            className={`text-[11px] font-black px-2 py-0.5 rounded-md flex items-center gap-1.5 transition-all active:scale-95 group/prog ${
+                                isFullyComplete 
+                                    ? 'bg-emerald-100 text-emerald-700' 
+                                    : 'bg-neutral-200 hover:bg-indigo-600 hover:text-white text-neutral-600 shadow-sm'
+                            }`}
+                        >
+                            {isFullyComplete ? (
+                                <Check size={10} strokeWidth={4} />
+                            ) : (
+                                <Play size={8} fill="currentColor" className="opacity-0 group-hover/prog:opacity-100 transition-opacity" />
+                            )}
                             {packageDone}/{packageTotal}
-                        </span>
+                        </button>
                     )}
 
                     {/* RC26: Review Status Badge */}

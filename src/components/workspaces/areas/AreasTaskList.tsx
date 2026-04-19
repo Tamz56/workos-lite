@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Task } from "@/lib/types";
 import { AreasViewState } from "./useAreasState";
 import { selectGroupedTasks } from "./areasSelectors";
@@ -6,6 +7,9 @@ import TaskRow from "./TaskRow";
 import QuickAddTask from "./QuickAddTask";
 import { GroupedVirtuoso, VirtuosoHandle } from "react-virtuoso";
 import PackageGroupHeader from "./PackageGroupHeader";
+import { WORKSPACES_LIST } from "@/lib/workspaces";
+import * as LucideIcons from "lucide-react";
+import { Plus, LayoutGrid, Zap } from "lucide-react";
 
 interface AreasTaskListProps {
     workspaceId: string;
@@ -32,6 +36,7 @@ export default function AreasTaskList({
     highlightedTaskIds = [],
     refresh
 }: AreasTaskListProps) {
+    const router = useRouter();
     const virtuosoRef = useRef<VirtuosoHandle>(null);
     
     // Delegate complex logic to pure selector
@@ -121,8 +126,72 @@ export default function AreasTaskList({
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [state.selectedTaskId, state.viewMode, flattenedTasks, onTaskClick]);
 
+    // RC46: Viewport-aware Auto-Scroll
+    useEffect(() => {
+        if (state.selectedTaskId && state.isFlowMode) {
+            const index = flattenedTasks.findIndex(t => t.id === state.selectedTaskId);
+            if (index !== -1) {
+                // Only scroll if we are in Flow Mode (system-led)
+                // Virtuoso handles internal "is in viewport" checks if we use 'center' align,
+                // but for specialized 'only if outside' behavior, we rely on Virtuoso's internal state.
+                // For RC46, we'll perform a standard scroll with 'center' alignment to ensure focus.
+                virtuosoRef.current?.scrollToIndex({
+                    index,
+                    align: "center",
+                    behavior: "smooth"
+                });
+            }
+        }
+    }, [state.selectedTaskId, state.isFlowMode, flattenedTasks]);
+
+    // RC45: Empty State Logic
     if (tasks.length === 0 && !state.isQuickAddOpen) {
-        return <div className="p-10 text-center text-neutral-400">No tasks found.</div>;
+        const wsConfig = WORKSPACES_LIST.find(w => w.id === workspaceId);
+        const empty = wsConfig?.emptyState;
+        const WsIcon = (LucideIcons as any)[wsConfig?.iconKey || "LayoutGrid"] || LayoutGrid;
+
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-neutral-50/30 min-h-[400px]">
+                <div className="max-w-md w-full bg-white border border-neutral-200 rounded-[32px] p-10 text-center shadow-xl shadow-neutral-200/50 flex flex-col items-center animate-in fade-in zoom-in-95 duration-500">
+                    <div className="w-20 h-20 bg-neutral-50 rounded-[24px] flex items-center justify-center mb-6 border border-neutral-100 shadow-inner group">
+                        <WsIcon size={32} className="text-neutral-400 group-hover:scale-110 transition-transform duration-300" />
+                    </div>
+                    
+                    <h2 className="text-2xl font-black text-neutral-900 tracking-tight mb-3">
+                        {empty?.title || "No tasks found"}
+                    </h2>
+                    <p className="text-neutral-500 text-sm font-medium mb-10 leading-relaxed">
+                        {empty?.description || "This workspace is currently empty. Start by adding your first task or using a template."}
+                    </p>
+
+                    <div className="w-full flex flex-col gap-3">
+                        <button 
+                            onClick={() => {
+                                if (empty?.actionType === 'newPackage') updateState({ isPackageModalOpen: true });
+                                else updateState({ isQuickAddOpen: true });
+                            }}
+                            className="w-full py-4 bg-black text-white rounded-2xl font-black text-sm hover:bg-neutral-800 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-black/10"
+                        >
+                            <Plus size={18} />
+                            {empty?.actionLabel || "Add Task"}
+                        </button>
+                        
+                        <button 
+                            onClick={() => router.push('/workspaces')}
+                            className="w-full py-4 bg-white border border-neutral-200 text-neutral-500 rounded-2xl font-bold text-sm hover:bg-neutral-50 transition-all flex items-center justify-center gap-2"
+                        >
+                            <LayoutGrid size={16} />
+                            Back to All Areas
+                        </button>
+                    </div>
+
+                    <div className="mt-8 flex items-center gap-2 text-[10px] font-bold text-neutral-300 uppercase tracking-widest">
+                        <Zap size={10} className="fill-current" />
+                        Smart Workspace Engine Active
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -391,6 +460,8 @@ export default function AreasTaskList({
                                     isHighlighted={highlightedTaskIds.includes(task.id)}
                                     isNextStep={isNextStep}
                                     mode={state.viewMode === 'list' ? 'table' : 'package'}
+                                    isFlowModeActive={state.isFlowMode}
+                                    isCurrentlyWorking={state.selectedTaskId === task.id}
                                 />
                             </div>
                         );
