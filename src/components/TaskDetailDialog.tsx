@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import * as LucideIcons from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Task, TaskStatus, Sprint } from "../lib/types";
 import { patchTask, listAttachments } from "../lib/api";
@@ -9,6 +10,14 @@ import AttachmentsPanel from "./AttachmentsPanel";
 import { List } from "../lib/lists";
 import TaskRelatedNotes from "./TaskRelatedNotes";
 import { INPUT_BASE as _OLD_INPUT_BASE, LABEL_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "../lib/styles";
+import { 
+    cleanTaskTitle, 
+    parseProjectFromTitle, 
+    parseStageFromTitle, 
+    parsePlatformsFromTitle, 
+    constructRawTitle,
+    KNOWN_PLATFORMS 
+} from "../lib/content/utils";
 
 const INPUT_BASE = "w-full text-sm bg-neutral-50/50 hover:bg-neutral-100/80 border border-transparent focus:border-neutral-200 focus:bg-white rounded-xl px-3 py-2 outline-none transition-all placeholder:text-neutral-400 disabled:opacity-50 disabled:cursor-not-allowed";
 
@@ -22,60 +31,6 @@ function normalizeDate(d: string | null): string | null {
     return date.toISOString().split('T')[0];
 }
 
-// Parse "project:Name"
-function parseProject(title: string): string {
-    const match = title.match(/project:([^\s]+)/);
-    return match ? match[1] : "";
-}
-
-// Parse "#stage:Name"
-function parseStage(title: string): string {
-    const match = title.match(/#stage:([^\s]+)/);
-    return match ? match[1] : "";
-}
-
-// Parse platforms (#fb, #ig, #yt, #tk)
-const KNOWN_PLATFORMS = ["fb", "ig", "yt", "tk"];
-function parsePlatforms(title: string): string[] {
-    const regex = /#(fb|ig|yt|tk)\b/g;
-    const matches = title.match(regex);
-    return matches ? matches.map(m => m.replace("#", "")) : [];
-}
-
-// Clean title for display (remove project:..., #stage:..., #platform)
-function cleanTitle(title: string): string {
-    let t = title || ""
-        .replace(/project:[^\s]+/, "")
-        .replace(/#stage:[^\s]+/, "")
-        .replace(/#priority:[^\s]+/, "");
-
-    KNOWN_PLATFORMS.forEach(p => {
-        t = t.replace(new RegExp(`#${p}\\b`, "g"), "");
-    });
-    return t.trim();
-}
-
-// Construct title
-function constructTitle(base: string, project: string, stage: string, platforms: string[]) {
-    let t = base || "";
-    // Strip all first
-    t = t.replace(/project:[^\s]+/, "")
-        .replace(/#stage:[^\s]+/, "")
-        .replace(/#priority:[^\s]+/, ""); // We don't write priority to title anymore (using DB col), but strip if exists
-
-    KNOWN_PLATFORMS.forEach(p => {
-        t = t.replace(new RegExp(`#${p}\\b`, "g"), "");
-    });
-    t = t.trim();
-
-    const parts = [];
-    if (project) parts.push(`project:${project}`);
-    parts.push(t);
-    if (stage) parts.push(`#stage:${stage}`);
-    platforms.forEach(p => parts.push(`#${p}`));
-
-    return parts.join(" ");
-}
 
 // Subtasks / Notes Parsing
 // Format: 
@@ -146,9 +101,9 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
     // Consolidated Editable State
     // We keep individual states for ease of binding, but we'll bundle them for save
     const [titleRaw, setTitleRaw] = useState(task.title || "");
-    const [project, setProject] = useState(parseProject(task.title || ""));
-    const [stage, setStage] = useState(parseStage(task.title || ""));
-    const [platforms, setPlatforms] = useState<string[]>(parsePlatforms(task.title || ""));
+    const [project, setProject] = useState(parseProjectFromTitle(task.title || ""));
+    const [stage, setStage] = useState(parseStageFromTitle(task.title || ""));
+    const [platforms, setPlatforms] = useState<string[]>(parsePlatformsFromTitle(task.title || ""));
 
     const [status, setStatus] = useState<TaskStatus>((task.status?.toLowerCase() as TaskStatus) || "inbox");
     const [listId, setListId] = useState<string | null>(task.list_id || null);
@@ -169,6 +124,15 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
     const [realSubtasks, setRealSubtasks] = useState<Task[]>([]);
     const [loadingSubtasks, setLoadingSubtasks] = useState(false);
 
+    const [agentEnabled, setAgentEnabled] = useState(task.agent_enabled === 1);
+    const [agentMode, setAgentMode] = useState(task.agent_mode || "content_pack");
+    const [sourceNoteId, setSourceNoteId] = useState(task.source_note_id || "");
+    const [researchNoteId, setResearchNoteId] = useState(task.research_note_id || "");
+    const [agentStatus, setAgentStatus] = useState(task.agent_status || "idle");
+    const [lastRunAt, setLastRunAt] = useState(task.agent_last_run_at || "");
+    const [lastResultNoteId, setLastResultNoteId] = useState(task.last_agent_result_note_id || "");
+    const [lastError, setLastError] = useState(task.last_agent_error || "");
+
     // Save Status
     const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
     const dirtyRef = useRef(false);
@@ -182,7 +146,7 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
 
     useEffect(() => {
         payloadRef.current = {
-            title: constructTitle(cleanTitle(titleRaw), project, stage, platforms),
+            title: constructRawTitle(cleanTaskTitle(titleRaw), project, stage, platforms),
             status,
             list_id: listId,
             sprint_id: sprintId,
@@ -190,9 +154,17 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
             start_time: startTime || null,
             end_time: endTime || null,
             priority,
-            notes: serializeNotes(description, checklistItems)
+            notes: serializeNotes(description, checklistItems),
+            agent_enabled: agentEnabled ? 1 : 0,
+            agent_mode: agentMode,
+            source_note_id: sourceNoteId,
+            research_note_id: researchNoteId,
+            agent_status: agentStatus,
+            agent_last_run_at: lastRunAt,
+            last_agent_result_note_id: lastResultNoteId,
+            last_agent_error: lastError
         };
-    }, [titleRaw, project, stage, platforms, status, listId, sprintId, scheduledDate, startTime, endTime, priority, description, checklistItems]);
+    }, [titleRaw, project, stage, platforms, status, listId, sprintId, scheduledDate, startTime, endTime, priority, description, checklistItems, agentEnabled, agentMode, sourceNoteId, researchNoteId, agentStatus, lastRunAt, lastResultNoteId, lastError]);
 
     const doSave = useCallback(async () => {
         if (!dirtyRef.current) return;
@@ -295,15 +267,44 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
             .catch(() => setLoadingSubtasks(false));
     }, [task.id]);
 
-    // --- Handlers ---
+    const [loadingRun, setLoadingRun] = useState(false);
+
+    const handleRunAgent = async () => {
+        if (loadingRun) return;
+        setLoadingRun(true);
+        setAgentStatus("running");
+        triggerSave(); // Save current state first
+
+        try {
+            // Wait a bit for the auto-save to settle if needed, or just force save
+            await doSave();
+
+            const res = await fetch(`/api/tasks/${task.id}/run-agent`, { method: "POST" });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || "Failed to run agent");
+            }
+            const data = await res.json();
+            
+            if (data.task) {
+                onUpdate(data.task);
+                setAgentStatus(data.task.agent_status);
+                setLastRunAt(data.task.agent_last_run_at);
+                setLastResultNoteId(data.task.last_agent_result_note_id);
+                setLastError(data.task.last_agent_error || "");
+                setStatus(data.task.status);
+            }
+        } catch (e: any) {
+            console.error(e);
+            setAgentStatus("failed");
+            setLastError(e.message || "Execution failed");
+        } finally {
+            setLoadingRun(false);
+        }
+    };
 
     const handleTitleChange = (val: string) => {
-        setTitleRaw(constructTitle(val, project, stage, platforms)); // Update raw immediately?
-        // Actually, we bind the INPUT to cleanTitle, but setTitleRaw stores the full constructed one?
-        // Re-flow: 
-        // Input shows cleanTitle(titleRaw)
-        // User edits -> calls setRawTitle(constructTitle(newVal...))
-        // That seems circular but correct for maintaining prefix/suffix.
+        setTitleRaw(constructRawTitle(val, project, stage, platforms)); 
         triggerSave();
     };
 
@@ -377,9 +378,9 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                         {/* Header (Title) */}
                         <div className="flex items-start justify-between px-5 md:px-8 pt-6 pb-4 border-b border-neutral-100 gap-4 shrink-0 bg-white/95 backdrop-blur-md z-20">
                             <input
-                                value={cleanTitle(titleRaw)}
+                                value={cleanTaskTitle(titleRaw)}
                                 onChange={(e) => {
-                                    setTitleRaw(constructTitle(e.target.value, project, stage, platforms));
+                                    setTitleRaw(constructRawTitle(e.target.value, project, stage, platforms));
                                     triggerSave();
                                 }}
                                 placeholder="Task Title"
@@ -418,6 +419,7 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                                     <option value="inbox">Inbox</option>
                                     <option value="planned">Planned</option>
                                     <option value="in_progress">In Progress</option>
+                                    <option value="review">Review</option>
                                     <option value="done">Done</option>
                                 </select>
                             </div>
@@ -557,7 +559,7 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                                         value={project}
                                         onChange={e => {
                                             setProject(e.target.value);
-                                            setTitleRaw(constructTitle(cleanTitle(titleRaw), e.target.value, stage, platforms));
+                                            setTitleRaw(constructRawTitle(cleanTaskTitle(titleRaw), e.target.value, stage, platforms));
                                             triggerSave();
                                         }}
                                         readOnly={readOnly}
@@ -570,7 +572,7 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                                         value={stage}
                                         onChange={e => {
                                             setStage(e.target.value);
-                                            setTitleRaw(constructTitle(cleanTitle(titleRaw), project, e.target.value, platforms));
+                                            setTitleRaw(constructRawTitle(cleanTaskTitle(titleRaw), project, e.target.value, platforms));
                                             triggerSave();
                                         }}
                                         disabled={readOnly}
@@ -605,7 +607,7 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                                                                 ? [...platforms, p]
                                                                 : platforms.filter(x => x !== p);
                                                             setPlatforms(next);
-                                                            setTitleRaw(constructTitle(cleanTitle(titleRaw), project, stage, next));
+                                                            setTitleRaw(constructRawTitle(cleanTaskTitle(titleRaw), project, stage, next));
                                                             triggerSave();
                                                         }}
                                                         className="hidden"
@@ -697,6 +699,130 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                                 </div>
                             </div>
                         </div>
+                    </section>
+
+                    {/* AGENT AUTOMATION SECTION */}
+                    <section className={`space-y-6 pt-2 border-l-4 ${agentEnabled ? 'border-indigo-500 bg-indigo-50/20' : 'border-transparent'} -mx-5 px-5 py-6 transition-all`}>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <LucideIcons.Zap className={agentEnabled ? "text-indigo-600" : "text-neutral-400"} size={18} />
+                                <h3 className="text-xs font-bold text-neutral-900 uppercase tracking-widest">Agent Automation</h3>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only peer" 
+                                    checked={agentEnabled}
+                                    onChange={(e) => {
+                                        setAgentEnabled(e.target.checked);
+                                        triggerSave();
+                                    }}
+                                />
+                                <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+
+                        {agentEnabled && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className={LABEL_BASE}>Agent Mode</label>
+                                        <select 
+                                            className={INPUT_BASE}
+                                            value={agentMode}
+                                            onChange={(e) => {
+                                                setAgentMode(e.target.value);
+                                                triggerSave();
+                                            }}
+                                        >
+                                            <option value="content_pack">Content Pack Agent</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_BASE}>Source Note ID</label>
+                                        <input 
+                                            className={INPUT_BASE}
+                                            placeholder="Enter Source Note ID..."
+                                            value={sourceNoteId}
+                                            onChange={(e) => {
+                                                setSourceNoteId(e.target.value);
+                                                triggerSave();
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={LABEL_BASE}>Research Note ID</label>
+                                        <input 
+                                            className={INPUT_BASE}
+                                            placeholder="Enter Research Summary ID..."
+                                            value={researchNoteId}
+                                            onChange={(e) => {
+                                                setResearchNoteId(e.target.value);
+                                                triggerSave();
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col justify-between p-4 bg-white rounded-2xl border border-neutral-100 shadow-sm">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Status</span>
+                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                                agentStatus === 'success' ? 'bg-emerald-50 text-emerald-600' :
+                                                agentStatus === 'failed' ? 'bg-red-50 text-red-600' :
+                                                agentStatus === 'running' ? 'bg-indigo-50 text-indigo-600 animate-pulse' :
+                                                'bg-neutral-100 text-neutral-500'
+                                            }`}>
+                                                {agentStatus}
+                                            </span>
+                                        </div>
+                                        {lastRunAt && (
+                                            <div className="text-[10px] text-neutral-400">
+                                                Last Run: <span className="font-bold text-neutral-600">{new Date(lastRunAt).toLocaleString()}</span>
+                                            </div>
+                                        )}
+                                        {lastResultNoteId && (
+                                            <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded-lg">
+                                                <LucideIcons.FileText size={14} className="text-indigo-600" />
+                                                <span className="text-xs font-bold text-indigo-700 truncate flex-1">Result: {lastResultNoteId}</span>
+                                                <button 
+                                                    onClick={() => router.push(`/notes/${lastResultNoteId}`)}
+                                                    className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-bold"
+                                                >
+                                                    View
+                                                </button>
+                                            </div>
+                                        )}
+                                        {lastError && (
+                                            <div className="text-[10px] text-red-500 bg-red-50 p-2 rounded-lg border border-red-100">
+                                                <span className="font-black">Error:</span> {lastError}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <button 
+                                        onClick={handleRunAgent}
+                                        disabled={loadingRun || !sourceNoteId}
+                                        className={`w-full mt-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${
+                                            loadingRun ? 'bg-neutral-100 text-neutral-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md active:scale-95'
+                                        }`}
+                                    >
+                                        {loadingRun ? (
+                                            <>
+                                                <div className="w-3 h-3 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <LucideIcons.Play size={14} className="fill-current" />
+                                                Run Now
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </section>
 
                     {/* MATERIALS & CONTENT HUBS */}

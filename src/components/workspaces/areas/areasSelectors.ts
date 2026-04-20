@@ -180,10 +180,15 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState): Groupe
             }
         } else {
             // Default non-content grouping
-            if (state.groupBy === "status") key = t.status || "inbox";
-            else if (state.groupBy === "list") key = t.list_name || "Unassigned";
-            else if (state.groupBy === "sprint") key = t.sprint_name || "Backlog";
-            key = key.charAt(0).toUpperCase() + key.slice(1);
+            if (state.groupBy === "status") {
+                key = t.status || "inbox";
+                // Normalize for display: replace _ with space and Title Case
+                key = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            } else if (state.groupBy === "list") {
+                key = t.list_name || "Unassigned";
+            } else if (state.groupBy === "sprint") {
+                key = t.sprint_name || "Backlog";
+            }
         }
         
         if (!groups[key]) groups[key] = [];
@@ -243,9 +248,11 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState): Groupe
 
 
         if (state.groupBy === "status") {
-            const order = ["Inbox", "Planned", "Done"];
+            const order = ["Inbox", "Planned", "In Progress", "Done"];
             const i1 = order.indexOf(k1), i2 = order.indexOf(k2);
             if (i1 >= 0 && i2 >= 0) return i1 - i2;
+            if (i1 >= 0) return -1;
+            if (i2 >= 0) return 1;
         }
         return k1.localeCompare(k2);
     });

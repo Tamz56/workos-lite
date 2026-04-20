@@ -1,13 +1,19 @@
 import React from "react";
 import { Task } from "@/lib/types";
-import { CheckSquare, Check, Paperclip, FileText, Calendar, Tag, Circle } from "lucide-react";
+import { Check, Paperclip, FileText, Calendar, Tag, Circle } from "lucide-react";
 import { prefetchTaskDetail } from "@/components/GlobalTaskDialogs";
 import QuickStatusPicker from "./QuickStatusPicker";
+import { 
+    cleanTaskTitle, 
+    parseProjectFromTitle, 
+    parseStageFromTitle, 
+    parsePlatformsFromTitle 
+} from "@/lib/content/utils";
 
 interface TaskRowProps {
     task: Task;
     onClick: () => void;
-    onStatusChange?: (newStatus: "inbox" | "planned" | "done") => void;
+    onStatusChange?: (newStatus: "inbox" | "planned" | "in_progress" | "review" | "done") => void;
     onQuickComplete?: () => void; // RC25
     isSelected?: boolean;
     isHighlighted?: boolean;
@@ -55,6 +61,12 @@ export default function TaskRow({
                     activeNextStep ? "bg-amber-50/40 border-amber-100/50" : 
                     "bg-white border-neutral-100";
 
+    // Metadata Parsing
+    const cleanTitle = cleanTaskTitle(task.title);
+    const titleProject = parseProjectFromTitle(task.title);
+    const titleStage = parseStageFromTitle(task.title);
+    const titlePlatforms = parsePlatformsFromTitle(task.title);
+
     // RC33: Execution Table Mode (List View)
     if (mode === "table") {
         return (
@@ -77,17 +89,37 @@ export default function TaskRow({
                         <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                             task.status === 'done' ? 'bg-emerald-500' : 
                             task.status === 'inbox' ? 'bg-neutral-300' : 
+                            task.status === 'review' ? 'bg-indigo-500' :
                             'bg-blue-500'
                         }`} />
                     )}
                     <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-[12px] font-bold truncate leading-tight ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-indigo-600'}`}>
-                                {task.title}
+                                {cleanTitle}
                             </span>
                             {isActiveExecution && (
                                 <span className="text-[8px] bg-blue-600 text-white px-1.5 py-0.5 rounded-sm font-black uppercase tracking-widest whitespace-nowrap">Execution Mode</span>
                             )}
+                            
+                            {/* Metadata Badges in Table Mode */}
+                            <div className="flex items-center gap-1.5">
+                                {titleProject && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-sm bg-neutral-100 text-neutral-500 uppercase tracking-tighter">
+                                        {titleProject}
+                                    </span>
+                                )}
+                                {titleStage && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-sm bg-indigo-50 text-indigo-600 uppercase tracking-tighter border border-indigo-100">
+                                        {titleStage}
+                                    </span>
+                                )}
+                                {titlePlatforms.map(p => (
+                                    <span key={p} className="text-[8px] font-black px-1 py-0.5 rounded-full bg-blue-50 text-blue-500 uppercase">
+                                        #{p}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                         {task.topic_id && (
                             <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest leading-none mt-0.5">
@@ -164,31 +196,51 @@ export default function TaskRow({
                     <div className={`w-2 h-2 mt-1.5 sm:mt-0 shrink-0 rounded-full flex-none ${
                         task.status === 'done' ? 'bg-green-500' : 
                         task.status === 'inbox' ? 'bg-neutral-300' : 
+                        task.status === 'review' ? 'bg-indigo-500' :
                         'bg-blue-500'
                     }`} />
                 )}
                 
                 {/* Title + Topic Signal */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0.5 flex-1 min-w-0">
-                    <div className={`text-sm font-medium leading-tight sm:leading-normal sm:truncate ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-black'}`}>
-                        {task.title}
-                    </div>
-                    {task.topic_id && (
-                        <div className="flex items-center gap-1 shrink-0">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tight ${
-                                activeNextStep && !isDone 
-                                    ? 'bg-amber-100 text-amber-700' 
-                                    : 'bg-neutral-100 text-neutral-500'
-                            }`}>
-                                {task.topic_id}
-                            </span>
-                            {task.package_total !== undefined && (
-                                <span className="text-[10px] font-bold text-neutral-400">
-                                    {task.package_done}/{task.package_total}
-                                </span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-1 flex-1 min-w-0">
+                    <div className="flex flex-col">
+                        <div className={`text-sm font-medium leading-tight sm:leading-normal sm:truncate ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-black'}`}>
+                            {cleanTitle}
+                        </div>
+                        
+                        {/* Inline Metadata (for mobile/package view) */}
+                        <div className="flex items-center gap-1.5 mt-0.5 sm:hidden">
+                             {titleProject && (
+                                <span className="text-[8px] font-black px-1 rounded bg-neutral-100 text-neutral-500 uppercase">{titleProject}</span>
+                            )}
+                            {titleStage && (
+                                <span className="text-[8px] font-black px-1 rounded bg-indigo-50 text-indigo-600 uppercase">{titleStage}</span>
                             )}
                         </div>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-1.5 pt-1 sm:pt-0 shrink-0">
+                        {/* Topic/Package ID Badge */}
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tight ${
+                            activeNextStep && !isDone 
+                                ? 'bg-amber-100 text-amber-700' 
+                                : 'bg-neutral-100 text-neutral-500'
+                        }`}>
+                            {task.topic_id || titleProject || 'Untitled'}
+                        </span>
+
+                        {/* Stage Badge (Desktop) */}
+                        {titleStage && (
+                             <span className="hidden sm:inline-flex text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase tracking-tighter">
+                                {titleStage}
+                            </span>
+                        )}
+
+                        {task.package_total !== undefined && (
+                            <span className="text-[10px] font-bold text-neutral-400">
+                                {task.package_done}/{task.package_total}
+                            </span>
+                        )}
+                    </div>
 
 
                 </div>

@@ -254,6 +254,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const doneTasks = useMemo(() => tasks.filter(t => t.status === 'done'), [tasks]);
     const todoCount = todoTasks.length;
     const inProgressCount = useMemo(() => tasks.filter(t => t.status === 'in_progress').length, [tasks]);
+    const reviewCount = useMemo(() => tasks.filter(t => t.status === 'review').length, [tasks]);
 
     // RC46: Execution Engine Helpers
     const ensureTaskVisible = useCallback((taskId: string) => {
@@ -774,6 +775,14 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                             <div className="flex items-center gap-1.5 text-amber-600">
                                 <Clock size={12} className="shrink-0" />
                                 <span className="text-sm font-black">{inProgressCount}</span>
+                            </div>
+                        </div>
+                        <div className="w-px h-6 bg-neutral-100 hidden sm:block" />
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Review</span>
+                            <div className="flex items-center gap-1.5 text-indigo-600">
+                                <CheckCircle2 size={12} className="shrink-0" />
+                                <span className="text-sm font-black">{reviewCount}</span>
                             </div>
                         </div>
                     </div>
