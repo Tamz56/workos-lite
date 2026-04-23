@@ -4,7 +4,7 @@ import React, { Fragment } from "react";
 import { Menu, Transition } from "@headlessui/react";
 import { ChevronDown } from "lucide-react";
 
-type TaskStatus = "inbox" | "planned" | "done";
+type TaskStatus = "inbox" | "planned" | "in_progress" | "review" | "done";
 
 interface QuickStatusPickerProps {
     status: TaskStatus;
@@ -24,6 +24,18 @@ const statusConfig: Record<TaskStatus, { label: string; bg: string; text: string
         bg: "bg-blue-500", 
         text: "text-white",
         hover: "hover:bg-blue-600"
+    },
+    in_progress: { 
+        label: "In Progress", 
+        bg: "bg-amber-500", 
+        text: "text-white",
+        hover: "hover:bg-amber-600"
+    },
+    review: { 
+        label: "Review", 
+        bg: "bg-indigo-500", 
+        text: "text-white",
+        hover: "hover:bg-indigo-600"
     },
     done: { 
         label: "Done", 

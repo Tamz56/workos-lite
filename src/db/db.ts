@@ -108,8 +108,9 @@ function ensureMigrations() {
             CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
             AFTER UPDATE ON tasks
             FOR EACH ROW
+            WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
             BEGIN
-                UPDATE tasks SET updated_at = datetime('now') WHERE id = OLD.id;
+                UPDATE tasks SET updated_at = datetime('now') WHERE id = NEW.id;
             END;
         `);
     }
@@ -163,6 +164,105 @@ function ensureMigrations() {
     }
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_performance_metrics ON tasks(performance_metrics)");
 
+    // Agent Automation MVP Migration
+    const hasAgentEnabled = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "agent_enabled");
+    const taskTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get() as { sql: string } | undefined;
+    const hasReviewInConstraint = taskTableSql?.sql.includes("'review'");
+
+    if (!hasAgentEnabled || !hasReviewInConstraint) {
+        console.log("🛠 Migrating tasks table for Agent Automation MVP...");
+        // Rebuild table to update CHECK constraint and add all new columns
+        db.exec(`
+            -- Backup existing data
+            CREATE TABLE tasks_backup AS SELECT * FROM tasks;
+            
+            -- Drop old table
+            DROP TABLE tasks;
+            
+            -- Recreate from schema.sql (this is safe because we just updated schema.sql)
+            -- But easier to just define it here to be explicit
+            CREATE TABLE tasks (
+                id              TEXT PRIMARY KEY,
+                title           TEXT NOT NULL,
+                workspace       TEXT NOT NULL,
+                list_id         TEXT NULL,
+                status          TEXT NOT NULL DEFAULT 'inbox' CHECK (status IN ('inbox','planned','in_progress','review','done')),
+                scheduled_date  TEXT NULL,
+                schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning','afternoon','evening','none') OR schedule_bucket IS NULL),
+                start_time      TEXT NULL,
+                end_time        TEXT NULL,
+                priority        INTEGER NULL,
+                notes           TEXT NULL,
+                parent_task_id  TEXT NULL,
+                sort_order      INTEGER NULL,
+                doc_id          TEXT NULL,
+                is_seed         INTEGER DEFAULT 0,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                done_at         TEXT NULL,
+                sprint_id       TEXT NULL,
+                published_at    TEXT NULL,
+                distribution_channels TEXT NULL,
+                performance_metrics TEXT NULL,
+                review_status   TEXT DEFAULT 'draft',
+                agent_enabled   INTEGER DEFAULT 0,
+                agent_mode      TEXT NULL,
+                scheduled_run_at TEXT NULL,
+                source_note_id  TEXT NULL,
+                research_note_id TEXT NULL,
+                output_target   TEXT DEFAULT 'new_note',
+                approval_required INTEGER DEFAULT 1,
+                agent_status    TEXT DEFAULT 'idle',
+                agent_last_run_at TEXT NULL,
+                last_agent_result_note_id TEXT NULL,
+                last_agent_error TEXT NULL
+            );
+
+            -- Restore data (handling missing columns gracefully)
+            INSERT INTO tasks (
+                id, title, workspace, list_id, status, scheduled_date, schedule_bucket, 
+                start_time, end_time, priority, notes, parent_task_id, sort_order, 
+                doc_id, is_seed, created_at, updated_at, done_at, sprint_id, 
+                published_at, distribution_channels, performance_metrics, review_status
+            )
+            SELECT 
+                id, title, workspace, list_id, status, scheduled_date, schedule_bucket, 
+                start_time, end_time, priority, notes, parent_task_id, sort_order, 
+                doc_id, is_seed, created_at, updated_at, done_at, sprint_id, 
+                published_at, distribution_channels, performance_metrics, 
+                COALESCE(review_status, 'draft')
+            FROM tasks_backup;
+
+            -- Cleanup
+            DROP TABLE tasks_backup;
+
+            -- Recreate indexes
+            CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+            CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace);
+            CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id);
+            CREATE INDEX IF NOT EXISTS idx_tasks_parent_task_id ON tasks(parent_task_id);
+            CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_date ON tasks(scheduled_date);
+            CREATE INDEX IF NOT EXISTS idx_tasks_bucket ON tasks(schedule_bucket);
+            CREATE INDEX IF NOT EXISTS idx_tasks_done_at ON tasks(done_at);
+            CREATE INDEX IF NOT EXISTS idx_tasks_is_seed ON tasks(is_seed);
+            CREATE INDEX IF NOT EXISTS idx_tasks_sprint_id ON tasks(sprint_id);
+            CREATE INDEX IF NOT EXISTS idx_tasks_published_at ON tasks(published_at);
+            CREATE INDEX IF NOT EXISTS idx_tasks_distribution_channels ON tasks(distribution_channels);
+            CREATE INDEX IF NOT EXISTS idx_tasks_performance_metrics ON tasks(performance_metrics);
+            CREATE INDEX IF NOT EXISTS idx_tasks_agent_enabled ON tasks(agent_enabled);
+            CREATE INDEX IF NOT EXISTS idx_tasks_agent_status ON tasks(agent_status);
+
+            -- Recreate trigger
+            CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
+            AFTER UPDATE ON tasks
+            FOR EACH ROW
+            WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+            BEGIN
+                UPDATE tasks SET updated_at = datetime('now') WHERE id = NEW.id;
+            END;
+        `);
+    }
+
 
 
     const hasListIsSeed = db.prepare("PRAGMA table_info(lists)").all().some((c: any) => c.name === "is_seed");
@@ -196,8 +296,9 @@ function ensureMigrations() {
         CREATE TRIGGER IF NOT EXISTS trg_lists_updated_at
         AFTER UPDATE ON lists
         FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
         BEGIN
-            UPDATE lists SET updated_at = datetime('now') WHERE id = OLD.id;
+            UPDATE lists SET updated_at = datetime('now') WHERE id = NEW.id;
         END;
     `);
 
@@ -363,8 +464,9 @@ function ensureProjectsAndSprints() {
         CREATE TRIGGER IF NOT EXISTS trg_projects_updated_at
         AFTER UPDATE ON projects
         FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
         BEGIN
-          UPDATE projects SET updated_at = datetime('now') WHERE id = OLD.id;
+          UPDATE projects SET updated_at = datetime('now') WHERE id = NEW.id;
         END;
         CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 
@@ -388,8 +490,9 @@ function ensureProjectsAndSprints() {
         CREATE TRIGGER IF NOT EXISTS trg_project_items_updated_at
         AFTER UPDATE ON project_items
         FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
         BEGIN
-          UPDATE project_items SET updated_at = datetime('now') WHERE id = OLD.id;
+          UPDATE project_items SET updated_at = datetime('now') WHERE id = NEW.id;
         END;
 
         CREATE INDEX IF NOT EXISTS idx_project_items_project_status ON project_items(project_id, status);

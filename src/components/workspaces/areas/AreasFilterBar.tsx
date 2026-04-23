@@ -73,6 +73,7 @@ function MultiSelectDropdown({
 }
 
 interface AreasFilterBarProps {
+    workspaceId: string;
     tasks: Task[];
     lists: any[];
     sprints: any[];
@@ -80,7 +81,7 @@ interface AreasFilterBarProps {
     updateState: (updates: Partial<AreasViewState>) => void;
 }
 
-export default function AreasFilterBar({ tasks, lists, sprints, state, updateState }: AreasFilterBarProps) {
+export default function AreasFilterBar({ workspaceId, tasks, lists, sprints, state, updateState }: AreasFilterBarProps) {
     const toggleStatus = (status: string) => {
         const current = state.statusFilter;
         if (current.includes(status)) {
@@ -143,7 +144,7 @@ export default function AreasFilterBar({ tasks, lists, sprints, state, updateSta
                     <div className="border-r border-neutral-200 pr-4">
                         <MultiSelectDropdown
                             icon={<Tag className="w-3.5 h-3.5" />}
-                            label="Lists"
+                            label={workspaceId === 'content' ? "Topics" : "Lists"}
                             options={uniqueLists}
                             selectedKeys={state.listFilter}
                             onChange={(keys) => updateState({ listFilter: keys })}

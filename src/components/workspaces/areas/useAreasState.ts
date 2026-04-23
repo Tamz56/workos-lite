@@ -34,11 +34,13 @@ export interface AreasViewState {
     isQuickAddOpen: boolean;
     isTableQuickAddOpen: boolean;
     inlineQuickAddTopicId: string | null;
+    inlineQuickAddTopicTitle: string | null;
     isPackageModalOpen: boolean;
     collapsedTopicIds: string[];
     viewMode: "package" | "list";
     lastActiveTaskId: string | null;
     isFlowMode: boolean;
+    selectedTaskIds: string[]; // RC65: Bulk Selection
 }
 
 export function useAreasState(workspaceId: string, initialState?: Partial<AreasViewState>) {
@@ -61,11 +63,13 @@ export function useAreasState(workspaceId: string, initialState?: Partial<AreasV
         isQuickAddOpen: false,
         isTableQuickAddOpen: false,
         inlineQuickAddTopicId: null,
+        inlineQuickAddTopicTitle: null,
         isPackageModalOpen: false,
         collapsedTopicIds: [],
         viewMode: "package",
         lastActiveTaskId: null,
         isFlowMode: false,
+        selectedTaskIds: [],
     };
 
     const validate = (key: string, value: any): boolean => {

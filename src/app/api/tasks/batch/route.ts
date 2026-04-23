@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { toErrorMessage } from "@/lib/error";
+import fs from "fs/promises";
+import path from "path";
 
 export const runtime = "nodejs";
 
@@ -145,6 +147,57 @@ export async function PATCH(req: NextRequest) {
             ok: true, 
             deltaDays, 
             updatedCount 
+        });
+
+    } catch (e: unknown) {
+        return NextResponse.json({ error: toErrorMessage(e) }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const { ids } = await req.json();
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return NextResponse.json({ error: "Missing or invalid ids array" }, { status: 400 });
+        }
+
+        const db = getDb();
+        const now = new Date().toISOString();
+
+        // 1. Fetch all associated attachments to clean up files
+        // RC65: Collective file cleanup
+        const placeholders = ids.map((_, i) => `@id_${i}`).join(", ");
+        const bindValues: Record<string, string> = {};
+        ids.forEach((id, i) => { bindValues[`id_${i}`] = id; });
+
+        const attachments = db.prepare(`
+            SELECT id, storage_path 
+            FROM attachments 
+            WHERE task_id IN (${placeholders})
+        `).all(bindValues) as { id: string; storage_path: string }[];
+
+        // 2. Perform file deletion
+        for (const a of attachments) {
+            if (a.storage_path) {
+                const absPath = path.isAbsolute(a.storage_path)
+                    ? a.storage_path
+                    : path.join(process.cwd(), ".workos-lite", a.storage_path);
+                try {
+                    await fs.unlink(absPath);
+                } catch (e: any) {
+                    if (e.code !== 'ENOENT') console.error("[batch-delete] unlink failed", e);
+                }
+            }
+        }
+
+        // 3. Delete tasks (cascades should handle sub-rows if configured, but we'll reflect main deletion)
+        const deleteStmt = db.prepare(`DELETE FROM tasks WHERE id IN (${placeholders})`);
+        const info = deleteStmt.run(bindValues);
+
+        return NextResponse.json({ 
+            ok: true, 
+            deletedCount: info.changes 
         });
 
     } catch (e: unknown) {

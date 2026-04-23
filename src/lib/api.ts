@@ -71,6 +71,17 @@ export async function deleteTask(id: string): Promise<void> {
     if (!res.ok) throw new Error(`deleteTask failed: ${res.status}`);
 }
 
+export async function runAgent(id: string): Promise<{ task: Task }> {
+    const res = await fetch(`/api/tasks/${id}/run-agent`, {
+        method: "POST",
+    });
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "runAgent failed");
+    }
+    return res.json();
+}
+
 // Backward compatibility aliases
 export const listTasks = getTasks;
 

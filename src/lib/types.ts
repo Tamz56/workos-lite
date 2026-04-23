@@ -1,6 +1,6 @@
 import { Workspace } from "./workspaces";
 export { type Workspace };
-export type TaskStatus = "inbox" | "planned" | "in_progress" | "done";
+export type TaskStatus = "inbox" | "planned" | "in_progress" | "review" | "done";
 export type ScheduleBucket = "morning" | "afternoon" | "evening" | "none";
 
 export type Task = {
@@ -39,6 +39,7 @@ export type Task = {
     sprint_name?: string;
     template_key?: string | null;
     topic_id?: string | null;
+    topic_title?: string | null;
     package_id?: string | null;
     step_key?: string | null;
     package_total?: number;
@@ -47,6 +48,19 @@ export type Task = {
     published_at?: string | null; // RC28
     distribution_channels?: string | null; // RC29
     performance_metrics?: string | null; // RC30
+
+    // Agent Automation (MVP)
+    agent_enabled?: number;
+    agent_mode?: string | null;
+    scheduled_run_at?: string | null;
+    source_note_id?: string | null;
+    research_note_id?: string | null;
+    output_target?: 'new_note';
+    approval_required?: number;
+    agent_status?: 'idle' | 'queued' | 'running' | 'review' | 'failed';
+    agent_last_run_at?: string | null;
+    last_agent_result_note_id?: string | null;
+    last_agent_error?: string | null;
 };
 
 

@@ -9,6 +9,7 @@ export function resolveSmartCreateDefaults(ctx: CreationContext): CreateDefaults
     topicId: ctx.topicId ?? null,
     packageId: ctx.packageId ?? null,
     packageStepKey: ctx.packageStepKey ?? null,
+    parentTaskId: ctx.parentTaskId ?? null,
     suggestedReason: null,
   }
 

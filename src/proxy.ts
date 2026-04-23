@@ -9,7 +9,7 @@ const PROTECTED_ROUTES = [
     '/api/agent/logs'
 ]
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname: p } = request.nextUrl
 
     // 1. Auth Logic for protected routes

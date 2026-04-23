@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   title           TEXT NOT NULL,
   workspace       TEXT NOT NULL,
   list_id         TEXT NULL,
-  status          TEXT NOT NULL DEFAULT 'inbox' CHECK (status IN ('inbox','planned','in_progress','done')),
+  status          TEXT NOT NULL DEFAULT 'inbox' CHECK (status IN ('inbox','planned','in_progress','review','done')),
   scheduled_date  TEXT NULL, -- YYYY-MM-DD
   schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning','afternoon','evening','none') OR schedule_bucket IS NULL),
   start_time      TEXT NULL, -- HH:MM
@@ -26,7 +26,19 @@ CREATE TABLE IF NOT EXISTS tasks (
   sprint_id       TEXT NULL,
   published_at    TEXT NULL,
   distribution_channels TEXT NULL,
-  performance_metrics TEXT NULL
+  performance_metrics TEXT NULL,
+  -- Agent Automation (MVP)
+  agent_enabled   INTEGER DEFAULT 0,
+  agent_mode      TEXT NULL,
+  scheduled_run_at TEXT NULL,
+  source_note_id  TEXT NULL,
+  research_note_id TEXT NULL,
+  output_target   TEXT DEFAULT 'new_note',
+  approval_required INTEGER DEFAULT 1,
+  agent_status    TEXT DEFAULT 'idle',
+  agent_last_run_at TEXT NULL,
+  last_agent_result_note_id TEXT NULL,
+  last_agent_error TEXT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);

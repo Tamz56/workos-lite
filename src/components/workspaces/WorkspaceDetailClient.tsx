@@ -10,10 +10,13 @@ import { useAreasState } from "./areas/useAreasState";
 import AreasToolbar from "./areas/AreasToolbar";
 import AreasFilterBar from "./areas/AreasFilterBar";
 import AreasTaskList from "./areas/AreasTaskList";
+import { useSearchParams } from "next/navigation";
 import CreateContentPackageModal from "./areas/CreateContentPackageModal";
 import CommandPalette, { CommandOption } from "./areas/CommandPalette";
 import QuickAddTask from "./areas/QuickAddTask";
+import CreateListModal from "./areas/CreateListModal";
 import { Toast } from "../ui/Toast";
+import { Modal, isAnyModalOpen } from "../ui/Modal";
 
 // RC39: Smart Suggestions
 import { SmartViewHint } from "./SmartViewHint";
@@ -25,20 +28,301 @@ import { resolveSmartCreateDefaults } from "../../lib/smart/defaults/resolveSmar
 import { resolveSuggestedView } from "../../lib/smart/view/resolveSuggestedView";
 import { scoreSuggestionConfidence } from "../../lib/smart/confidence/scoreSuggestionConfidence";
 import { getViewHintMemory, setViewHintMemory, setLastUsedList } from "../../lib/workspaceMemory/smartMemory";
-import { resolveNextTask } from "../../lib/smart/queue/resolveNextTask";
+// import { resolveNextTask } from "../../lib/smart/queue/resolveNextTask";
 import { SingleFlowBar } from "./SingleFlowBar";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { workspaceLabel } from "@/lib/workspaces";
-import { ChevronRight, LayoutGrid } from "lucide-react";
+import { getWorkspaceColor } from "@/lib/workspaces";
+import * as LucideIcons from "lucide-react";
+import { ChevronRight, LayoutGrid, X, Play, ArrowRight, CheckCircle2, Clock, List, Zap } from "lucide-react";
+
+// RC47: Intelligence Layer
+import { 
+    resolveBestNextTask, 
+    IntelligenceContext, 
+    scoreTask, 
+    RecommendationMode, 
+    TuningPreferences, 
+    FeedbackSignal 
+} from "../../lib/smart/intelligence/nextTaskEngine";
+import { calculateWorkspaceUrgency, UrgencySignal } from "../../lib/smart/intelligence/workspaceUrgency";
+
+// RC50: Learning imports
+import { recordEvent, getEvents, clearEvents } from "../../lib/smart/learning/behaviorTracker";
+import { generateInsights, deriveAdaptiveNudges } from "../../lib/smart/learning/insightEngine";
+import { deriveSuggestedActions, deriveMicroInsights, recordActionDismissal } from "../../lib/smart/learning/actionEngine";
+import { InsightReport, LearningNudges, SuggestedAction, MicroInsight } from "../../lib/smart/learning/types";
+import { InsightSummaryModal } from "./InsightSummaryModal";
+
+const DEFAULT_PREFERENCES: TuningPreferences = {
+    preferOverdue: false,
+    preferContinuity: true,
+    reduceResurfacing: false,
+    conservative: true
+};
 
 export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: string }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const isCreatePackageModalOpen = searchParams.get('createPackage') === 'true';
+    const isNewListModalOpen = searchParams.get('newList') === 'true';
+    const activeTaskIdFromUrl = searchParams.get('taskId');
     const ws = WORKSPACES_LIST.find(w => w.id === workspaceId);
- 
-    const { state, updateState } = useAreasState(workspaceId);
+    const wsColor = ws ? getWorkspaceColor(ws.colorKey) : getWorkspaceColor("neutral");
+    const WsIcon = (LucideIcons as any)[ws?.iconKey || "LayoutGrid"] || LayoutGrid;
+    
+    const { state, updateState } = useAreasState(workspaceId, {
+        selectedTaskId: activeTaskIdFromUrl,
+    });
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
+    
+    // RC49: Mode & Preferences state with Persistence
+    const [mode, setMode] = useState<RecommendationMode>('balanced');
+    const [preferences, setPreferences] = useState<TuningPreferences>(DEFAULT_PREFERENCES);
+    const [pinnedTaskId, setPinnedTaskId] = useState<string | null>(null);
+    
+    // RC47/RC48/RC49: Intelligence State (Granular)
+    const [skips, setSkips] = useState<Record<string, number>>({});
+    const [viewed, setViewed] = useState<string[]>([]);
+    const [overrides, setOverrides] = useState<string[]>([]);
+    const [feedback, setFeedback] = useState<Record<string, FeedbackSignal>>({});
+    const [lastCompletedTaskId, setLastCompletedTaskId] = useState<string | null>(null);
 
+    // RC50/51: Learning State
+    const [events, setEvents] = useState<any[]>([]);
+    const [report, setReport] = useState<InsightReport | null>(null);
+    const [nudges, setNudges] = useState<LearningNudges | null>(null);
+    const [suggestions, setSuggestions] = useState<SuggestedAction[]>([]);
+    const [microInsight, setMicroInsight] = useState<MicroInsight | null>(null);
+    const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
+
+    const intelligence: IntelligenceContext = useMemo(() => ({
+        skips,
+        viewed,
+        lastCompletedTaskId: lastCompletedTaskId || state.lastActiveTaskId || null,
+        overrides,
+        mode,
+        preferences,
+        feedback,
+        learningNudges: nudges || undefined
+    }), [skips, viewed, lastCompletedTaskId, state.lastActiveTaskId, overrides, mode, preferences, feedback, nudges]);
+
+    // Load/Save Preferences
+    useEffect(() => {
+        if (typeof window !== 'undefined' && workspaceId) {
+            const saved = localStorage.getItem(`ws_prefs_${workspaceId}`);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.mode) setMode(parsed.mode);
+                    if (parsed.preferences) setPreferences(parsed.preferences);
+                } catch (e) {
+                    console.error("Failed to parse prefs", e);
+                }
+            }
+        }
+    }, [workspaceId]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && workspaceId) {
+            localStorage.setItem(`ws_prefs_${workspaceId}`, JSON.stringify({ mode, preferences }));
+        }
+    }, [workspaceId, mode, preferences]);
+
+    // Track recently viewed & Initialize Learning
+    useEffect(() => {
+        if (state.selectedTaskId && !viewed.includes(state.selectedTaskId)) {
+            setViewed(prev => [...prev, state.selectedTaskId as string]);
+        }
+    }, [state.selectedTaskId, viewed]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && workspaceId) {
+            const evs = getEvents(workspaceId);
+            setEvents(evs);
+            const rep = generateInsights(evs);
+            setReport(rep);
+            setNudges(deriveAdaptiveNudges(evs));
+            setMicroInsight(deriveMicroInsights(evs));
+        }
+    }, [workspaceId]);
+
+    const handleResetLearning = useCallback(() => {
+        if (workspaceId) {
+            clearEvents(workspaceId);
+            setEvents([]);
+            setReport(null);
+            setNudges(null);
+            setToast({ isVisible: true, message: "🧹 รีเซ็ตข้อมูลการเรียนรู้เรียบร้อยแล้ว" });
+        }
+    }, [workspaceId]);
+
+    // RC48B: Selection tracking for stability
+    const lastRecommendedId = useRef<string | null>(null);
+    const isSystemSelecting = useRef(false);
+
+    // RC47A/C/RC48/RC49: Upgraded Intelligence Resolver
+    const smartRecommendation = useMemo(() => {
+        return resolveBestNextTask(tasks, null, intelligence, lastRecommendedId.current);
+    }, [tasks, intelligence]);
+
+    const headerTaskResult = useMemo(() => {
+        // Priority 1: Manual selection (if not done)
+        const current = tasks.find(t => t.id === state.selectedTaskId);
+        if (current && current.status !== 'done') {
+            return scoreTask(current, intelligence, tasks);
+        }
+        
+        // Priority 2: Pinned recommendation
+        if (pinnedTaskId) {
+            const pinned = tasks.find(t => t.id === pinnedTaskId);
+            if (pinned && pinned.status !== 'done') {
+                return scoreTask(pinned, intelligence, tasks);
+            }
+            // Auto-unpin if invalid/done
+            setPinnedTaskId(null);
+        }
+
+        return smartRecommendation;
+    }, [tasks, state.selectedTaskId, intelligence, smartRecommendation, pinnedTaskId]);
+
+    const headerTask = headerTaskResult?.task || null;
+
+    // Track recommendation for stability & overrides
+    useEffect(() => {
+        if (smartRecommendation?.task.id) {
+            lastRecommendedId.current = smartRecommendation.task.id;
+        }
+    }, [smartRecommendation]);
+
+    // RC49 Handlers
+    const handleFeedback = useCallback((taskId: string, signal: FeedbackSignal) => {
+        setFeedback(prev => ({ ...prev, [taskId]: signal }));
+        recordEvent(workspaceId, 'feedback_given', taskId, { signal });
+    }, [workspaceId]);
+
+    const handleModeChange = useCallback((newMode: RecommendationMode) => {
+        const prevMode = mode;
+        setMode(newMode);
+        recordEvent(workspaceId, 'mode_changed', undefined, { fromMode: prevMode, toMode: newMode });
+    }, [workspaceId, mode]);
+
+    const handleTogglePreference = useCallback((key: keyof TuningPreferences) => {
+        setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
+    }, []);
+
+    const handleSkipTask = useCallback((taskId: string) => {
+        setSkips(prev => ({ ...prev, [taskId]: (prev[taskId] || 0) + 1 }));
+        recordEvent(workspaceId, 'task_skipped', taskId, { activeMode: mode });
+    }, [workspaceId, mode]);
+
+    // RC50: Tracking manual overrides
+    useEffect(() => {
+        if (state.selectedTaskId && !isSystemSelecting.current) {
+            const recommendedId = lastRecommendedId.current;
+            if (recommendedId && state.selectedTaskId !== recommendedId) {
+                if (!overrides.includes(recommendedId)) {
+                    setOverrides(prev => [...prev, recommendedId]);
+                    recordEvent(workspaceId, 'task_override', recommendedId, { chosenId: state.selectedTaskId });
+                }
+            }
+        }
+        isSystemSelecting.current = false;
+    }, [state.selectedTaskId, overrides, workspaceId, state.isFlowMode]);
+
+    const handlePinTask = useCallback((taskId: string) => {
+        setPinnedTaskId(taskId);
+        setToast({ isVisible: true, message: "📌 ปักหมุดงานแนะนำเรียบร้อยแล้ว" });
+    }, []);
+
+    // RC51: Action Execution
+    const handleSuggestedAction = useCallback((action: SuggestedAction) => {
+        if (action.type === 'switch_mode' && action.payload.mode) {
+            handleModeChange(action.payload.mode);
+        } else if (action.type === 'toggle_pref' && action.payload.preferenceKey) {
+            handleTogglePreference(action.payload.preferenceKey);
+        } else if (action.type === 'pin_task' && action.payload.taskId) {
+            handlePinTask(action.payload.taskId);
+        }
+        
+        recordActionDismissal(action.id);
+    }, [handleModeChange, handleTogglePreference, handlePinTask]);
+
+    const handleRestoreIntelligence = useCallback(() => {
+        setSkips({});
+        setIsQueueDismissed(false);
+        setViewHintDismissed(false);
+        setToast({ isVisible: true, message: "↺ คืนค่าการแนะนำและแถบอัจฉริยะเรียบร้อยแล้ว" });
+        recordEvent(workspaceId, 'intelligence_restored', undefined, {});
+    }, [workspaceId]);
+
+    // RC51: Suggestion Refresh
+    useEffect(() => {
+        if (report) {
+            setSuggestions(deriveSuggestedActions(report, mode, preferences, smartRecommendation?.task.id));
+        }
+    }, [report, mode, preferences, smartRecommendation?.task.id]);
+
+    // RC47D: Urgency Signal
+    const urgencySignal = useMemo(() => calculateWorkspaceUrgency(tasks), [tasks]);
+
+    // RC45: Calculated Stats
+    const todoTasks = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
+    const doneTasks = useMemo(() => tasks.filter(t => t.status === 'done'), [tasks]);
+    const todoCount = todoTasks.length;
+    const inProgressCount = useMemo(() => tasks.filter(t => t.status === 'in_progress').length, [tasks]);
+    const reviewCount = useMemo(() => tasks.filter(t => t.status === 'review').length, [tasks]);
+
+    // RC46: Execution Engine Helpers
+    const ensureTaskVisible = useCallback((taskId: string) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (task?.package_id && state.collapsedTopicIds.includes(task.package_id)) {
+            updateState({ 
+                collapsedTopicIds: state.collapsedTopicIds.filter(id => id !== task.package_id) 
+            });
+        }
+    }, [tasks, state.collapsedTopicIds, updateState]);
+
+    const handleResumeWork = useCallback(() => {
+        isSystemSelecting.current = true;
+        const currentSelected = tasks.find(t => t.id === state.selectedTaskId);
+        const lastActive = tasks.find(t => t.id === state.lastActiveTaskId);
+        
+        const bestNext = smartRecommendation?.task;
+
+        const toResume = (lastActive && lastActive.status !== 'done' && tasks.some(tx => tx.id === lastActive.id))
+            ? lastActive
+            : (currentSelected && currentSelected.status !== 'done')
+                ? currentSelected
+                : bestNext;
+        
+        if (toResume) {
+            ensureTaskVisible(toResume.id);
+            updateState({ 
+                selectedTaskId: toResume.id,
+                isFlowMode: true 
+            });
+            router.push(`?taskId=${toResume.id}`);
+            setToast({ isVisible: true, message: `🚀 กลับเข้าสู่การทำงาน: ${toResume.title}` });
+        } else {
+            setToast({ isVisible: true, message: "ไม่มีงานค้างที่ต้องการ Resume ในขณะนี้" });
+        }
+    }, [tasks, state.lastActiveTaskId, state.selectedTaskId, updateState, ensureTaskVisible, router, smartRecommendation]);
+
+    const handleOpenNextTask = useCallback(() => {
+        isSystemSelecting.current = true;
+        const next = smartRecommendation?.task;
+        if (next) {
+            ensureTaskVisible(next.id);
+            updateState({ selectedTaskId: next.id });
+            router.push(`?taskId=${next.id}`);
+            setToast({ isVisible: true, message: `เปิดงานถัดไป: ${next.title}` });
+        } else {
+            setToast({ isVisible: true, message: "คุณเคลียร์งานทั้งหมดเรียบร้อยแล้ว!" });
+        }
+    }, [updateState, ensureTaskVisible, router, smartRecommendation]);
+
+    const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
     const [loadingTasks, setLoadingTasks] = useState(true);
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
@@ -85,7 +369,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             try {
                 const [lRes, sRes] = await Promise.all([
                     fetch(`/api/lists?workspace=${workspaceId}`),
-                    fetch(`/api/sprints`) // Sprints are cross-project but we can filter if needed. For now fetch all or simple.
+                    fetch(`/api/sprints`) 
                 ]);
                 const lData = await lRes.json();
                 const sData = await sRes.json();
@@ -105,24 +389,17 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
         try {
             const params = new URLSearchParams();
-            
-            // RC8A: Pass multi-value filters to API
             if (state.statusFilter.length > 0) params.set("statuses", state.statusFilter.join(","));
             if (state.workspaceFilter.length > 0) params.set("workspaces", state.workspaceFilter.join(","));
-            else params.set("workspace", workspaceId); // Default to current workspace if no specific filter
+            else params.set("workspace", workspaceId); 
             
             if (state.listFilter.length > 0) params.set("list_ids", state.listFilter.join(","));
             if (state.sprintFilter.length > 0) params.set("sprint_ids", state.sprintFilter.join(","));
-            
-            // RC19/RC20: Content specific filters
             if (state.templateFilter.length > 0) params.set("template_keys", state.templateFilter.join(","));
-            if (state.reviewStatusFilter.length > 0) params.set("review_statuses", state.reviewStatusFilter.join(",")); // RC26
+            if (state.reviewStatusFilter.length > 0) params.set("review_statuses", state.reviewStatusFilter.join(",")); 
             if (state.scheduleFilter !== "all") params.set("schedule_state", state.scheduleFilter);
-            
-            // RC20: Date Range
             if (state.dateRange.start) params.set("start", state.dateRange.start);
             if (state.dateRange.end) params.set("end", state.dateRange.end);
-
             if (state.search) params.set("q", state.search);
             
             params.set("limit", LIMIT.toString());
@@ -149,7 +426,6 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     // RC37: Keyboard-First Flow
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // 1. Command Palette: Cmd/Ctrl + K
             if ((e.metaKey || e.ctrlKey) && e.key === "k") {
                 e.preventDefault();
                 lastActiveElement.current = document.activeElement as HTMLElement;
@@ -157,7 +433,6 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 return;
             }
 
-            // Safety Guard: Check if user is typing in any input/textarea/editable
             const target = e.target as HTMLElement;
             const isTyping = 
                 target.tagName === "INPUT" || 
@@ -166,25 +441,16 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 target.isContentEditable ||
                 target.closest('[role="combobox"]');
 
+            if (isAnyModalOpen()) return;
             if (isTyping && !isCommandPaletteOpen) return;
 
-            // 1. Global Quick Add (RC37): n or /
             if (e.key === "n" || e.key === "/") {
                 e.preventDefault();
                 updateState({ isQuickAddOpen: true });
                 return;
             }
 
-            // 2. Esc: Layered closing (one at a time)
             if (e.key === "Escape") {
-                // Priority 0: Command Palette (RC38)
-                if (isCommandPaletteOpen) {
-                    setIsCommandPaletteOpen(false);
-                    lastActiveElement.current?.focus();
-                    return;
-                }
-
-                // Priority A: Inline Popovers/Composers in Table/Package mode
                 if (state.isTableQuickAddOpen || state.inlineQuickAddTopicId) {
                     updateState({ 
                         isTableQuickAddOpen: false, 
@@ -192,36 +458,18 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                     });
                     return;
                 }
-
-                // Priority B: Global Quick Add
-                if (state.isQuickAddOpen) {
-                    updateState({ isQuickAddOpen: false });
-                    return;
-                }
-
-                // Priority C: Task Drawer
-                // Task drawer is closed via removing taskId from URL or setting selectedTaskId
-                const searchParams = new URLSearchParams(window.location.search);
-                if (searchParams.has("taskId")) {
-                    router.push(window.location.pathname);
-                    return;
-                }
-
-                // Priority D: Flow Mode Exit
                 if (state.isFlowMode) {
                     updateState({ isFlowMode: false });
                     return;
                 }
             }
 
-            // RC43: Switcher Shortcut (Cmd+Shift+W)
-            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "w") {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "j") {
                 e.preventDefault();
                 setIsSwitcherOpen(true);
                 return;
             }
 
-            // RC42: Flow Mode Shortcuts
             if (state.isFlowMode && (e.metaKey || e.ctrlKey)) {
                 if (e.key === "Enter") {
                     e.preventDefault();
@@ -230,7 +478,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 }
                 if (e.key === "ArrowRight") {
                     e.preventDefault();
-                    handleFlowNext(true); // Skip
+                    handleFlowNext(true); 
                     return;
                 }
                 if (e.key === "o") {
@@ -244,17 +492,25 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isCommandPaletteOpen, state.isQuickAddOpen, state.isTableQuickAddOpen, state.inlineQuickAddTopicId, state.isFlowMode, state.selectedTaskId, updateState, router]);
+    
+    // RC65: Listen for external task updates (e.g. from GlobalTaskDialogs)
+    useEffect(() => {
+        const handleExternalUpdate = () => {
+            fetchTasks(false);
+        };
+        window.addEventListener("task-updated", handleExternalUpdate);
+        return () => window.removeEventListener("task-updated", handleExternalUpdate);
+    }, [fetchTasks]);
 
-    // Initial fetch and fetch on filter change
     useEffect(() => {
         fetchTasks(false);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workspaceId, state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter, state.templateFilter, state.reviewStatusFilter, state.scheduleFilter, state.dateRange.start, state.dateRange.end, state.search]);
+    }, [workspaceId, state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter, state.templateFilter, state.reviewStatusFilter, state.scheduleFilter, state.dateRange.start, state.dateRange.end, state.search, fetchTasks]);
 
-    // Handle Task Update
     const handleTaskUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
-        // Optimistic Update
+        const prevTask = tasks.find(t => t.id === taskId);
+        const prevStatus = prevTask?.status;
         const prevTasks = [...tasks];
+        
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
 
         try {
@@ -266,185 +522,268 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             if (!res.ok) throw new Error("Update failed");
             
             const { task: updatedFromServer } = await res.json();
-            // Sync with server response
             setTasks(prev => prev.map(t => t.id === taskId ? updatedFromServer : t));
+            // RC52: Undo Support for Status Changes
+            if (updates.status && prevTask && prevStatus !== updates.status) {
+                setToast({
+                    isVisible: true,
+                    message: updates.status === 'done' ? `✅ เสร็จสิ้น: ${prevTask.title}` : `อัปเดตสถานะเป็น: ${updates.status}`,
+                    action: {
+                        label: "ย้อนกลับ",
+                        onClick: () => {
+                            handleTaskUpdate(taskId, { status: prevStatus as any });
+                        }
+                    }
+                });
+            }
+
+            if (updates.status === 'done' && !state.isFlowMode) {
+                // If not in flow mode, we might want to suggest the next task separately
+                // but we wait a bit to let the "Undo" toast be seen first
+                const nextResult = resolveBestNextTask(tasks, taskId, intelligence);
+                const next = nextResult?.task;
+                if (next) {
+                    setTimeout(() => {
+                        setToast(prev => {
+                            if (prev.isVisible && prev.message.includes("เสร็จสิ้น")) {
+                                return {
+                                    ...prev,
+                                    message: `งานเสร็จเรียบร้อย! ขั้นตอนถัดไป: ${next.title}`,
+                                    action: {
+                                        label: "เริ่มทำเลย",
+                                        onClick: () => {
+                                            ensureTaskVisible(next.id);
+                                            updateState({ selectedTaskId: next.id });
+                                            router.push(`?taskId=${next.id}`);
+                                        }
+                                    }
+                                };
+                            }
+                            return prev;
+                        });
+                    }, 3000);
+                }
+            }
+
+            if (updates.status === 'done' && state.isFlowMode) {
+                setLastCompletedTaskId(taskId);
+                recordEvent(workspaceId, 'task_completed', taskId, { activeMode: mode });
+
+                const nextResult = resolveBestNextTask(tasks, taskId, intelligence);
+                const next = nextResult?.task;
+
+                if (next) {
+                    handleFlowNext(false, taskId); 
+                } else {
+                    setToast({ 
+                        isVisible: true, 
+                        message: "🎊 ยอดเยี่ยม! คุณเคลียร์งานทั้งหมดใน Workspace นี้เรียบร้อยแล้ว",
+                    });
+                    updateState({ isFlowMode: false });
+                }
+            }
         } catch (e) {
             console.error("Failed to update task", e);
-            // Revert on error
             setTasks(prevTasks);
-            alert("Failed to update status. Please try again.");
         }
-    }, [tasks]);
+    }, [tasks, state.isFlowMode, updateState, router, ensureTaskVisible, intelligence]);
 
-    // RC42: Single Flow Logic
     const currentTask = useMemo(() => {
         return tasks.find(t => t.id === state.selectedTaskId) || null;
     }, [tasks, state.selectedTaskId]);
 
     const nextTask = useMemo(() => {
-        return resolveNextTask(tasks, state.selectedTaskId);
-    }, [tasks, state.selectedTaskId]);
+        const result = resolveBestNextTask(tasks, state.selectedTaskId, intelligence);
+        return result?.task || null;
+    }, [tasks, state.selectedTaskId, intelligence]);
 
-    const handleFlowNext = useCallback((isSkip = false) => {
-        if (nextTask) {
+    const handleFlowNext = useCallback((isSkip = false, currentId?: string) => {
+        const activeId = currentId || state.selectedTaskId;
+        
+        if (isSkip && activeId) {
+            handleSkipTask(activeId);
+        }
+
+        const nextResult = resolveBestNextTask(tasks, activeId, intelligence);
+        const next = nextResult?.task;
+
+        if (next) {
+            ensureTaskVisible(next.id);
             updateState({ 
-                selectedTaskId: nextTask.id,
-                lastActiveTaskId: nextTask.id
+                selectedTaskId: next.id,
+                lastActiveTaskId: next.id
             });
-            // If skip, we might want a small transition here in the UI
+            router.push(`?taskId=${next.id}`);
+            if (isSkip) {
+                setToast({ isVisible: true, message: `ข้ามไปที่: ${next.title}` });
+            }
         } else {
-            // No more tasks
             setToast({ isVisible: true, message: "🎉 ทุกอย่างสำเร็จครบถ้วนแล้ว! (All tasks complete)" });
             updateState({ isFlowMode: false });
         }
-    }, [nextTask, updateState]);
+    }, [tasks, state.selectedTaskId, updateState, ensureTaskVisible, router, intelligence, handleSkipTask]);
 
     const handleFlowDone = useCallback(async () => {
         if (!currentTask) return;
         await handleTaskUpdate(currentTask.id, { status: "done" });
-        handleFlowNext(false); // Move to next
-    }, [currentTask, handleTaskUpdate, handleFlowNext]);
+    }, [currentTask, handleTaskUpdate]);
 
     const handleWorkspaceSelect = useCallback((newId: string) => {
         setIsSwitcherOpen(false);
         if (newId === workspaceId) return;
-        
-        // Navigation triggers refetch and sticky task restore in Next.js
         router.push(`/workspaces/${newId}`);
     }, [workspaceId, router]);
 
-    // Sync lastActiveTaskId to state.selectedTaskId on Load
     useEffect(() => {
         if (state.lastActiveTaskId && !state.selectedTaskId && tasks.length > 0) {
-            // Validate if task exists and is not done
             const task = tasks.find(t => t.id === state.lastActiveTaskId);
             if (task && task.status !== 'done') {
+                ensureTaskVisible(task.id);
                 updateState({ selectedTaskId: task.id });
             } else {
-                // Fallback to next best
-                const fallback = resolveNextTask(tasks, null);
+                const fallbackResult = resolveBestNextTask(tasks, null, intelligence);
+                const fallback = fallbackResult?.task;
                 if (fallback) {
+                    ensureTaskVisible(fallback.id);
                     updateState({ selectedTaskId: fallback.id, lastActiveTaskId: fallback.id });
                 }
             }
         }
-    }, [tasks.length, state.lastActiveTaskId, state.selectedTaskId, updateState]);
+    }, [tasks.length, state.lastActiveTaskId, state.selectedTaskId, updateState, ensureTaskVisible, tasks, intelligence]);
 
-    // Update lastActiveTaskId when selection changes
     useEffect(() => {
         if (state.selectedTaskId && state.selectedTaskId !== state.lastActiveTaskId) {
             updateState({ lastActiveTaskId: state.selectedTaskId });
         }
     }, [state.selectedTaskId, state.lastActiveTaskId, updateState]);
 
-    // RC25: Quick Complete with Auto-focus
     const handleQuickComplete = useCallback(async (taskId: string) => {
         const t = tasks.find(x => x.id === taskId);
         if (!t || t.status === "done") return;
-
-        // 1. Update status to done
         await handleTaskUpdate(taskId, { status: "done" });
-
-        // 2. Auto-focus next logic (only for packages)
         if (t.topic_id) {
-            // We need the updated tasks to find the next one
-            // Since setTasks is async, we use a timeout or calculate from the "would be" state
-            setTimeout(() => {
-                setTasks(currentTasks => {
-                    const pkgTasks = currentTasks.filter(x => x.topic_id === t.topic_id);
-                    const doneCount = pkgTasks.filter(x => x.status === "done").length;
-                    const totalCount = pkgTasks.length;
+            const pkgTasks = tasks.map(x => x.id === taskId ? { ...x, status: 'done' as const } : x)
+                                 .filter(x => x.topic_id === t.topic_id);
+            
+            const doneCount = pkgTasks.filter(x => x.status === "done").length;
+            const totalCount = pkgTasks.length;
 
-                    // Success Feedback: Package Complete
-                    if (doneCount === totalCount && totalCount > 0) {
-                        setToast({
-                            isVisible: true,
-                            message: `🎉 แพ็กเกจ ${t.topic_id} สำเร็จครบถ้วนแล้ว!`,
-                        });
-                    } else {
-                        // Success Feedback: Step Complete
-                        setToast({
-                            isVisible: true,
-                            message: `✅ บันทึกความคืบหน้าของ ${t.topic_id} เรียบร้อย`,
-                        });
+            if (doneCount === totalCount && totalCount > 0) {
+                setToast({ isVisible: true, message: `🎉 แพ็กเกจ ${t.topic_id} สำเร็จครบถ้วนแล้ว!` });
+            } else {
+                setToast({ isVisible: true, message: `✅ บันทึกความคืบหน้าของ ${t.topic_id} เรียบร้อย` });
+            }
+
+            const remaining = pkgTasks.filter(x => x.status !== "done");
+            if (remaining.length > 0) {
+                const stepOrder = ["Brief Approved", "Script & Caption", "Assets / Canva", "Publish", "Archive"];
+                let bestTask = remaining[0];
+                let bestIdx = 99;
+                remaining.forEach(rt => {
+                    const idx = stepOrder.findIndex(s => rt.title.toLowerCase().includes(s.toLowerCase()));
+                    if (idx !== -1 && idx < bestIdx) {
+                        bestIdx = idx;
+                        bestTask = rt;
                     }
-
-                    // Auto-focus Next Step
-                    const stepOrder = ["Brief Approved", "Script & Caption", "Assets / Canva", "Publish", "Archive"];
-                    const remaining = pkgTasks.filter(x => x.status !== "done");
-                    
-                    if (remaining.length > 0) {
-                        let bestTask = remaining[0];
-                        let bestIdx = 99;
-                        remaining.forEach(rt => {
-                            const idx = stepOrder.findIndex(s => rt.title.toLowerCase().includes(s.toLowerCase()));
-                            if (idx !== -1 && idx < bestIdx) {
-                                bestIdx = idx;
-                                bestTask = rt;
-                            }
-                        });
-                        
-                        // Select the next task
-                        router.push(`?taskId=${bestTask.id}`);
-                    }
-
-                    return currentTasks;
                 });
-            }, 100);
+                router.push(`?taskId=${bestTask.id}`);
+            }
         }
     }, [tasks, handleTaskUpdate, router]);
 
-    // RC38: Dynamic Command Registry
+    // RC65: Batch Cleanup & Undo Logic
+    const [deletedTasksBuffer, setDeletedTasksBuffer] = useState<Task[]>([]);
+    
+    const handleUndo = useCallback(async () => {
+        if (deletedTasksBuffer.length === 0) return;
+        
+        try {
+            // Restore tasks one-by-one or in batch if API supports
+            // For now, iterate and restore to ensure they go back to the right group
+            const results = await Promise.all(deletedTasksBuffer.map(task => 
+                fetch("/api/tasks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ...task,
+                        id: undefined // Let DB assign new ID if needed, or preserve if API allows
+                    }),
+                })
+            ));
+
+            if (results.some(r => !r.ok)) throw new Error("Some tasks failed to restore");
+
+            setToast({ isVisible: true, message: "↺ กู้คืนงานที่ลบไปเรียบร้อยแล้ว" });
+            setDeletedTasksBuffer([]);
+            fetchTasks(false); // Full refresh to ensure grouping and progress are correct
+        } catch (e) {
+            console.error("Undo failed", e);
+            setToast({ isVisible: true, message: "❌ กู้คืนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" });
+        }
+    }, [deletedTasksBuffer, fetchTasks]);
+
+    const handleTasksDelete = useCallback(async (ids: string[]) => {
+        if (!ids.length) return;
+        
+        const tasksToDelete = tasks.filter(t => ids.includes(t.id));
+        
+        try {
+            const res = await fetch("/api/tasks/batch", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids }),
+            });
+            
+            if (!res.ok) throw new Error("Batch delete failed");
+            
+            const data = await res.json();
+            setTasks(prev => prev.filter(t => !ids.includes(t.id)));
+            setDeletedTasksBuffer(tasksToDelete);
+            
+            setToast({ 
+                isVisible: true, 
+                message: `🗑️ ลบงาน ${data.deletedCount} รายการเรียบร้อยแล้ว`,
+                action: {
+                    label: "เลิกทำ (UNDO)",
+                    onClick: handleUndo
+                }
+            });
+            
+            // Clear selections if they were deleted
+            updateState({ selectedTaskIds: [] });
+            
+            // RC50: Record event
+            recordEvent(workspaceId, 'tasks_deleted_batch', ids[0], { count: ids.length });
+
+            // Clear buffer after 5 seconds if not undone
+            setTimeout(() => setDeletedTasksBuffer([]), 10000); // 10s buffer
+        } catch (e) {
+            console.error("Delete failed", e);
+            setToast({ isVisible: true, message: "เกิดข้อผิดพลาดในการลบงาน กรุณาลองใหม่อีกครั้ง" });
+        }
+    }, [workspaceId, updateState, tasks, handleUndo]);
+
     const commands = useMemo<CommandOption[]>(() => {
         const pool: CommandOption[] = [
-            // Navigation
             { id: "nav-inbox", label: "Go to Inbox", action: () => router.push("/workspaces/inbox"), category: "navigation" },
             { id: "nav-content", label: "Go to Content Workspace", action: () => router.push("/workspaces/content"), category: "navigation" },
             { id: "nav-ops", label: "Go to Operations", action: () => router.push("/workspaces/ops"), category: "navigation" },
             { id: "nav-system", label: "Go to System", action: () => router.push("/workspaces/system"), category: "navigation" },
-            
-            // Actions
             { id: "act-new-task", label: "New Task", description: "Open global quick add", action: () => updateState({ isQuickAddOpen: true }), category: "actions" },
         ];
-
-        // Context-aware Views
         if (state.viewMode === "package") {
-            pool.push({ id: "view-table", label: "Switch to Table Mode", description: "Condensed execution view", action: () => updateState({ viewMode: "list" }), category: "view" });
+            pool.push({ id: "view-table", label: "Switch to Table Mode", action: () => updateState({ viewMode: "list" }), category: "view" });
         } else {
-            pool.push({ id: "view-package", label: "Switch to Package View", description: "Structured grouping by topic", action: () => updateState({ viewMode: "package" }), category: "view" });
+            pool.push({ id: "view-package", label: "Switch to Package View", action: () => updateState({ viewMode: "package" }), category: "view" });
         }
-
-        // Context-aware Selection
         if (state.selectedTaskId) {
-            pool.push({ id: "act-open-task", label: "Open Selected Task", description: "Open task details in drawer", action: () => router.push(`?taskId=${state.selectedTaskId}`), category: "actions" });
+            pool.push({ id: "act-open-task", label: "Open Selected Task", action: () => router.push(`?taskId=${state.selectedTaskId}`), category: "actions" });
         }
-
-        // Context-aware Filters
-        const hasFilters = state.statusFilter.length > 0 || state.scheduleFilter !== "all" || state.search;
-        if (hasFilters) {
-            pool.push({ 
-                id: "filter-clear", 
-                label: "Clear All Filters", 
-                action: () => updateState({ statusFilter: [], scheduleFilter: "all", search: "", listFilter: [], sprintFilter: [] }),
-                category: "filters" 
-            });
-        }
-        
-        if (!state.statusFilter.includes("done")) {
-            pool.push({ id: "filter-done", label: "Show Completed Tasks", action: () => updateState({ statusFilter: ["done"] }), category: "filters" });
-        }
-
-        if (state.scheduleFilter !== "scheduled") {
-            pool.push({ id: "filter-scheduled", label: "Show Scheduled This Week", action: () => updateState({ scheduleFilter: "scheduled" }), category: "filters" });
-        }
-
         return pool;
     }, [state, router, updateState]);
 
-    // RC39: Computed Suggested View
     const suggestedView = useMemo(() => {
         if (viewHintDismissed || viewHintAccepted) return null;
-        
         return resolveSuggestedView({
             workspaceId,
             workspaceType: ws?.type,
@@ -458,10 +797,6 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         updateState({ viewMode: mode });
         setViewHintAccepted(true);
         setViewHintMemory(workspaceId, { accepted: true });
-        setToast({
-            isVisible: true,
-            message: `Switched to ${mode} mode based on suggestion 🚀`,
-        });
     };
 
     const handleDismissViewHint = () => {
@@ -469,138 +804,261 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         setViewHintMemory(workspaceId, { dismissed: true });
     };
 
-    // RC39: Global Quick Add Defaults
+    const parentTaskIdFromUrl = searchParams.get('parent_task_id');
+    const topicIdFromUrl = searchParams.get('topic_id');
+    const packageIdFromUrl = searchParams.get('package_id');
+    const listIdFromUrl = searchParams.get('list_id');
+
     const creationDefaults = useMemo(() => {
-        const ctx = buildCreationContext({
-            workspaceId,
-            workspaceType: ws?.type,
-            mode: state.viewMode,
+        const ctx = buildCreationContext({ 
+            workspaceId, 
+            workspaceType: ws?.type, 
+            mode: state.viewMode, 
             launchSource: 'global',
+            topicId: topicIdFromUrl || state.inlineQuickAddTopicId,
+            packageId: packageIdFromUrl,
+            listId: listIdFromUrl,
+            parentTaskId: parentTaskIdFromUrl
         });
         return resolveSmartCreateDefaults(ctx);
-    }, [workspaceId, ws?.type, state.viewMode]);
+    }, [workspaceId, ws?.type, state.viewMode, state.inlineQuickAddTopicId, topicIdFromUrl, packageIdFromUrl, listIdFromUrl, parentTaskIdFromUrl]);
 
-    const handleNewList = () => {
-        const title = window.prompt("Enter new list title:");
-        if (!title) return;
-        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        fetch("/api/lists", {
+    const handleNewList = (title: string) => {
+        return fetch("/api/lists", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ workspace: workspaceId, title, slug })
+            body: JSON.stringify({ workspace: workspaceId, title, slug: title.toLowerCase().replace(/ /g, '-') })
         }).then(res => {
-            if (!res.ok) alert("Failed to create list");
-            else alert("List created!");
+            if (!res.ok) throw new Error("Failed to create list");
+            setToast({ isVisible: true, message: `✅ สร้างรายการ ${title} สำเร็จ` });
+            fetchTasks(false); // Refresh lists/tasks
         });
     };
 
-    // RC40A: Smart Queue Logic
     const smartQueueItems = useMemo(() => {
         if (isQueueDismissed || tasks.length === 0) return [];
         return resolveWorkspaceSmartQueue(tasks, feedbackStore);
     }, [tasks, isQueueDismissed, feedbackStore]);
 
     const handleQueueItemClick = (item: QueueItem) => {
-        // RC41A: Record click
         recordQueueClick(item.identity);
-        setFeedbackStore(getAllQueueFeedback()); // Refresh
-
-        if (item.taskId) {
-            router.push(`?taskId=${item.taskId}`);
-            // If the task is likely in the current list, the router.push will handle highlighting via taskId query param
-            // and AreasTaskList already reacts to router.query.taskId
-        } else if (item.topicId) {
-            // If it's a package cue, expand it
-            if (state.collapsedTopicIds.includes(item.topicId)) {
-                updateState({
-                    collapsedTopicIds: state.collapsedTopicIds.filter(id => id !== item.topicId)
-                });
-            }
+        setFeedbackStore(getAllQueueFeedback());
+        if (item.taskId) router.push(`?taskId=${item.taskId}`);
+        else if (item.topicId && state.collapsedTopicIds.includes(item.topicId)) {
+            updateState({ collapsedTopicIds: state.collapsedTopicIds.filter(id => id !== item.topicId) });
         }
     };
 
-    const handleQueueItemShown = (identity: string) => {
-        recordQueueShow(identity);
-        // We don't refresh state here to avoid rerender loops while rendering the strip
-    };
+    const handleQueueItemShown = (identity: string) => recordQueueShow(identity);
 
-    if (!ws) return <div className="p-10 text-neutral-500 font-medium">Workspace not found</div>;
+    if (!ws) return null;
 
     return (
         <div className="flex h-screen flex-col overflow-hidden bg-gray-50/50">
-            {/* Toolbar acts as Header */}
             <AreasToolbar
                 title={ws.label}
                 state={state}
                 updateState={updateState}
-                onNewList={handleNewList}
+                onNewList={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set('newList', 'true');
+                    router.push(`?${params.toString()}`);
+                }}
                 workspaceId={workspaceId}
-                onNewPackage={() => updateState({ isPackageModalOpen: true })}
+                onNewPackage={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set('createPackage', 'true');
+                    router.push(`?${params.toString()}`);
+                }}
                 isFocusMode={isFocusMode}
                 onToggleFocusMode={toggleFocusMode}
             />
 
-            {/* RC43A: Breadcrumb Bar */}
-            {!isFocusMode && (
-                <div className="bg-white px-6 py-2 border-b border-neutral-100 flex items-center gap-2 text-xs font-medium text-neutral-500 overflow-x-auto whitespace-nowrap">
-                    <button 
-                        onClick={() => router.push('/workspaces')}
-                        className="hover:text-neutral-900 flex items-center gap-1 transition-colors"
-                    >
-                        <LayoutGrid size={12} className="text-neutral-400" />
-                        Areas
+            <div className={`bg-white border-b border-neutral-100 flex flex-col md:flex-row items-stretch md:items-center justify-between z-20 shadow-sm transition-all duration-300 ${isFocusMode ? 'py-1 opacity-90' : 'py-2 md:py-3'}`}>
+                <div className="flex items-center gap-2 px-6 border-b md:border-b-0 md:border-r border-neutral-100 py-2 md:py-0">
+                    <button onClick={() => router.push('/workspaces')} className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-400 hover:text-neutral-600 transition-colors">
+                        <LayoutGrid size={18} />
                     </button>
-                    <ChevronRight size={12} className="text-neutral-300" />
+                    <ChevronRight size={14} className="text-neutral-300" />
+                    <button onClick={() => setIsSwitcherOpen(true)} className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all active:scale-95 group ${wsColor.border} ${wsColor.light}`}>
+                        <div className={`w-6 h-6 rounded-lg ${wsColor.bg} text-white flex items-center justify-center shadow-sm`}>
+                            <WsIcon size={14} />
+                        </div>
+                        <span className={`text-sm font-black tracking-tight ${wsColor.text}`}>{ws.label}</span>
+                        <div className={`w-1.5 h-1.5 rounded-full ${wsColor.dot} animate-pulse`} />
+                    </button>
+
+                    {ws.isHidden && (
+                        <div className="ml-2 px-2 py-0.5 bg-neutral-100 border border-neutral-200 rounded-md flex items-center gap-1 opacity-70">
+                            <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Archived Area</span>
+                        </div>
+                    )}
+
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${urgencySignal.bgColor} border border-neutral-100/50 shadow-sm`}>
+                        <div className={`w-2 h-2 rounded-full ${urgencySignal.dotColor} ${urgencySignal.status === 'critical' ? 'animate-ping' : ''}`} />
+                        <span className={`text-[10px] font-black uppercase tracking-wider ${urgencySignal.color}`}>
+                            {urgencySignal.label}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex-1 flex flex-col sm:flex-row items-center gap-4 md:gap-8 px-6 py-2 md:py-0 overflow-hidden">
+                    <div className="flex items-center gap-5 shrink-0">
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Tasks</span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-black text-neutral-900">{todoCount}</span>
+                                <span className="text-[10px] font-bold text-neutral-400">/ {tasks.length}</span>
+                            </div>
+                        </div>
+                        <div className="w-px h-6 bg-neutral-100 hidden sm:block" />
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">In Progress</span>
+                            <div className="flex items-center gap-1.5 text-amber-600">
+                                <Clock size={12} className="shrink-0" />
+                                <span className="text-sm font-black">{inProgressCount}</span>
+                            </div>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Review</span>
+                            <div className="flex items-center gap-1.5 text-indigo-600">
+                                <CheckCircle2 size={12} className="shrink-0" />
+                                <span className="text-sm font-black">{reviewCount}</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <button 
-                        onClick={() => setIsSwitcherOpen(true)}
-                        className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md hover:bg-indigo-100 transition-all font-bold flex items-center gap-1.5 group"
-                        title="คลิกเพื่อสลับ Workspace (Cmd+Shift+W)"
+                        onClick={handleRestoreIntelligence}
+                        title="คืนค่ารายการที่ซ่อน (Restore Hidden)"
+                        className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-400 hover:text-indigo-600 transition-colors shrink-0"
                     >
-                        {ws.label}
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover:scale-125 transition-transform" />
+                        <LucideIcons.RotateCcw size={14} />
+                    </button>
+
+                    <div className="flex-1 flex items-center gap-3 bg-neutral-50/80 px-4 py-2 rounded-2xl border border-neutral-100/50 max-w-lg overflow-hidden group hover:bg-white hover:border-neutral-200 transition-all cursor-default shadow-sm hover:shadow-md">
+                        <div className="p-1.5 bg-white rounded-xl shadow-sm border border-neutral-100 text-neutral-400 group-hover:text-black transition-colors shrink-0">
+                            <ArrowRight size={14} />
+                        </div>
+                        
+                        <div className="flex flex-col min-w-0 flex-1">
+                            {headerTaskResult && (
+                                <div className="flex items-center gap-2 mb-0.5">
+                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border shadow-sm ${
+                                        headerTaskResult.confidence === 'high' ? 'bg-green-50 text-green-700 border-green-100' :
+                                        headerTaskResult.confidence === 'medium' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                        'bg-neutral-100 text-neutral-600 border-neutral-200'
+                                    }`}>
+                                        {headerTaskResult.confidence}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-neutral-400 truncate italic bg-white/50 px-1.5 rounded-md">
+                                        {headerTaskResult.explanation}
+                                    </span>
+                                    {headerTaskResult.nudgeReason && (
+                                        <span className="text-[9px] font-black text-amber-500/80 bg-amber-50 px-1.5 rounded-md border border-amber-100 flex items-center gap-1">
+                                            <Zap size={8} className="fill-current" /> {headerTaskResult.nudgeReason}
+                                        </span>
+                                    )}
+                                    {microInsight && (
+                                        <span className={`text-[9px] font-bold px-1.5 rounded-md border animate-in slide-in-from-left-2 duration-500 ${
+                                            microInsight.type === 'success' ? 'text-green-600 bg-green-50 border-green-100' : 
+                                            microInsight.type === 'nudge' ? 'text-amber-600 bg-amber-50 border-amber-100' :
+                                            'text-blue-600 bg-blue-50 border-blue-100'
+                                        }`}>
+                                            {microInsight.message}
+                                        </span>
+                                    )}
+                                    <button 
+                                        onClick={() => setIsInsightModalOpen(true)}
+                                        className="ml-1 p-1 bg-white text-amber-500 rounded-md border border-neutral-100 shadow-sm hover:scale-110 transition-transform"
+                                        title="View Insights"
+                                    >
+                                        <Zap size={10} className="fill-current" />
+                                    </button>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                                {pinnedTaskId === headerTask?.id && <LucideIcons.Pin size={10} className="text-amber-500 fill-amber-500 shrink-0" />}
+                                <span className={`text-xs font-black truncate ${pinnedTaskId === headerTask?.id ? 'text-amber-700' : 'text-neutral-800'}`}>
+                                    {headerTask?.title || "คุณเคลียร์งานทั้งหมดเรียบร้อยแล้ว!"}
+                                </span>
+                            </div>
+                        </div>
+
+                        {headerTask && (
+                            <div className="flex items-center gap-1.5 ml-2 border-l border-neutral-100 pl-3">
+                                <div className="flex items-center bg-white/50 rounded-lg border border-neutral-100/50 p-0.5 shadow-sm">
+                                    <button onClick={() => { handleFeedback(headerTask.id, 'good'); setToast({ isVisible: true, message: "🙌 ขอบคุณครับ ทีมงานจะแนะนำงานแบบนี้ให้บ่อยขึ้น" }); }} className={`p-1.5 rounded-md transition-all hover:bg-green-50 hover:text-green-600 ${feedback[headerTask.id] === 'good' ? 'text-green-600 bg-green-50' : 'text-neutral-300'}`}>
+                                        <LucideIcons.ThumbsUp size={12} />
+                                    </button>
+                                    <button onClick={() => { handleFeedback(headerTask.id, 'not_now'); setToast({ isVisible: true, message: "⏳ เข้าใจครับ ไว้เราค่อยกลับมาดูงานนี้ใหม่" }); }} className={`p-1.5 rounded-md transition-all hover:bg-amber-50 hover:text-amber-600 ${feedback[headerTask.id] === 'not_now' ? 'text-amber-600 bg-amber-50' : 'text-neutral-300'}`}>
+                                        <LucideIcons.Calendar size={12} />
+                                    </button>
+                                    <button onClick={() => { handleFeedback(headerTask.id, 'wrong_context'); setToast({ isVisible: true, message: "🚫 รับทราบครับ จะลดลำดับความสำคัญของงานนี้ลง" }); }} className={`p-1.5 rounded-md transition-all hover:bg-red-50 hover:text-red-600 ${feedback[headerTask.id] === 'wrong_context' ? 'text-red-600 bg-red-50' : 'text-neutral-300'}`}>
+                                        <LucideIcons.AlertCircle size={12} />
+                                    </button>
+                                </div>
+
+                                <button onClick={() => setPinnedTaskId(pinnedTaskId === headerTask.id ? null : headerTask.id)} className={`p-2 rounded-xl border transition-all shadow-sm ${pinnedTaskId === headerTask.id ? 'bg-amber-500 border-amber-600 text-white' : 'bg-white border-neutral-200 text-neutral-400 hover:border-amber-500 hover:text-amber-500'}`}>
+                                    <LucideIcons.Pin size={12} className={pinnedTaskId === headerTask.id ? "fill-current" : ""} />
+                                </button>
+
+                                <div className="relative group/tuning">
+                                    <button className="p-2 bg-white border border-neutral-200 text-neutral-400 rounded-xl hover:bg-neutral-50 hover:text-black transition-all shadow-sm">
+                                        <LucideIcons.Settings2 size={12} />
+                                    </button>
+                                    <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl border border-neutral-200 shadow-2xl p-4 invisible group-hover/tuning:visible opacity-0 group-hover/tuning:opacity-100 transition-all z-50">
+                                        <h4 className="text-[10px] font-black uppercase text-neutral-400 tracking-widest mb-3 px-1">Reco Settings</h4>
+                                        <div className="space-y-1 mb-4 border-b border-neutral-50 pb-4">
+                                            {(['balanced', 'urgency', 'focus', 'momentum'] as RecommendationMode[]).map(m => (
+                                                <button key={m} onClick={() => handleModeChange(m)} className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${mode === m ? 'bg-black text-white' : 'hover:bg-neutral-50 text-neutral-600'}`}>
+                                                    <span className="capitalize">{m}</span>
+                                                    {mode === m && <CheckCircle2 size={10} />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-3">
+                                            {Object.entries(preferences).map(([key, val]) => (
+                                                <div key={key} className="flex items-center justify-between px-1">
+                                                    <span className="text-[10px] font-bold text-neutral-500 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                                                    <button onClick={() => handleTogglePreference(key as keyof TuningPreferences)} className={`w-8 h-4 rounded-full transition-all relative ${val ? 'bg-black' : 'bg-neutral-200'}`}>
+                                                        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${val ? 'left-4.5' : 'left-0.5'}`} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 px-6 py-2 md:py-0 border-t md:border-t-0 md:border-l border-neutral-100">
+                    <button onClick={handleResumeWork} disabled={loadingTasks || !todoCount} className={`group flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black transition-all active:scale-95 disabled:opacity-50 disabled:grayscale disabled:scale-100 ${wsColor.bg} text-white shadow-lg ${wsColor.ring} hover:brightness-110`}>
+                        <Play size={14} className="fill-current" /> Resume
+                    </button>
+                    <button onClick={handleOpenNextTask} disabled={loadingTasks || !headerTask} className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-sm font-black hover:bg-neutral-50 hover:border-neutral-300 transition-all active:scale-95 disabled:opacity-50">
+                        Go <ArrowRight size={14} />
                     </button>
                 </div>
-            )}
+            </div>
 
-            {/* Filters Row - Compact slightly in focus mode if needed, but keeping for now per constraints */}
             {!isFocusMode && !state.isFlowMode && (
-                <AreasFilterBar
-                    tasks={tasks}
-                    lists={lists}
-                    sprints={sprints}
-                    state={state}
-                    updateState={updateState}
-                />
+                <AreasFilterBar workspaceId={workspaceId} tasks={tasks} lists={lists} sprints={sprints} state={state} updateState={updateState} />
             )}
 
-            {/* Main Content Area */}
             <div className="flex-1 overflow-hidden relative flex flex-col px-4">
                 {smartQueueItems.length > 0 && (
-                    <SmartQueueStrip 
-                        items={smartQueueItems} 
-                        onItemClick={handleQueueItemClick}
-                        onItemShown={handleQueueItemShown}
-                        onDismiss={() => setIsQueueDismissed(true)}
-                    />
+                    <SmartQueueStrip items={smartQueueItems} onItemClick={handleQueueItemClick} onItemShown={handleQueueItemShown} onDismiss={() => setIsQueueDismissed(true)} />
                 )}
-
                 {suggestedView && !isFocusMode && !state.isFlowMode && (
                     <div className="mt-4">
-                        <SmartViewHint 
-                            label={suggestedView.mode === 'package' ? 'Package View' : 'Table Mode'}
-                            reason={suggestedView.reason}
-                            confidence={scoreSuggestionConfidence({
-                                workspaceType: ws?.type,
-                                suggestedMode: suggestedView.mode
-                            })}
-                            onAccept={() => handleAcceptViewHint(suggestedView.mode)}
-                            onDismiss={handleDismissViewHint}
-                        />
+                        <SmartViewHint label={suggestedView.mode === 'package' ? 'Package View' : 'Table Mode'} reason={suggestedView.reason} confidence={scoreSuggestionConfidence({ workspaceType: ws?.type, suggestedMode: suggestedView.mode })} onAccept={() => handleAcceptViewHint(suggestedView.mode)} onDismiss={handleDismissViewHint} />
                     </div>
                 )}
-                
                 <div className="flex-1 overflow-hidden relative flex flex-col">
-                    <div className="flex-1 overflow-y-auto relative custom-scrollbar">
+                    <div className="flex-1 overflow-hidden relative flex flex-col custom-scrollbar">
                         {loadingTasks && tasks.length === 0 ? (
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="text-neutral-400 font-bold uppercase tracking-widest text-sm animate-pulse flex items-center gap-3">
@@ -610,98 +1068,72 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         ) : (
                             <>
                                 {state.isQuickAddOpen && (
-                                    <div className="max-w-4xl mx-auto w-full py-4 animate-in slide-in-from-top-4 duration-300">
+                                    <Modal 
+                                        isOpen={state.isQuickAddOpen} 
+                                        onClose={() => updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null })} 
+                                        title="Quick Add Task"
+                                        hideBackdrop={true}
+                                    >
                                         <QuickAddTask 
-                                            workspaceId={workspaceId}
-                                            initialStatus={creationDefaults.status}
-                                            initialListId={creationDefaults.listId}
-                                            initialPackageId={creationDefaults.packageId}
-                                            initialTopicId={creationDefaults.topicId}
+                                            workspaceId={workspaceId} 
+                                            initialStatus={creationDefaults.status} 
+                                            initialListId={creationDefaults.listId} 
+                                            initialPackageId={creationDefaults.packageId} 
+                                            initialTopicId={creationDefaults.topicId} 
+                                            initialTopicTitle={state.inlineQuickAddTopicTitle ? (state.inlineQuickAddTopicTitle.includes(" — ") ? state.inlineQuickAddTopicTitle.split(" — ")[1] : state.inlineQuickAddTopicTitle) : null}
+                                            initialParentTaskId={creationDefaults.parentTaskId}
                                             initialStepKey={creationDefaults.packageStepKey}
-                                            launchSource="global"
-                                            onCreated={(task) => {
-                                                // 1. Local update for immediate feedback
-                                                setTasks(prev => [task, ...prev]);
-                                                
-                                                // 2. Select the new task immediately if in flow or if requested
-                                                updateState({ 
-                                                    isQuickAddOpen: false,
-                                                    selectedTaskId: task.id,
-                                                    lastActiveTaskId: task.id
-                                                });
-
-                                                // 3. Full Revalidation (RC42C)
-                                                fetchTasks(false);
-
-                                                setToast({
-                                                    isVisible: true,
-                                                    message: `Task created: ${task.title}`,
-                                                });
-                                            }}
-                                            onCancel={() => updateState({ isQuickAddOpen: false })}
+                                            launchSource="global" 
+                                            onCreated={(task) => { 
+                                                setTasks(prev => [task, ...prev]); 
+                                                updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null, selectedTaskId: task.id, lastActiveTaskId: task.id }); 
+                                                fetchTasks(false); 
+                                            }} 
+                                            onCancel={() => updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null })} 
                                         />
-                                    </div>
+                                    </Modal>
                                 )}
-
-                                <AreasTaskList
-                                    workspaceId={workspaceId}
-                                    tasks={tasks}
-                                    state={state}
-                                    onTaskClick={(t) => router.push(`?taskId=${t.id}`)}
-                                    onTaskUpdate={handleTaskUpdate}
-                                    onQuickComplete={handleQuickComplete}
-                                    onTaskCreated={(newTask) => {
-                                        setTasks(prev => [newTask, ...prev]);
-                                        fetchTasks(false); // RC42C
-                                    }}
+                                <AreasTaskList 
+                                    workspaceId={workspaceId} 
+                                    tasks={tasks} 
+                                    state={state} 
+                                    onTaskClick={(t: Task) => router.push(`?taskId=${t.id}`)} 
+                                    onTaskUpdate={handleTaskUpdate} 
+                                    onQuickComplete={handleQuickComplete} 
+                                    onTaskCreated={() => fetchTasks(false)}
                                     updateState={updateState}
                                     highlightedTaskIds={highlightedTaskIds}
                                     refresh={() => fetchTasks(false)}
+                                    onTasksDelete={handleTasksDelete}
                                 />
-                                
-                                <Toast 
-                                    isVisible={toast.isVisible}
-                                    message={toast.message}
-                                    action={toast.action}
-                                    onClose={() => setToast({ ...toast, isVisible: false })}
-                                />
-
-                                <CreateContentPackageModal
-                                    isOpen={state.isPackageModalOpen}
-                                    onClose={() => updateState({ isPackageModalOpen: false })}
-                                    onSuccess={(data) => {
-                                        fetchTasks(false);
-                                        setHighlightedTaskIds(data.taskIds);
-                                        setToast({
-                                            isVisible: true,
-                                            message: `Created ${data.topicId} — 1 note + 5 tasks`,
-                                            action: {
-                                                label: "Open Note",
-                                                onClick: () => router.push(`/notes/edit/${data.noteId}`)
-                                            }
-                                        });
-                                        // Clear highlights after 5s
-                                        setTimeout(() => setHighlightedTaskIds([]), 5000);
-                                    }}
-                                />
-
-                                <CommandPalette 
-                                    isOpen={isCommandPaletteOpen}
+                                <Toast isVisible={toast.isVisible} message={toast.message} action={toast.action} onClose={() => setToast({ ...toast, isVisible: false })} />
+                                <CreateContentPackageModal 
+                                    isOpen={isCreatePackageModalOpen} 
                                     onClose={() => {
-                                        setIsCommandPaletteOpen(false);
-                                        lastActiveElement.current?.focus();
-                                    }}
-                                    commands={commands}
+                                        const params = new URLSearchParams(searchParams.toString());
+                                        params.delete('createPackage');
+                                        router.push(`?${params.toString()}`);
+                                    }} 
+                                    onSuccess={(data) => { 
+                                        fetchTasks(false); 
+                                        setHighlightedTaskIds(data.taskIds); 
+                                        setTimeout(() => setHighlightedTaskIds([]), 5000); 
+                                    }} 
                                 />
-
-                                {/* Load More Button */}
+                                <CreateListModal
+                                    isOpen={isNewListModalOpen}
+                                    onClose={() => {
+                                        const params = new URLSearchParams(searchParams.toString());
+                                        params.delete('newList');
+                                        router.push(`?${params.toString()}`);
+                                    }}
+                                    workspaceId={workspaceId}
+                                    onCreated={handleNewList}
+                                />
+                                <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => { setIsCommandPaletteOpen(false); lastActiveElement.current?.focus(); }} commands={commands} />
                                 {hasMore && (
                                     <div className="p-8 flex justify-center pb-32">
-                                        <button
-                                            onClick={() => fetchTasks(true)}
-                                            disabled={loadingTasks}
-                                            className="px-6 py-2 bg-white border border-neutral-200 rounded-full text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-all shadow-sm active:scale-95 disabled:opacity-50"
-                                        >
+                                        <button onClick={() => fetchTasks(true)} disabled={loadingTasks} className="px-6 py-2 bg-white border border-neutral-200 rounded-full text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-all shadow-sm active:scale-95 disabled:opacity-50">
                                             {loadingTasks ? "Loading..." : "Load More Tasks"}
                                         </button>
                                     </div>
@@ -712,24 +1144,19 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 </div>
             </div>
 
-            {/* RC42: Single Flow UI */}
             {state.isFlowMode && (
-                <SingleFlowBar 
-                    currentTask={currentTask}
-                    nextTask={nextTask}
-                    onDone={handleFlowDone}
-                    onSkip={() => handleFlowNext(true)}
-                    onOpenDetail={() => currentTask && router.push(`?taskId=${currentTask.id}`)}
-                    onClose={() => updateState({ isFlowMode: false })}
-                />
+                <SingleFlowBar currentTask={currentTask} nextTask={nextTask} onDone={handleFlowDone} onSkip={() => handleFlowNext(true)} onOpenDetail={() => currentTask && router.push(`?taskId=${currentTask.id}`)} onClose={() => updateState({ isFlowMode: false })} />
             )}
 
-            {/* RC43B: Switcher Component */}
-            <WorkspaceSwitcher
-                isOpen={isSwitcherOpen}
-                currentWorkspaceId={workspaceId}
-                onClose={() => setIsSwitcherOpen(false)}
-                onSelect={handleWorkspaceSelect}
+            <WorkspaceSwitcher isOpen={isSwitcherOpen} currentWorkspaceId={workspaceId} onClose={() => setIsSwitcherOpen(false)} onSelect={handleWorkspaceSelect} />
+
+            <InsightSummaryModal 
+                isOpen={isInsightModalOpen} 
+                onClose={() => setIsInsightModalOpen(false)} 
+                report={report}
+                suggestions={suggestions}
+                onReset={handleResetLearning}
+                onAction={handleSuggestedAction}
             />
         </div>
     );

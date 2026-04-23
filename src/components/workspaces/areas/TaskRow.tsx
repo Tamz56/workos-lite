@@ -1,18 +1,30 @@
 import React from "react";
 import { Task } from "@/lib/types";
-import { CheckSquare, Check, Paperclip, FileText, Calendar, Tag, Circle } from "lucide-react";
+import { Check, Paperclip, FileText, Calendar, Tag, Circle } from "lucide-react";
 import { prefetchTaskDetail } from "@/components/GlobalTaskDialogs";
 import QuickStatusPicker from "./QuickStatusPicker";
+import { 
+    cleanTaskTitle, 
+    parseProjectFromTitle, 
+    parseStageFromTitle, 
+    parsePlatformsFromTitle 
+} from "@/lib/content/utils";
+import { Trash2 } from "lucide-react";
 
 interface TaskRowProps {
     task: Task;
     onClick: () => void;
-    onStatusChange?: (newStatus: "inbox" | "planned" | "done") => void;
+    onStatusChange?: (newStatus: "inbox" | "planned" | "in_progress" | "review" | "done") => void;
     onQuickComplete?: () => void; // RC25
     isSelected?: boolean;
     isHighlighted?: boolean;
     isNextStep?: boolean; // RC25
     mode?: "package" | "table"; // RC33
+    isFlowModeActive?: boolean; // RC46
+    isCurrentlyWorking?: boolean; // RC46
+    isMultiSelected?: boolean; // RC65
+    onMultiSelect?: (checked: boolean) => void; // RC65
+    onDelete?: () => void; // RC65
 }
 
 export default function TaskRow({ 
@@ -23,8 +35,34 @@ export default function TaskRow({
     isSelected, 
     isHighlighted,
     isNextStep,
-    mode = "package"
+    mode = "package",
+    isFlowModeActive,
+    isCurrentlyWorking,
+    isMultiSelected,
+    onMultiSelect,
+    onDelete
 }: TaskRowProps) {
+    const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
+
+    const handleCheckClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onMultiSelect?.(!isMultiSelected);
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isConfirmingDelete) {
+            onDelete?.();
+            setIsConfirmingDelete(false);
+        } else {
+            setIsConfirmingDelete(true);
+        }
+    };
+
+    const handleCancelDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsConfirmingDelete(false);
+    };
 
 
     const isDone = task.status === "done";
@@ -40,12 +78,22 @@ export default function TaskRow({
     const priorityColor = ["text-neutral-400", "text-blue-500", "text-neutral-600", "text-orange-500", "text-red-600"];
     const pIdx = task.priority ?? 2;
 
-    // RC25: Visual Priority Logic (Modified for RC32)
+    // RC46: Execution Engine Visuals
+    const isActiveExecution = isCurrentlyWorking && isFlowModeActive;
+    const dimmingClass = (isFlowModeActive && !isCurrentlyWorking) ? "opacity-30 grayscale pointer-events-none scale-[0.98] blur-[0.5px]" : "opacity-100 grayscale-0 scale-100 blur-0";
+
+    // RC25: Visual Priority Logic (Modified for RC32/RC46)
     const activeNextStep = mode === "package" && isNextStep;
     const rowClass = isSelected ? "bg-blue-50/40 border-blue-100 z-10" : 
                     isHighlighted ? "bg-blue-50 border-blue-200 z-10" : 
                     activeNextStep ? "bg-amber-50/40 border-amber-100/50" : 
                     "bg-white border-neutral-100";
+
+    // Metadata Parsing
+    const cleanTitle = cleanTaskTitle(task.title);
+    const titleProject = parseProjectFromTitle(task.title);
+    const titleStage = parseStageFromTitle(task.title);
+    const titlePlatforms = parsePlatformsFromTitle(task.title);
 
     // RC33: Execution Table Mode (List View)
     if (mode === "table") {
@@ -54,21 +102,53 @@ export default function TaskRow({
                 id={`task-row-${task.id}`}
                 onClick={onClick}
                 onMouseEnter={() => prefetchTaskDetail(task.id)}
-                className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-1.5 px-4 border-b hover:bg-indigo-50/30 transition-all duration-200 cursor-pointer ${
-                    isSelected ? "bg-indigo-50/50 border-blue-100" : "bg-white border-neutral-100"
-                } ${isDone ? "opacity-60" : ""}`}
+                className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-1.5 px-4 border-b hover:bg-indigo-50/30 transition-all duration-300 cursor-pointer ${
+                    isSelected ? "bg-indigo-50/50 border-blue-100 ring-1 ring-blue-500/20 shadow-md z-10" : "bg-white border-neutral-100"
+                } ${isDone ? "opacity-60" : ""} ${dimmingClass}`}
             >
                 {/* Column 1: Task Name & Topic Cue */}
                 <div className="flex items-center gap-3 min-w-0 pr-4">
-                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                        task.status === 'done' ? 'bg-emerald-500' : 
-                        task.status === 'inbox' ? 'bg-neutral-300' : 
-                        'bg-blue-500'
-                    }`} />
+                    {isActiveExecution ? (
+                         <div className="w-5 h-5 flex items-center justify-center relative shrink-0">
+                            <Circle size={10} className="text-blue-500 fill-blue-500 animate-pulse" />
+                            <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20" />
+                         </div>
+                    ) : (
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            task.status === 'done' ? 'bg-emerald-500' : 
+                            task.status === 'inbox' ? 'bg-neutral-300' : 
+                            task.status === 'review' ? 'bg-indigo-500' :
+                            'bg-blue-500'
+                        }`} />
+                    )}
                     <div className="flex flex-col min-w-0">
-                        <span className={`text-[12px] font-bold truncate leading-tight ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-indigo-600'}`}>
-                            {task.title}
-                        </span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[12px] font-bold truncate leading-tight ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-indigo-600'}`}>
+                                {cleanTitle}
+                            </span>
+                            {isActiveExecution && (
+                                <span className="text-[8px] bg-blue-600 text-white px-1.5 py-0.5 rounded-sm font-black uppercase tracking-widest whitespace-nowrap">Execution Mode</span>
+                            )}
+                            
+                            {/* Metadata Badges in Table Mode */}
+                            <div className="flex items-center gap-1.5">
+                                {titleProject && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-sm bg-neutral-100 text-neutral-500 uppercase tracking-tighter">
+                                        {titleProject}
+                                    </span>
+                                )}
+                                {titleStage && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-sm bg-indigo-50 text-indigo-600 uppercase tracking-tighter border border-indigo-100">
+                                        {titleStage}
+                                    </span>
+                                )}
+                                {titlePlatforms.map(p => (
+                                    <span key={p} className="text-[8px] font-black px-1 py-0.5 rounded-full bg-blue-50 text-blue-500 uppercase">
+                                        #{p}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
                         {task.topic_id && (
                             <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest leading-none mt-0.5">
                                 {task.topic_id}
@@ -94,14 +174,39 @@ export default function TaskRow({
                     {task.scheduled_date || "NO DATE"}
                 </div>
 
-                {/* Column 4: Indicators */}
-                <div className="flex justify-end gap-2 text-neutral-300 opacity-60">
-                    {task.doc_id && <Paperclip size={12} className="text-blue-400" />}
+                {/* Column 4: Indicators & Actions (RC65) */}
+                <div className="flex items-center justify-end gap-2 text-neutral-300">
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isConfirmingDelete ? (
+                            <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-200">
+                                <button 
+                                    onClick={handleDeleteClick}
+                                    className="px-2 py-1 bg-red-600 text-white text-[9px] font-black rounded hover:bg-red-700 shadow-sm"
+                                >
+                                    CONFIRM
+                                </button>
+                                <button 
+                                    onClick={handleCancelDelete}
+                                    className="px-2 py-1 bg-white border border-neutral-200 text-neutral-400 text-[9px] font-black rounded hover:bg-neutral-50"
+                                >
+                                    CANCEL
+                                </button>
+                            </div>
+                        ) : (
+                            <button 
+                                onClick={handleDeleteClick}
+                                className="p-1.5 rounded-md transition-all hover:bg-red-50 hover:text-red-500 text-neutral-300"
+                                title="ลบงานนี้"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        )}
+                    </div>
+                    {task.doc_id && <Paperclip size={12} className="text-blue-400 shrink-0" />}
                 </div>
             </div>
         );
     }
-
 
     return (
         <div 
@@ -110,60 +215,101 @@ export default function TaskRow({
             onMouseEnter={() => prefetchTaskDetail(task.id)}
             className={`relative group w-full flex flex-col sm:flex-row sm:items-center py-2 px-3 sm:px-4 border-b hover:bg-neutral-50 cursor-pointer transition-all duration-300 ${rowClass} ${
                 isDone ? "opacity-60 hover:opacity-100" : ""
+            } ${dimmingClass} ${isActiveExecution ? "ring-2 ring-blue-500/20 shadow-lg z-20 scale-[1.01] -mx-1 px-5 rounded-md" : ""} ${
+                isMultiSelected ? "bg-indigo-50/30" : ""
             }`}
         >
 
             {isSelected && <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-blue-500 rounded-r-sm z-20" />}
+            {isActiveExecution && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-lg z-30 uppercase tracking-[0.2em] whitespace-nowrap border-2 border-white">
+                    Currently Working On
+                </div>
+            )}
             {activeNextStep && !isSelected && !isHighlighted && <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-amber-400/60 rounded-r-sm z-20" />}
             
+            {/* Selection Checkbox (RC65) */}
+            <div 
+                onClick={handleCheckClick}
+                className="absolute -left-1 top-1/2 -translate-y-1/2 p-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                    isMultiSelected ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white border-neutral-300 hover:border-indigo-400"
+                }`}>
+                    {isMultiSelected && <Check size={10} strokeWidth={4} />}
+                </div>
+            </div>
+
             {/* Mobile Top Row: Check/Status + Title */}
-            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0 sm:pl-4">
                 {/* RC25: Quick Complete Checkbox (Only for Package Tasks) */}
                 {task.topic_id && onQuickComplete ? (
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isDone) onQuickComplete();
-                        }}
-                        className={`group/check shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                            isDone 
-                                ? "bg-emerald-500 border-emerald-500 text-white" 
-                                : "border-neutral-300 hover:border-emerald-500 text-transparent hover:text-emerald-500 bg-white"
-                        }`}
-                        title={isDone ? "เสร็จสมบูรณ์แล้ว" : "ทำเครื่องหมายว่าเสร็จสิ้น (Quick Complete)"}
-                    >
-                        <Check size={12} strokeWidth={4} />
-                    </button>
+                    <div className="flex items-center justify-center pr-1 sm:pr-2">
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isDone) onQuickComplete();
+                            }}
+                            className={`group/check shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
+                                isDone 
+                                    ? "bg-emerald-500 border-emerald-500 text-white" 
+                                    : "border-neutral-300 hover:border-emerald-500 text-transparent hover:text-emerald-500 bg-white"
+                            }`}
+                            title={isDone ? "เสร็จสมบูรณ์แล้ว" : "ทำเครื่องหมายว่าเสร็จสิ้น (Quick Complete)"}
+                        >
+                            <Check size={14} strokeWidth={4} />
+                        </button>
+                    </div>
                 ) : (
                     /* Default Status Dot */
                     <div className={`w-2 h-2 mt-1.5 sm:mt-0 shrink-0 rounded-full flex-none ${
                         task.status === 'done' ? 'bg-green-500' : 
                         task.status === 'inbox' ? 'bg-neutral-300' : 
+                        task.status === 'review' ? 'bg-indigo-500' :
                         'bg-blue-500'
                     }`} />
                 )}
                 
                 {/* Title + Topic Signal */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0.5 flex-1 min-w-0">
-                    <div className={`text-sm font-medium leading-tight sm:leading-normal sm:truncate ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-black'}`}>
-                        {task.title}
-                    </div>
-                    {task.topic_id && (
-                        <div className="flex items-center gap-1 shrink-0">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tight ${
-                                activeNextStep && !isDone 
-                                    ? 'bg-amber-100 text-amber-700' 
-                                    : 'bg-neutral-100 text-neutral-500'
-                            }`}>
-                                {task.topic_id}
-                            </span>
-                            {task.package_total !== undefined && (
-                                <span className="text-[10px] font-bold text-neutral-400">
-                                    {task.package_done}/{task.package_total}
-                                </span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-1 flex-1 min-w-0">
+                    <div className="flex flex-col">
+                        <div className={`text-sm font-medium leading-tight sm:leading-normal sm:truncate ${isDone ? 'line-through text-neutral-400' : 'text-neutral-900 group-hover:text-black'}`}>
+                            {cleanTitle}
+                        </div>
+                        
+                        {/* Inline Metadata (for mobile/package view) */}
+                        <div className="flex items-center gap-1.5 mt-0.5 sm:hidden">
+                             {titleProject && (
+                                <span className="text-[8px] font-black px-1 rounded bg-neutral-100 text-neutral-500 uppercase">{titleProject}</span>
+                            )}
+                            {titleStage && (
+                                <span className="text-[8px] font-black px-1 rounded bg-indigo-50 text-indigo-600 uppercase">{titleStage}</span>
                             )}
                         </div>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-1.5 pt-1 sm:pt-0 shrink-0">
+                        {/* Topic/Package ID Badge */}
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tight ${
+                            activeNextStep && !isDone 
+                                ? 'bg-amber-100 text-amber-700' 
+                                : 'bg-neutral-100 text-neutral-500'
+                        }`}>
+                            {task.topic_id || titleProject || 'Untitled'}
+                        </span>
+
+                        {/* Stage Badge (Desktop) */}
+                        {titleStage && (
+                             <span className="hidden sm:inline-flex text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase tracking-tighter">
+                                {titleStage}
+                            </span>
+                        )}
+
+                        {task.package_total !== undefined && (
+                            <span className="text-[10px] font-bold text-neutral-400">
+                                {task.package_done}/{task.package_total}
+                            </span>
+                        )}
+                    </div>
 
 
                 </div>
@@ -219,10 +365,35 @@ export default function TaskRow({
                 </div>
 
                 {/* Indicators + Linked Notice */}
-                <div className="flex items-center gap-3 w-auto sm:w-16 sm:justify-end shrink-0 text-neutral-400 ml-auto sm:ml-0">
+                <div className="flex items-center gap-3 w-auto sm:w-20 sm:justify-end shrink-0 text-neutral-400 ml-auto sm:ml-0">
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isConfirmingDelete ? (
+                            <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-200">
+                                <button 
+                                    onClick={handleDeleteClick}
+                                    className="px-2 py-1 bg-red-600 text-white text-[9px] font-black rounded hover:bg-red-700 shadow-sm"
+                                >
+                                    CONFIRM
+                                </button>
+                                <button 
+                                    onClick={handleCancelDelete}
+                                    className="px-2 py-1 bg-white border border-neutral-200 text-neutral-400 text-[9px] font-black rounded hover:bg-neutral-50"
+                                >
+                                    CANCEL
+                                </button>
+                            </div>
+                        ) : (
+                            <button 
+                                onClick={handleDeleteClick}
+                                className="p-1.5 rounded-md transition-all hover:bg-red-50 hover:text-red-500 text-neutral-300"
+                                title="ลบงานนี้"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        )}
+                    </div>
                     {task.doc_id && <div title="เชื่อมกับ Hub Note"><Paperclip className="w-3.5 h-3.5 text-blue-500" /></div>}
                     {hasNotes && <div title="มีบันทึก"><FileText className="w-3.5 h-3.5" /></div>}
-                    {!task.doc_id && hasAttachments && <div title="มีเอกสารแนบ"><Paperclip className="w-3.5 h-3.5" /></div>}
                 </div>
             </div>
         </div>

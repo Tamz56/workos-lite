@@ -28,10 +28,47 @@ const CreateTaskSchema = z.object({
     sort_order: z.number().int().optional().nullable(),
     sprint_id: z.string().optional().nullable(),
     review_status: ReviewStatus.default("draft"), // RC26
+    topic_id: z.string().optional().nullable(),
+    topic_title: z.string().optional().nullable(),
 });
 
 function isDateYYYYMMDD(s: string) {
     return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+// RC65: Shared enrichment logic for consistent API responses
+function enrichTask(row: any) {
+    if (!row) return row;
+    let templateKey = null;
+    let topicId = null;
+    let topicTitle = null;
+
+    if (row.notes) {
+        const tMatch = row.notes.match(/template_key:\s*([a-zA-Z0-9_-]+)/);
+        if (tMatch) templateKey = tMatch[1];
+        
+        const idMatch = row.notes.match(/topic_id:\s*([a-zA-Z0-9_-]+)/);
+        if (idMatch) topicId = idMatch[1];
+
+        const titleMatch = row.notes.match(/topic_title:\s*(.+)/);
+        if (titleMatch) topicTitle = titleMatch[1].trim();
+    }
+
+    // RC65: Title-based fallback for topic_id (legacy support)
+    if (!topicId && row.title) {
+        const titleMatch = row.title.match(/TOPIC-(\d+)/i);
+        if (titleMatch) topicId = titleMatch[0].toUpperCase();
+        
+        const gfMatch = row.title.match(/GF-CONTENT-(\d+)/i);
+        if (gfMatch) topicId = gfMatch[0].toUpperCase();
+    }
+
+    return {
+        ...row,
+        template_key: templateKey,
+        topic_id: topicId,
+        topic_title: topicTitle
+    };
 }
 
 export async function GET(req: NextRequest) {
@@ -251,23 +288,8 @@ export async function GET(req: NextRequest) {
             )
             .all(bind) as any[];
 
-        // RC19/RC21: Enrich rows with template_key and topic_id from notes
-        const enrichedRows = rows.map(row => {
-            let templateKey = null;
-            let topicId = null;
-            if (row.notes) {
-                const tMatch = row.notes.match(/template_key:\s*([a-zA-Z0-9_-]+)/);
-                if (tMatch) templateKey = tMatch[1];
-                
-                const idMatch = row.notes.match(/topic_id:\s*([a-zA-Z0-9_-]+)/);
-                if (idMatch) topicId = idMatch[1];
-            }
-            return {
-                ...row,
-                template_key: templateKey,
-                topic_id: topicId
-            };
-        });
+        // RC65: Unified enrichment logic
+        const enrichedRows = rows.map(row => enrichTask(row));
 
         // RC21: Batch fetch package progress for identified topics
         const uniqueTopicIds = Array.from(new Set(enrichedRows.map(r => r.topic_id).filter(Boolean))) as string[];
@@ -357,6 +379,17 @@ export async function POST(req: NextRequest) {
         const scheduledDate = t.scheduled_date ?? null;
         const bucket = scheduledDate ? (t.schedule_bucket ?? "none") : "none";
 
+        // RC65: Embed topic metadata into notes if provided
+        let finalNotes = t.notes ?? "";
+        if (t.topic_id) {
+            if (!finalNotes.includes("topic_id:")) {
+                finalNotes = `topic_id: ${t.topic_id}\n${finalNotes}`;
+            }
+            if (t.topic_title && !finalNotes.includes("topic_title:")) {
+                finalNotes = `topic_title: ${t.topic_title}\n${finalNotes}`;
+            }
+        }
+
         getDb().prepare(
             `
       INSERT INTO tasks (
@@ -391,7 +424,7 @@ export async function POST(req: NextRequest) {
             start_time: t.start_time ?? null,
             end_time: t.end_time ?? null,
             priority: t.priority ?? null,
-            notes: t.notes ?? null,
+            notes: finalNotes || null,
             parent_task_id: t.parent_task_id ?? null,
             sort_order: t.sort_order ?? null,
             sprint_id: t.sprint_id ?? null,
@@ -402,7 +435,8 @@ export async function POST(req: NextRequest) {
         });
 
         const created = getDb().prepare("SELECT * FROM tasks WHERE id = ?").get(id);
-        return NextResponse.json({ task: created }, { status: 201 });
+        const enriched = enrichTask(created);
+        return NextResponse.json({ task: enriched }, { status: 201 });
     } catch (e: unknown) {
         return NextResponse.json(
             { error: toErrorMessage(e) },

@@ -8,6 +8,8 @@ interface QuickAddTaskProps {
     initialListId?: string | null;
     initialPackageId?: string | null;
     initialTopicId?: string | null;
+    initialTopicTitle?: string | null;
+    initialParentTaskId?: string | null;
     initialStepKey?: string | null;
     launchSource?: string;
     placeholder?: string;
@@ -21,6 +23,8 @@ export default function QuickAddTask({
     initialListId,
     initialPackageId,
     initialTopicId,
+    initialTopicTitle,
+    initialParentTaskId,
     initialStepKey,
     launchSource,
     placeholder = "What needs to be done?", 
@@ -54,6 +58,8 @@ export default function QuickAddTask({
                     status: initialStatus,
                     list_id: initialListId || undefined,
                     topic_id: initialTopicId || undefined,
+                    topic_title: initialTopicTitle || undefined,
+                    parent_task_id: initialParentTaskId || undefined,
                     package_id: initialPackageId || undefined,
                     step_key: initialStepKey || undefined,
                 })

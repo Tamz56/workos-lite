@@ -39,6 +39,7 @@ const CHANNELS = [
 
 interface PackageGroupHeaderProps {
     topicId: string;
+    title?: string; // RC48: Added for List-as-Topic support
     templateKey?: string | null;
     packageDone?: number;
     packageTotal?: number;
@@ -67,12 +68,13 @@ interface PackageGroupHeaderProps {
     onUpdateMetrics?: (metrics: Record<string, any>) => void; // RC30
     isBestPerformer?: boolean; // RC31
     bestChannelHint?: string; // RC31
-    onQuickAdd?: () => void; // RC36
+    onQuickAdd?: (topicId: string, topicTitle?: string) => void; // RC36
     tasks?: Task[]; // RC39
 }
 
 export default function PackageGroupHeader({
     topicId,
+    title,
     templateKey,
     packageDone,
     packageTotal,
@@ -153,10 +155,15 @@ export default function PackageGroupHeader({
         setTimeout(() => dateInputRef.current?.showPicker?.(), 50);
     };
 
-    // RC25: Calm completed state colors
+    const isLegacy = !topicId || topicId === 'legacy-topic' || (!topicId.startsWith('TOPIC-') && !topicId.startsWith('GF-CONTENT-'));
+
     const bgClass = isFullyComplete 
-        ? "bg-emerald-50/80 hover:bg-emerald-100/80 border-l-emerald-500" 
-        : "bg-neutral-50/90 hover:bg-neutral-100 border-l-neutral-300";
+        ? "bg-emerald-50/40 hover:bg-emerald-100/40" 
+        : isLegacy
+            ? "bg-neutral-50/40 hover:bg-neutral-100/40 opacity-70"
+            : "bg-white hover:bg-neutral-50";
+
+    const accentClass = isLegacy ? "border-l-neutral-200" : "border-l-indigo-500 shadow-sm";
 
     return (
         <div 
@@ -164,17 +171,22 @@ export default function PackageGroupHeader({
                 e.stopPropagation();
                 onToggle();
             }}
-            className={`group py-2.5 px-4 flex items-center border-b border-neutral-200 cursor-pointer select-none transition-all duration-300 border-l-4 sticky top-0 z-30 backdrop-blur ${bgClass} active:opacity-80`}
+            className={`group py-2 px-4 flex items-center border-b border-neutral-100 cursor-pointer select-none transition-all duration-300 sticky top-0 z-30 backdrop-blur-xl ${bgClass} ${accentClass} border-l-4 active:opacity-95`}
         >
-            <div className="w-6 h-6 flex items-center justify-center text-neutral-400 group-hover:text-neutral-600 mr-2">
-                {isCollapsed ? <ChevronRight size={16} strokeWidth={2.5} /> : <ChevronDown size={16} strokeWidth={2.5} />}
+            <div className="w-6 h-6 flex items-center justify-center text-neutral-400 group-hover:text-black mr-3 bg-white/50 rounded-md transition-all border border-black/5 group-hover:scale-105">
+                {isCollapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronDown size={14} strokeWidth={3} />}
             </div>
 
             <div className="flex-1 flex items-center gap-3 min-w-0">
-                <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`text-xs font-black px-2 py-0.5 rounded-sm tracking-tight uppercase ${isFullyComplete ? 'bg-emerald-600' : 'bg-neutral-800'} text-white`}>
+                <div className="flex items-center gap-2.5 shrink-0 max-w-[600px] overflow-hidden">
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded bg-black text-white shrink-0 shadow-sm`}>
                         {topicId}
                     </span>
+                    {title && title !== topicId && (
+                        <span className="text-sm font-black text-neutral-900 truncate tracking-tight">
+                            {title.includes(" — ") ? title.split(" — ")[1] : title}
+                        </span>
+                    )}
                     
                     {/* RC27: Ready to Publish Signal */}
                     {readyToPublish && (
@@ -184,12 +196,41 @@ export default function PackageGroupHeader({
                     )}
 
                     {packageTotal !== undefined && (
-                        <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-sm flex items-center gap-1 ${
-                            isFullyComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-neutral-200/50 text-neutral-500'
-                        }`}>
-                            {isFullyComplete && <Check size={10} strokeWidth={4} />}
-                            {packageDone}/{packageTotal}
-                        </span>
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (isCollapsed) onToggle();
+                                
+                                // RC46C: Resolve next actionable task in group
+                                const targetId = suggestedAction?.taskId || tasks.find(t => t.status !== 'done')?.id;
+                                if (targetId && onNextStep) {
+                                    onNextStep(targetId);
+                                }
+                            }}
+                            title={isFullyComplete ? "ครบถ้วนแล้ว!" : "คลิกเพื่อไปที่ขั้นตอนถัดไปในกลุ่มนี้"}
+                            className={`text-[10px] font-black px-2 py-0.5 rounded flex items-center gap-1.5 transition-all active:scale-95 group/prog relative overflow-hidden ${
+                                isFullyComplete 
+                                    ? 'bg-emerald-100 text-emerald-700 shadow-sm border border-emerald-200' 
+                                    : 'bg-neutral-100 hover:bg-indigo-600 hover:text-white text-neutral-500 border border-neutral-200'
+                            }`}
+                        >
+                            {/* Visual Progress Bar in badge bg */}
+                            {!isFullyComplete && (
+                                <div 
+                                    className="absolute inset-0 bg-indigo-500/10 group-hover/prog:bg-white/10 transition-all pointer-events-none" 
+                                    style={{ width: `${(packageDone || 0) / (packageTotal || 1) * 100}%` }}
+                                />
+                            )}
+                            
+                            <span className="relative z-10 flex items-center gap-1">
+                                {isFullyComplete ? (
+                                    <Check size={10} strokeWidth={4} />
+                                ) : (
+                                    <Play size={8} fill="currentColor" className="opacity-0 group-hover/prog:opacity-100 transition-opacity" />
+                                )}
+                                {packageDone}/{packageTotal}
+                            </span>
+                        </button>
                     )}
 
                     {/* RC26: Review Status Badge */}
@@ -398,7 +439,7 @@ export default function PackageGroupHeader({
                     {/* RC36: Quick Add Trigger */}
                     {onQuickAdd && (
                         <button 
-                            onClick={(e) => { e.stopPropagation(); onQuickAdd(); }}
+                            onClick={(e) => { e.stopPropagation(); onQuickAdd(topicId, title); }}
                             title="Add Task to Package"
                             className="p-1 px-1.5 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors flex items-center gap-1 border border-indigo-200/50"
                         >

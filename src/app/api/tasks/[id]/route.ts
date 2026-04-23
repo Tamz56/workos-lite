@@ -8,7 +8,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const Workspace = z.enum(["avacrm", "ops", "content"]);
-const Status = z.enum(["inbox", "planned", "in_progress", "done"]);
+const Status = z.enum(["inbox", "planned", "in_progress", "review", "done"]);
 const Bucket = z.enum(["none", "morning", "afternoon", "evening"]);
 
 const PatchTaskSchema = z
@@ -28,6 +28,19 @@ const PatchTaskSchema = z
         parent_task_id: z.string().nullable().optional(),
         sort_order: z.number().int().nullable().optional(),
         review_status: z.enum(["draft", "in_review", "approved", "published"]).optional(), // RC26
+
+        // Agent Automation (MVP)
+        agent_enabled: z.number().int().optional(),
+        agent_mode: z.string().nullable().optional(),
+        scheduled_run_at: z.string().nullable().optional(),
+        source_note_id: z.string().nullable().optional(),
+        research_note_id: z.string().nullable().optional(),
+        output_target: z.literal("new_note").optional(),
+        approval_required: z.number().int().optional(),
+        agent_status: z.enum(['idle', 'queued', 'running', 'review', 'failed']).optional(),
+        agent_last_run_at: z.string().nullable().optional(),
+        last_agent_result_note_id: z.string().nullable().optional(),
+        last_agent_error: z.string().nullable().optional(),
     })
     .strict();
 
