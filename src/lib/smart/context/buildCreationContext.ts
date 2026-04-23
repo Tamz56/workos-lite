@@ -13,6 +13,7 @@ interface BuildCreationContextArgs {
   packageStepKey?: string | null
   scheduleFilter?: 'scheduled' | 'unscheduled' | null
   launchSource?: LaunchSource | null
+  parentTaskId?: string | null
 }
 
 export function buildCreationContext(args: BuildCreationContextArgs): CreationContext {
@@ -28,5 +29,6 @@ export function buildCreationContext(args: BuildCreationContextArgs): CreationCo
     packageStepKey: args.packageStepKey ?? null,
     scheduleFilter: args.scheduleFilter ?? null,
     launchSource: args.launchSource ?? null,
+    parentTaskId: args.parentTaskId ?? null,
   }
 }

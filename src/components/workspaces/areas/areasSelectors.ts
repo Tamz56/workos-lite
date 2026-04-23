@@ -1,5 +1,6 @@
 import { Task } from "@/lib/types";
 import { AreasViewState } from "./useAreasState";
+import { WORKSPACES_LIST } from "@/lib/workspaces";
 
 export interface GroupedTasks {
     key: string;
@@ -24,13 +25,22 @@ export interface GroupedTasks {
     performanceScore?: number; // RC31
     isBestPerformer?: boolean; // RC31
     bestChannelHint?: string; // RC31
+    listId?: string | null;
+    title?: string;
 }
 
 
 
 
-export function selectGroupedTasks(tasks: Task[], state: AreasViewState): GroupedTasks[] {
+export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspaceId: string): GroupedTasks[] {
     let filtered = tasks;
+
+    // RCRestruct: Global Filter for hidden workspaces if in global view
+    const isExplicitWorkspace = !!workspaceId && workspaceId !== 'global' && workspaceId !== 'all';
+    if (!isExplicitWorkspace) {
+        const activeWorkspaces = new Set(WORKSPACES_LIST.filter(w => !w.isHidden).map(w => w.id));
+        filtered = filtered.filter(t => activeWorkspaces.has(t.workspace));
+    }
 
     // 1. Search Match
     if (state.search) {
@@ -90,99 +100,106 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState): Groupe
     });
 
     // 6. Grouping Logic (RC22)
-    const isPackageGroup = state.groupBy === "package";
-
-    // RC32: Handle Flat List Mode Intervention (Modified for RC33: Simple Grouping)
-    if (state.viewMode === "list") {
-        const todo = filtered.filter(t => t.status !== 'done');
-        const completed = filtered.filter(t => t.status === 'done');
-        
-        const listGroups: GroupedTasks[] = [];
-        if (todo.length > 0) {
-            listGroups.push({
-                key: "To-Do",
-                tasks: todo,
-                isPackage: false
-            });
-        }
-        if (completed.length > 0) {
-            listGroups.push({
-                key: "Completed",
-                tasks: completed,
-                isPackage: false
-            });
-        }
-        return listGroups;
-    }
+    // V5: Strict 1:1 mapping. 
+    // RC65: Enhanced content code detection (GF-CONTENT-### > TOPIC-###)
+    const isContentWorkspace = workspaceId === 'content' || workspaceId === 'avacrm';
+    const isPackageGroup = state.groupBy === "package" || isContentWorkspace;
 
     const groups: Record<string, Task[]> = {};
-
-
     const groupMeta: Record<string, any> = {};
+
+    // Helper: Code extraction (GF-CONTENT-### or TOPIC-###)
+    const extractCode = (t: Task) => {
+        const gfPattern = /GF-CONTENT-\d+/g;
+        const topicPattern = /TOPIC-\d+/g;
+
+        // 1. Check metadata (notes) - Highest Priority
+        if (t.notes) {
+            const gfMatch = t.notes.match(gfPattern);
+            if (gfMatch) return gfMatch[0];
+            const topicMatch = t.notes.match(topicPattern);
+            if (topicMatch) return topicMatch[0];
+        }
+
+        // 2. Check explicit topic_id field
+        if (t.topic_id) {
+            const gfMatch = t.topic_id.match(gfPattern);
+            if (gfMatch) return gfMatch[0];
+            const topicMatch = t.topic_id.match(topicPattern);
+            if (topicMatch) return topicMatch[0];
+        }
+
+        // 3. Check title - Fallback
+        const gfMatchTitle = t.title.match(gfPattern);
+        if (gfMatchTitle) return gfMatchTitle[0];
+        const topicMatchTitle = t.title.match(topicPattern);
+        if (topicMatchTitle) return topicMatchTitle[0];
+
+        return null;
+    };
 
     filtered.forEach(t => {
         let key = "Uncategorized";
 
         if (isPackageGroup) {
-            if (t.topic_id) {
-                key = `package:${t.topic_id}`;
+            const extractedCode = extractCode(t);
+            // Canonical Key resolution: Extracted Code > list_id > topic_id
+            const topicKey = extractedCode || t.list_id || t.topic_id || (isContentWorkspace ? "legacy-topic" : null);
+            
+            // Name resolution: if we extracted a code, try to find a nice name from the title
+            let topicName = t.list_name || t.topic_id || (isContentWorkspace ? "Legacy / Needs Topic Mapping" : "Uncategorized");
+            
+            if (topicKey) {
+                key = isContentWorkspace ? `topic:${topicKey}` : `package:${topicKey}`;
+                
+                // RC65: Resolve canonical title (Prefer Metadata > Parsed Title > Topic ID)
+                const metadataTitle = t.topic_title;
+                const titleCandidate = t.title.includes(" — ") ? t.title.split(" — ")[1] : null;
+                const canonicalName = metadataTitle || titleCandidate || topicName;
+
                 if (!groupMeta[key]) {
                     groupMeta[key] = {
-                        topicId: t.topic_id,
+                        key,
+                        title: (extractedCode && canonicalName !== extractedCode) ? `${extractedCode} — ${canonicalName}` : canonicalName,
+                        topicId: extractedCode || t.topic_id,
+                        listId: t.list_id,
                         templateKey: t.template_key,
                         packageDone: t.package_done,
                         packageTotal: t.package_total,
-                        scheduledDate: t.scheduled_date, // Default to first seen
+                        scheduledDate: t.scheduled_date, 
                         docId: t.doc_id,
-                        reviewStatus: t.review_status, // RC26
-                        publishedAt: t.published_at, // RC28
+                        reviewStatus: t.review_status,
+                        publishedAt: t.published_at,
                         isPackage: true,
-                        _allApproved: t.review_status === 'approved', // Internal RC27 tracker
-                        _hasDifferentReview: false, // Internal RC27 tracker
-                        _channelsRaw: t.distribution_channels, // Internal RC29 tracker
-                        _hasDifferentChannels: false // Internal RC29 tracker
+                        _allApproved: t.review_status === 'approved',
+                        _hasDifferentReview: false,
+                        _channelsRaw: t.distribution_channels,
+                        _hasDifferentChannels: false,
+                        _metricsRaw: t.performance_metrics
                     };
                 } else {
-                    // RC27: Review Consistency Check
-                    if (t.review_status !== groupMeta[key].reviewStatus) {
-                        groupMeta[key]._hasDifferentReview = true;
-                    }
-                    if (t.review_status !== 'approved') {
-                        groupMeta[key]._allApproved = false;
-                    }
-                    if (!groupMeta[key].publishedAt && t.published_at) {
-                        groupMeta[key].publishedAt = t.published_at;
+                    // Title recovery: If the current group title is generic, update it with best candidate
+                    const currentTitle = groupMeta[key].title;
+                    const isCurrentGeneric = currentTitle === "Legacy / Needs Topic Mapping" || !currentTitle.includes(" — ");
+                    if (isCurrentGeneric && canonicalName && canonicalName !== topicName) {
+                        groupMeta[key].title = extractedCode ? `${extractedCode} — ${canonicalName}` : canonicalName;
                     }
 
-                    // RC29: Channels Consistency Check
-                    if (t.distribution_channels !== groupMeta[key]._channelsRaw) {
-                        groupMeta[key]._hasDifferentChannels = true;
-                    }
-
-                    // RC30: Metrics Consistency Check
-                    if (t.performance_metrics !== groupMeta[key]._metricsRaw) {
-                        groupMeta[key]._hasDifferentMetrics = true;
-                    }
+                    // Consistency Checks
+                    if (t.review_status !== groupMeta[key].reviewStatus) groupMeta[key]._hasDifferentReview = true;
+                    if (t.review_status !== 'approved') groupMeta[key]._allApproved = false;
+                    if (!groupMeta[key].publishedAt && t.published_at) groupMeta[key].publishedAt = t.published_at;
+                    if (t.distribution_channels !== groupMeta[key]._channelsRaw) groupMeta[key]._hasDifferentChannels = true;
                 }
-
-                if (!groupMeta[key]._metricsRaw && t.performance_metrics) {
-                    groupMeta[key]._metricsRaw = t.performance_metrics;
-                }
-
-
                 
-                // RC24: If this task is the 'Publish' task, prioritize its date for the header
                 if (t.title.toLowerCase().includes("publish") && t.scheduled_date) {
                     groupMeta[key].scheduledDate = t.scheduled_date;
                 }
-            } else {
-                key = "Other Tasks";
             }
         } else {
             // Default non-content grouping
             if (state.groupBy === "status") {
                 key = t.status || "inbox";
-                // Normalize for display: replace _ with space and Title Case
                 key = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
             } else if (state.groupBy === "list") {
                 key = t.list_name || "Unassigned";
@@ -227,11 +244,13 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState): Groupe
 
     // 7. Sort Groups & Finalize Package Metadata
     const sortedKeys = Object.keys(groups).sort((k1, k2) => {
+        const isContent = isContentWorkspace;
+        const legacyKey = "Legacy / Needs Topic Mapping";
 
         if (isPackageGroup) {
-            // "Other Tasks" always last
-            if (k1 === "Other Tasks") return 1;
-            if (k2 === "Other Tasks") return -1;
+            // "Other Tasks" / "Legacy..." always last
+            if (k1 === "Other Tasks" || k1 === legacyKey) return 1;
+            if (k2 === "Other Tasks" || k2 === legacyKey) return -1;
             
             // Sort packages by their earliest scheduled date
             const d1 = groupMeta[k1]?.scheduledDate || "9999-99-99";
@@ -339,10 +358,9 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState): Groupe
         };
     });
 
-    // 8. RC27: Filter by Ready-to-Publish if requested
-    if (state.onlyReadyToPublish) {
-        return finalGroups.filter(g => g.readyToPublish);
-    }
-
+    // 9. RC55: Auto-collapse Legacy for Content Workspace
+    // This is a UI-level intervention. We set a flag or handle it in the component.
+    // For simplicity, we ensure the groups correctly identify themselves.
+    
     return finalGroups;
 }

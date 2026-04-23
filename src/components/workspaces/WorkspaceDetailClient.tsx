@@ -10,10 +10,13 @@ import { useAreasState } from "./areas/useAreasState";
 import AreasToolbar from "./areas/AreasToolbar";
 import AreasFilterBar from "./areas/AreasFilterBar";
 import AreasTaskList from "./areas/AreasTaskList";
+import { useSearchParams } from "next/navigation";
 import CreateContentPackageModal from "./areas/CreateContentPackageModal";
 import CommandPalette, { CommandOption } from "./areas/CommandPalette";
 import QuickAddTask from "./areas/QuickAddTask";
+import CreateListModal from "./areas/CreateListModal";
 import { Toast } from "../ui/Toast";
+import { Modal, isAnyModalOpen } from "../ui/Modal";
 
 // RC39: Smart Suggestions
 import { SmartViewHint } from "./SmartViewHint";
@@ -60,11 +63,17 @@ const DEFAULT_PREFERENCES: TuningPreferences = {
 
 export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: string }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const isCreatePackageModalOpen = searchParams.get('createPackage') === 'true';
+    const isNewListModalOpen = searchParams.get('newList') === 'true';
+    const activeTaskIdFromUrl = searchParams.get('taskId');
     const ws = WORKSPACES_LIST.find(w => w.id === workspaceId);
     const wsColor = ws ? getWorkspaceColor(ws.colorKey) : getWorkspaceColor("neutral");
     const WsIcon = (LucideIcons as any)[ws?.iconKey || "LayoutGrid"] || LayoutGrid;
     
-    const { state, updateState } = useAreasState(workspaceId);
+    const { state, updateState } = useAreasState(workspaceId, {
+        selectedTaskId: activeTaskIdFromUrl,
+    });
     const [tasks, setTasks] = useState<Task[]>([]);
     
     // RC49: Mode & Preferences state with Persistence
@@ -238,6 +247,14 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         
         recordActionDismissal(action.id);
     }, [handleModeChange, handleTogglePreference, handlePinTask]);
+
+    const handleRestoreIntelligence = useCallback(() => {
+        setSkips({});
+        setIsQueueDismissed(false);
+        setViewHintDismissed(false);
+        setToast({ isVisible: true, message: "↺ คืนค่าการแนะนำและแถบอัจฉริยะเรียบร้อยแล้ว" });
+        recordEvent(workspaceId, 'intelligence_restored', undefined, {});
+    }, [workspaceId]);
 
     // RC51: Suggestion Refresh
     useEffect(() => {
@@ -424,6 +441,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 target.isContentEditable ||
                 target.closest('[role="combobox"]');
 
+            if (isAnyModalOpen()) return;
             if (isTyping && !isCommandPaletteOpen) return;
 
             if (e.key === "n" || e.key === "/") {
@@ -433,25 +451,11 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             }
 
             if (e.key === "Escape") {
-                if (isCommandPaletteOpen) {
-                    setIsCommandPaletteOpen(false);
-                    lastActiveElement.current?.focus();
-                    return;
-                }
                 if (state.isTableQuickAddOpen || state.inlineQuickAddTopicId) {
                     updateState({ 
                         isTableQuickAddOpen: false, 
                         inlineQuickAddTopicId: null 
                     });
-                    return;
-                }
-                if (state.isQuickAddOpen) {
-                    updateState({ isQuickAddOpen: false });
-                    return;
-                }
-                const searchParams = new URLSearchParams(window.location.search);
-                if (searchParams.has("taskId")) {
-                    router.push(window.location.pathname);
                     return;
                 }
                 if (state.isFlowMode) {
@@ -488,13 +492,25 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isCommandPaletteOpen, state.isQuickAddOpen, state.isTableQuickAddOpen, state.inlineQuickAddTopicId, state.isFlowMode, state.selectedTaskId, updateState, router]);
+    
+    // RC65: Listen for external task updates (e.g. from GlobalTaskDialogs)
+    useEffect(() => {
+        const handleExternalUpdate = () => {
+            fetchTasks(false);
+        };
+        window.addEventListener("task-updated", handleExternalUpdate);
+        return () => window.removeEventListener("task-updated", handleExternalUpdate);
+    }, [fetchTasks]);
 
     useEffect(() => {
         fetchTasks(false);
     }, [workspaceId, state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter, state.templateFilter, state.reviewStatusFilter, state.scheduleFilter, state.dateRange.start, state.dateRange.end, state.search, fetchTasks]);
 
     const handleTaskUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
+        const prevTask = tasks.find(t => t.id === taskId);
+        const prevStatus = prevTask?.status;
         const prevTasks = [...tasks];
+        
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
 
         try {
@@ -507,38 +523,63 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             
             const { task: updatedFromServer } = await res.json();
             setTasks(prev => prev.map(t => t.id === taskId ? updatedFromServer : t));
+            // RC52: Undo Support for Status Changes
+            if (updates.status && prevTask && prevStatus !== updates.status) {
+                setToast({
+                    isVisible: true,
+                    message: updates.status === 'done' ? `✅ เสร็จสิ้น: ${prevTask.title}` : `อัปเดตสถานะเป็น: ${updates.status}`,
+                    action: {
+                        label: "ย้อนกลับ",
+                        onClick: () => {
+                            handleTaskUpdate(taskId, { status: prevStatus as any });
+                        }
+                    }
+                });
+            }
 
-            if (updates.status === 'done') {
+            if (updates.status === 'done' && !state.isFlowMode) {
+                // If not in flow mode, we might want to suggest the next task separately
+                // but we wait a bit to let the "Undo" toast be seen first
+                const nextResult = resolveBestNextTask(tasks, taskId, intelligence);
+                const next = nextResult?.task;
+                if (next) {
+                    setTimeout(() => {
+                        setToast(prev => {
+                            if (prev.isVisible && prev.message.includes("เสร็จสิ้น")) {
+                                return {
+                                    ...prev,
+                                    message: `งานเสร็จเรียบร้อย! ขั้นตอนถัดไป: ${next.title}`,
+                                    action: {
+                                        label: "เริ่มทำเลย",
+                                        onClick: () => {
+                                            ensureTaskVisible(next.id);
+                                            updateState({ selectedTaskId: next.id });
+                                            router.push(`?taskId=${next.id}`);
+                                        }
+                                    }
+                                };
+                            }
+                            return prev;
+                        });
+                    }, 3000);
+                }
+            }
+
+            if (updates.status === 'done' && state.isFlowMode) {
                 setLastCompletedTaskId(taskId);
                 recordEvent(workspaceId, 'task_completed', taskId, { activeMode: mode });
 
-                const isFlow = state.isFlowMode;
                 const nextResult = resolveBestNextTask(tasks, taskId, intelligence);
                 const next = nextResult?.task;
 
-                if (isFlow) {
-                    if (next) {
-                        handleFlowNext(false, taskId); 
-                    } else {
-                        setToast({ 
-                            isVisible: true, 
-                            message: "🎊 ยอดเยี่ยม! คุณเคลียร์งานทั้งหมดใน Workspace นี้เรียบร้อยแล้ว",
-                        });
-                        updateState({ isFlowMode: false });
-                    }
-                } else if (next) {
-                    setToast({
-                        isVisible: true,
-                        message: `งานเสร็จเรียบร้อย! ขั้นตอนถัดไป: ${next.title}`,
-                        action: {
-                            label: "เริ่มทำเลย",
-                            onClick: () => {
-                                ensureTaskVisible(next.id);
-                                updateState({ selectedTaskId: next.id });
-                                router.push(`?taskId=${next.id}`);
-                            }
-                        }
+                if (next) {
+                    handleFlowNext(false, taskId); 
+                } else {
+                    setToast({ 
+                        isVisible: true, 
+                        message: "🎊 ยอดเยี่ยม! คุณเคลียร์งานทั้งหมดใน Workspace นี้เรียบร้อยแล้ว",
                     });
+                    updateState({ isFlowMode: false });
                 }
             }
         } catch (e) {
@@ -621,35 +662,106 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         if (!t || t.status === "done") return;
         await handleTaskUpdate(taskId, { status: "done" });
         if (t.topic_id) {
-            setTimeout(() => {
-                setTasks(currentTasks => {
-                    const pkgTasks = currentTasks.filter(x => x.topic_id === t.topic_id);
-                    const doneCount = pkgTasks.filter(x => x.status === "done").length;
-                    const totalCount = pkgTasks.length;
-                    if (doneCount === totalCount && totalCount > 0) {
-                        setToast({ isVisible: true, message: `🎉 แพ็กเกจ ${t.topic_id} สำเร็จครบถ้วนแล้ว!` });
-                    } else {
-                        setToast({ isVisible: true, message: `✅ บันทึกความคืบหน้าของ ${t.topic_id} เรียบร้อย` });
+            const pkgTasks = tasks.map(x => x.id === taskId ? { ...x, status: 'done' as const } : x)
+                                 .filter(x => x.topic_id === t.topic_id);
+            
+            const doneCount = pkgTasks.filter(x => x.status === "done").length;
+            const totalCount = pkgTasks.length;
+
+            if (doneCount === totalCount && totalCount > 0) {
+                setToast({ isVisible: true, message: `🎉 แพ็กเกจ ${t.topic_id} สำเร็จครบถ้วนแล้ว!` });
+            } else {
+                setToast({ isVisible: true, message: `✅ บันทึกความคืบหน้าของ ${t.topic_id} เรียบร้อย` });
+            }
+
+            const remaining = pkgTasks.filter(x => x.status !== "done");
+            if (remaining.length > 0) {
+                const stepOrder = ["Brief Approved", "Script & Caption", "Assets / Canva", "Publish", "Archive"];
+                let bestTask = remaining[0];
+                let bestIdx = 99;
+                remaining.forEach(rt => {
+                    const idx = stepOrder.findIndex(s => rt.title.toLowerCase().includes(s.toLowerCase()));
+                    if (idx !== -1 && idx < bestIdx) {
+                        bestIdx = idx;
+                        bestTask = rt;
                     }
-                    const remaining = pkgTasks.filter(x => x.status !== "done");
-                    if (remaining.length > 0) {
-                        const stepOrder = ["Brief Approved", "Script & Caption", "Assets / Canva", "Publish", "Archive"];
-                        let bestTask = remaining[0];
-                        let bestIdx = 99;
-                        remaining.forEach(rt => {
-                            const idx = stepOrder.findIndex(s => rt.title.toLowerCase().includes(s.toLowerCase()));
-                            if (idx !== -1 && idx < bestIdx) {
-                                bestIdx = idx;
-                                bestTask = rt;
-                            }
-                        });
-                        router.push(`?taskId=${bestTask.id}`);
-                    }
-                    return currentTasks;
                 });
-            }, 100);
+                router.push(`?taskId=${bestTask.id}`);
+            }
         }
     }, [tasks, handleTaskUpdate, router]);
+
+    // RC65: Batch Cleanup & Undo Logic
+    const [deletedTasksBuffer, setDeletedTasksBuffer] = useState<Task[]>([]);
+    
+    const handleUndo = useCallback(async () => {
+        if (deletedTasksBuffer.length === 0) return;
+        
+        try {
+            // Restore tasks one-by-one or in batch if API supports
+            // For now, iterate and restore to ensure they go back to the right group
+            const results = await Promise.all(deletedTasksBuffer.map(task => 
+                fetch("/api/tasks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ...task,
+                        id: undefined // Let DB assign new ID if needed, or preserve if API allows
+                    }),
+                })
+            ));
+
+            if (results.some(r => !r.ok)) throw new Error("Some tasks failed to restore");
+
+            setToast({ isVisible: true, message: "↺ กู้คืนงานที่ลบไปเรียบร้อยแล้ว" });
+            setDeletedTasksBuffer([]);
+            fetchTasks(false); // Full refresh to ensure grouping and progress are correct
+        } catch (e) {
+            console.error("Undo failed", e);
+            setToast({ isVisible: true, message: "❌ กู้คืนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" });
+        }
+    }, [deletedTasksBuffer, fetchTasks]);
+
+    const handleTasksDelete = useCallback(async (ids: string[]) => {
+        if (!ids.length) return;
+        
+        const tasksToDelete = tasks.filter(t => ids.includes(t.id));
+        
+        try {
+            const res = await fetch("/api/tasks/batch", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids }),
+            });
+            
+            if (!res.ok) throw new Error("Batch delete failed");
+            
+            const data = await res.json();
+            setTasks(prev => prev.filter(t => !ids.includes(t.id)));
+            setDeletedTasksBuffer(tasksToDelete);
+            
+            setToast({ 
+                isVisible: true, 
+                message: `🗑️ ลบงาน ${data.deletedCount} รายการเรียบร้อยแล้ว`,
+                action: {
+                    label: "เลิกทำ (UNDO)",
+                    onClick: handleUndo
+                }
+            });
+            
+            // Clear selections if they were deleted
+            updateState({ selectedTaskIds: [] });
+            
+            // RC50: Record event
+            recordEvent(workspaceId, 'tasks_deleted_batch', ids[0], { count: ids.length });
+
+            // Clear buffer after 5 seconds if not undone
+            setTimeout(() => setDeletedTasksBuffer([]), 10000); // 10s buffer
+        } catch (e) {
+            console.error("Delete failed", e);
+            setToast({ isVisible: true, message: "เกิดข้อผิดพลาดในการลบงาน กรุณาลองใหม่อีกครั้ง" });
+        }
+    }, [workspaceId, updateState, tasks, handleUndo]);
 
     const commands = useMemo<CommandOption[]>(() => {
         const pool: CommandOption[] = [
@@ -692,18 +804,34 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         setViewHintMemory(workspaceId, { dismissed: true });
     };
 
-    const creationDefaults = useMemo(() => {
-        const ctx = buildCreationContext({ workspaceId, workspaceType: ws?.type, mode: state.viewMode, launchSource: 'global' });
-        return resolveSmartCreateDefaults(ctx);
-    }, [workspaceId, ws?.type, state.viewMode]);
+    const parentTaskIdFromUrl = searchParams.get('parent_task_id');
+    const topicIdFromUrl = searchParams.get('topic_id');
+    const packageIdFromUrl = searchParams.get('package_id');
+    const listIdFromUrl = searchParams.get('list_id');
 
-    const handleNewList = () => {
-        const title = window.prompt("Enter new list title:");
-        if (!title) return;
-        fetch("/api/lists", {
+    const creationDefaults = useMemo(() => {
+        const ctx = buildCreationContext({ 
+            workspaceId, 
+            workspaceType: ws?.type, 
+            mode: state.viewMode, 
+            launchSource: 'global',
+            topicId: topicIdFromUrl || state.inlineQuickAddTopicId,
+            packageId: packageIdFromUrl,
+            listId: listIdFromUrl,
+            parentTaskId: parentTaskIdFromUrl
+        });
+        return resolveSmartCreateDefaults(ctx);
+    }, [workspaceId, ws?.type, state.viewMode, state.inlineQuickAddTopicId, topicIdFromUrl, packageIdFromUrl, listIdFromUrl, parentTaskIdFromUrl]);
+
+    const handleNewList = (title: string) => {
+        return fetch("/api/lists", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ workspace: workspaceId, title, slug: title.toLowerCase().replace(/ /g, '-') })
+        }).then(res => {
+            if (!res.ok) throw new Error("Failed to create list");
+            setToast({ isVisible: true, message: `✅ สร้างรายการ ${title} สำเร็จ` });
+            fetchTasks(false); // Refresh lists/tasks
         });
     };
 
@@ -731,9 +859,17 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 title={ws.label}
                 state={state}
                 updateState={updateState}
-                onNewList={handleNewList}
+                onNewList={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set('newList', 'true');
+                    router.push(`?${params.toString()}`);
+                }}
                 workspaceId={workspaceId}
-                onNewPackage={() => updateState({ isPackageModalOpen: true })}
+                onNewPackage={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set('createPackage', 'true');
+                    router.push(`?${params.toString()}`);
+                }}
                 isFocusMode={isFocusMode}
                 onToggleFocusMode={toggleFocusMode}
             />
@@ -751,6 +887,12 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         <span className={`text-sm font-black tracking-tight ${wsColor.text}`}>{ws.label}</span>
                         <div className={`w-1.5 h-1.5 rounded-full ${wsColor.dot} animate-pulse`} />
                     </button>
+
+                    {ws.isHidden && (
+                        <div className="ml-2 px-2 py-0.5 bg-neutral-100 border border-neutral-200 rounded-md flex items-center gap-1 opacity-70">
+                            <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Archived Area</span>
+                        </div>
+                    )}
 
                     <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${urgencySignal.bgColor} border border-neutral-100/50 shadow-sm`}>
                         <div className={`w-2 h-2 rounded-full ${urgencySignal.dotColor} ${urgencySignal.status === 'critical' ? 'animate-ping' : ''}`} />
@@ -777,7 +919,6 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                                 <span className="text-sm font-black">{inProgressCount}</span>
                             </div>
                         </div>
-                        <div className="w-px h-6 bg-neutral-100 hidden sm:block" />
                         <div className="flex flex-col">
                             <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Review</span>
                             <div className="flex items-center gap-1.5 text-indigo-600">
@@ -786,6 +927,14 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                             </div>
                         </div>
                     </div>
+
+                    <button 
+                        onClick={handleRestoreIntelligence}
+                        title="คืนค่ารายการที่ซ่อน (Restore Hidden)"
+                        className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-400 hover:text-indigo-600 transition-colors shrink-0"
+                    >
+                        <LucideIcons.RotateCcw size={14} />
+                    </button>
 
                     <div className="flex-1 flex items-center gap-3 bg-neutral-50/80 px-4 py-2 rounded-2xl border border-neutral-100/50 max-w-lg overflow-hidden group hover:bg-white hover:border-neutral-200 transition-all cursor-default shadow-sm hover:shadow-md">
                         <div className="p-1.5 bg-white rounded-xl shadow-sm border border-neutral-100 text-neutral-400 group-hover:text-black transition-colors shrink-0">
@@ -896,7 +1045,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             </div>
 
             {!isFocusMode && !state.isFlowMode && (
-                <AreasFilterBar tasks={tasks} lists={lists} sprints={sprints} state={state} updateState={updateState} />
+                <AreasFilterBar workspaceId={workspaceId} tasks={tasks} lists={lists} sprints={sprints} state={state} updateState={updateState} />
             )}
 
             <div className="flex-1 overflow-hidden relative flex flex-col px-4">
@@ -909,7 +1058,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                     </div>
                 )}
                 <div className="flex-1 overflow-hidden relative flex flex-col">
-                    <div className="flex-1 overflow-y-auto relative custom-scrollbar">
+                    <div className="flex-1 overflow-hidden relative flex flex-col custom-scrollbar">
                         {loadingTasks && tasks.length === 0 ? (
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="text-neutral-400 font-bold uppercase tracking-widest text-sm animate-pulse flex items-center gap-3">
@@ -919,13 +1068,68 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         ) : (
                             <>
                                 {state.isQuickAddOpen && (
-                                    <div className="max-w-4xl mx-auto w-full py-4 animate-in slide-in-from-top-4 duration-300">
-                                        <QuickAddTask workspaceId={workspaceId} initialStatus={creationDefaults.status} initialListId={creationDefaults.listId} initialPackageId={creationDefaults.packageId} initialTopicId={creationDefaults.topicId} initialStepKey={creationDefaults.packageStepKey} launchSource="global" onCreated={(task) => { setTasks(prev => [task, ...prev]); updateState({ isQuickAddOpen: false, selectedTaskId: task.id, lastActiveTaskId: task.id }); fetchTasks(false); }} onCancel={() => updateState({ isQuickAddOpen: false })} />
-                                    </div>
+                                    <Modal 
+                                        isOpen={state.isQuickAddOpen} 
+                                        onClose={() => updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null })} 
+                                        title="Quick Add Task"
+                                        hideBackdrop={true}
+                                    >
+                                        <QuickAddTask 
+                                            workspaceId={workspaceId} 
+                                            initialStatus={creationDefaults.status} 
+                                            initialListId={creationDefaults.listId} 
+                                            initialPackageId={creationDefaults.packageId} 
+                                            initialTopicId={creationDefaults.topicId} 
+                                            initialTopicTitle={state.inlineQuickAddTopicTitle ? (state.inlineQuickAddTopicTitle.includes(" — ") ? state.inlineQuickAddTopicTitle.split(" — ")[1] : state.inlineQuickAddTopicTitle) : null}
+                                            initialParentTaskId={creationDefaults.parentTaskId}
+                                            initialStepKey={creationDefaults.packageStepKey}
+                                            launchSource="global" 
+                                            onCreated={(task) => { 
+                                                setTasks(prev => [task, ...prev]); 
+                                                updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null, selectedTaskId: task.id, lastActiveTaskId: task.id }); 
+                                                fetchTasks(false); 
+                                            }} 
+                                            onCancel={() => updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null })} 
+                                        />
+                                    </Modal>
                                 )}
-                                <AreasTaskList workspaceId={workspaceId} tasks={tasks} state={state} onTaskClick={(t: Task) => router.push(`?taskId=${t.id}`)} onTaskUpdate={handleTaskUpdate} onQuickComplete={handleQuickComplete} onTaskCreated={(newTask: Task) => { setTasks(prev => [newTask, ...prev]); fetchTasks(false); }} updateState={updateState} highlightedTaskIds={highlightedTaskIds} refresh={() => fetchTasks(false)} />
+                                <AreasTaskList 
+                                    workspaceId={workspaceId} 
+                                    tasks={tasks} 
+                                    state={state} 
+                                    onTaskClick={(t: Task) => router.push(`?taskId=${t.id}`)} 
+                                    onTaskUpdate={handleTaskUpdate} 
+                                    onQuickComplete={handleQuickComplete} 
+                                    onTaskCreated={() => fetchTasks(false)}
+                                    updateState={updateState}
+                                    highlightedTaskIds={highlightedTaskIds}
+                                    refresh={() => fetchTasks(false)}
+                                    onTasksDelete={handleTasksDelete}
+                                />
                                 <Toast isVisible={toast.isVisible} message={toast.message} action={toast.action} onClose={() => setToast({ ...toast, isVisible: false })} />
-                                <CreateContentPackageModal isOpen={state.isPackageModalOpen} onClose={() => updateState({ isPackageModalOpen: false })} onSuccess={(data) => { fetchTasks(false); setHighlightedTaskIds(data.taskIds); setTimeout(() => setHighlightedTaskIds([]), 5000); }} />
+                                <CreateContentPackageModal 
+                                    isOpen={isCreatePackageModalOpen} 
+                                    onClose={() => {
+                                        const params = new URLSearchParams(searchParams.toString());
+                                        params.delete('createPackage');
+                                        router.push(`?${params.toString()}`);
+                                    }} 
+                                    onSuccess={(data) => { 
+                                        fetchTasks(false); 
+                                        setHighlightedTaskIds(data.taskIds); 
+                                        setTimeout(() => setHighlightedTaskIds([]), 5000); 
+                                    }} 
+                                />
+                                <CreateListModal
+                                    isOpen={isNewListModalOpen}
+                                    onClose={() => {
+                                        const params = new URLSearchParams(searchParams.toString());
+                                        params.delete('newList');
+                                        router.push(`?${params.toString()}`);
+                                    }}
+                                    workspaceId={workspaceId}
+                                    onCreated={handleNewList}
+                                />
                                 <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => { setIsCommandPaletteOpen(false); lastActiveElement.current?.focus(); }} commands={commands} />
                                 {hasMore && (
                                     <div className="p-8 flex justify-center pb-32">

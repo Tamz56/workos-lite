@@ -50,14 +50,14 @@ export const KNOWN_PLATFORMS = ["fb", "ig", "yt", "tk"];
 export function cleanTaskTitle(title: string): string {
     if (!title) return "";
     let t = title
-        .replace(/project:[^\s]+/g, "")
+        .replace(/\bproject:[^\s]+/g, "")
         .replace(/#stage:[^\s]+/g, "")
         .replace(/#priority:[^\s]+/g, "");
 
     KNOWN_PLATFORMS.forEach(p => {
         t = t.replace(new RegExp(`#${p}\\b`, "g"), "");
     });
-    return t.trim();
+    return t.trim().replace(/\s+/g, " ");
 }
 
 /**

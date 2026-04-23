@@ -39,6 +39,7 @@ export type Task = {
     sprint_name?: string;
     template_key?: string | null;
     topic_id?: string | null;
+    topic_title?: string | null;
     package_id?: string | null;
     step_key?: string | null;
     package_total?: number;

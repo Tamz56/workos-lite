@@ -33,6 +33,21 @@ export function GlobalTaskDialogs() {
     const [loading, setLoading] = React.useState(false);
 
     React.useEffect(() => {
+        const handleExternalUpdate = () => {
+            if (taskId) {
+                fetch(`/api/tasks/${taskId}`, { cache: "no-store", headers: { 'Pragma': 'no-cache' } })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.task) setTask(data.task);
+                    })
+                    .catch(() => {});
+            }
+        };
+        window.addEventListener("task-updated", handleExternalUpdate);
+        return () => window.removeEventListener("task-updated", handleExternalUpdate);
+    }, [taskId]);
+
+    React.useEffect(() => {
         if (!taskId) {
             setTask(null);
             return;
@@ -115,7 +130,10 @@ export function GlobalTaskDialogs() {
         router.replace(params.toString() ? `?${params.toString()}` : pathname, { scroll: false });
     };
 
-    const handleSuccess = () => {
+    const handleSuccess = (updated?: Task) => {
+        if (updated && updated.id === taskId) {
+            setTask(updated);
+        }
         router.refresh();
         if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("task-updated"));
