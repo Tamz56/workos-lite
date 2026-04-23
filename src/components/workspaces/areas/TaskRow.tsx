@@ -9,6 +9,7 @@ import {
     parseStageFromTitle, 
     parsePlatformsFromTitle 
 } from "@/lib/content/utils";
+import { Trash2 } from "lucide-react";
 
 interface TaskRowProps {
     task: Task;
@@ -21,6 +22,9 @@ interface TaskRowProps {
     mode?: "package" | "table"; // RC33
     isFlowModeActive?: boolean; // RC46
     isCurrentlyWorking?: boolean; // RC46
+    isMultiSelected?: boolean; // RC65
+    onMultiSelect?: (checked: boolean) => void; // RC65
+    onDelete?: () => void; // RC65
 }
 
 export default function TaskRow({ 
@@ -33,8 +37,32 @@ export default function TaskRow({
     isNextStep,
     mode = "package",
     isFlowModeActive,
-    isCurrentlyWorking
+    isCurrentlyWorking,
+    isMultiSelected,
+    onMultiSelect,
+    onDelete
 }: TaskRowProps) {
+    const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
+
+    const handleCheckClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onMultiSelect?.(!isMultiSelected);
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isConfirmingDelete) {
+            onDelete?.();
+            setIsConfirmingDelete(false);
+        } else {
+            setIsConfirmingDelete(true);
+        }
+    };
+
+    const handleCancelDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsConfirmingDelete(false);
+    };
 
 
     const isDone = task.status === "done";
@@ -146,14 +174,39 @@ export default function TaskRow({
                     {task.scheduled_date || "NO DATE"}
                 </div>
 
-                {/* Column 4: Indicators */}
-                <div className="flex justify-end gap-2 text-neutral-300 opacity-60">
-                    {task.doc_id && <Paperclip size={12} className="text-blue-400" />}
+                {/* Column 4: Indicators & Actions (RC65) */}
+                <div className="flex items-center justify-end gap-2 text-neutral-300">
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isConfirmingDelete ? (
+                            <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-200">
+                                <button 
+                                    onClick={handleDeleteClick}
+                                    className="px-2 py-1 bg-red-600 text-white text-[9px] font-black rounded hover:bg-red-700 shadow-sm"
+                                >
+                                    CONFIRM
+                                </button>
+                                <button 
+                                    onClick={handleCancelDelete}
+                                    className="px-2 py-1 bg-white border border-neutral-200 text-neutral-400 text-[9px] font-black rounded hover:bg-neutral-50"
+                                >
+                                    CANCEL
+                                </button>
+                            </div>
+                        ) : (
+                            <button 
+                                onClick={handleDeleteClick}
+                                className="p-1.5 rounded-md transition-all hover:bg-red-50 hover:text-red-500 text-neutral-300"
+                                title="ลบงานนี้"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        )}
+                    </div>
+                    {task.doc_id && <Paperclip size={12} className="text-blue-400 shrink-0" />}
                 </div>
             </div>
         );
     }
-
 
     return (
         <div 
@@ -162,7 +215,9 @@ export default function TaskRow({
             onMouseEnter={() => prefetchTaskDetail(task.id)}
             className={`relative group w-full flex flex-col sm:flex-row sm:items-center py-2 px-3 sm:px-4 border-b hover:bg-neutral-50 cursor-pointer transition-all duration-300 ${rowClass} ${
                 isDone ? "opacity-60 hover:opacity-100" : ""
-            } ${dimmingClass} ${isActiveExecution ? "ring-2 ring-blue-500/20 shadow-lg z-20 scale-[1.01] -mx-1 px-5 rounded-md" : ""}`}
+            } ${dimmingClass} ${isActiveExecution ? "ring-2 ring-blue-500/20 shadow-lg z-20 scale-[1.01] -mx-1 px-5 rounded-md" : ""} ${
+                isMultiSelected ? "bg-indigo-50/30" : ""
+            }`}
         >
 
             {isSelected && <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-blue-500 rounded-r-sm z-20" />}
@@ -173,24 +228,38 @@ export default function TaskRow({
             )}
             {activeNextStep && !isSelected && !isHighlighted && <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-amber-400/60 rounded-r-sm z-20" />}
             
+            {/* Selection Checkbox (RC65) */}
+            <div 
+                onClick={handleCheckClick}
+                className="absolute -left-1 top-1/2 -translate-y-1/2 p-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                    isMultiSelected ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white border-neutral-300 hover:border-indigo-400"
+                }`}>
+                    {isMultiSelected && <Check size={10} strokeWidth={4} />}
+                </div>
+            </div>
+
             {/* Mobile Top Row: Check/Status + Title */}
-            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0 sm:pl-4">
                 {/* RC25: Quick Complete Checkbox (Only for Package Tasks) */}
                 {task.topic_id && onQuickComplete ? (
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isDone) onQuickComplete();
-                        }}
-                        className={`group/check shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                            isDone 
-                                ? "bg-emerald-500 border-emerald-500 text-white" 
-                                : "border-neutral-300 hover:border-emerald-500 text-transparent hover:text-emerald-500 bg-white"
-                        }`}
-                        title={isDone ? "เสร็จสมบูรณ์แล้ว" : "ทำเครื่องหมายว่าเสร็จสิ้น (Quick Complete)"}
-                    >
-                        <Check size={12} strokeWidth={4} />
-                    </button>
+                    <div className="flex items-center justify-center pr-1 sm:pr-2">
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isDone) onQuickComplete();
+                            }}
+                            className={`group/check shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
+                                isDone 
+                                    ? "bg-emerald-500 border-emerald-500 text-white" 
+                                    : "border-neutral-300 hover:border-emerald-500 text-transparent hover:text-emerald-500 bg-white"
+                            }`}
+                            title={isDone ? "เสร็จสมบูรณ์แล้ว" : "ทำเครื่องหมายว่าเสร็จสิ้น (Quick Complete)"}
+                        >
+                            <Check size={14} strokeWidth={4} />
+                        </button>
+                    </div>
                 ) : (
                     /* Default Status Dot */
                     <div className={`w-2 h-2 mt-1.5 sm:mt-0 shrink-0 rounded-full flex-none ${
@@ -296,10 +365,35 @@ export default function TaskRow({
                 </div>
 
                 {/* Indicators + Linked Notice */}
-                <div className="flex items-center gap-3 w-auto sm:w-16 sm:justify-end shrink-0 text-neutral-400 ml-auto sm:ml-0">
+                <div className="flex items-center gap-3 w-auto sm:w-20 sm:justify-end shrink-0 text-neutral-400 ml-auto sm:ml-0">
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isConfirmingDelete ? (
+                            <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-200">
+                                <button 
+                                    onClick={handleDeleteClick}
+                                    className="px-2 py-1 bg-red-600 text-white text-[9px] font-black rounded hover:bg-red-700 shadow-sm"
+                                >
+                                    CONFIRM
+                                </button>
+                                <button 
+                                    onClick={handleCancelDelete}
+                                    className="px-2 py-1 bg-white border border-neutral-200 text-neutral-400 text-[9px] font-black rounded hover:bg-neutral-50"
+                                >
+                                    CANCEL
+                                </button>
+                            </div>
+                        ) : (
+                            <button 
+                                onClick={handleDeleteClick}
+                                className="p-1.5 rounded-md transition-all hover:bg-red-50 hover:text-red-500 text-neutral-300"
+                                title="ลบงานนี้"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        )}
+                    </div>
                     {task.doc_id && <div title="เชื่อมกับ Hub Note"><Paperclip className="w-3.5 h-3.5 text-blue-500" /></div>}
                     {hasNotes && <div title="มีบันทึก"><FileText className="w-3.5 h-3.5" /></div>}
-                    {!task.doc_id && hasAttachments && <div title="มีเอกสารแนบ"><Paperclip className="w-3.5 h-3.5" /></div>}
                 </div>
             </div>
         </div>

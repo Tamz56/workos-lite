@@ -22,6 +22,7 @@ interface AreasTaskListProps {
     updateState: (updates: Partial<AreasViewState>) => void; // RC22
     highlightedTaskIds?: string[];
     refresh?: () => void; // RC24
+    onTasksDelete?: (ids: string[]) => Promise<void> | void; // RC65
 }
 
 export default function AreasTaskList({ 
@@ -34,36 +35,105 @@ export default function AreasTaskList({
     onTaskCreated,
     updateState,
     highlightedTaskIds = [],
-    refresh
+    refresh,
+    onTasksDelete
 }: AreasTaskListProps) {
     const router = useRouter();
     const virtuosoRef = useRef<VirtuosoHandle>(null);
     
     // Delegate complex logic to pure selector
-    const grouped = useMemo(() => selectGroupedTasks(tasks, state), [tasks, state]);
+    const grouped = useMemo(() => selectGroupedTasks(tasks, state, workspaceId), [tasks, state, workspaceId]);
 
-    // RC22: Calculate group counts including collapse logic
+    const flattenedTasksExtended = useMemo(() => {
+        const result: { task: Task, isFirst: boolean, isLast: boolean, groupId: string | null }[] = [];
+        const legacyKey = "Legacy / Needs Topic Mapping";
+        
+        grouped.forEach(g => {
+            const collapseKey = g.listId || g.topicId || g.key;
+            
+            // RC55: Auto-collapse Legacy for Content Workspace by default
+            let isCollapsed = collapseKey && state.collapsedTopicIds.includes(collapseKey);
+            if (workspaceId === 'content' && collapseKey === legacyKey && !state.collapsedTopicIds.includes(collapseKey) && !state.selectedTaskId?.startsWith('legacy')) {
+                // If it's legacy and not explicitly collapsed, we still treat it as collapsed 
+                // UNLESS the user has a selected task inside it (which shouldn't happen by default)
+                // Actually, let's just use the state. If it's not in state, and it's content, we hide it.
+                // But we need a way for the user to UNHIDE it.
+                // handleToggleTopic will add it to the list.
+                // So if it's NOT in state, we treat it as collapsed for Content.
+                isCollapsed = true;
+            }
+
+            if (!isCollapsed) {
+                g.tasks.forEach((t, i) => {
+                    result.push({
+                        task: t,
+                        isFirst: i === 0,
+                        isLast: i === g.tasks.length - 1,
+                        groupId: collapseKey
+                    });
+                });
+            }
+        });
+        return result;
+    }, [grouped, state.collapsedTopicIds, workspaceId, state.selectedTaskId]);
+    
+    // RC55: Helper for legacy compatibility in hooks
+    const flattenedTasks = useMemo(() => flattenedTasksExtended.map(item => item.task), [flattenedTasksExtended]);
+
     const groupCounts = useMemo(() => {
+        const legacyKey = "Legacy / Needs Topic Mapping";
         return grouped.map(g => {
-            const isCollapsed = g.topicId && state.collapsedTopicIds.includes(g.topicId);
+            const collapseKey = g.listId || g.topicId || g.key;
+            
+            // RC55: Auto-collapse Legacy for Content Workspace by default
+            let isCollapsed = collapseKey && state.collapsedTopicIds.includes(collapseKey);
+            if (workspaceId === 'content' && collapseKey === legacyKey && !state.collapsedTopicIds.includes(collapseKey) && !state.selectedTaskId?.startsWith('legacy')) {
+                isCollapsed = true;
+            }
+            
             return isCollapsed ? 0 : g.tasks.length;
         });
-    }, [grouped, state.collapsedTopicIds]);
-
-    const flattenedTasks = useMemo(() => {
-        return grouped.flatMap(g => {
-            const isCollapsed = g.topicId && state.collapsedTopicIds.includes(g.topicId);
-            return isCollapsed ? [] : g.tasks;
-        });
-    }, [grouped, state.collapsedTopicIds]);
+    }, [grouped, state.collapsedTopicIds, workspaceId, state.selectedTaskId]);
 
     // Toggle Collapse Handler
-    const handleToggleTopic = (topicId: string) => {
+    const handleToggleTopic = (id: string) => {
         const current = state.collapsedTopicIds;
-        if (current.includes(topicId)) {
-            updateState({ collapsedTopicIds: current.filter(id => id !== topicId) });
+        if (current.includes(id)) {
+            updateState({ collapsedTopicIds: current.filter(cid => cid !== id) });
         } else {
-            updateState({ collapsedTopicIds: [...current, topicId] });
+            updateState({ collapsedTopicIds: [...current, id] });
+        }
+    };
+
+    // RC65: Selection Handlers
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            updateState({ selectedTaskIds: tasks.map(t => t.id) });
+        } else {
+            updateState({ selectedTaskIds: [] });
+        }
+    };
+
+    const handleSelectTask = (taskId: string, checked: boolean) => {
+        const current = state.selectedTaskIds;
+        if (checked) {
+            updateState({ selectedTaskIds: [...current, taskId] });
+        } else {
+            updateState({ selectedTaskIds: current.filter(id => id !== taskId) });
+        }
+    };
+
+    const [isBulkDeleteConfirming, setIsBulkDeleteConfirming] = React.useState(false);
+    const handleBulkDelete = async () => {
+        if (isBulkDeleteConfirming) {
+            if (onTasksDelete) {
+                await onTasksDelete(state.selectedTaskIds);
+                updateState({ selectedTaskIds: [] });
+            }
+            setIsBulkDeleteConfirming(false);
+        } else {
+            setIsBulkDeleteConfirming(true);
+            setTimeout(() => setIsBulkDeleteConfirming(false), 5000);
         }
     };
 
@@ -111,6 +181,12 @@ export default function AreasTaskList({
                         behavior: "smooth"
                     });
                 }
+            }
+
+            if (e.key === "Escape" && state.selectedTaskIds.length > 0) {
+                e.preventDefault();
+                updateState({ selectedTaskIds: [] });
+                return;
             }
 
             if (isEnter && state.selectedTaskId) {
@@ -254,25 +330,27 @@ export default function AreasTaskList({
                             );
                         }
 
-                        if (group.isPackage && group.topicId) {
-                            const isComposerOpen = state.inlineQuickAddTopicId === group.topicId;
+                        if (group.isPackage) {
+                            const collapseKey = group.listId || group.topicId || group.key;
+                            const isComposerOpen = state.inlineQuickAddTopicId === collapseKey;
                             return (
                                 <div className="flex flex-col">
                                     <PackageGroupHeader 
-                                        topicId={group.topicId}
+                                        topicId={group.topicId!}
+                                        title={group.title}
                                         tasks={group.tasks}
                                         templateKey={group.templateKey}
                                         packageDone={group.packageDone}
                                         packageTotal={group.packageTotal}
                                         scheduledDate={group.scheduledDate}
                                         docId={group.docId}
-                                        isCollapsed={state.collapsedTopicIds.includes(group.topicId)}
+                                        isCollapsed={state.collapsedTopicIds.includes(collapseKey)}
                                         isFullyComplete={group.isFullyComplete} // RC25
                                         readyToPublish={group.readyToPublish} // RC27
                                         publishedAt={group.publishedAt} // RC28
                                         channels={group.channels} // RC29
                                         isChannelsInconsistent={group.isChannelsInconsistent} // RC29
-                                        onToggle={() => handleToggleTopic(group.topicId!)}
+                                        onToggle={() => handleToggleTopic(collapseKey)}
                                         onOpenNote={() => {
                                             if (group.docId) {
                                                 window.location.hash = `#/notes/edit/${group.docId}`;
@@ -288,7 +366,7 @@ export default function AreasTaskList({
                                                 updateState({ search: group.topicId });
                                             }
                                         }}
-                                        onQuickAdd={() => updateState({ inlineQuickAddTopicId: group.topicId })} // RC36
+                                        onQuickAdd={(tid, tTitle) => updateState({ inlineQuickAddTopicId: tid, inlineQuickAddTopicTitle: tTitle, isQuickAddOpen: true })} // RC36
                                         nextTaskId={group.nextTaskId}
                                         onNextStep={(taskId) => {
                                             const task = tasks.find(t => t.id === taskId);
@@ -442,58 +520,126 @@ export default function AreasTaskList({
                         );
                     }}
                     itemContent={(index) => {
-                        const task = flattenedTasks[index];
+                        const row = flattenedTasksExtended[index];
+                        if (!row) return null;
+                        
+                        const { task, isFirst, isLast } = row;
                         // RC33: Pass mode='table' if in list mode
                         const groupForTask = state.viewMode === 'package' ? grouped.find(g => g.topicId === task.topic_id) : null;
                         const isNextStep = !!groupForTask?.nextTaskId && groupForTask.nextTaskId === task.id;
 
-                        const isIndented = state.viewMode === 'package' && !!task.topic_id;
+                        const isGrouped = state.viewMode === 'package' && (!!task.topic_id || !!task.list_id);
+
+                        const isStructuredTopic = !!task.topic_id && task.topic_id.startsWith('TOPIC-');
 
                         return (
-                            <div className={isIndented ? "pl-2 border-l-2 border-neutral-100" : ""}>
-                                <TaskRow 
-                                    task={task} 
-                                    onClick={() => onTaskClick(task)} 
-                                    onStatusChange={(newStatus) => onTaskUpdate(task.id, { status: newStatus })}
-                                    onQuickComplete={onQuickComplete ? () => onQuickComplete(task.id) : undefined}
-                                    isSelected={state.selectedTaskId === task.id}
-                                    isHighlighted={highlightedTaskIds.includes(task.id)}
-                                    isNextStep={isNextStep}
-                                    mode={state.viewMode === 'list' ? 'table' : 'package'}
-                                    isFlowModeActive={state.isFlowMode}
-                                    isCurrentlyWorking={state.selectedTaskId === task.id}
-                                />
+                            <div className="border-b border-neutral-100 bg-white">
+                                <div className={`${isStructuredTopic ? 'pl-4 sm:pl-10 relative' : ''}`}>
+                                    {isStructuredTopic && (
+                                        <div className="absolute left-3 sm:left-6 top-0 bottom-0 w-px bg-neutral-100" />
+                                    )}
+                                    <TaskRow 
+                                        task={task} 
+                                        onClick={() => onTaskClick(task)} 
+                                        onStatusChange={(newStatus) => onTaskUpdate(task.id, { status: newStatus })}
+                                        onQuickComplete={onQuickComplete ? () => onQuickComplete(task.id) : undefined}
+                                        isSelected={state.selectedTaskId === task.id}
+                                        isHighlighted={highlightedTaskIds.includes(task.id)}
+                                        isNextStep={isNextStep}
+                                        mode={state.viewMode === 'list' ? 'table' : 'package'}
+                                        isFlowModeActive={state.isFlowMode}
+                                        isCurrentlyWorking={state.selectedTaskId === task.id}
+                                        isMultiSelected={state.selectedTaskIds.includes(task.id)}
+                                        onMultiSelect={(checked) => handleSelectTask(task.id, checked)}
+                                        onDelete={() => onTasksDelete?.([task.id])}
+                                    />
+                                </div>
                             </div>
                         );
                     }}
 
                     components={{
-                        Header: () => (
-                            <div className="flex flex-col">
-                                {/* Table Header (RC33) */}
-                                {state.viewMode === 'list' && (
-                                    <div className="grid grid-cols-[1fr_120px_120px_40px] px-4 py-2 border-b-2 border-neutral-100 bg-white sticky top-0 z-30 shadow-sm">
-                                        <div className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em] pl-7">Task Name</div>
-                                        <div className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em] text-center border-l border-neutral-100/50">Status</div>
-                                        <div className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em] px-4 border-l border-neutral-100/50">Scheduled</div>
-                                        <div></div>
-                                    </div>
-                                )}
+                        Header: () => {
+                            const hasBulkActions = state.selectedTaskIds.length > 0;
+                            const hasTableHeader = state.viewMode === 'list';
+                            const hasGlobalQuickAdd = state.isQuickAddOpen;
 
-                                {/* Global Quick Add Composer (RC36) */}
-                                {state.isQuickAddOpen && (
-                                    <div className="border-b border-neutral-200 bg-blue-50/30 py-2">
-                                        <QuickAddTask 
-                                            workspaceId={workspaceId} 
-                                            launchSource="global"
-                                            onCreated={onTaskCreated} 
-                                            onCancel={() => updateState({ isQuickAddOpen: false })}
-                                            placeholder="Global capture: What needs to be done?"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        ),
+                            if (!hasBulkActions && !hasTableHeader && !hasGlobalQuickAdd) return null;
+
+                            return (
+                                <div className="flex flex-col">
+                                    {/* Bulk Action Bar (RC65) */}
+                                    {hasBulkActions && (
+                                        <div className="bg-indigo-600 text-white px-6 py-3 flex items-center justify-between animate-in slide-in-from-top duration-300 z-[40]">
+                                            <div className="flex items-center gap-4">
+                                                <button 
+                                                    onClick={() => handleSelectAll(false)}
+                                                    className="p-1 hover:bg-white/20 rounded transition-colors"
+                                                >
+                                                    <LucideIcons.X size={18} />
+                                                </button>
+                                                <span className="text-sm font-black uppercase tracking-widest leading-none">
+                                                    {state.selectedTaskIds.length} items selected
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={handleBulkDelete}
+                                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-black text-xs uppercase tracking-widest transition-all ${
+                                                        isBulkDeleteConfirming 
+                                                            ? "bg-red-500 text-white animate-pulse" 
+                                                            : "bg-white/10 hover:bg-white/20 text-white"
+                                                    }`}
+                                                >
+                                                    {isBulkDeleteConfirming ? (
+                                                        <>
+                                                            <LucideIcons.AlertTriangle size={14} />
+                                                            <span>Confirm Delete</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <LucideIcons.Trash2 size={14} />
+                                                            <span>Delete Selection</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                                
+                                                <button 
+                                                    onClick={() => updateState({ selectedTaskIds: [] })}
+                                                    className="text-[10px] font-bold opacity-60 hover:opacity-100 px-2"
+                                                >
+                                                    CLEAR
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Table Header (RC33) */}
+                                    {hasTableHeader && (
+                                        <div className="grid grid-cols-[1fr_120px_120px_40px] px-4 py-1.5 border-b border-neutral-100 bg-white sticky top-0 z-30 shadow-sm">
+                                            <div className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em] pl-7">Task Name</div>
+                                            <div className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em] text-center border-l border-neutral-100/50">Status</div>
+                                            <div className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em] px-4 border-l border-neutral-100/50">Scheduled</div>
+                                            <div></div>
+                                        </div>
+                                    )}
+
+                                    {/* Global Quick Add Composer (RC36) */}
+                                    {hasGlobalQuickAdd && (
+                                        <div className="border-b border-neutral-200 bg-blue-50/30 py-2">
+                                            <QuickAddTask 
+                                                workspaceId={workspaceId} 
+                                                launchSource="global"
+                                                onCreated={onTaskCreated} 
+                                                onCancel={() => updateState({ isQuickAddOpen: false })}
+                                                placeholder="Global capture: What needs to be done?"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        },
                         Footer: () => <div className="h-32" /> // Extra space for better scrolling experience
                     }}
 

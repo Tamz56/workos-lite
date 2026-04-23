@@ -19,6 +19,7 @@ export interface WorkspaceConfig {
     iconKey: string;
     colorKey: string;
     description?: string;
+    isHidden?: boolean; // RCRestruct: Hide from main flows
     emptyState?: {
         title: string;
         description: string;
@@ -31,11 +32,13 @@ export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
     { 
         id: "avacrm", label: "AVACRM", type: "admin", 
         iconKey: "Briefcase", colorKey: "indigo",
+        isHidden: true,
         emptyState: { title: "Manage your CRM", description: "Track clients and sales pipelines here.", actionLabel: "Add CRM Task", actionType: "quickAdd" }
     },
     { 
         id: "ops", label: "OPS", type: "ops", 
         iconKey: "Settings", colorKey: "emerald",
+        isHidden: true,
         emptyState: { title: "Operations are clear", description: "No pending operational tasks at the moment.", actionLabel: "Add Ops Task", actionType: "quickAdd" }
     },
     { 
@@ -54,12 +57,12 @@ export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
         emptyState: { title: "Plan your next journey", description: "No upcoming travel tasks planned.", actionLabel: "Add Itinerary", actionType: "quickAdd" }
     },
     { 
-        id: "admin", label: "Admin", type: "admin", 
+        id: "admin", label: "Personal Admin", type: "admin", 
         iconKey: "Shield", colorKey: "slate",
         emptyState: { title: "Administrative tasks", description: "Manage organizational overhead effectively.", actionLabel: "Add Admin Task", actionType: "quickAdd" }
     },
     { 
-        id: "marketing", label: "Marketing/Sales", type: "ops", 
+        id: "marketing", label: "Business / Marketing", type: "ops", 
         iconKey: "TrendingUp", colorKey: "orange",
         emptyState: { title: "Growth is looking good", description: "No active marketing campaigns in this view.", actionLabel: "Start Campaign", actionType: "quickAdd" }
     },
@@ -132,8 +135,8 @@ export function workspaceLabel(w: Workspace | string): string {
         case "ops": return "OPS";
         case "content": return "CONTENT";
         case "personal": return "Personal";
-        case "admin": return "Admin";
-        case "marketing": return "Marketing/Sales";
+        case "admin": return "Personal Admin";
+        case "marketing": return "Business / Marketing";
         case "finance": return "Finance";
         case "travel": return "Travel";
         case "system": return "System/Archive";
