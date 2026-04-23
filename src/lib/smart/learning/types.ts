@@ -5,7 +5,9 @@ export type BehaviorEventType =
     | 'task_skipped' 
     | 'task_override' 
     | 'feedback_given' 
-    | 'mode_changed';
+    | 'mode_changed'
+    | 'intelligence_restored'
+    | 'tasks_deleted_batch';
 
 export interface BehaviorEvent {
     type: BehaviorEventType;
