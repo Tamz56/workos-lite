@@ -271,7 +271,7 @@ export default function AreasTaskList({
     }
 
     return (
-        <div className="flex flex-col h-full bg-white overflow-hidden relative">
+        <div className="flex flex-col h-full min-h-0 bg-white overflow-hidden relative">
             {/* Field Headers (Fixed above the list) */}
             <div className="hidden sm:flex items-center py-2 px-4 border-b border-neutral-200 bg-neutral-50/80 text-[10px] uppercase font-bold text-neutral-400 tracking-wider z-20 backdrop-blur-sm shrink-0">
                 <div className="flex-1 ml-5">Task Name</div>
@@ -285,7 +285,7 @@ export default function AreasTaskList({
                 </div>
             </div>
 
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
                 <GroupedVirtuoso
                     ref={virtuosoRef}
                     groupCounts={groupCounts}

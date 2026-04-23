@@ -1048,7 +1048,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 <AreasFilterBar workspaceId={workspaceId} tasks={tasks} lists={lists} sprints={sprints} state={state} updateState={updateState} />
             )}
 
-            <div className="flex-1 overflow-hidden relative flex flex-col px-4">
+            <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col px-4">
                 {smartQueueItems.length > 0 && (
                     <SmartQueueStrip items={smartQueueItems} onItemClick={handleQueueItemClick} onItemShown={handleQueueItemShown} onDismiss={() => setIsQueueDismissed(true)} />
                 )}
@@ -1057,8 +1057,8 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         <SmartViewHint label={suggestedView.mode === 'package' ? 'Package View' : 'Table Mode'} reason={suggestedView.reason} confidence={scoreSuggestionConfidence({ workspaceType: ws?.type, suggestedMode: suggestedView.mode })} onAccept={() => handleAcceptViewHint(suggestedView.mode)} onDismiss={handleDismissViewHint} />
                     </div>
                 )}
-                <div className="flex-1 overflow-hidden relative flex flex-col">
-                    <div className="flex-1 overflow-hidden relative flex flex-col custom-scrollbar">
+                <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
+                    <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
                         {loadingTasks && tasks.length === 0 ? (
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="text-neutral-400 font-bold uppercase tracking-widest text-sm animate-pulse flex items-center gap-3">
