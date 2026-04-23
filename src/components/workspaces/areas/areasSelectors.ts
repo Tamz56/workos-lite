@@ -147,7 +147,7 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
             const topicKey = extractedCode || t.list_id || t.topic_id || (isContentWorkspace ? "legacy-topic" : null);
             
             // Name resolution: if we extracted a code, try to find a nice name from the title
-            let topicName = t.list_name || t.topic_id || (isContentWorkspace ? "Legacy / Needs Topic Mapping" : "Uncategorized");
+            const topicName = t.list_name || t.topic_id || (isContentWorkspace ? "Legacy / Needs Topic Mapping" : "Uncategorized");
             
             if (topicKey) {
                 key = isContentWorkspace ? `topic:${topicKey}` : `package:${topicKey}`;

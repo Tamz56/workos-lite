@@ -89,7 +89,7 @@ export function parsePlatformsFromTitle(title: string): string[] {
  * Construct raw title with tags preserved
  */
 export function constructRawTitle(base: string, project: string, stage: string, platforms: string[]): string {
-    let t = cleanTaskTitle(base);
+    const t = cleanTaskTitle(base);
     const parts = [];
     if (project) parts.push(`project:${project}`);
     parts.push(t);
