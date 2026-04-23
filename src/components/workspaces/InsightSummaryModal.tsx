@@ -1,7 +1,8 @@
-// src/components/workspaces/InsightSummaryModal.tsx
 import React from 'react';
 import { X, TrendingUp, Zap, Target, RotateCcw, Award, BarChart3, Activity, CheckCircle2 } from 'lucide-react';
 import { InsightReport, SuggestedAction } from '@/lib/smart/learning/types';
+import { Modal } from '@/components/ui/Modal';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Props {
     isOpen: boolean;
@@ -14,33 +15,21 @@ interface Props {
 
 export function InsightSummaryModal({ isOpen, onClose, report, suggestions, onReset, onAction }: Props) {
     const [executedActionId, setExecutedActionId] = React.useState<string | null>(null);
-
-    if (!isOpen) return null;
+    const [showResetConfirm, setShowResetConfirm] = React.useState(false);
 
     const metrics = report?.metrics;
     const style = report?.styleBadge;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-neutral-100 animate-in zoom-in-95 duration-200">
-                {/* Header */}
-                <div className="px-6 py-5 border-b border-neutral-50 flex items-center justify-between bg-neutral-50/50">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center shadow-lg transform -rotate-3">
-                            <Zap size={20} className="fill-current" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-black tracking-tight text-neutral-900">Productivity Pulse</h2>
-                            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Workspace Insights</p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="p-2 hover:bg-neutral-200 rounded-full transition-colors text-neutral-400 hover:text-neutral-600">
-                        <X size={20} />
-                    </button>
-                </div>
-
+        <Modal 
+            isOpen={isOpen} 
+            onClose={onClose} 
+            title="Productivity Pulse"
+            maxWidth="max-w-lg"
+        >
+            <div className="flex flex-col animate-in zoom-in-95 duration-200">
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                <div className="flex-1 space-y-8 custom-scrollbar">
                     {/* Style Badge Section */}
                     {style && (
                         <div className="relative group overflow-hidden bg-gradient-to-br from-neutral-50 to-white p-6 rounded-3xl border border-neutral-100 shadow-sm transition-all hover:shadow-md">
@@ -155,18 +144,27 @@ export function InsightSummaryModal({ isOpen, onClose, report, suggestions, onRe
 
                     <div className="pt-4 border-t border-neutral-50">
                         <button 
-                            onClick={() => {
-                                if (confirm("ยืนยันการล้างข้อมูลการเรียนรู้? ระบบจะเริ่มนับหนึ่งใหม่สำหรับ Workspace นี้")) {
-                                    onReset();
-                                }
-                            }}
+                            onClick={() => setShowResetConfirm(true)}
                             className="w-full flex items-center justify-center gap-2 py-3 text-red-500 hover:bg-neutral-50 rounded-2xl text-[10px] font-black tracking-widest transition-all grayscale hover:grayscale-0 opacity-50 hover:opacity-100"
                         >
                             <RotateCcw size={12} /> ล้างข้อมูลการเรียนรู้ (RESET LEARNING)
                         </button>
                     </div>
+
+                    <ConfirmDialog
+                        isOpen={showResetConfirm}
+                        title="Reset Learning Data?"
+                        message="ยืนยันการล้างข้อมูลการเรียนรู้? ระบบจะเริ่มนับหนึ่งใหม่สำหรับ Workspace นี้"
+                        confirmText="Reset Now"
+                        danger={true}
+                        onConfirm={() => {
+                            onReset();
+                            setShowResetConfirm(false);
+                        }}
+                        onCancel={() => setShowResetConfirm(false)}
+                    />
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

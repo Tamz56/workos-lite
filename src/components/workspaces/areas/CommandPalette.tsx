@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Command as CmdIcon, ArrowRight } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 
 export interface CommandOption {
   id: string;
@@ -47,12 +48,6 @@ export default function CommandPalette({ isOpen, onClose, commands }: CommandPal
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      onClose();
-      return;
-    }
-
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex(prev => (prev + 1) % filteredCommands.length);
@@ -69,21 +64,18 @@ export default function CommandPalette({ isOpen, onClose, commands }: CommandPal
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div 
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 animate-in fade-in duration-200"
-      onKeyDown={handleKeyDown}
+    <Modal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title="Command Palette" 
+      maxWidth="max-w-xl"
+      hideBackdrop={true}
     >
-      {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-neutral-900/40 backdrop-blur-[2px]" 
-        onClick={onClose}
-      />
-
-      {/* Palette Container */}
-      <div className="relative w-full max-w-xl bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col animate-in slide-in-from-top-4 duration-300">
+        className="flex flex-col animate-in slide-in-from-top-4 duration-300"
+        onKeyDown={handleKeyDown}
+      >
         {/* Search Header */}
         <div className="flex items-center px-4 py-4 border-b border-neutral-100 gap-3">
           <Search className="text-neutral-400" size={20} />
@@ -163,6 +155,6 @@ export default function CommandPalette({ isOpen, onClose, commands }: CommandPal
             </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

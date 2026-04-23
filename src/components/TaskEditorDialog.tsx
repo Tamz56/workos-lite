@@ -9,24 +9,7 @@ import { List } from "@/lib/lists";
 import { postJson } from "@/lib/api"; // Need to ensure postJson is available or copy it
 import { createMissingContentDocs } from "@/lib/content/createContentTask";
 
-// Helper for Modal UI
-function Modal(props: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
-    if (!props.open) return null;
-    return (
-        <div className="fixed inset-0 z-[60]">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={props.onClose} />
-            <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-200/70 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-                <div className="mb-5 flex items-center justify-between gap-3">
-                    <div className="text-lg font-medium text-neutral-900">{props.title}</div>
-                    <button className="rounded-lg px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-50 hover:text-black transition-colors" onClick={props.onClose}>
-                        Close
-                    </button>
-                </div>
-                {props.children}
-            </div>
-        </div>
-    );
-}
+import { Modal } from "@/components/ui/Modal";
 
 interface TaskEditorDialogProps {
     isOpen: boolean;
@@ -37,6 +20,8 @@ interface TaskEditorDialogProps {
 
 export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: TaskEditorDialogProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
     // Form State
     const [title, setTitle] = useState(task.title || "");
@@ -73,6 +58,8 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
             setContentProject("");
             setContentStage(STAGE_TAGS[0]);
             setContentPlatforms([]);
+            setError(null);
+            setShowDiscardConfirm(false);
         }
     }, [isOpen, task]);
 
@@ -183,19 +170,67 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
 
             onUpdate();
             onClose();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert("Failed to create task");
+            setError(e.message || "Failed to create task");
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    console.log("TaskEditorDialog WORKSPACES_LIST:", WORKSPACES_LIST.map(w => w.id).join(","));
+    const handleClose = () => {
+        if (showDiscardConfirm) {
+            setShowDiscardConfirm(false);
+            return;
+        }
+
+        const isDirty = title.trim() || notes.trim() || contentProject.trim();
+        if (isDirty) {
+            setShowDiscardConfirm(true);
+        } else {
+            onClose();
+        }
+    };
 
     return (
-        <Modal open={isOpen} title="New Task" onClose={onClose}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <Modal isOpen={isOpen} title="New Task" onClose={handleClose}>
+            <div className="relative">
+                {/* Discard Confirmation Overlay */}
+                {showDiscardConfirm && (
+                    <div className="absolute inset-0 z-[100] bg-white/90 backdrop-blur-sm flex items-center justify-center animate-in fade-in zoom-in-95 duration-200">
+                        <div className="max-w-xs text-center space-y-6 p-6">
+                            <div className="space-y-2">
+                                <h3 className="text-lg font-black text-neutral-900">Discard Task?</h3>
+                                <p className="text-sm text-neutral-500 font-medium leading-relaxed">
+                                    You have unsaved changes in this draft. Are you sure you want to discard it?
+                                </p>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <button 
+                                    onClick={onClose}
+                                    className="w-full py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-colors shadow-lg shadow-red-200"
+                                >
+                                    Discard Draft
+                                </button>
+                                <button 
+                                    onClick={() => setShowDiscardConfirm(false)}
+                                    className="w-full py-3 bg-neutral-100 text-neutral-600 rounded-xl font-bold text-sm hover:bg-neutral-200 transition-colors"
+                                >
+                                    Keep Editing
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-bold flex items-center justify-between">
+                        <span>{error}</span>
+                        <button onClick={() => setError(null)}>×</button>
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
                 {workspace === 'content' && (
                     <div className="flex border-b border-neutral-100 mb-4">
                         <button type="button" onClick={() => setContentTab("details")} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${contentTab === 'details' ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-700'}`}>
@@ -340,10 +375,11 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
                 )}
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-neutral-50 mt-4">
-                    <button type="button" onClick={onClose} className={BUTTON_SECONDARY}>Cancel</button>
+                    <button type="button" onClick={handleClose} className={BUTTON_SECONDARY}>Cancel</button>
                     <button type="submit" disabled={isSubmitting} className={BUTTON_PRIMARY}>{isSubmitting ? 'Saving...' : 'Create Task'}</button>
                 </div>
             </form>
-        </Modal>
+        </div>
+    </Modal>
     );
 }
