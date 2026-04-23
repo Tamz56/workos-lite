@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { toErrorMessage } from "@/lib/error";
+import fs from "fs/promises";
+import path from "path";
 
 export const runtime = "nodejs";
 
@@ -176,8 +178,6 @@ export async function DELETE(req: NextRequest) {
         `).all(bindValues) as { id: string; storage_path: string }[];
 
         // 2. Perform file deletion
-        const fs = require('fs/promises');
-        const path = require('path');
         for (const a of attachments) {
             if (a.storage_path) {
                 const absPath = path.isAbsolute(a.storage_path)
