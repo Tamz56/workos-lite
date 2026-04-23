@@ -36,15 +36,17 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
 
     const filteredWorkspaces = useMemo(() => {
         return WORKSPACES_LIST.filter(ws => 
-            ws.label.toLowerCase().includes(search.toLowerCase()) ||
-            ws.id.toLowerCase().includes(search.toLowerCase())
+            !ws.isHidden && (
+                ws.label.toLowerCase().includes(search.toLowerCase()) ||
+                ws.id.toLowerCase().includes(search.toLowerCase())
+            )
         );
     }, [search]);
 
     const recentWorkspaces = useMemo(() => {
         return recentIds
             .map(id => WORKSPACES_LIST.find(ws => ws.id === id))
-            .filter((ws): ws is typeof WORKSPACES_LIST[number] => !!ws);
+            .filter((ws): ws is typeof WORKSPACES_LIST[number] => !!ws && !ws.isHidden);
     }, [recentIds]);
 
     if (!isOpen) return null;

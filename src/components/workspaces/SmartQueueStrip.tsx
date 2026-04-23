@@ -1,6 +1,6 @@
 // src/components/workspaces/SmartQueueStrip.tsx
 import React from 'react'
-import { AlertCircle, Calendar, ShieldCheck, Play, ChevronRight } from 'lucide-react'
+import { AlertCircle, Calendar, ShieldCheck, Play, ChevronRight, Zap } from 'lucide-react'
 import { QueueItem, QueueItemType } from '../../lib/smart/queue/resolveWorkspaceSmartQueue'
 
 interface SmartQueueStripProps {
@@ -44,31 +44,31 @@ export const SmartQueueStrip: React.FC<SmartQueueStripProps> = ({ items, onItemC
   }
 
   return (
-    <div className="w-full py-2 animate-in fade-in slide-in-from-top-2 duration-500 overflow-hidden shrink-0">
-      <div className="flex items-center justify-between mb-1.5 px-1">
-        <h4 className="text-[10px] font-black uppercase text-neutral-400 tracking-widest flex items-center gap-1.5 pl-1">
-          <Play size={10} fill="currentColor" /> Workspace Smart Queue
+    <div className="w-full py-3 animate-in fade-in slide-in-from-top-2 duration-700 overflow-hidden shrink-0">
+      <div className="flex items-center justify-between mb-2 px-1">
+        <h4 className="text-[10px] font-black uppercase text-neutral-400 tracking-[0.2em] flex items-center gap-2 pl-2">
+          <Zap size={10} fill="currentColor" className="text-amber-500" /> Next Best Action
         </h4>
         {onDismiss && (
           <button 
             onClick={onDismiss}
-            className="text-[10px] font-bold text-neutral-300 hover:text-neutral-500 transition-colors uppercase px-2"
+            className="text-[10px] font-black text-neutral-300 hover:text-indigo-600 transition-colors uppercase px-3 tracking-widest"
           >
-            Hide
+            Dismiss
           </button>
         )}
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 px-1 custom-scrollbar-hide">
+      <div className="flex items-center gap-2.5 overflow-x-auto pb-2 px-2 custom-scrollbar-hide">
         {items.map((item) => (
           <button
             key={item.id}
             onClick={() => onItemClick(item)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all whitespace-nowrap active:scale-95 shadow-sm group ${getStyle(item.type)}`}
+            className={`flex items-center gap-2.5 px-4 py-2 rounded-xl border text-[11px] font-black transition-all whitespace-nowrap active:scale-95 shadow-md hover:shadow-lg hover:-translate-y-0.5 group ${getStyle(item.type)}`}
           >
             {getIcon(item.type)}
-            <span className="truncate max-w-[200px]">{item.label}</span>
-            <ChevronRight size={10} className="ml-1 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all text-[8px]" />
+            <span className="truncate max-w-[220px] tracking-tight">{item.label}</span>
+            <ChevronRight size={12} className="ml-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all text-current" />
           </button>
         ))}
       </div>

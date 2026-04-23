@@ -15,6 +15,7 @@ export interface CreationContext {
   packageStepKey?: string | null
   scheduleFilter?: 'scheduled' | 'unscheduled' | null
   launchSource?: LaunchSource | null
+  parentTaskId?: string | null
 }
 
 export interface CreateDefaults {
@@ -24,6 +25,7 @@ export interface CreateDefaults {
   topicId?: string | null
   packageId?: string | null
   packageStepKey?: string | null
+  parentTaskId?: string | null
   suggestedReason?: string | null
 }
 
