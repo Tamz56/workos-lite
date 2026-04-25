@@ -1,10 +1,14 @@
-import { db } from "@/db/db";
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
     try {
         const { mode, dry_run } = await req.json();
         const isDev = process.env.NODE_ENV === "development";
+        const { getDb } = await import("@/db/db");
+        const db = getDb();
 
         if (mode === "clean_start" && !isDev) {
             return NextResponse.json({ error: "clean_start is only available in development mode" }, { status: 403 });
