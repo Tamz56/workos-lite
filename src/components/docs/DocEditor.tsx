@@ -6,8 +6,10 @@ import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { clsx } from "clsx";
 
+import { MarkdownToolbar } from "@/components/editor/MarkdownToolbar";
 import { patchDoc } from "@/lib/api";
 import { formatDate } from "@/lib/docsUtils";
+import { highlightSanitizeSchema, rehypeHighlight } from "@/lib/editor/rehypeHighlight";
 import { toErrorMessage } from "@/lib/error";
 import { findActiveMentionQuery, processMentionsToMarkdown, replaceRange } from "@/lib/mentions";
 import type { Doc } from "@/lib/types";
@@ -244,22 +246,30 @@ export default function DocEditor({
         }
     };
 
+    const handleToolbarChange = (val: string) => {
+        setContent(val);
+        setDirty(true);
+        if (saveStatus === "saved") setSaveStatus("idle");
+        setMentionQuery(null);
+        setMentionStart(null);
+    };
+
     // Render Helpers
     const handleRetry = () => void doSave();
 
     const StatusBadge = () => {
         if (!docId) return null;
-        if (saveStatus === "saving") return <span className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 animate-pulse">Saving…</span>;
-        if (saveStatus === "saved") return <span className="text-xs px-2 py-1 rounded bg-green-50 text-green-700">Saved {formatDate(lastSavedAt)}</span>;
+        if (saveStatus === "saving") return <span className="text-xs px-2 py-1 rounded bg-theme-accent/10 text-theme-accent animate-pulse">Saving…</span>;
+        if (saveStatus === "saved") return <span className="text-xs px-2 py-1 rounded bg-green-500/10 text-green-600">Saved {formatDate(lastSavedAt)}</span>;
         if (saveStatus === "error") return (
-            <span className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 flex items-center gap-1">
-                Error <button type="button" onClick={handleRetry} className="underline font-medium hover:text-red-900">Retry</button>
+            <span className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-600 flex items-center gap-1">
+                Error <button type="button" onClick={handleRetry} className="underline font-medium hover:text-red-700">Retry</button>
             </span>
         );
-        return dirty ? <span className="text-xs px-2 py-1 rounded bg-amber-50 text-amber-700">Unsaved</span> : <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500">Up to date</span>;
+        return dirty ? <span className="text-xs px-2 py-1 rounded bg-amber-500/10 text-amber-600">Unsaved</span> : <span className="text-xs px-2 py-1 rounded bg-theme-input text-theme-muted">Up to date</span>;
     };
 
-    if (isLoading) return <div className="p-8 text-center text-gray-400">Loading document...</div>;
+    if (isLoading) return <div className="p-8 text-center text-theme-muted">Loading document...</div>;
     if (!docId) return null;
 
     const previewContent = processMentionsToMarkdown(content);
@@ -268,11 +278,11 @@ export default function DocEditor({
         <div className={clsx("flex flex-col gap-2", className)}>
             {/* Toolbar */}
             <div className={clsx(
-                "flex items-center justify-between gap-2 border-b pb-2",
-                isDrawer && "border-neutral-100 pb-1"
+                "flex items-center justify-between gap-2 border-b pb-2 border-theme-border",
+                isDrawer && "border-theme-border/50 pb-1"
             )}>
                 <div className={clsx(
-                    "flex bg-neutral-100 p-0.5 rounded-lg border border-neutral-200",
+                    "flex bg-theme-input p-0.5 rounded-lg border border-theme-border",
                     isDrawer && "bg-transparent border-none p-0 gap-1"
                 )}>
                     {(["write", "split", "preview"] as ViewMode[]).map((m) => (
@@ -286,8 +296,8 @@ export default function DocEditor({
                             className={clsx(
                                 "px-3 py-1 text-xs font-medium rounded-md capitalize transition-all",
                                 viewMode === m 
-                                    ? (isDrawer ? "bg-blue-600 text-white shadow-sm scale-105" : "bg-white text-gray-900 shadow-sm")
-                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                                    ? (isDrawer ? "bg-theme-accent text-theme-app shadow-sm scale-105" : "bg-theme-card text-theme-primary shadow-sm")
+                                    : "text-theme-muted hover:text-theme-primary hover:bg-theme-hover"
                             )}
                         >
                             {m}
@@ -302,7 +312,7 @@ export default function DocEditor({
                                 void doSave();
                             }}
                             disabled={inFlightRef.current}
-                            className="text-xs text-gray-500 hover:text-gray-900 disabled:opacity-50"
+                            className="text-xs text-theme-muted hover:text-theme-primary disabled:opacity-50"
                         >
                             Save now
                         </button>
@@ -313,12 +323,18 @@ export default function DocEditor({
 
             {/* Editor Area */}
             <div className={clsx(
-                "border rounded-xl overflow-hidden bg-white flex relative transition-all",
-                isDrawer ? "border-neutral-200 shadow-none" : "shadow-sm",
+                "border rounded-xl overflow-hidden bg-theme-card flex relative transition-all",
+                isDrawer ? "border-theme-border shadow-none" : "border-theme-border shadow-sm",
             )} style={{ height }}>
                 {/* Write Pane */}
                 {(viewMode === "write" || viewMode === "split") && (
-                    <div className={clsx("flex-1 h-full relative", viewMode === "split" && "border-r")}>
+                    <div className={clsx("flex-1 h-full relative flex min-w-0 flex-col", viewMode === "split" && "border-r border-theme-border")}>
+                        <MarkdownToolbar
+                            value={content}
+                            onChange={handleToolbarChange}
+                            textareaRef={textAreaRef}
+                            className="shrink-0 rounded-none border-x-0 border-t-0"
+                        />
                         <textarea
                             ref={textAreaRef}
                             value={content}
@@ -339,14 +355,14 @@ export default function DocEditor({
                                     setMentionStart(null);
                                 }
                             }}
-                            className="w-full h-full p-4 text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500/10"
+                            className="min-h-0 w-full flex-1 p-4 text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-inset focus:ring-theme-accent/10 bg-transparent text-theme-primary"
                             placeholder="Type markdown here... use [[ to mention docs"
                         />
 
                         {/* Mention Popover */}
                         {mentionQuery !== null && (filteredMentions.length > 0) && (
-                            <div className="absolute left-4 bottom-4 z-10 w-64 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden ring-1 ring-black/5">
-                                <div className="text-xs bg-gray-50 px-2 py-1 text-gray-500 border-b">Link to doc...</div>
+                            <div className="absolute left-4 bottom-4 z-10 w-64 bg-theme-overlay rounded-lg shadow-xl border border-theme-border overflow-hidden ring-1 ring-black/5">
+                                <div className="text-xs bg-theme-panel px-2 py-1 text-theme-muted border-b border-theme-border">Link to doc...</div>
                                 {filteredMentions.map((doc, i) => (
                                     <button
                                         key={doc.id}
@@ -357,8 +373,8 @@ export default function DocEditor({
                                             handleSelectMention(i);
                                         }}
                                         className={clsx(
-                                            "w-full text-left px-3 py-2 text-sm truncate",
-                                            i === mentionIndex ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"
+                                            "w-full text-left px-3 py-2 text-sm truncate transition-colors",
+                                            i === mentionIndex ? "bg-theme-accent/10 text-theme-accent" : "text-theme-primary hover:bg-theme-hover"
                                         )}
                                     >
                                         {doc.title || "Untitled"}
@@ -373,13 +389,13 @@ export default function DocEditor({
                 {(viewMode === "preview" || viewMode === "split") && (
                     <div className={clsx(
                         "flex-1 h-full overflow-auto p-4 transition-colors",
-                        isDrawer ? "bg-white" : "bg-gray-50/50"
+                        isDrawer ? "bg-theme-card" : "bg-theme-app/50"
                     )}>
                         <article className={clsx(
-                            "prose prose-slate max-w-none",
-                            isDrawer ? "prose-sm leading-relaxed" : "prose-sm"
+                            "prose prose-sm max-w-none prose-theme",
+                            isDrawer ? "leading-relaxed" : ""
                         )}>
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, [rehypeSanitize, highlightSanitizeSchema]]}>
                                 {previewContent || (isDrawer ? "*Start writing in the full note editor...*" : "*No content*")}
                             </ReactMarkdown>
                         </article>

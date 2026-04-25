@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 
 import { getDoc } from "@/lib/api/docs";
+import { highlightSanitizeSchema, rehypeHighlight } from "@/lib/editor/rehypeHighlight";
 import { processMentionsToMarkdown } from "@/lib/mentions";
 import { formatDate } from "@/lib/docsUtils";
 import { toErrorMessage } from "@/lib/error";
@@ -78,7 +79,7 @@ export default function PrintClient({ docId }: { docId: string }) {
                             </div>
                         )}
 
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, [rehypeSanitize, highlightSanitizeSchema]]}>
                             {processed || "*No content*"}
                         </ReactMarkdown>
                     </article>
