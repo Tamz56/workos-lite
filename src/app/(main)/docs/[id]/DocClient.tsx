@@ -9,6 +9,7 @@ import { RefreshCw, Trash2, ChevronLeft, Save, Printer, Layout, Briefcase, Exter
 import { WORKSPACES_LIST, workspaceLabel } from "@/lib/workspaces";
 import { Project } from "@/lib/types";
 import AttachmentsPanel from "@/components/AttachmentsPanel";
+import { MarkdownToolbar } from "@/components/editor/MarkdownToolbar";
 import { Toast } from "@/components/ui/Toast";
 
 type DocRow = {
@@ -51,6 +52,7 @@ export default function DocClient({ id }: { id: string }) {
     const tRef = useRef<number | null>(null);
     const pendingRef = useRef<Partial<DocRow>>({});
     const mountedRef = useRef(true);
+    const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     const load = useCallback(async () => {
         setErr(null);
@@ -138,6 +140,11 @@ export default function DocClient({ id }: { id: string }) {
         }, 800);
     }
 
+    function handleContentChange(value: string) {
+        setDoc(prev => prev ? { ...prev, content_md: value } : null);
+        scheduleSave({ content_md: value });
+    }
+
     async function flushPending() {
         const payload = pendingRef.current;
         if (Object.keys(payload).length === 0) return;
@@ -191,12 +198,12 @@ export default function DocClient({ id }: { id: string }) {
     }
 
     if (!doc) {
-        return <PageShell><div className="p-20 text-center text-neutral-400 italic">Finding document...</div></PageShell>;
+        return <PageShell><div className="p-20 text-center text-theme-muted italic">Finding document...</div></PageShell>;
     }
 
     return (
         <PageShell>
-            <div className="flex items-center gap-2 mb-6 text-neutral-400 hover:text-black transition-colors cursor-pointer group w-fit" onClick={() => router.push("/docs")}>
+            <div className="flex items-center gap-2 mb-6 text-theme-muted hover:text-theme-primary transition-colors cursor-pointer group w-fit" onClick={() => router.push("/docs")}>
                 <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                 <span className="text-xs font-black uppercase tracking-widest">Docs & Knowledge</span>
             </div>
@@ -206,19 +213,19 @@ export default function DocClient({ id }: { id: string }) {
                 subtitle={`Updated: ${formatDateTime(doc.updated_at)}`}
                 actions={
                     <div className="flex items-center gap-2">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mr-2">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-theme-muted mr-2">
                             {saving ? "Saving..." : saved ? "All changes saved" : ""}
                         </div>
                         <button
                             onClick={() => router.push(`/docs/${id}/print`)}
-                            className="p-2.5 rounded-2xl bg-white border border-neutral-200 text-neutral-400 hover:text-neutral-900 hover:border-neutral-300 transition-all active:scale-95 shadow-sm"
+                            className="p-2.5 rounded-2xl bg-theme-card border border-theme-border text-theme-muted hover:text-theme-primary hover:border-theme-accent transition-all active:scale-95 shadow-sm"
                             title="Print"
                         >
                             <Printer className="w-4 h-4" />
                         </button>
                         <button
                             onClick={onDelete}
-                            className="p-2.5 rounded-2xl bg-white border border-neutral-200 text-neutral-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all active:scale-95 shadow-sm"
+                            className="p-2.5 rounded-2xl bg-theme-card border border-theme-border text-theme-muted hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/10 transition-all active:scale-95 shadow-sm"
                             title="Delete"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -229,10 +236,10 @@ export default function DocClient({ id }: { id: string }) {
 
             <div className="max-w-5xl mx-auto mt-8 space-y-8 pb-20">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                    <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
                         <div className="flex items-center gap-2 mb-3 px-1">
-                            <Layout className="w-3.5 h-3.5 text-neutral-400" />
-                            <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Linked Project</label>
+                            <Layout className="w-3.5 h-3.5 text-theme-muted" />
+                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Linked Project</label>
                         </div>
                         <select
                             value={doc.project_id || ""}
@@ -241,7 +248,7 @@ export default function DocClient({ id }: { id: string }) {
                                 setDoc(prev => prev ? { ...prev, project_id: val } : null);
                                 patch({ project_id: val }); // Immediate save for metadata
                             }}
-                            className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:bg-white focus:border-neutral-300 transition-all"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2 text-sm font-bold outline-none focus:bg-theme-card focus:border-theme-accent transition-all text-theme-primary"
                         >
                             <option value="">None (Unlinked)</option>
                             {projects.map(p => (
@@ -250,10 +257,10 @@ export default function DocClient({ id }: { id: string }) {
                         </select>
                     </div>
 
-                    <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                    <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
                         <div className="flex items-center gap-2 mb-3 px-1">
-                            <Briefcase className="w-3.5 h-3.5 text-neutral-400" />
-                            <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Workspace Category</label>
+                            <Briefcase className="w-3.5 h-3.5 text-theme-muted" />
+                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Workspace Category</label>
                         </div>
                         <select
                             value={doc.workspace || ""}
@@ -262,7 +269,7 @@ export default function DocClient({ id }: { id: string }) {
                                 setDoc(prev => prev ? { ...prev, workspace: val } : null);
                                 patch({ workspace: val }); // Immediate save for metadata
                             }}
-                            className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:bg-white focus:border-neutral-300 transition-all"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2 text-sm font-bold outline-none focus:bg-theme-card focus:border-theme-accent transition-all text-theme-primary"
                         >
                             <option value="">None (General)</option>
                             {WORKSPACES_LIST.map(w => (
@@ -274,7 +281,7 @@ export default function DocClient({ id }: { id: string }) {
 
                 <div className="space-y-4">
                     <input
-                        className="w-full bg-transparent border-none text-4xl font-black tracking-tight outline-none placeholder:text-neutral-200"
+                        className="w-full bg-transparent border-none text-4xl font-black tracking-tight outline-none placeholder:text-theme-muted text-theme-primary"
                         placeholder="Untitled Note"
                         value={doc.title}
                         onChange={(e) => {
@@ -284,16 +291,21 @@ export default function DocClient({ id }: { id: string }) {
                         }}
                     />
                     
-                    <textarea
-                        className="w-full min-h-[600px] bg-white border border-neutral-200 rounded-3xl p-8 text-lg font-medium outline-none focus:shadow-xl transition-all shadow-sm leading-relaxed"
-                        placeholder="Start writing your thoughts, documentation, or knowledge here..."
-                        value={doc.content_md}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            setDoc(prev => prev ? { ...prev, content_md: val } : null);
-                            scheduleSave({ content_md: val });
-                        }}
-                    />
+                    <div className="overflow-hidden rounded-3xl border border-theme-border bg-theme-card shadow-sm transition-all focus-within:shadow-xl">
+                        <MarkdownToolbar
+                            value={doc.content_md}
+                            onChange={handleContentChange}
+                            textareaRef={contentTextareaRef}
+                            className="rounded-none border-x-0 border-t-0"
+                        />
+                        <textarea
+                            ref={contentTextareaRef}
+                            className="w-full min-h-[600px] bg-transparent p-8 text-lg font-medium outline-none leading-relaxed text-theme-primary resize-y"
+                            placeholder="Start writing your thoughts, documentation, or knowledge here..."
+                            value={doc.content_md}
+                            onChange={(e) => handleContentChange(e.target.value)}
+                        />
+                    </div>
 
                     <AttachmentsPanel kind="doc" entityId={id} />
                 </div>
