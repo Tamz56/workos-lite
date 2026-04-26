@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
     CalendarIcon,
@@ -17,7 +16,7 @@ import {
 // Helper for consistent Nav Items
 function NavItem(props: { href: string; icon: React.ReactNode; label: string; active?: boolean }) {
     return (
-        <Link
+        <a
             href={props.href}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${props.active
                 ? "bg-neutral-900 text-white"
@@ -26,7 +25,7 @@ function NavItem(props: { href: string; icon: React.ReactNode; label: string; ac
         >
             {props.icon}
             {props.label}
-        </Link>
+        </a>
     );
 }
 

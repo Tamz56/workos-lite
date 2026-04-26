@@ -547,6 +547,33 @@ function placeholders(values: string[]) {
     return values.map(() => "?").join(", ");
 }
 
+const LEGACY_AVA_CLEANUP_FLAG = "legacy_ava_demo_cleanup_v1";
+
+function ensureAppMeta() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS app_meta (
+          key        TEXT PRIMARY KEY,
+          value      TEXT NOT NULL,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+    `);
+}
+
+function hasAppMetaFlag(key: string) {
+    const row = db.prepare("SELECT value FROM app_meta WHERE key = ?").get(key) as { value: string } | undefined;
+    return row?.value === "done";
+}
+
+function markAppMetaFlagDone(key: string) {
+    db.prepare(`
+        INSERT INTO app_meta (key, value, updated_at)
+        VALUES (?, 'done', datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = excluded.updated_at
+    `).run(key);
+}
+
 function cleanupLegacyAvaDemoData() {
     const workspacePlaceholders = placeholders(LEGACY_AVA_WORKSPACES);
     const projectPlaceholders = placeholders(LEGACY_AVA_PROJECT_SLUGS);
@@ -633,9 +660,16 @@ function cleanupLegacyAvaDemoData() {
     deleteTx();
 }
 
+function cleanupLegacyAvaDemoDataOnce() {
+    if (hasAppMetaFlag(LEGACY_AVA_CLEANUP_FLAG)) return;
+    cleanupLegacyAvaDemoData();
+    markAppMetaFlagDone(LEGACY_AVA_CLEANUP_FLAG);
+}
+
 ensureProjectsAndSprints();
 ensureNotes();
-cleanupLegacyAvaDemoData();
+ensureAppMeta();
+cleanupLegacyAvaDemoDataOnce();
 if (!shouldSkipSeed) {
     ensureSeedProjects();
 }

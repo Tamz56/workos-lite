@@ -132,10 +132,10 @@ async function fetchEvents(params: Record<string, string>) {
     return pickArray<unknown>(raw).map(r => mapEventRow((r ?? {}) as EventRow));
 }
 
-async function fetchDocs(params: Record<string, string>) {
+async function fetchDocs(params: Record<string, string>, timeoutMs = 15000) {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) sp.set(k, v);
-    const res = await fetchWithTimeout(`/api/docs?${sp.toString()}`, { cache: "no-store" });
+    const res = await fetchWithTimeout(`/api/docs?${sp.toString()}`, { cache: "no-store" }, timeoutMs);
     if (!res.ok) throw new Error(`docs: HTTP ${res.status}`);
     const raw: unknown = await res.json();
     return pickArray<DocRow>(raw);
@@ -769,11 +769,11 @@ function DashboardContent() {
         setError(null);
         try {
             const [allTasks, allEvents, allDocs, allProjs, allLst, summary, healthRes] = await Promise.all([
-                fetchTasks({ limit: "1000" }),
-                fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }),
-                fetchDocs({ limit: "100" }),
-                fetch("/api/projects").then(res => res.json()).catch(() => []),
-                fetch("/api/lists").then(res => res.json()).catch(() => []),
+                fetchTasks({ limit: "1000" }).catch(() => [] as DashboardTask[]),
+                fetchEvents({ start: toUtcIso(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), end: toUtcIso(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)) }).catch(() => [] as CalendarEvent[]),
+                fetchDocs({ limit: "100" }, 5000).catch(() => [] as DocRow[]),
+                fetchWithTimeout("/api/projects", { cache: "no-store" }).then(res => res.ok ? res.json() : []).catch(() => []),
+                fetchWithTimeout("/api/lists", { cache: "no-store" }).then(res => res.ok ? res.json() : []).catch(() => []),
                 fetchWithTimeout("/api/analytics/summary").then(res => res.json()).catch(() => null),
                 fetchWithTimeout("/api/health").then(res => ({ ok: res.ok })).catch(() => ({ ok: false }))
             ]);
@@ -1058,8 +1058,6 @@ function DashboardContent() {
             stats: getBucketStats(b.tasks),
         })).filter(b => b.tasks.length > 0 || b.id !== "other"); // Keep main 5, hide empty "other"
     }, [tasks, todayYmd]);
-
-    if (loading && tasks.length === 0) return <div className="p-10 flex justify-center items-center gap-3 text-neutral-400"><span className="animate-spin text-xl">⏳</span> Loading Home...</div>;
 
     if (error && tasks.length === 0) {
         return (
