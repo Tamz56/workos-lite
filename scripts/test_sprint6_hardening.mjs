@@ -19,7 +19,7 @@ async function run() {
     const created = await j(`${base}/api/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "S6 hardening test", workspace: "ops", status: "inbox" }),
+        body: JSON.stringify({ title: "S6 hardening test", workspace: "personal", status: "inbox" }),
     });
     const taskId = created.task.id;
     console.log("✅ Task:", taskId);

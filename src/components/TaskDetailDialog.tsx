@@ -125,7 +125,7 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const isContentWs = task.workspace === "content" || task.workspace === "avacrm";
+    const isContentWs = task.workspace === "content";
 
     const payloadRef = useRef<Partial<Task>>({});
 

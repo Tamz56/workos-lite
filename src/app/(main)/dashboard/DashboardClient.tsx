@@ -226,9 +226,8 @@ function WorkspaceCard(props: {
 
     const title = workspaceLabel(workspace);
     const colorMap: Record<string, string> = {
-        avacrm: "text-blue-600 bg-blue-50 border-blue-100",
-        ops: "text-orange-600 bg-orange-50 border-orange-100",
         content: "text-purple-600 bg-purple-50 border-purple-100",
+        personal: "text-violet-600 bg-violet-50 border-violet-100",
         default: "text-neutral-600 bg-neutral-50 border-neutral-100"
     };
     const theme = colorMap[workspace] || colorMap.default;
@@ -601,7 +600,7 @@ function ProjectTimeline(props: { tasks: DashboardTask[]; projects: any[]; lists
     );
 }
 
-const WORKSPACE_DISPLAY_ORDER: Workspace[] = ['avacrm', 'content', 'marketing', 'admin', 'ops', 'other', 'personal', 'finance', 'travel'];
+const WORKSPACE_DISPLAY_ORDER: Workspace[] = ['personal', 'content', 'admin', 'inbox', 'marketing', 'finance', 'travel', 'other'];
 
 function OtherWorkspacesList(props: { tasks: DashboardTask[]; todayYmd: string; className?: string }) {
     const rows = useMemo(() => {
@@ -731,7 +730,7 @@ function DashboardContent() {
 
     // New Task State Extended
     const [newTaskTitle, setNewTaskTitle] = useState("");
-    const [newTaskWs, setNewTaskWs] = useState<Workspace>("avacrm");
+    const [newTaskWs, setNewTaskWs] = useState<Workspace>("personal");
     const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>("inbox");
     const [newTaskDate, setNewTaskDate] = useState(todayYmd);
     const [newTaskStartTime, setNewTaskStartTime] = useState("");
@@ -951,7 +950,7 @@ function DashboardContent() {
     const isFirstRun = useMemo(() => {
         if (tasks.length === 0) return true; // empty workspace = first run
 
-        const seedSlugs = new Set(["avaone-q1", "avaone-q1-sales", "avaone-homeforest-q1", "avafarm888-fb-content-q1", "avaone-fb-content-q1", "avaone-tiktok-q1"]);
+        const seedSlugs = new Set<string>();
 
         const hasUserTask = (tasks as any[]).some((t: any) => {
             // Prefer is_seed flag if available
@@ -1002,8 +1001,8 @@ function DashboardContent() {
     // --- Bucket Logic ---
     const buckets = useMemo(() => {
         const bucketMap = {
-            "avaone": { title: "AVAONE / Brand / Content", description: "Marketing, CRM & Brand management", workspaces: ["content", "avacrm"] as Workspace[], tasks: [] as Task[] },
-            "farm": { title: "Farm Operations", description: "Avafarm888 & OPS management", workspaces: ["ops"] as Workspace[], tasks: [] as Task[] },
+            "content": { title: "Green Fineness / Content", description: "Learning content, publishing, and content planning", workspaces: ["content"] as Workspace[], tasks: [] as Task[] },
+            "personal": { title: "Personal Focus", description: "Personal priorities and day-to-day execution", workspaces: ["personal"] as Workspace[], tasks: [] as Task[] },
             "nanagarden": { title: "Website (NanaGarden)", description: "Travel, Project & NanaGarden site", workspaces: ["marketing"] as Workspace[], tasks: [] as Task[] },
             "marketing": { title: "Marketing & Sales", description: "Marketing & General sales", workspaces: ["marketing"] as Workspace[], tasks: [] as Task[] },
             "other": { title: "Admin / Other", description: "Finance, Admin & Personal", workspaces: ["admin", "finance", "personal"] as Workspace[], tasks: [] as Task[] },
@@ -1015,13 +1014,13 @@ function DashboardContent() {
             const ws = task.workspace as Workspace;
             const titleLower = task.title.toLowerCase();
 
-            // 1. AVAONE: content/avacrm OR title match
-            if (ws === 'content' || ws === 'avacrm' || titleLower.includes('avaone')) {
-                bucketMap.avaone.tasks.push(task);
-            } 
-            // 2. Farm: ops
-            else if (ws === 'ops') {
-                bucketMap.farm.tasks.push(task);
+            // 1. Content: Green Fineness and learning content planning
+            if (ws === 'content' || titleLower.includes('green fineness') || titleLower.includes('gf-')) {
+                bucketMap.content.tasks.push(task);
+            }
+            // 2. Personal
+            else if (ws === 'personal') {
+                bucketMap.personal.tasks.push(task);
             }
             // 3. Website: marketing + keyword
             else if (ws === 'marketing' && (titleLower.includes('nanagarden') || titleLower.includes('website'))) {

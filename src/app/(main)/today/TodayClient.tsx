@@ -135,7 +135,7 @@ export default function TodayClient() {
                     try {
                         const newTask = await createTask({ 
                             title: inlineTitle, 
-                            workspace: "avacrm", 
+                            workspace: "personal",
                             status: "planned",
                         });
                         await patchTask(newTask.id, { 

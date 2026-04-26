@@ -153,7 +153,7 @@ export default function BulkTaskDialog({ isOpen, onClose, onSuccess }: BulkTaskD
                                         <textarea
                                             value={rawText}
                                             onChange={(e) => setRawText(e.target.value)}
-                                            placeholder={`[crm] Call Client X | today | due:2026-01-20\n[ops] Check stock | #urgent\nType your tasks here...`}
+                                            placeholder={`[personal] Renew passport | today | due:2026-01-20\n[content] Draft GF learning post | #urgent\nType your tasks here...`}
                                             className="w-full h-40 p-4 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-neutral-900 focus:border-neutral-900 font-mono text-sm leading-relaxed"
                                         />
                                         <div className="mt-2 text-xs text-neutral-400">
@@ -179,7 +179,7 @@ export default function BulkTaskDialog({ isOpen, onClose, onSuccess }: BulkTaskD
                                                         <tr key={idx} className={task.validationError ? "bg-red-50" : "hover:bg-neutral-50"}>
                                                             <td className="px-4 py-2 font-medium text-neutral-600">
                                                                 <span className={`inline-block px-2 py-0.5 rounded text-[10px] uppercase tracking-wide border ${task.workspace === 'content' ? 'bg-purple-50 text-purple-700 border-purple-100' :
-                                                                    task.workspace === 'avacrm' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                                    task.workspace === 'personal' ? 'bg-violet-50 text-violet-700 border-violet-100' :
                                                                         'bg-neutral-100 text-neutral-600 border-neutral-200'
                                                                     }`}>
                                                                     {task.workspace}

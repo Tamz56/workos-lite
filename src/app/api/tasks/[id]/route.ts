@@ -6,8 +6,9 @@ import { z } from "zod";
 import { defaultBucketForWorkspace } from "@/lib/planning";
 import fs from "fs/promises";
 import path from "path";
+import { WORKSPACES } from "@/lib/workspaces";
 
-const Workspace = z.enum(["avacrm", "ops", "content"]);
+const Workspace = z.enum(WORKSPACES);
 const Status = z.enum(["inbox", "planned", "in_progress", "review", "done"]);
 const Bucket = z.enum(["none", "morning", "afternoon", "evening"]);
 

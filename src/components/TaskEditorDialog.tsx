@@ -45,7 +45,7 @@ export default function TaskEditorDialog({ isOpen, onClose, task, onUpdate }: Ta
         if (isOpen) {
             // Reset state when opening
             setTitle(task.title || "");
-            setWorkspace((task.workspace as Workspace) || "avacrm");
+            setWorkspace((task.workspace as Workspace) || "personal");
             setStatus(task.status === "planned" ? "planned" : "inbox");
             setListId(task.list_id || "");
             setScheduledDate(task.scheduled_date || "");

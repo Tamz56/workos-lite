@@ -19,15 +19,6 @@ export const TEMPLATES: Template[] = [
         ],
     },
     {
-        id: "farm",
-        name: "Farm Operations",
-        description: "Manage planting, harvesting, and field tasks.",
-        lists: [
-            { slug: "planting", title: "Planting Schedule", tasks: ["Order seeds", "Prepare Soil", "Seedling Nursery"] },
-            { slug: "maintenance", title: "Maintenance", tasks: ["Irrigation check", "Fertilization", "Pest control"] },
-        ],
-    },
-    {
         id: "software",
         name: "Software Development",
         description: "Agile workflow for building applications.",

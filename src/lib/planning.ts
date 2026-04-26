@@ -15,9 +15,7 @@ export function defaultBucketForWorkspace(workspace: string): ScheduleBucket | u
 
     if (w === "content") return "afternoon";
     if (w === "system") return "morning";
-    if (w === "ops") return "morning";
     if (w === "personal") return "evening";
-    if (w === "avacrm") return "morning";
 
     return undefined;
 }

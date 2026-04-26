@@ -102,7 +102,7 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
     // 6. Grouping Logic (RC22)
     // V5: Strict 1:1 mapping. 
     // RC65: Enhanced content code detection (GF-CONTENT-### > TOPIC-###)
-    const isContentWorkspace = workspaceId === 'content' || workspaceId === 'avacrm';
+    const isContentWorkspace = workspaceId === 'content';
     const isPackageGroup = state.groupBy === "package" || isContentWorkspace;
 
     const groups: Record<string, Task[]> = {};

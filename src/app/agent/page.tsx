@@ -21,7 +21,7 @@ const DEFAULT_PAYLOAD_RAW = `{
       "type": "task.create", 
       "data": { 
         "title": "Review Agent Output", 
-        "workspace": "avacrm", 
+        "workspace": "personal",
         "status": "inbox", 
         "doc_id_ref": "doc1" 
       } 

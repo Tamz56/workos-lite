@@ -32,7 +32,7 @@ async function runTest() {
         const taskData = await requestJson(`${BASE_URL}/tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: 'API Test Task', workspace: 'avacrm' })
+            body: JSON.stringify({ title: 'API Test Task', workspace: 'personal' })
         });
         const taskId = taskData.task.id;
         console.log('✅ Task Created:', taskId);

@@ -396,7 +396,7 @@ export async function POST(req: Request) {
                     insertTask.run({
                         id: String(row.id),
                         title: String(row.title),
-                        workspace: String(row.workspace || "avacrm"),
+                        workspace: String(row.workspace || "personal"),
                         status: String(row.status || "inbox"),
                         scheduled_date: row.scheduled_date ? String(row.scheduled_date) : null,
                         schedule_bucket: row.schedule_bucket ? String(row.schedule_bucket) : null,

@@ -1,14 +1,12 @@
 export const WORKSPACES = [
-    "avacrm",
-    "ops",
+    "personal",
     "content",
+    "admin",
+    "inbox",
     "finance",
     "travel",
-    "admin",
     "marketing",
-    "personal",
     "system",
-    "inbox",
     "other",
 ] as const;
 
@@ -29,60 +27,48 @@ export interface WorkspaceConfig {
 }
 
 export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
-    { 
-        id: "avacrm", label: "AVACRM", type: "admin", 
-        iconKey: "Briefcase", colorKey: "indigo",
-        isHidden: true,
-        emptyState: { title: "Manage your CRM", description: "Track clients and sales pipelines here.", actionLabel: "Add CRM Task", actionType: "quickAdd" }
-    },
-    { 
-        id: "ops", label: "OPS", type: "ops", 
-        iconKey: "Settings", colorKey: "emerald",
-        isHidden: true,
-        emptyState: { title: "Operations are clear", description: "No pending operational tasks at the moment.", actionLabel: "Add Ops Task", actionType: "quickAdd" }
-    },
-    { 
-        id: "content", label: "CONTENT", type: "content", 
-        iconKey: "PenTool", colorKey: "blue",
-        emptyState: { title: "Ready for a new campaign?", description: "Create a structured content package with notes and tasks.", actionLabel: "Create Content Package", actionType: "newPackage" }
-    },
-    { 
-        id: "finance", label: "Finance", type: "admin", 
-        iconKey: "DollarSign", colorKey: "amber",
-        emptyState: { title: "Finance queue is empty", description: "Keep your books clean and budgets updated.", actionLabel: "Record Expense", actionType: "quickAdd" }
-    },
-    { 
-        id: "travel", label: "Travel", type: "admin", 
-        iconKey: "Plane", colorKey: "rose",
-        emptyState: { title: "Plan your next journey", description: "No upcoming travel tasks planned.", actionLabel: "Add Itinerary", actionType: "quickAdd" }
-    },
-    { 
-        id: "admin", label: "Personal Admin", type: "admin", 
-        iconKey: "Shield", colorKey: "slate",
-        emptyState: { title: "Administrative tasks", description: "Manage organizational overhead effectively.", actionLabel: "Add Admin Task", actionType: "quickAdd" }
-    },
-    { 
-        id: "marketing", label: "Business / Marketing", type: "ops", 
-        iconKey: "TrendingUp", colorKey: "orange",
-        emptyState: { title: "Growth is looking good", description: "No active marketing campaigns in this view.", actionLabel: "Start Campaign", actionType: "quickAdd" }
-    },
-    { 
-        id: "personal", label: "Personal", type: "other", 
+    {
+        id: "personal", label: "Personal", type: "other",
         iconKey: "User", colorKey: "violet",
         emptyState: { title: "Capture your first thought", description: "Empty space is free space. Focus on what matters.", actionLabel: "Add Quick Task", actionType: "quickAdd" }
     },
-    { 
-        id: "system", label: "System/Archive", type: "system", 
-        iconKey: "Archive", colorKey: "neutral",
-        emptyState: { title: "Archive view", description: "Everything is backed up and safe.", actionLabel: "Archive Task", actionType: "quickAdd" }
+    {
+        id: "content", label: "CONTENT", type: "content",
+        iconKey: "PenTool", colorKey: "blue",
+        emptyState: { title: "Ready for a new campaign?", description: "Create a structured content package with notes and tasks.", actionLabel: "Create Content Package", actionType: "newPackage" }
     },
-    { 
-        id: "inbox", label: "Inbox", type: "inbox", 
+    {
+        id: "admin", label: "Personal Admin", type: "admin",
+        iconKey: "Shield", colorKey: "slate",
+        emptyState: { title: "Administrative tasks", description: "Manage organizational overhead effectively.", actionLabel: "Add Admin Task", actionType: "quickAdd" }
+    },
+    {
+        id: "inbox", label: "Inbox", type: "inbox",
         iconKey: "Inbox", colorKey: "sky",
         emptyState: { title: "Inbox Zero reached!", description: "All new captures have been processed.", actionLabel: "Quick Capture", actionType: "quickAdd" }
     },
-    { 
-        id: "other", label: "Other", type: "other", 
+    {
+        id: "finance", label: "Finance", type: "admin",
+        iconKey: "DollarSign", colorKey: "amber",
+        emptyState: { title: "Finance queue is empty", description: "Keep your books clean and budgets updated.", actionLabel: "Record Expense", actionType: "quickAdd" }
+    },
+    {
+        id: "travel", label: "Travel", type: "admin",
+        iconKey: "Plane", colorKey: "rose",
+        emptyState: { title: "Plan your next journey", description: "No upcoming travel tasks planned.", actionLabel: "Add Itinerary", actionType: "quickAdd" }
+    },
+    {
+        id: "marketing", label: "Business / Marketing", type: "ops",
+        iconKey: "TrendingUp", colorKey: "orange",
+        emptyState: { title: "Growth is looking good", description: "No active marketing campaigns in this view.", actionLabel: "Start Campaign", actionType: "quickAdd" }
+    },
+    {
+        id: "system", label: "System/Archive", type: "system",
+        iconKey: "Archive", colorKey: "neutral",
+        emptyState: { title: "Archive view", description: "Everything is backed up and safe.", actionLabel: "Archive Task", actionType: "quickAdd" }
+    },
+    {
+        id: "other", label: "Other", type: "other",
         iconKey: "MoreHorizontal", colorKey: "neutral",
         emptyState: { title: "Everything Else", description: "A catch-all for miscellaneous tasks.", actionLabel: "Add Task", actionType: "quickAdd" }
     },
@@ -91,14 +77,16 @@ export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
 export type Workspace = (typeof WORKSPACES)[number];
 
 const ALIASES: Record<string, Workspace> = {
-    // crm
-    "crm": "avacrm",
-    "avacrm": "avacrm",
-    "ava": "avacrm",
-
-    // ops
-    "ops": "ops",
-    "operation": "ops",
+    // legacy AVA aliases now route to Other instead of recreating old workspaces
+    "crm": "other",
+    "avacrm": "other",
+    "ava": "other",
+    "avaops": "other",
+    "avafarm": "other",
+    "salescrm": "other",
+    "ops": "other",
+    "operation": "other",
+    "farm ops": "other",
 
     // content
     "content": "content",
@@ -131,8 +119,6 @@ export function normalizeWorkspace(input?: string | null): Workspace {
 
 export function workspaceLabel(w: Workspace | string): string {
     switch (w) {
-        case "avacrm": return "AVACRM";
-        case "ops": return "OPS";
         case "content": return "CONTENT";
         case "personal": return "Personal";
         case "admin": return "Personal Admin";

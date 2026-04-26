@@ -37,7 +37,7 @@ export function parseBulkTasks(text: string, options: ParseOptions): ParsedTask[
         const workspaceMatch = cleanLine.match(/^\[([a-zA-Z0-9_]+)\]/);
 
         if (workspaceMatch) {
-            // Robust Normalization for [crm]/[ops] etc.
+            // Robust normalization for legacy aliases and current workspace labels.
             const raw = workspaceMatch[1];
             workspace = normalizeWorkspace(raw);
 
@@ -105,7 +105,7 @@ export function parseBulkTasks(text: string, options: ParseOptions): ParsedTask[
         // 3.5 Re-scan Title for inline tags/project/stage?
         // User said: "project:stock -> tag project:stock". 
         // User example format shows pipes: "... | project:xxx". 
-        // But what if they type "[ops] Do thing #urgent"?
+        // But what if they type "[content] Draft post #urgent"?
         // Let's scan Title for inline #tags too.
         const titleTags = title.match(/#[a-zA-Z0-9_]+/g);
         if (titleTags) {

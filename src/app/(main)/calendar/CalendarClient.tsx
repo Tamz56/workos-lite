@@ -272,7 +272,7 @@ function CalendarContent() {
     const [start, setStart] = useState(startParam ?? ymd(new Date()));
     const [end, setEnd] = useState(endParam ?? ymd(new Date(Date.now() + 7 * 86400000)));
     const [workspace, setWorkspace] = useState<EventWorkspace | "all">(
-        (workspaceParam === "avacrm" || workspaceParam === "ops" || workspaceParam === "content")
+        WORKSPACES.includes(workspaceParam as Workspace)
             ? (workspaceParam as EventWorkspace)
             : "all"
     );
@@ -285,7 +285,7 @@ function CalendarContent() {
     const [open, setOpen] = useState(false);
     const [title, setTitle] = useState("");
     const [kind, setKind] = useState<EventKind>("appointment");
-    const [ws, setWs] = useState<EventWorkspace>("avacrm");
+    const [ws, setWs] = useState<EventWorkspace>("personal");
     const [allDay, setAllDay] = useState(false);
 
     const today = useMemo(() => ymd(new Date()), []);

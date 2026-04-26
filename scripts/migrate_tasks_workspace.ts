@@ -2,7 +2,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 
-const WORKSPACES = ["avacrm", "ops", "content", "personal", "admin", "finance", "travel", "other"] as const;
+const WORKSPACES = ["personal", "content", "admin", "inbox", "finance", "travel", "marketing", "system", "other"] as const;
 
 type Row = Record<string, unknown>;
 
@@ -40,7 +40,7 @@ function hasWorkspaceCheck(sql: string) {
 
 function buildWorkspaceCheck(): string {
     const list = WORKSPACES.map(q).join(",");
-    return `workspace TEXT NOT NULL DEFAULT 'avacrm' CHECK (workspace IN (${list}))`;
+    return `workspace TEXT NOT NULL DEFAULT 'personal' CHECK (workspace IN (${list}))`;
 }
 
 function main() {

@@ -169,7 +169,7 @@ export default function DoneClient() {
                     <div style={{ fontSize: 12, color: "#333", paddingTop: 22 }}>
                         Total: <b>{stats.total}</b>{" "}
                         <span style={{ color: "#666" }}>
-                            (avaCRM {stats.byWs.avacrm ?? 0} / ops {stats.byWs.ops ?? 0} / content {stats.byWs.content ?? 0})
+                            (personal {stats.byWs.personal ?? 0} / content {stats.byWs.content ?? 0} / admin {stats.byWs.admin ?? 0})
                         </span>
                     </div>
                 </div>

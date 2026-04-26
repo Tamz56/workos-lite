@@ -15,7 +15,7 @@ const ReviewStatus = z.enum(["draft", "in_review", "approved", "published"]); //
 
 const CreateTaskSchema = z.object({
     title: z.string().min(1),
-    workspace: Workspace.default("avacrm"),
+    workspace: Workspace.default("personal"),
     status: Status.default("inbox"),
     list_id: z.string().optional().nullable(),
     scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),

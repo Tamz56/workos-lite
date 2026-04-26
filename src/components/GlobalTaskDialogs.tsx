@@ -108,7 +108,7 @@ export function GlobalTaskDialogs() {
         }
 
         // Final fallback to the first workspace in the list if still null
-        const finalWs: Workspace = ws || (WORKSPACES_LIST[0]?.id as Workspace) || "avacrm";
+        const finalWs: Workspace = ws || (WORKSPACES_LIST[0]?.id as Workspace) || "personal";
 
         return {
             id: "new",

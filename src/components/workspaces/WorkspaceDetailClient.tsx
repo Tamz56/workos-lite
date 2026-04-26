@@ -767,7 +767,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         const pool: CommandOption[] = [
             { id: "nav-inbox", label: "Go to Inbox", action: () => router.push("/workspaces/inbox"), category: "navigation" },
             { id: "nav-content", label: "Go to Content Workspace", action: () => router.push("/workspaces/content"), category: "navigation" },
-            { id: "nav-ops", label: "Go to Operations", action: () => router.push("/workspaces/ops"), category: "navigation" },
+            { id: "nav-personal", label: "Go to Personal", action: () => router.push("/workspaces/personal"), category: "navigation" },
             { id: "nav-system", label: "Go to System", action: () => router.push("/workspaces/system"), category: "navigation" },
             { id: "act-new-task", label: "New Task", description: "Open global quick add", action: () => updateState({ isQuickAddOpen: true }), category: "actions" },
         ];

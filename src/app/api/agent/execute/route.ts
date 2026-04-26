@@ -15,7 +15,7 @@ const Bucket = z.enum(["none", "morning", "afternoon", "evening"]);
 // ---- Action Schemas ----
 const TaskCreate = z.object({
     title: z.string().min(1),
-    workspace: Workspace.default("avacrm"),
+    workspace: Workspace.default("personal"),
     status: Status.default("inbox"),
     scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
     schedule_bucket: Bucket.nullable().optional(),

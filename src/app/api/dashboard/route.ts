@@ -175,7 +175,7 @@ export async function GET(req: Request) {
         .prepare(
             `
       WITH ws(workspace) AS (
-        VALUES ('avacrm'), ('ops'), ('content')
+        VALUES ('personal'), ('content'), ('admin'), ('inbox'), ('marketing'), ('finance'), ('travel'), ('other')
       ),
       agg AS (
         SELECT

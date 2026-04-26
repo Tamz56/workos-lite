@@ -18,7 +18,7 @@ import { WORKSPACES_LIST } from "@/lib/workspaces";
 
 export default function InboxClient() {
     const [title, setTitle] = useState("");
-    const [workspace, setWorkspace] = useState<Workspace>("avacrm");
+    const [workspace, setWorkspace] = useState<Workspace>("personal");
 
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<any[]>([]);

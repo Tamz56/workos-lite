@@ -169,7 +169,7 @@ export async function uploadDocAttachment(docId: string, file: File): Promise<At
 // --- EVENTS ---
 
 export type EventKind = "appointment" | "meeting" | "reminder";
-export type EventWorkspace = "avacrm" | "ops" | "content";
+export type EventWorkspace = Workspace;
 
 export type Event = {
     id: string;

@@ -6,6 +6,17 @@ import crypto from "crypto";
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
 
+const LEGACY_AVA_WORKSPACES = ["avacrm", "ops"];
+const LEGACY_AVA_PROJECT_SLUGS = [
+    "avaone-q1",
+    "avaone-q1-sales",
+    "avaone-homeforest-q1",
+    "avafarm888-fb-content-q1",
+    "avaone-fb-content-q1",
+    "avaone-tiktok-q1"
+];
+const LEGACY_DEMO_LIST_SLUGS = ["nanagarden-q1", "sku-ads"];
+
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
 // Avoid "global as any" by defining a precise type
@@ -68,7 +79,7 @@ function ensureMigrations() {
             CREATE TABLE tasks_new (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
-                workspace TEXT NOT NULL DEFAULT 'avacrm',
+                workspace TEXT NOT NULL DEFAULT 'personal',
                 status TEXT NOT NULL DEFAULT 'inbox' CHECK (status IN ('inbox','planned','done')),
                 scheduled_date TEXT NULL,
                 schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning','afternoon','evening','none') OR schedule_bucket IS NULL),
@@ -316,30 +327,8 @@ function auditWorkspaceConstraint() {
 }
 
 function ensureSeedLists() {
-    const defaultLists = [
-        { workspace: 'marketing', slug: 'nanagarden-q1', title: 'NanaGarden Q1', desc: 'Q1 Tasks for NanaGarden' },
-        { workspace: 'marketing', slug: 'sku-ads', title: 'SKU Ads', desc: 'SKU advertisements tracking' }
-    ];
-
-    const insertStmt = db.prepare(`
-        INSERT INTO lists (id, workspace, slug, title, description, is_seed, created_at, updated_at)
-        VALUES (@id, @workspace, @slug, @title, @description, 1, datetime('now'), datetime('now'))
-        ON CONFLICT(workspace, slug) DO NOTHING
-    `);
-
-    const runTx = db.transaction(() => {
-        for (const list of defaultLists) {
-            insertStmt.run({
-                id: crypto.randomUUID(),
-                workspace: list.workspace,
-                slug: list.slug,
-                title: list.title,
-                description: list.desc
-            });
-        }
-    });
-
-    runTx();
+    const defaultLists: { workspace: string; slug: string; title: string; desc: string }[] = [];
+    if (defaultLists.length === 0) return;
 }
 
 function ensureDocsAndAttachments() {
@@ -521,33 +510,8 @@ function ensureProjectsAndSprints() {
 }
 
 function ensureSeedProjects() {
-    const defaultProjects = [
-        "avaone-q1",
-        "avaone-q1-sales",
-        "avaone-homeforest-q1",
-        "avafarm888-fb-content-q1",
-        "avaone-fb-content-q1",
-        "avaone-tiktok-q1"
-    ];
-
-    const insertStmt = db.prepare(`
-        INSERT INTO projects (id, slug, name, status, is_seed, created_at, updated_at)
-        VALUES (@id, @slug, @name, 'planned', 1, datetime('now'), datetime('now'))
-        ON CONFLICT(slug) DO NOTHING
-    `);
-
-    const runTx = db.transaction(() => {
-        for (const slug of defaultProjects) {
-            insertStmt.run({
-                id: crypto.randomUUID(),
-                slug: slug,
-                // Simple formatting for demonstration (e.g., 'avaone-q1' -> 'Avaone Q1')
-                name: slug.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase())
-            });
-        }
-    });
-
-    runTx();
+    const defaultProjects: string[] = [];
+    if (defaultProjects.length === 0) return;
 }
 
 function ensureNotes() {
@@ -579,8 +543,99 @@ function ensureNotes() {
     `);
 }
 
+function placeholders(values: string[]) {
+    return values.map(() => "?").join(", ");
+}
+
+function cleanupLegacyAvaDemoData() {
+    const workspacePlaceholders = placeholders(LEGACY_AVA_WORKSPACES);
+    const projectPlaceholders = placeholders(LEGACY_AVA_PROJECT_SLUGS);
+    const listPlaceholders = placeholders(LEGACY_DEMO_LIST_SLUGS);
+
+    const projectIds = db.prepare(`
+        SELECT id
+        FROM projects
+        WHERE slug IN (${projectPlaceholders})
+           OR lower(slug) LIKE 'avaone-%'
+           OR lower(slug) LIKE 'avafarm%'
+           OR lower(name) LIKE '%avaone%'
+           OR lower(name) LIKE '%avafarm%'
+           OR lower(name) LIKE '%avacrm%'
+           OR lower(name) LIKE '%avaops%'
+    `).all(...LEGACY_AVA_PROJECT_SLUGS) as { id: string }[];
+
+    const legacyListIds = db.prepare(`
+        SELECT id
+        FROM lists
+        WHERE workspace IN (${workspacePlaceholders})
+           OR (is_seed = 1 AND slug IN (${listPlaceholders}))
+    `).all(...LEGACY_AVA_WORKSPACES, ...LEGACY_DEMO_LIST_SLUGS) as { id: string }[];
+
+    const deleteTx = db.transaction(() => {
+        if (legacyListIds.length > 0) {
+            const ids = legacyListIds.map((row) => row.id);
+            db.prepare(`DELETE FROM tasks WHERE list_id IN (${placeholders(ids)})`).run(...ids);
+        }
+
+        db.prepare(`DELETE FROM tasks WHERE workspace IN (${workspacePlaceholders})`).run(...LEGACY_AVA_WORKSPACES);
+
+        for (const slug of LEGACY_AVA_PROJECT_SLUGS) {
+            db.prepare(`
+                DELETE FROM tasks
+                WHERE lower(COALESCE(notes, '')) LIKE ?
+                   OR lower(COALESCE(title, '')) LIKE ?
+            `).run(`%project:${slug}%`, `%${slug}%`);
+        }
+
+        db.prepare(`DELETE FROM events WHERE workspace IN (${workspacePlaceholders})`).run(...LEGACY_AVA_WORKSPACES);
+
+        db.prepare(`
+            DELETE FROM docs
+            WHERE is_seed = 1
+              AND (
+                lower(title) LIKE '%avaone%'
+                OR lower(title) LIKE '%avafarm%'
+                OR lower(title) LIKE '%avacrm%'
+                OR lower(title) LIKE '%avaops%'
+                OR lower(content_md) LIKE '%project:avaone-%'
+                OR lower(content_md) LIKE '%project:avafarm%'
+              )
+        `).run();
+
+        if (projectIds.length > 0) {
+            const ids = projectIds.map((row) => row.id);
+            const idsPlaceholders = placeholders(ids);
+            const hasNotesProjectId = db.prepare("PRAGMA table_info(notes)").all().some((c: any) => c.name === "project_id");
+            if (hasNotesProjectId) {
+                db.prepare(`DELETE FROM notes WHERE project_id IN (${idsPlaceholders})`).run(...ids);
+            }
+            db.prepare(`DELETE FROM projects WHERE id IN (${idsPlaceholders})`).run(...ids);
+        }
+
+        db.prepare(`
+            DELETE FROM projects
+            WHERE slug IN (${projectPlaceholders})
+               OR lower(slug) LIKE 'avaone-%'
+               OR lower(slug) LIKE 'avafarm%'
+               OR lower(name) LIKE '%avaone%'
+               OR lower(name) LIKE '%avafarm%'
+               OR lower(name) LIKE '%avacrm%'
+               OR lower(name) LIKE '%avaops%'
+        `).run(...LEGACY_AVA_PROJECT_SLUGS);
+
+        db.prepare(`
+            DELETE FROM lists
+            WHERE workspace IN (${workspacePlaceholders})
+               OR (is_seed = 1 AND slug IN (${listPlaceholders}))
+        `).run(...LEGACY_AVA_WORKSPACES, ...LEGACY_DEMO_LIST_SLUGS);
+    });
+
+    deleteTx();
+}
+
 ensureProjectsAndSprints();
 ensureNotes();
+cleanupLegacyAvaDemoData();
 if (!shouldSkipSeed) {
     ensureSeedProjects();
 }
