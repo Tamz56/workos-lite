@@ -14,9 +14,9 @@ export function PageHeader({
     return (
         <div className="flex items-start justify-between gap-4 mb-6">
             <div className="min-w-0">
-                <div className="text-2xl font-bold font-display tracking-tight text-neutral-900 truncate">{title}</div>
+                <div className="text-2xl font-bold font-display tracking-tight text-theme-primary truncate">{title}</div>
                 {subtitle ? (
-                    <div className="text-sm text-neutral-500 font-medium mt-1">{subtitle}</div>
+                    <div className="text-sm text-theme-secondary font-medium mt-1">{subtitle}</div>
                 ) : null}
             </div>
 

@@ -65,7 +65,7 @@ export function Modal(props: ModalProps) {
     if (!isOpen || !mounted) return null;
 
     const modalContent = (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6 text-neutral-900">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6 text-theme-primary">
             {/* Overlay - High contrast glassmorphism */}
             {!hideBackdrop && (
                 <div 
@@ -82,13 +82,13 @@ export function Modal(props: ModalProps) {
             <div 
                 ref={containerRef}
                 tabIndex={-1}
-                className={`relative w-full ${maxWidth} rounded-[24px] border border-white/20 bg-white shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300 flex flex-col max-h-[90vh] outline-none`}
+                className={`relative w-full ${maxWidth} rounded-[24px] border border-theme-border bg-theme-overlay shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300 flex flex-col max-h-[90vh] outline-none`}
             >
                 {/* Header - Compact */}
                 <div className="px-8 pt-8 pb-4 flex items-center justify-between gap-3 shrink-0">
-                    <div className="text-2xl font-black text-neutral-900 tracking-tight">{title}</div>
+                    <div className="text-2xl font-black text-theme-primary tracking-tight">{title}</div>
                     <button 
-                        className="w-10 h-10 flex items-center justify-center rounded-xl text-neutral-400 hover:bg-neutral-100 hover:text-black transition-all active:scale-90" 
+                        className="w-10 h-10 flex items-center justify-center rounded-xl text-theme-muted hover:bg-theme-hover hover:text-theme-primary transition-all active:scale-90" 
                         onClick={onClose}
                         title="Close (Esc)"
                     >

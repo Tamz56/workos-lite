@@ -43,8 +43,8 @@ const MenuButton = ({
         title={title}
         className={`p-1.5 rounded-md transition-all ${
             isActive 
-                ? "bg-neutral-900 text-white" 
-                : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                ? "bg-theme-primary text-theme-app" 
+                : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
         } disabled:opacity-30 disabled:cursor-not-allowed`}
     >
         {children}
@@ -78,7 +78,7 @@ export default function RichTextEditor({
         },
         editorProps: {
             attributes: {
-                class: `prose prose-sm max-w-none focus:outline-none min-h-[150px] p-4 text-neutral-800 ${readOnly ? "cursor-default" : "cursor-text"}`,
+                class: `prose prose-sm prose-theme max-w-none focus:outline-none min-h-[150px] p-4 text-theme-primary ${readOnly ? "cursor-default" : "cursor-text"}`,
             },
         },
     });
@@ -94,9 +94,9 @@ export default function RichTextEditor({
     if (!editor) return null;
 
     return (
-        <div className={`border border-neutral-200 rounded-xl bg-white overflow-hidden flex flex-col transition-all focus-within:border-neutral-400 focus-within:ring-2 focus-within:ring-neutral-100 ${className}`}>
+        <div className={`border border-theme-border rounded-xl bg-theme-card text-theme-primary overflow-hidden flex flex-col transition-all focus-within:border-theme-accent focus-within:ring-2 focus-within:ring-theme-ring ${className}`}>
             {!readOnly && (
-                <div className="flex items-center gap-1 p-1.5 border-b border-neutral-100 bg-neutral-50/50 flex-wrap">
+                <div className="flex items-center gap-1 p-1.5 border-b border-theme-border bg-theme-panel flex-wrap">
                     <MenuButton
                         onClick={() => editor.chain().focus().toggleBold().run()}
                         isActive={editor.isActive("bold")}
@@ -112,7 +112,7 @@ export default function RichTextEditor({
                         <Italic className="w-4 h-4" />
                     </MenuButton>
                     
-                    <div className="w-[1px] h-4 bg-neutral-200 mx-1" />
+                    <div className="w-[1px] h-4 bg-theme-border mx-1" />
                     
                     <MenuButton
                         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -129,7 +129,7 @@ export default function RichTextEditor({
                         <Heading2 className="w-4 h-4" />
                     </MenuButton>
                     
-                    <div className="w-[1px] h-4 bg-neutral-200 mx-1" />
+                    <div className="w-[1px] h-4 bg-theme-border mx-1" />
                     
                     <MenuButton
                         onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -146,7 +146,7 @@ export default function RichTextEditor({
                         <ListOrdered className="w-4 h-4" />
                     </MenuButton>
                     
-                    <div className="w-[1px] h-4 bg-neutral-200 mx-1" />
+                    <div className="w-[1px] h-4 bg-theme-border mx-1" />
                     
                     <MenuButton
                         onClick={() => editor.chain().focus().toggleBlockquote().run()}
@@ -178,7 +178,7 @@ export default function RichTextEditor({
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <EditorContent editor={editor} />
                 {editor.isEmpty && !readOnly && (
-                    <div className="absolute top-[52px] left-4 text-neutral-400 text-sm pointer-events-none italic">
+                    <div className="absolute top-[52px] left-4 text-theme-muted text-sm pointer-events-none italic">
                         {placeholder}
                     </div>
                 )}
@@ -188,7 +188,7 @@ export default function RichTextEditor({
                 .ProseMirror p.is-editor-empty:first-child::before {
                     content: attr(data-placeholder);
                     float: left;
-                    color: #adb5bd;
+                    color: var(--theme-text-muted);
                     pointer-events: none;
                     height: 0;
                 }
@@ -197,7 +197,7 @@ export default function RichTextEditor({
                 .prose p { margin-bottom: 0.5rem; line-height: 1.6; }
                 .prose ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.5rem; }
                 .prose ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.5rem; }
-                .prose blockquote { border-left: 3px solid #e5e5e5; padding-left: 1rem; italic; color: #666; margin-bottom: 0.5rem; }
+                .prose blockquote { border-left: 3px solid var(--theme-border); padding-left: 1rem; font-style: italic; color: var(--theme-text-secondary); margin-bottom: 0.5rem; }
             `}</style>
         </div>
     );
