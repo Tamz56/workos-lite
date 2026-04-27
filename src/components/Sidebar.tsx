@@ -19,8 +19,8 @@ function NavItem(props: { href: string; icon: React.ReactNode; label: string; ac
         <a
             href={props.href}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${props.active
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                ? "bg-theme-primary text-theme-app"
+                : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
                 }`}
         >
             {props.icon}
@@ -33,12 +33,12 @@ export function Sidebar() {
     const pathname = usePathname();
 
     return (
-        <aside className="w-64 bg-white border-r border-neutral-200 shadow-[1px_0_0_rgba(0,0,0,0.03)] flex flex-col h-screen sticky top-0 z-40">
+        <aside className="w-64 bg-theme-card border-r border-theme-border shadow-[1px_0_0_rgba(0,0,0,0.03)] flex flex-col h-screen sticky top-0 z-40 transition-theme">
             {/* Logo */}
-            <div className="h-16 flex items-center px-6 border-b border-neutral-100 mb-4">
+            <div className="h-16 flex items-center px-6 border-b border-theme-border mb-4">
                 <div className="flex flex-col leading-none">
-                    <span className="text-lg font-bold text-neutral-900">ArborDesk</span>
-                    <span className="text-[10px] text-neutral-400 font-medium tracking-wide">WorkOS-Lite</span>
+                    <span className="text-lg font-bold text-theme-primary">ArborDesk</span>
+                    <span className="text-[10px] text-theme-muted font-medium tracking-wide">WorkOS-Lite</span>
                 </div>
             </div>
 
@@ -95,9 +95,9 @@ export function Sidebar() {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-neutral-100">
+            <div className="p-4 border-t border-theme-border">
                 <NavItem
-                    href="/settings/data"
+                    href="/settings"
                     label="Settings"
                     icon={<Cog6ToothIcon className="w-5 h-5" />}
                     active={pathname.startsWith("/settings")}
