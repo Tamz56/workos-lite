@@ -107,7 +107,9 @@ export default function ProjectDetailClient() {
     if (!project) return <PageShell><div className="p-20 text-center text-red-500 font-bold">Project &quot;{slug}&quot; not found.</div></PageShell>;
 
     const milestones = items.filter(i => i.is_milestone === 1);
-    const otherItems = items.filter(i => i.is_milestone === 0);
+    const otherItems = items
+        .filter(i => i.is_milestone === 0)
+        .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }));
 
     return (
         <PageShell>
