@@ -11,7 +11,12 @@ import {
 import { toErrorMessage } from "../lib/error";
 import type { Attachment } from "../lib/types";
 import ConfirmDialog from "./ConfirmDialog";
-import { MAX_UPLOAD_BYTES, ALLOWED_EXTENSIONS, getFileExtLower } from "../lib/uploadRules";
+import {
+    ALLOWED_EXTENSIONS_LABEL,
+    ATTACHMENT_ACCEPT,
+    MAX_UPLOAD_BYTES,
+    isAllowedAttachmentFile,
+} from "../lib/uploadRules";
 import { Paperclip, FileText, Download, Eye, File } from "lucide-react";
 
 type Props = {
@@ -62,9 +67,8 @@ export default function AttachmentsPanel({ kind, entityId, onCountChange }: Prop
             return;
         }
 
-        const ext = getFileExtLower(file.name);
-        if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
-            setErrorMsg(`File type not allowed. Allowed: ${Array.from(ALLOWED_EXTENSIONS).join(", ")}`);
+        if (!isAllowedAttachmentFile(file)) {
+            setErrorMsg(`File type not allowed. Allowed: ${ALLOWED_EXTENSIONS_LABEL}`);
             e.target.value = "";
             return;
         }
@@ -129,7 +133,7 @@ export default function AttachmentsPanel({ kind, entityId, onCountChange }: Prop
                      <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-neutral-200 text-[10px] font-black uppercase tracking-widest hover:border-neutral-900 transition-all shadow-sm active:scale-95">
                         <Paperclip className="w-3 h-3" />
                          Attach File
-                        <input type="file" onChange={handleUpload} disabled={uploading} className="hidden" />
+                        <input type="file" accept={ATTACHMENT_ACCEPT} onChange={handleUpload} disabled={uploading} className="hidden" />
                      </label>
                 </div>
             </div>

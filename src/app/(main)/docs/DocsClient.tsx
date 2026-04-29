@@ -179,7 +179,7 @@ export default function DocsClient() {
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
                         placeholder="Search notes, knowledge, and documents..."
-                        className="w-full bg-white border border-neutral-200 rounded-3xl pl-12 pr-4 py-4 text-base focus:border-neutral-400 focus:outline-none transition-all shadow-sm focus:shadow-md"
+                        className="w-full bg-theme-card border border-neutral-200 rounded-3xl pl-12 pr-4 py-4 text-base focus:border-neutral-400 focus:outline-none transition-all shadow-sm focus:shadow-md"
                     />
                     <FileText className="absolute left-4 top-4.5 w-5 h-5 text-neutral-400 group-focus-within:text-neutral-600 transition-colors" />
                 </div>
@@ -288,7 +288,7 @@ function DocCard({ doc, onClick, onDelete }: { doc: DocRow, onClick: () => void,
     return (
         <div 
             onClick={onClick}
-            className="group bg-white border border-neutral-200 rounded-3xl p-5 hover:shadow-xl hover:border-neutral-300 transition-all cursor-pointer flex flex-col justify-between min-h-[140px]"
+            className="group bg-theme-card border border-neutral-200 rounded-3xl p-5 hover:shadow-xl hover:border-neutral-300 transition-all cursor-pointer flex flex-col justify-between min-h-[140px]"
         >
             <div>
                 <div className="flex justify-between items-start">
@@ -325,7 +325,7 @@ function DocListItem({ doc, onClick }: { doc: DocRow, onClick: () => void }) {
     return (
         <div 
             onClick={onClick}
-            className="group bg-white border border-neutral-200 rounded-2xl px-6 py-4 flex items-center justify-between hover:border-neutral-400 transition-all cursor-pointer hover:shadow-sm"
+            className="group bg-theme-card border border-neutral-200 rounded-2xl px-6 py-4 flex items-center justify-between hover:border-neutral-400 transition-all cursor-pointer hover:shadow-sm"
         >
             <div className="flex items-center gap-4 flex-1 truncate">
                 <FileText className="w-4 h-4 text-neutral-400 group-hover:text-neutral-900" />

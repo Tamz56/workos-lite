@@ -87,7 +87,7 @@ export default function TaskRow({
     const rowClass = isSelected ? "bg-blue-50/40 border-blue-100 z-10" : 
                     isHighlighted ? "bg-blue-50 border-blue-200 z-10" : 
                     activeNextStep ? "bg-amber-50/40 border-amber-100/50" : 
-                    "bg-white border-neutral-100";
+                    "bg-theme-card border-neutral-100";
 
     // Metadata Parsing
     const cleanTitle = cleanTaskTitle(task.title);
@@ -103,7 +103,7 @@ export default function TaskRow({
                 onClick={onClick}
                 onMouseEnter={() => prefetchTaskDetail(task.id)}
                 className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-1.5 px-4 border-b hover:bg-indigo-50/30 transition-all duration-300 cursor-pointer ${
-                    isSelected ? "bg-indigo-50/50 border-blue-100 ring-1 ring-blue-500/20 shadow-md z-10" : "bg-white border-neutral-100"
+                    isSelected ? "bg-indigo-50/50 border-blue-100 ring-1 ring-blue-500/20 shadow-md z-10" : "bg-theme-card border-neutral-100"
                 } ${isDone ? "opacity-60" : ""} ${dimmingClass}`}
             >
                 {/* Column 1: Task Name & Topic Cue */}

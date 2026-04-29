@@ -168,7 +168,7 @@ function fmtTimeLocal(iso: string) {
 
 function Card(props: { title: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
     return (
-        <div className={`rounded-2xl border border-neutral-200/70 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col ${props.className || ""}`}>
+        <div className={`rounded-2xl border border-neutral-200/70 bg-theme-card p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col ${props.className || ""}`}>
             <div className="mb-4 flex items-center justify-between gap-3 border-b border-neutral-50 pb-2 flex-none">
                 <div className="text-sm font-semibold text-neutral-900 uppercase tracking-wide">{props.title}</div>
                 {props.right}
@@ -317,7 +317,7 @@ function AgendaCardBig(props: { events: CalendarEvent[]; className?: string; tod
 
     return (
         <Card title="Agenda" className={`flex flex-col ${props.className || ""}`} right={
-            <div className="flex items-center gap-1 bg-neutral-50 p-1 rounded-lg">
+            <div className="flex items-center gap-1 bg-theme-panel p-1 rounded-lg">
                 {(["today", "tomorrow", "upcoming"] as const).map(mode => (
                     <button
                         key={mode}
@@ -1218,7 +1218,7 @@ function DashboardContent() {
                     <ProjectHealthGrid projects={analytics?.projects || []} loading={loading && !analytics} />
                 </div>
                 <div className="col-span-12 xl:col-span-4">
-                    <Card title="System Status" className="bg-neutral-50/50 h-full flex flex-col">
+                    <Card title="System Status" className="bg-theme-panel h-full flex flex-col">
                         <div className="flex items-center gap-3 mb-4">
                             <div className={`w-3 h-3 rounded-full ${health?.ok ? 'bg-green-500' : 'bg-red-500'}`} />
                             <div className="font-bold text-neutral-700">{health?.status || "Checking..."}</div>

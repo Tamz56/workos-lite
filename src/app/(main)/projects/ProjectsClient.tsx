@@ -119,13 +119,13 @@ export default function ProjectsClient() {
 
             <div className="max-w-6xl mx-auto space-y-8">
                 {/* Search & Filter Bar */}
-                <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm">
+                <div className="flex flex-col md:flex-row gap-4 items-center bg-theme-panel p-4 rounded-2xl border border-neutral-200 shadow-sm">
                     <div className="relative flex-1 w-full">
                         <Search className="absolute left-4 top-3 h-5 w-5 text-neutral-400" />
                         <input
                             type="text"
                             placeholder="Search projects..."
-                            className="w-full pl-12 pr-4 py-3 bg-neutral-50 border-transparent focus:bg-white focus:border-neutral-200 rounded-xl text-base transition-all outline-none font-medium"
+                            className="w-full pl-12 pr-4 py-3 bg-theme-card border-transparent focus:bg-white focus:border-neutral-200 rounded-xl text-base transition-all outline-none font-medium"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
@@ -146,9 +146,9 @@ export default function ProjectsClient() {
                 </div>
 
                 {loading ? (
-                    <div className="text-center py-20 bg-white rounded-3xl border border-neutral-100 italic text-neutral-400 font-medium">Loading projects...</div>
+                    <div className="text-center py-20 bg-theme-card rounded-3xl border border-neutral-100 italic text-neutral-400 font-medium">Loading projects...</div>
                 ) : filteredProjects.length === 0 ? (
-                    <div className="text-center py-24 border border-dashed border-neutral-200 rounded-[2.5rem] bg-white flex flex-col items-center justify-center">
+                    <div className="text-center py-24 border border-dashed border-neutral-200 rounded-[2.5rem] bg-theme-card flex flex-col items-center justify-center">
                         <div className="w-16 h-16 bg-neutral-100 rounded-3xl flex items-center justify-center text-neutral-400 mb-4">
                             <Layout className="w-8 h-8" />
                         </div>
@@ -169,7 +169,7 @@ export default function ProjectsClient() {
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                         {filteredProjects.map(project => (
-                            <div key={project.id} className="group relative bg-white border border-neutral-200 rounded-[32px] p-6 hover:shadow-2xl hover:shadow-neutral-200 transition-all hover:border-neutral-300 flex flex-col h-full active:scale-[0.98]">
+                            <div key={project.id} className="group relative bg-theme-card border border-neutral-200 rounded-[32px] p-6 hover:shadow-2xl hover:shadow-neutral-200 transition-all hover:border-neutral-300 flex flex-col h-full active:scale-[0.98]">
                                 <div className="flex justify-between items-start mb-4">
                                     <Link href={`/projects/${project.slug}`} className="flex-1">
                                         <h2 className="font-black text-xl text-neutral-900 group-hover:text-black transition-colors leading-tight tracking-tight">{project.name}</h2>

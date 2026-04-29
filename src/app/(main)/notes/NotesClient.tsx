@@ -96,14 +96,14 @@ export default function KnowledgeClient() {
                         placeholder="Search notes by title or content..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white border border-neutral-200 rounded-2xl pl-12 pr-4 py-3.5 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-4 focus:ring-neutral-100 focus:border-neutral-300 transition-all"
+                        className="w-full bg-theme-card border border-neutral-200 rounded-2xl pl-12 pr-4 py-3.5 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-4 focus:ring-neutral-100 focus:border-neutral-300 transition-all"
                     />
                 </div>
 
                 {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[1, 2, 3].map(i => (
-                            <div key={i} className="h-48 bg-neutral-50 animate-pulse rounded-3xl border border-neutral-100" />
+                            <div key={i} className="h-48 bg-theme-panel animate-pulse rounded-3xl border border-neutral-100" />
                         ))}
                     </div>
                 ) : filteredNotes.length > 0 ? (
@@ -117,7 +117,7 @@ export default function KnowledgeClient() {
                         ))}
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-24 text-center space-y-4 border-2 border-dashed border-neutral-100 rounded-[2.5rem] bg-neutral-50/30">
+                    <div className="flex flex-col items-center justify-center py-24 text-center space-y-4 border-2 border-dashed border-neutral-100 rounded-[2.5rem] bg-theme-panel">
                         <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center shadow-sm border border-neutral-100 text-neutral-300">
                             <FileText className="w-8 h-8" />
                         </div>
@@ -146,7 +146,7 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
     return (
         <div 
             onClick={onClick}
-            className="group bg-white border border-neutral-200 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-neutral-200/50 hover:border-neutral-300 transition-all cursor-pointer flex flex-col justify-between min-h-[220px] relative overflow-hidden"
+            className="group bg-theme-card border border-neutral-200 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-neutral-200/50 hover:border-neutral-300 transition-all cursor-pointer flex flex-col justify-between min-h-[220px] relative overflow-hidden"
         >
             <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="p-2 bg-neutral-50 rounded-xl hover:bg-neutral-100">

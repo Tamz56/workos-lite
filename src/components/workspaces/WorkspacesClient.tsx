@@ -71,9 +71,9 @@ export default function WorkspacesClient() {
     };
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-50/50">
+        <div className="flex h-screen flex-col overflow-hidden bg-theme-app">
             {/* RC44C: Overview Header */}
-            <div className="px-8 py-6 bg-white border-b border-neutral-200 flex items-center justify-between shadow-sm z-10">
+            <div className="px-8 py-6 bg-theme-panel border-b border-neutral-200 flex items-center justify-between shadow-sm z-10">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shadow-lg shadow-black/10">
                         <LayoutGrid size={20} />
@@ -137,7 +137,7 @@ export default function WorkspacesClient() {
                             <p className="text-2xl font-black text-neutral-900 tracking-tight">เลือกพื้นที่ต้องการจัดการ</p>
                         </div>
                         <div className="text-right hidden sm:block">
-                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest bg-neutral-100 px-2 py-1 rounded-md">
+                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest bg-theme-panel px-2 py-1 rounded-md">
                                 {WORKSPACES_LIST.length} พื้นที่ทั้งหมด
                             </span>
                         </div>
@@ -154,11 +154,11 @@ export default function WorkspacesClient() {
                                 <button
                                     key={ws.id}
                                     onClick={() => router.push(`/workspaces/${ws.id}`)}
-                                    className="group relative bg-white border border-neutral-200 rounded-3xl p-6 text-left transition-all duration-300 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 flex flex-col h-full"
+                                    className="group relative bg-theme-card border border-neutral-200 rounded-3xl p-6 text-left transition-all duration-300 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 flex flex-col h-full"
                                 >
                                     <div className="flex items-start justify-between mb-4">
                                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg shadow-sm border border-neutral-100 transition-colors ${
-                                            ws.id === resumeData?.id ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-neutral-50 text-neutral-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100'
+                                            ws.id === resumeData?.id ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-theme-panel text-neutral-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100'
                                         }`}>
                                             {ws.label[0]}
                                         </div>
@@ -182,13 +182,13 @@ export default function WorkspacesClient() {
                                         <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-4 opacity-70">Type: {ws.type}</p>
                                         
                                         <div className="flex flex-wrap gap-3">
-                                            <div className="flex items-center gap-1.5 bg-neutral-50 px-2 py-1 rounded-lg border border-neutral-100 group-hover:bg-white group-hover:border-indigo-100 transition-colors">
+                                            <div className="flex items-center gap-1.5 bg-theme-panel px-2 py-1 rounded-lg border border-neutral-100 group-hover:bg-theme-card group-hover:border-indigo-100 transition-colors">
                                                 <Circle size={12} className={hasTasks ? "text-amber-500 fill-amber-500" : "text-neutral-300"} />
                                                 <span className="text-[11px] font-black text-neutral-600">
                                                     {loadingTasks ? "..." : stats.todo} <span className="font-medium text-neutral-400 ml-0.5">ค้างอยู่</span>
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-1.5 bg-neutral-50 px-2 py-1 rounded-lg border border-neutral-100 group-hover:bg-white group-hover:border-indigo-100 transition-colors">
+                                            <div className="flex items-center gap-1.5 bg-theme-panel px-2 py-1 rounded-lg border border-neutral-100 group-hover:bg-theme-card group-hover:border-indigo-100 transition-colors">
                                                 <CheckCircle2 size={12} className={stats.done > 0 ? "text-green-500" : "text-neutral-300"} />
                                                 <span className="text-[11px] font-black text-neutral-600">
                                                     {loadingTasks ? "..." : stats.done} <span className="font-medium text-neutral-400 ml-0.5">เสร็จแล้ว</span>

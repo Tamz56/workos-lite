@@ -151,13 +151,13 @@ export default function TodayClient() {
                         setIsAdding(false);
                     }
                 }}
-                className="flex gap-2 bg-white p-3 rounded-2xl border border-neutral-200 shadow-sm focus-within:border-neutral-400 transition-all"
+                className="flex gap-2 bg-theme-panel p-3 rounded-2xl border border-neutral-200 shadow-sm focus-within:border-neutral-400 transition-all"
             >
                 <div className="flex-1 relative">
                     <input
                         type="text"
                         placeholder="What's the main thing today?"
-                        className="w-full pl-10 pr-4 py-3 bg-neutral-50/50 border-transparent focus:bg-white rounded-xl text-base transition-all outline-none font-medium"
+                        className="w-full pl-10 pr-4 py-3 bg-theme-card border-transparent focus:bg-white rounded-xl text-base transition-all outline-none font-medium"
                         value={inlineTitle}
                         onChange={(e) => setInlineTitle(e.target.value)}
                         disabled={isAdding}
@@ -302,8 +302,8 @@ export default function TodayClient() {
                 {buckets.map((b) => {
                     const rows = grouped.get(b.key) ?? [];
                     return (
-                        <section key={b.key} className="rounded-3xl border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-all flex flex-col h-full overflow-hidden">
-                            <div className="border-b border-neutral-100 px-5 py-4 bg-neutral-50/50">
+                        <section key={b.key} className="rounded-3xl border border-neutral-200 bg-theme-card shadow-sm hover:shadow-md transition-all flex flex-col h-full overflow-hidden">
+                            <div className="border-b border-neutral-100 px-5 py-4 bg-theme-panel">
                                 <div className="text-xs font-black text-neutral-900 uppercase tracking-widest">{b.label}</div>
                                 <div className="text-[10px] font-bold text-neutral-400 mt-0.5">{loading ? "..." : `${rows.length} tasks`}</div>
                             </div>

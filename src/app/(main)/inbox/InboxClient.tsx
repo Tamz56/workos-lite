@@ -246,14 +246,14 @@ export default function InboxClient() {
 
             <div className="max-w-5xl mx-auto space-y-6 pt-6">
                 {/* Quick Add Section */}
-                <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-4">
+                <div className="bg-theme-panel p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-4">
                     <div className="flex gap-2">
                         <div className="flex-1 relative">
                             <input
                                 ref={inputRef}
                                 type="text"
                                 placeholder="Quick add to inbox..."
-                                className="w-full pl-10 pr-4 py-3 bg-neutral-50 border-transparent focus:bg-white focus:border-neutral-200 rounded-xl text-base transition-all outline-none font-medium"
+                                className="w-full pl-10 pr-4 py-3 bg-theme-card border-transparent focus:bg-white focus:border-neutral-200 rounded-xl text-base transition-all outline-none font-medium"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 onKeyDown={(e) => e.key === "Enter" && add()}
@@ -327,8 +327,8 @@ export default function InboxClient() {
                 )}
 
                 {/* Inbox List */}
-                <div className="bg-white border border-neutral-200 rounded-3xl overflow-hidden shadow-sm">
-                    <div className="bg-neutral-50 border-b border-neutral-100 px-6 py-4 flex items-center justify-between">
+                <div className="bg-theme-card border border-neutral-200 rounded-3xl overflow-hidden shadow-sm">
+                    <div className="bg-theme-panel border-b border-neutral-100 px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <input
                                 type="checkbox"

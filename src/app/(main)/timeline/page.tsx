@@ -65,7 +65,7 @@ const TimelineTaskCard = React.memo(({ task, onClick, isDragging }: { task: Task
             {...listeners}
             {...attributes}
             onClick={() => onClick(task.id)}
-            className="text-left w-full group flex flex-col gap-2 p-3 bg-white border border-neutral-200 rounded-lg shadow-sm hover:shadow hover:border-blue-300 cursor-grab active:cursor-grabbing transition-all overflow-hidden"
+            className="text-left w-full group flex flex-col gap-2 p-3 bg-theme-card border border-neutral-200 rounded-lg shadow-sm hover:shadow hover:border-blue-300 cursor-grab active:cursor-grabbing transition-all overflow-hidden"
         >
             <div className="font-semibold text-sm text-neutral-900 leading-tight group-hover:text-blue-600 transition-colors pointer-events-none">
                 {task.title}
@@ -102,9 +102,9 @@ const TimelineDayColumn = React.memo(({ dateStr, dayName, dayNum, monthName, isT
     return (
         <div 
             ref={setNodeRef}
-            className={`flex-1 min-w-[280px] flex flex-col transition-colors ${isOver ? 'bg-blue-100/50' : isToday ? 'bg-blue-50/30' : 'bg-white'}`}
+            className={`flex-1 min-w-[280px] flex flex-col transition-colors ${isOver ? 'bg-blue-100/50' : isToday ? 'bg-blue-50/30' : 'bg-theme-card'}`}
         >
-            <div className={`p-3 border-b border-neutral-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-sm z-10 ${isToday ? 'bg-blue-50/80 shadow-sm border-blue-100' : ''}`}>
+            <div className={`p-3 border-b border-neutral-100 flex items-center justify-between sticky top-0 bg-theme-card/80 backdrop-blur-sm z-10 ${isToday ? 'bg-blue-50/80 shadow-sm border-blue-100' : ''}`}>
                 <div className="flex flex-col">
                     <span className={`text-[10px] font-black uppercase tracking-widest ${isToday ? 'text-blue-600' : 'text-neutral-400'}`}>{dayName}</span>
                     <span className={`font-bold text-sm ${isToday ? 'text-blue-900' : 'text-neutral-900'}`}>{dayNum} {monthName}</span>
@@ -210,7 +210,7 @@ export default function TimelinePage() {
     const headerTitle = `${formatter.format(weekDays[0])} - ${formatter.format(weekDays[6])}`;
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-theme-app">
             <div className="p-4 sm:p-6 max-w-[1600px] mx-auto w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                     <div>
@@ -218,7 +218,7 @@ export default function TimelinePage() {
                         <p className="text-sm font-medium text-neutral-500 mt-1">{headerTitle}</p>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-neutral-50 p-1.5 rounded-lg border border-neutral-200 shadow-sm">
+                    <div className="flex items-center gap-2 bg-theme-panel p-1.5 rounded-lg border border-neutral-200 shadow-sm">
                         <button onClick={handlePrev} className="p-1.5 hover:bg-neutral-200 rounded-md transition text-neutral-600">
                             <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -237,7 +237,7 @@ export default function TimelinePage() {
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >
-                    <div className="flex-1 flex overflow-hidden border border-neutral-200 rounded-xl bg-neutral-50/50 shadow-sm">
+                    <div className="flex-1 flex overflow-hidden border border-neutral-200 rounded-xl bg-theme-panel shadow-sm">
                         {/* Desktop Horizontal View */}
                         <div className="hidden md:flex flex-1 overflow-x-auto divide-x divide-neutral-200">
                             {weekDays.map((date, i) => {
@@ -262,7 +262,7 @@ export default function TimelinePage() {
                         </div>
 
                         {/* Mobile Agenda View (DND disabled for simple RC7B v1) */}
-                        <div className="md:hidden flex-1 overflow-y-auto custom-scrollbar bg-neutral-50 p-4">
+                        <div className="md:hidden flex-1 overflow-y-auto custom-scrollbar bg-theme-panel p-4">
                             {weekDays.map(date => {
                                 const dateStr = toYYYYMMDD(date);
                                 const dayTasks = tasks.filter(t => t.scheduled_date === dateStr).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -271,7 +271,7 @@ export default function TimelinePage() {
 
                                 return (
                                     <div key={dateStr} className="mb-6 last:mb-0 relative">
-                                        <div className="flex items-center gap-4 mb-3 sticky top-0 bg-neutral-50 p-1 z-10">
+                                        <div className="flex items-center gap-4 mb-3 sticky top-0 bg-theme-panel p-1 z-10">
                                             <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl shrink-0 border shadow-sm ${isToday ? 'bg-blue-600 border-blue-700 text-white' : 'bg-white border-neutral-200 text-neutral-600'}`}>
                                                 <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{date.toLocaleString('default', { weekday: 'short' })}</span>
                                                 <span className="text-lg font-bold leading-none mt-0.5">{date.getDate()}</span>
@@ -283,7 +283,7 @@ export default function TimelinePage() {
                                                 <button
                                                     key={task.id}
                                                     onClick={() => openTask(task.id)}
-                                                    className="text-left w-full group flex flex-col gap-2 p-3.5 bg-white border border-neutral-200 rounded-xl shadow-sm hover:border-neutral-300 active:scale-[0.98] transition-all"
+                                                    className="text-left w-full group flex flex-col gap-2 p-3.5 bg-theme-card border border-neutral-200 rounded-xl shadow-sm hover:border-neutral-300 active:scale-[0.98] transition-all"
                                                 >
                                                     <div className="font-semibold text-sm text-neutral-900 leading-snug">
                                                         {task.title}
@@ -306,7 +306,7 @@ export default function TimelinePage() {
                                 );
                             })}
                             {tasks.length === 0 && (
-                                <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-white border border-neutral-200 border-dashed rounded-xl">
+                                <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-theme-card border border-neutral-200 border-dashed rounded-xl">
                                     <CalendarIcon className="w-8 h-8 text-neutral-300 mb-3" />
                                     <div className="text-neutral-900 font-semibold mb-1">No scheduled tasks</div>
                                     <div className="text-neutral-500 text-sm">There are no tasks explicitly dated for this week.</div>
@@ -317,7 +317,7 @@ export default function TimelinePage() {
 
                     <DragOverlay>
                         {activeTask ? (
-                            <div className="bg-white p-3 rounded-lg shadow-2xl border-2 border-blue-500 rotate-1 w-64 pointer-events-none opacity-90 scale-105 transition-transform">
+                            <div className="bg-theme-card p-3 rounded-lg shadow-2xl border-2 border-blue-500 rotate-1 w-64 pointer-events-none opacity-90 scale-105 transition-transform">
                                 <div className="font-semibold text-sm text-neutral-900 leading-tight">
                                     {activeTask.title}
                                 </div>

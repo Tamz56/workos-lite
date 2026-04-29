@@ -854,7 +854,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     if (!ws) return null;
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-50/50">
+        <div className="flex h-screen flex-col overflow-hidden bg-theme-app">
             <AreasToolbar
                 title={ws.label}
                 state={state}
@@ -874,7 +874,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 onToggleFocusMode={toggleFocusMode}
             />
 
-            <div className={`bg-white border-b border-neutral-100 flex flex-col md:flex-row items-stretch md:items-center justify-between z-20 shadow-sm transition-all duration-300 ${isFocusMode ? 'py-1 opacity-90' : 'py-2 md:py-3'}`}>
+            <div className={`bg-theme-panel border-b border-neutral-100 flex flex-col md:flex-row items-stretch md:items-center justify-between z-20 shadow-sm transition-all duration-300 ${isFocusMode ? 'py-1 opacity-90' : 'py-2 md:py-3'}`}>
                 <div className="flex items-center gap-2 px-6 border-b md:border-b-0 md:border-r border-neutral-100 py-2 md:py-0">
                     <button onClick={() => router.push('/workspaces')} className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-400 hover:text-neutral-600 transition-colors">
                         <LayoutGrid size={18} />
@@ -936,8 +936,8 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         <LucideIcons.RotateCcw size={14} />
                     </button>
 
-                    <div className="flex-1 flex items-center gap-3 bg-neutral-50/80 px-4 py-2 rounded-2xl border border-neutral-100/50 max-w-lg overflow-hidden group hover:bg-white hover:border-neutral-200 transition-all cursor-default shadow-sm hover:shadow-md">
-                        <div className="p-1.5 bg-white rounded-xl shadow-sm border border-neutral-100 text-neutral-400 group-hover:text-black transition-colors shrink-0">
+                    <div className="flex-1 flex items-center gap-3 bg-theme-card px-4 py-2 rounded-2xl border border-neutral-100/50 max-w-lg overflow-hidden group hover:bg-theme-card hover:border-neutral-200 transition-all cursor-default shadow-sm hover:shadow-md">
+                        <div className="p-1.5 bg-theme-panel rounded-xl shadow-sm border border-neutral-100 text-neutral-400 group-hover:text-black transition-colors shrink-0">
                             <ArrowRight size={14} />
                         </div>
                         
@@ -951,7 +951,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                                     }`}>
                                         {headerTaskResult.confidence}
                                     </span>
-                                    <span className="text-[10px] font-bold text-neutral-400 truncate italic bg-white/50 px-1.5 rounded-md">
+                                    <span className="text-[10px] font-bold text-neutral-400 truncate italic bg-theme-panel/70 px-1.5 rounded-md">
                                         {headerTaskResult.explanation}
                                     </span>
                                     {headerTaskResult.nudgeReason && (
@@ -987,7 +987,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
                         {headerTask && (
                             <div className="flex items-center gap-1.5 ml-2 border-l border-neutral-100 pl-3">
-                                <div className="flex items-center bg-white/50 rounded-lg border border-neutral-100/50 p-0.5 shadow-sm">
+                                <div className="flex items-center bg-theme-panel/70 rounded-lg border border-neutral-100/50 p-0.5 shadow-sm">
                                     <button onClick={() => { handleFeedback(headerTask.id, 'good'); setToast({ isVisible: true, message: "🙌 ขอบคุณครับ ทีมงานจะแนะนำงานแบบนี้ให้บ่อยขึ้น" }); }} className={`p-1.5 rounded-md transition-all hover:bg-green-50 hover:text-green-600 ${feedback[headerTask.id] === 'good' ? 'text-green-600 bg-green-50' : 'text-neutral-300'}`}>
                                         <LucideIcons.ThumbsUp size={12} />
                                     </button>

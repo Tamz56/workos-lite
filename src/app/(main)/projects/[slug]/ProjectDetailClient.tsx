@@ -165,7 +165,7 @@ export default function ProjectDetailClient() {
 
             <div className="max-w-5xl mx-auto space-y-10 mt-8">
                 {/* Project Items Form */}
-                <div className="bg-white p-4 rounded-3xl border border-neutral-200 shadow-sm focus-within:shadow-md transition-shadow">
+                <div className="bg-theme-panel p-4 rounded-3xl border border-neutral-200 shadow-sm focus-within:shadow-md transition-shadow">
                     <form onSubmit={handleAddItem} className="flex gap-2">
                         <div className="flex-1 relative">
                             <input
@@ -173,7 +173,7 @@ export default function ProjectDetailClient() {
                                 value={newItemTitle}
                                 onChange={e => setNewItemTitle(e.target.value)}
                                 placeholder="Add a project deliverable or item..."
-                                className="w-full pl-10 pr-4 py-3 bg-neutral-50 border-transparent focus:bg-white focus:border-neutral-200 rounded-2xl text-base transition-all outline-none font-medium"
+                                className="w-full pl-10 pr-4 py-3 bg-theme-card border-transparent focus:bg-white focus:border-neutral-200 rounded-2xl text-base transition-all outline-none font-medium"
                             />
                             <Plus className="absolute left-3.5 top-3.5 h-5 w-5 text-neutral-400" />
                         </div>
@@ -270,7 +270,7 @@ export default function ProjectDetailClient() {
 
 function ItemCard({ item }: { item: ProjectItem }) {
     return (
-        <div className="bg-white border border-neutral-200 rounded-3xl p-5 flex justify-between items-center hover:shadow-xl hover:border-neutral-300 transition-all group active:scale-[0.99] cursor-default">
+        <div className="bg-theme-card border border-neutral-200 rounded-3xl p-5 flex justify-between items-center hover:shadow-xl hover:border-neutral-300 transition-all group active:scale-[0.99] cursor-default">
             <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${
                     item.status === 'done' ? 'bg-green-100 text-green-600' : 'bg-neutral-50 text-neutral-400 group-hover:bg-neutral-900 group-hover:text-white'
@@ -384,7 +384,7 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
                         <div 
                             key={note.id} 
                             onClick={() => router.push(`/docs/${note.id}`)}
-                            className="bg-white border border-neutral-200 rounded-2xl p-4 hover:border-neutral-900 transition-all group cursor-pointer shadow-sm hover:shadow-md active:scale-[0.98]"
+                            className="bg-theme-card border border-neutral-200 rounded-2xl p-4 hover:border-neutral-900 transition-all group cursor-pointer shadow-sm hover:shadow-md active:scale-[0.98]"
                         >
                             <div className="font-bold text-neutral-900 line-clamp-1 group-hover:text-black">{note.title || "Untitled"}</div>
                             <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest mt-1">

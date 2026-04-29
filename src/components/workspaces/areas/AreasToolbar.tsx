@@ -19,14 +19,14 @@ export default function AreasToolbar({
     isFocusMode = false, onToggleFocusMode 
 }: AreasToolbarProps) {
     return (
-        <div className="px-6 py-4 bg-white border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm z-10 shrink-0">
+        <div className="px-6 py-4 bg-theme-panel border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm z-10 shrink-0">
             {/* Left: Title & Search */}
             <div className="flex items-center gap-6 flex-1 max-w-2xl">
                 <h1 className="text-xl font-bold text-neutral-900 shrink-0 capitalize">{title}</h1>
                 <div className="relative flex-1 w-full max-w-sm hidden sm:block">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <input
-                        className="w-full bg-neutral-100/50 border border-neutral-200 text-sm rounded-lg pl-9 pr-3 py-1.5 focus:ring-black focus:border-black focus:bg-white transition-colors"
+                        className="w-full bg-theme-card border border-neutral-200 text-sm rounded-lg pl-9 pr-3 py-1.5 focus:ring-black focus:border-black focus:bg-white transition-colors"
                         placeholder="Search tasks..."
                         value={state.search}
                         onChange={e => updateState({ search: e.target.value })}
@@ -39,7 +39,7 @@ export default function AreasToolbar({
                 {onNewList && (
                     <button
                         onClick={onNewList}
-                        className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-200 transition-colors"
+                    className="bg-theme-card text-neutral-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-200 transition-colors"
                     >
                         New List
                     </button>
@@ -62,7 +62,7 @@ export default function AreasToolbar({
                     className={`p-2 rounded-lg transition-all duration-300 flex items-center gap-2 font-bold text-xs ${
                         state.isFlowMode 
                             ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 ring-2 ring-amber-200' 
-                            : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'
+                            : 'bg-theme-card text-neutral-500 hover:bg-neutral-200'
                     }`}
                     title={state.isFlowMode ? "ปิดโหมด Flow" : "เปิดโหมด Flow (Simplified Flow)"}
                 >
@@ -83,7 +83,7 @@ export default function AreasToolbar({
             <div className="relative w-full sm:hidden">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 <input
-                    className="w-full bg-neutral-100/50 border border-neutral-200 text-sm rounded-lg pl-9 pr-3 py-2"
+                    className="w-full bg-theme-card border border-neutral-200 text-sm rounded-lg pl-9 pr-3 py-2"
                     placeholder="Search tasks..."
                     value={state.search}
                     onChange={e => updateState({ search: e.target.value })}

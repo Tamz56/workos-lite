@@ -7,8 +7,8 @@ import path from "path";
 import fs from "fs/promises";
 import { ALLOWED_EXTENSIONS_LABEL, MAX_UPLOAD_BYTES, isAllowedAttachmentFile } from "@/lib/uploadRules";
 
-function uploadDir(taskId: string) {
-    return path.join(process.cwd(), "data", "uploads", "tasks", taskId);
+function uploadDir(docId: string) {
+    return path.join(process.cwd(), "data", "uploads", "docs", docId);
 }
 
 async function ensureDir(p: string) {
@@ -16,27 +16,27 @@ async function ensureDir(p: string) {
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const { id: taskId } = await params;
+    const { id: docId } = await params;
 
     const rows = db
         .prepare(
             `
       SELECT *
       FROM attachments
-      WHERE task_id = ?
+      WHERE doc_id = ?
       ORDER BY datetime(created_at) DESC
       `
         )
-        .all(taskId);
+        .all(docId);
 
     return NextResponse.json({ attachments: rows });
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const { id: taskId } = await params;
+    const { id: docId } = await params;
 
-    const task = db.prepare("SELECT id FROM tasks WHERE id = ?").get(taskId);
-    if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    const doc = db.prepare("SELECT id FROM docs WHERE id = ?").get(docId);
+    if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
 
     const form = await req.formData();
     const file = form.get("file");
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const id = nanoid();
     const now = new Date().toISOString();
 
-    const dir = uploadDir(taskId);
+    const dir = uploadDir(docId);
     await ensureDir(dir);
 
     // store with safe name: <id>_<original>
@@ -68,16 +68,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await fs.writeFile(absPath, buf);
 
     // Store RELATIVE path in DB
-    const relativePath = path.join("uploads", "tasks", taskId, storedName);
+    const relativePath = path.join("uploads", "docs", docId, storedName);
 
     db.prepare(
         `
     INSERT INTO attachments (id, task_id, doc_id, file_name, mime_type, size_bytes, storage_path, created_at)
-    VALUES (@id, @task_id, NULL, @file_name, @mime_type, @size_bytes, @storage_path, @created_at)
+    VALUES (@id, @task_id, @doc_id, @file_name, @mime_type, @size_bytes, @storage_path, @created_at)
     `
     ).run({
         id,
-        task_id: taskId,
+        task_id: null,
+        doc_id: docId,
         file_name: originalName,
         mime_type: file.type || null,
         size_bytes: buf.length,

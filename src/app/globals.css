@@ -5,11 +5,11 @@
   --foreground: #171717;
 
   /* Theme Tokens - Light (Default) */
-  --theme-sidebar-bg: #0F172A; /* Keep sidebar dark even in light mode for identity */
-  --theme-topbar-bg: #FFFFFF;
-  --theme-app-bg: #F8F9FA;
-  --theme-panel-bg: #FFFFFF;
-  --theme-card-bg: #FFFFFF;
+  --theme-sidebar-bg: #0B0C0F;
+  --theme-topbar-bg: #0B0C0F;
+  --theme-app-bg: #F1F0EC;
+  --theme-panel-bg: #F6F4EF;
+  --theme-card-bg: #FAF9F6;
   --theme-card-elevated: #FFFFFF;
   --theme-border: #E5E7EB;
   --theme-border-subtle: #F3F4F6;
@@ -275,6 +275,14 @@
   
   --shadow-theme-soft: var(--theme-shadow-soft);
   --shadow-theme-elevated: var(--theme-shadow-elevated);
+}
+
+.bg-theme-sidebar {
+  background-color: var(--theme-sidebar-bg);
+}
+
+.bg-theme-topbar {
+  background-color: var(--theme-topbar-bg);
 }
 
 body {

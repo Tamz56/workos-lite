@@ -68,7 +68,7 @@ const TaskCard = React.memo(({ task, onClick, isDragging }: TaskCardProps) => {
             {...attributes}
             {...listeners}
             onClick={() => onClick(task)}
-            className="bg-white p-3 rounded-lg shadow-sm border border-neutral-200 cursor-grab active:cursor-grabbing hover:border-blue-300 hover:shadow-md transition-all group"
+            className="bg-theme-card p-3 rounded-lg shadow-sm border border-neutral-200 cursor-grab active:cursor-grabbing hover:border-blue-300 hover:shadow-md transition-all group"
         >
             <div className="font-medium text-sm text-neutral-900 leading-snug group-hover:text-blue-700 transition-colors pointer-events-none">
                 {task.title}
@@ -110,7 +110,7 @@ const StatusColumn = React.memo(({ title, statusKey, tasks, onTaskClick }: Statu
     return (
         <div 
             ref={setNodeRef}
-            className="flex-1 bg-neutral-50 rounded-lg p-3 sm:p-4 border border-neutral-200 min-h-[500px] flex flex-col min-w-[280px]"
+            className="flex-1 bg-theme-panel rounded-lg p-3 sm:p-4 border border-neutral-200 min-h-[500px] flex flex-col min-w-[280px]"
         >
             <h3 className="font-bold text-neutral-800 mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -277,7 +277,7 @@ export default function SprintsClient() {
     if (loading) return <div className="p-6 text-sm text-neutral-500">Loading sprints...</div>;
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-theme-app">
             <div className="p-4 sm:p-6 max-w-[1600px] mx-auto w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold tracking-tight">Active Sprints Board</h1>
@@ -290,7 +290,7 @@ export default function SprintsClient() {
                 </div>
 
                 {isCreating && (
-                    <form onSubmit={handleCreateSprint} className="mb-6 bg-white p-4 rounded-lg border border-neutral-200 shadow-sm flex flex-col md:flex-row gap-4 items-end animate-in fade-in slide-in-from-top-2">
+                    <form onSubmit={handleCreateSprint} className="mb-6 bg-theme-panel p-4 rounded-lg border border-neutral-200 shadow-sm flex flex-col md:flex-row gap-4 items-end animate-in fade-in slide-in-from-top-2">
                         <div className="flex-1 w-full">
                             <label className="block text-xs font-medium text-neutral-600 mb-1">Project</label>
                             <select
@@ -335,7 +335,7 @@ export default function SprintsClient() {
                     </div>
 
                     {selectedSprint && totalTasks > 0 && (
-                        <div className="hidden sm:flex items-center gap-3 bg-neutral-50 px-4 py-2 rounded-lg border border-neutral-200">
+                        <div className="hidden sm:flex items-center gap-3 bg-theme-panel px-4 py-2 rounded-lg border border-neutral-200">
                             <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Progress</div>
                             <div className="w-32 h-2.5 bg-neutral-200 rounded-full overflow-hidden">
                                 <div 
@@ -365,7 +365,7 @@ export default function SprintsClient() {
                         </div>
                     ) : (
                         sprints.length > 0 && (
-                            <div className="flex-1 flex items-center justify-center border-2 border-dashed border-neutral-200 rounded-2xl bg-neutral-50/50">
+                            <div className="flex-1 flex items-center justify-center border-2 border-dashed border-neutral-200 rounded-2xl bg-theme-panel">
                                 <div className="text-neutral-500 text-sm font-medium">Select a sprint above to view its Kanban board.</div>
                             </div>
                         )
@@ -373,7 +373,7 @@ export default function SprintsClient() {
 
                     <DragOverlay>
                         {activeTask ? (
-                            <div className="bg-white p-3 rounded-lg shadow-xl border-2 border-blue-400 rotate-2 w-72 pointer-events-none">
+                            <div className="bg-theme-card p-3 rounded-lg shadow-xl border-2 border-blue-400 rotate-2 w-72 pointer-events-none">
                                 <div className="font-medium text-sm text-neutral-900 leading-snug">
                                     {activeTask.title}
                                 </div>

@@ -305,7 +305,7 @@ export default function AreasTaskList({
                                     
                                     {/* RC36: Table Mode Quick Add Row at top of To-Do */}
                                     {isTodoGroup && (
-                                        <div className="bg-white border-b border-neutral-100">
+                                        <div className="bg-theme-card border-b border-neutral-100">
                                             {state.isTableQuickAddOpen ? (
                                                 <QuickAddTask 
                                                     workspaceId={workspaceId}
