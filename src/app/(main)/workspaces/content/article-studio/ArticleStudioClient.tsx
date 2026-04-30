@@ -66,6 +66,100 @@ function ListField({ label, value }: { label: string; value: string[] }) {
     return <FieldRow label={label} value={value.length ? value.join(", ") : "-"} />;
 }
 
+function healthTone(status: ArticleStudioPreview["contentHealth"]["status"]) {
+    if (status === "Incomplete") return "border-red-200 bg-red-50 text-red-700";
+    if (status === "Publish Ready") return "border-green-200 bg-green-50 text-green-700";
+    if (status === "Review Needed") return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-blue-200 bg-blue-50 text-blue-700";
+}
+
+function readinessLabel(value: "ready" | "missing") {
+    return value === "ready" ? "ready" : "missing";
+}
+
+function ContentHealthCard({ health }: { health: ArticleStudioPreview["contentHealth"] }) {
+    return (
+        <section>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <h3 className="text-sm font-black text-theme-primary">Content Health</h3>
+                <span className={`w-fit rounded-md border px-2.5 py-1 text-xs font-black ${healthTone(health.status)}`}>
+                    {health.status}
+                </span>
+            </div>
+            <div className="grid gap-2 text-sm font-semibold text-theme-secondary sm:grid-cols-2">
+                <div>Required fields: {health.requiredComplete}/{health.requiredTotal}</div>
+                <div>SEO fields: {health.seoComplete}/{health.seoTotal}</div>
+                <div>Internal links: {health.internalLinksComplete}/{health.internalLinksTotal}</div>
+                <div>Visual notes: {readinessLabel(health.visualNotes)}</div>
+                <div>FAQ: {readinessLabel(health.faq)}</div>
+                <div>References: {readinessLabel(health.references)}</div>
+            </div>
+        </section>
+    );
+}
+
+function MissingFieldGroup({
+    title,
+    items,
+    emptyLabel,
+    tone,
+}: {
+    title: string;
+    items: ArticleStudioPreview["missingFieldGroups"]["required"];
+    emptyLabel: string;
+    tone: string;
+}) {
+    return (
+        <div className="border-l-2 border-theme-border pl-3">
+            <div className="mb-2 text-xs font-black uppercase tracking-wider text-theme-muted">{title}</div>
+            {items.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                    {items.map((item) => (
+                        <span key={item.field} className={`rounded-md border px-2.5 py-1 text-xs font-black ${tone}`}>
+                            {item.label}
+                        </span>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-sm font-semibold text-theme-secondary">{emptyLabel}</div>
+            )}
+        </div>
+    );
+}
+
+function MissingFieldsCard({ groups }: { groups: ArticleStudioPreview["missingFieldGroups"] }) {
+    return (
+        <section>
+            <div className="mb-3">
+                <h3 className="text-sm font-black text-theme-primary">Missing Fields</h3>
+                <p className="mt-1 text-xs font-semibold leading-5 text-theme-muted">
+                    Required blocks create package, recommended is warning, optional is informational.
+                </p>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-3">
+                <MissingFieldGroup
+                    title="Required / Blocking"
+                    items={groups.required}
+                    emptyLabel="พร้อมสร้าง"
+                    tone="border-red-200 bg-red-50 text-red-700"
+                />
+                <MissingFieldGroup
+                    title="Recommended / Warning"
+                    items={groups.recommended}
+                    emptyLabel="ครบสำหรับรีวิว"
+                    tone="border-amber-200 bg-amber-50 text-amber-700"
+                />
+                <MissingFieldGroup
+                    title="Optional / Info"
+                    items={groups.optional}
+                    emptyLabel="ครบแล้ว"
+                    tone="border-blue-200 bg-blue-50 text-blue-700"
+                />
+            </div>
+        </section>
+    );
+}
+
 function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
     const markdown = formatArticlePackageMarkdown(preview);
 
@@ -102,6 +196,11 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
                         Auto-generated fields: {preview.generatedFields.join(", ")}
                     </div>
                 )}
+
+                <div className="mb-4 grid gap-4 border-y border-theme-border py-4 xl:grid-cols-[0.9fr_1.1fr]">
+                    <ContentHealthCard health={preview.contentHealth} />
+                    <MissingFieldsCard groups={preview.missingFieldGroups} />
+                </div>
 
                 <FieldRow label="mode" value={preview.mode} />
                 <FieldRow label="status" value={preview.status} />

@@ -10,6 +10,26 @@ export type ArticleStudioStatus =
     | "published";
 export type ArticleStudioDifficulty = "beginner" | "intermediate" | "deep_dive";
 export type ArticleStudioVisualStatus = "not_needed_yet" | "notes_ready" | "visual_needed" | "done";
+export type ArticleStudioHealthStatus = "Incomplete" | "Draft Ready" | "Review Needed" | "Publish Ready";
+
+export type ArticleStudioMissingItem = {
+    field: string;
+    label: string;
+    state: "blocking" | "warning" | "info";
+};
+
+export type ArticleStudioContentHealth = {
+    status: ArticleStudioHealthStatus;
+    requiredComplete: number;
+    requiredTotal: 3;
+    seoComplete: number;
+    seoTotal: 4;
+    internalLinksComplete: number;
+    internalLinksTotal: 3;
+    visualNotes: "ready" | "missing";
+    faq: "ready" | "missing";
+    references: "ready" | "missing";
+};
 
 export type ArticleStudioPackage = {
     mode: ArticleStudioMode;
@@ -28,6 +48,9 @@ export type ArticleStudioPackage = {
     group_post: string;
     page_post: string;
     visual_brief: string;
+    references: string[];
+    canva_url: string;
+    published_url: string;
     status: ArticleStudioStatus;
     difficulty: ArticleStudioDifficulty;
     visual_status: ArticleStudioVisualStatus;
@@ -46,6 +69,12 @@ export type ArticleStudioPreview = ArticleStudioPackage & {
     missingFields: string[];
     validationMessages: string[];
     generatedFields: string[];
+    missingFieldGroups: {
+        required: ArticleStudioMissingItem[];
+        recommended: ArticleStudioMissingItem[];
+        optional: ArticleStudioMissingItem[];
+    };
+    contentHealth: ArticleStudioContentHealth;
 };
 
 const EMPTY_PACKAGE: ArticleStudioPackage = {
@@ -65,6 +94,9 @@ const EMPTY_PACKAGE: ArticleStudioPackage = {
     group_post: "",
     page_post: "",
     visual_brief: "",
+    references: [],
+    canva_url: "",
+    published_url: "",
     status: "needs_human_insight",
     difficulty: "intermediate",
     visual_status: "not_needed_yet",
@@ -87,6 +119,9 @@ const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     group_post: ["group_post", "group post"],
     page_post: ["page_post", "page post"],
     visual_brief: ["visual_brief", "visual brief"],
+    references: ["references", "reference", "เอกสารอ้างอิง", "แหล่งอ้างอิง"],
+    canva_url: ["canva_url", "canva url", "canva"],
+    published_url: ["published_url", "published url", "publish url", "article url"],
     status: ["status"],
     difficulty: ["difficulty", "level"],
     visual_status: ["visual_status", "visual status"],
@@ -173,6 +208,21 @@ function keywordCandidates(title: string, article: string) {
         .filter((word) => word.length >= 3 && !["the", "and", "for", "with", "this", "that", "จาก", "และ", "หรือ", "การ", "ของ", "คือ"].includes(word));
 
     return Array.from(new Set(words)).slice(0, 8);
+}
+
+function hasArrayItems(value: unknown) {
+    return Array.isArray(value) && value.length > 0;
+}
+
+function hasFaqContent(pkg: ArticleStudioPackage) {
+    if (hasArrayItems(pkg.schema_faq)) return true;
+    if (pkg.schema_faq && typeof pkg.schema_faq === "object" && !Array.isArray(pkg.schema_faq) && Object.keys(pkg.schema_faq).length > 0) return true;
+    return /(^|\n)#{1,4}\s*(faq|คำถามที่พบบ่อย)\b/i.test(pkg.article_markdown);
+}
+
+function hasReferencesContent(pkg: ArticleStudioPackage) {
+    if (pkg.references.length > 0) return true;
+    return /(^|\n)#{1,4}\s*(เอกสารอ้างอิง|references|แหล่งอ้างอิง)\b/i.test(pkg.article_markdown);
 }
 
 function safeJson(value: unknown, fallback: unknown) {
@@ -303,7 +353,7 @@ function buildMarkdownPackage(input: string): ArticleStudioPreview {
         const inlineValue = extractInlineField(input, FIELD_ALIASES[field]);
         const value = blockValue || inlineValue;
 
-        if (field === "keywords" || field.startsWith("internal_links_")) {
+        if (field === "keywords" || field === "references" || field.startsWith("internal_links_")) {
             byField[field] = asStringArray(value) as never;
         } else if (field === "schema_faq") {
             byField[field] = safeJson(value, []) as never;
@@ -320,6 +370,8 @@ function buildMarkdownPackage(input: string): ArticleStudioPreview {
         } else if (field === "topic_id") {
             byField[field] = normalizeTopicId(value) as never;
         } else if (field === "meta_description") {
+            byField[field] = asPlainString(value) as never;
+        } else if (field === "canva_url" || field === "published_url") {
             byField[field] = asPlainString(value) as never;
         } else {
             byField[field] = asString(value) as never;
@@ -365,6 +417,9 @@ export function normalizeArticleStudioPackage(input: Partial<ArticleStudioPackag
         group_post: asPlainString(input.group_post),
         page_post: asPlainString(input.page_post),
         visual_brief: asPlainString(input.visual_brief),
+        references: asStringArray(input.references),
+        canva_url: asPlainString(input.canva_url),
+        published_url: asPlainString(input.published_url),
         status: normalizeStatus(input.status, mode),
         difficulty: normalizeDifficulty(input.difficulty),
         visual_status: normalizeVisualStatus(input.visual_status),
@@ -391,6 +446,94 @@ export function validateArticleStudioPackage(pkg: ArticleStudioPackage) {
     return { missingFields, validationMessages };
 }
 
+export function resolveArticleStudioMissingGroups(pkg: ArticleStudioPackage): ArticleStudioPreview["missingFieldGroups"] {
+    const validation = validateArticleStudioPackage(pkg);
+    const requiredLabels: Record<string, string> = {
+        topic_id: "topic_id",
+        title: "title",
+        article_markdown: "article_markdown / draft",
+    };
+
+    const required = validation.missingFields.map((field) => ({
+        field,
+        label: requiredLabels[field] ?? field,
+        state: "blocking" as const,
+    }));
+
+    const recommended: ArticleStudioMissingItem[] = [];
+    if (!pkg.meta_description) recommended.push({ field: "meta_description", label: "meta_description", state: "warning" });
+    if (pkg.keywords.length === 0) recommended.push({ field: "keywords", label: "keywords", state: "warning" });
+    if (
+        pkg.internal_links_prerequisite.length === 0 ||
+        pkg.internal_links_next_step.length === 0 ||
+        pkg.internal_links_related.length === 0
+    ) {
+        recommended.push({ field: "internal_links", label: "internal_links", state: "warning" });
+    }
+    if (!pkg.visual_brief && pkg.visual_status === "not_needed_yet") recommended.push({ field: "visual_brief", label: "visual_brief", state: "warning" });
+    if (!hasFaqContent(pkg)) recommended.push({ field: "schema_faq", label: "faq / schema_faq", state: "warning" });
+    if (!hasReferencesContent(pkg)) recommended.push({ field: "references", label: "references", state: "warning" });
+
+    const optional: ArticleStudioMissingItem[] = [];
+    if (!pkg.group_post) optional.push({ field: "group_post", label: "group_post", state: "info" });
+    if (!pkg.page_post) optional.push({ field: "page_post", label: "page_post", state: "info" });
+    if (!pkg.canva_url) optional.push({ field: "canva_url", label: "canva_url", state: "info" });
+    if (!pkg.published_url) optional.push({ field: "published_url", label: "published_url", state: "info" });
+
+    return { required, recommended, optional };
+}
+
+export function resolveArticleStudioContentHealth(pkg: ArticleStudioPackage): ArticleStudioContentHealth {
+    const validation = validateArticleStudioPackage(pkg);
+    const requiredComplete = 3 - validation.missingFields.length;
+    const seoComplete = [
+        pkg.slug,
+        pkg.meta_title,
+        pkg.meta_description,
+        pkg.keywords.length > 0 ? "keywords" : "",
+    ].filter(Boolean).length;
+    const internalLinksComplete = [
+        pkg.internal_links_prerequisite.length > 0,
+        pkg.internal_links_next_step.length > 0,
+        pkg.internal_links_related.length > 0,
+    ].filter(Boolean).length;
+    const visualNotes = pkg.visual_brief || pkg.visual_status !== "not_needed_yet" ? "ready" : "missing";
+    const faq = hasFaqContent(pkg) ? "ready" : "missing";
+    const references = hasReferencesContent(pkg) ? "ready" : "missing";
+
+    const recommendedScore = [
+        pkg.meta_description,
+        pkg.keywords.length > 0 ? "keywords" : "",
+        internalLinksComplete === 3 ? "internal_links" : "",
+        visualNotes === "ready" ? "visual" : "",
+        faq === "ready" ? "faq" : "",
+        references === "ready" ? "references" : "",
+    ].filter(Boolean).length;
+
+    let status: ArticleStudioHealthStatus = "Draft Ready";
+    if (requiredComplete < 3) {
+        status = "Incomplete";
+    } else if (pkg.status === "publish_ready" && recommendedScore >= 4) {
+        status = "Publish Ready";
+    } else if (pkg.mode === "editorial" || pkg.status === "needs_human_insight") {
+        status = "Review Needed";
+    } else if (recommendedScore < 6) {
+        status = "Draft Ready";
+    }
+
+    return {
+        status,
+        requiredComplete,
+        requiredTotal: 3,
+        seoComplete,
+        seoTotal: 4,
+        internalLinksComplete,
+        internalLinksTotal: 3,
+        visualNotes,
+        faq,
+        references,
+    };
+}
 
 function withPreviewMetadata(
     pkg: ArticleStudioPackage,
@@ -431,6 +574,8 @@ function withPreviewMetadata(
     }
 
     const { missingFields, validationMessages } = validateArticleStudioPackage(normalizedPkg);
+    const missingFieldGroups = resolveArticleStudioMissingGroups(normalizedPkg);
+    const contentHealth = resolveArticleStudioContentHealth(normalizedPkg);
 
     return {
         ...normalizedPkg,
@@ -439,6 +584,8 @@ function withPreviewMetadata(
         missingFields,
         validationMessages,
         generatedFields,
+        missingFieldGroups,
+        contentHealth,
     };
 }
 
@@ -553,6 +700,9 @@ export function buildPublishPackJson(pkg: ArticleStudioPackage) {
             group_post: pkg.group_post,
             page_post: pkg.page_post,
             visual_brief: pkg.visual_brief,
+            references: pkg.references,
+            canva_url: pkg.canva_url,
+            published_url: pkg.published_url,
         },
         markdown: formatArticlePackageMarkdown(pkg),
     };
