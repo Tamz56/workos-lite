@@ -77,9 +77,16 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
                         <div className="text-[11px] font-black uppercase tracking-widest text-blue-600">Preview Required</div>
                         <h2 className="mt-1 break-words text-lg font-black tracking-tight text-theme-primary sm:text-xl">{preview.title || "Untitled Article"}</h2>
                     </div>
-                    <span className="w-fit shrink-0 rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
-                        {preview.status || "Needs Review"}
-                    </span>
+                    <div className="flex flex-wrap gap-2">
+                        {preview.status === "needs_human_insight" && (
+                            <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+                                Human Insight
+                            </span>
+                        )}
+                        <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+                            {preview.status || "needs_human_insight"}
+                        </span>
+                    </div>
                 </div>
 
                 {preview.validationMessages.length > 0 && (
@@ -96,6 +103,10 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
                     </div>
                 )}
 
+                <FieldRow label="mode" value={preview.mode} />
+                <FieldRow label="status" value={preview.status} />
+                <FieldRow label="difficulty" value={preview.difficulty} />
+                <FieldRow label="visual_status" value={preview.visual_status} />
                 <FieldRow label="topic_id" value={preview.topic_id} />
                 <FieldRow label="slug" value={preview.slug} />
                 <FieldRow label="meta_title" value={preview.meta_title} />

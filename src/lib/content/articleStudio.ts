@@ -1,6 +1,18 @@
-export type ArticleStudioStatus = "Needs Review" | "Draft" | "Approved" | "Published";
+export type ArticleStudioMode = "editorial" | "structured";
+export type ArticleStudioStatus =
+    | "idea"
+    | "research"
+    | "draft_bank"
+    | "needs_human_insight"
+    | "seo_ready"
+    | "visual_needed"
+    | "publish_ready"
+    | "published";
+export type ArticleStudioDifficulty = "beginner" | "intermediate" | "deep_dive";
+export type ArticleStudioVisualStatus = "not_needed_yet" | "notes_ready" | "visual_needed" | "done";
 
 export type ArticleStudioPackage = {
+    mode: ArticleStudioMode;
     topic_id: string;
     title: string;
     meta_title: string;
@@ -17,6 +29,8 @@ export type ArticleStudioPackage = {
     page_post: string;
     visual_brief: string;
     status: ArticleStudioStatus;
+    difficulty: ArticleStudioDifficulty;
+    visual_status: ArticleStudioVisualStatus;
 };
 
 export type ArticleStudioSectionKey =
@@ -35,6 +49,7 @@ export type ArticleStudioPreview = ArticleStudioPackage & {
 };
 
 const EMPTY_PACKAGE: ArticleStudioPackage = {
+    mode: "editorial",
     topic_id: "",
     title: "",
     meta_title: "",
@@ -50,10 +65,13 @@ const EMPTY_PACKAGE: ArticleStudioPackage = {
     group_post: "",
     page_post: "",
     visual_brief: "",
-    status: "Needs Review",
+    status: "needs_human_insight",
+    difficulty: "intermediate",
+    visual_status: "not_needed_yet",
 };
 
 const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
+    mode: ["mode", "article mode"],
     topic_id: ["topic_id", "topic id", "topic-id"],
     title: ["title", "article title", "working title"],
     meta_title: ["meta_title", "meta title", "seo title"],
@@ -70,7 +88,23 @@ const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     page_post: ["page_post", "page post"],
     visual_brief: ["visual_brief", "visual brief"],
     status: ["status"],
+    difficulty: ["difficulty", "level"],
+    visual_status: ["visual_status", "visual status"],
 };
+
+const VALID_MODES: ArticleStudioMode[] = ["editorial", "structured"];
+const VALID_STATUSES: ArticleStudioStatus[] = [
+    "idea",
+    "research",
+    "draft_bank",
+    "needs_human_insight",
+    "seo_ready",
+    "visual_needed",
+    "publish_ready",
+    "published",
+];
+const VALID_DIFFICULTIES: ArticleStudioDifficulty[] = ["beginner", "intermediate", "deep_dive"];
+const VALID_VISUAL_STATUSES: ArticleStudioVisualStatus[] = ["not_needed_yet", "notes_ready", "visual_needed", "done"];
 
 const SECTION_ALIASES: Record<ArticleStudioSectionKey, string[]> = {
     research_direction: ["research direction", "research", "direction"],
@@ -88,6 +122,10 @@ function asString(value: unknown) {
     if (value === null || value === undefined) return "";
     if (typeof value === "string") return value.trim();
     return JSON.stringify(value, null, 2);
+}
+
+function asPlainString(value: unknown) {
+    return typeof value === "string" ? value.trim() : "";
 }
 
 function asStringArray(value: unknown) {
@@ -122,6 +160,11 @@ function firstSentence(value: string) {
     return compactWhitespace(match?.[1] || text.slice(0, 155));
 }
 
+function shortDescription(title: string, article: string) {
+    const seed = compactWhitespace([title, firstSentence(article)].filter(Boolean).join(" - "));
+    return seed.slice(0, 155).trim();
+}
+
 function keywordCandidates(title: string, article: string) {
     const source = `${title} ${stripMarkdown(article)}`.toLowerCase();
     const words = source
@@ -140,6 +183,63 @@ function safeJson(value: unknown, fallback: unknown) {
     } catch {
         return value.trim();
     }
+}
+
+function isPlaceholderValue(value: unknown) {
+    if (typeof value !== "string") return false;
+    const normalized = normalizeKey(value);
+    if (!normalized) return true;
+    if (normalized.includes("|")) return true;
+    return [
+        "mode",
+        "status",
+        "difficulty",
+        "visual status",
+        "topic id",
+        "topic-id",
+        "topic_id",
+        "gf content xxx",
+        "gf-content-xxx",
+        "idea research draft bank needs human insight seo ready visual needed publish ready published",
+        "beginner intermediate deep dive",
+        "not needed yet notes ready visual needed done",
+        "editorial structured",
+    ].includes(normalized);
+}
+
+function normalizeEnumValue(value: unknown) {
+    if (isPlaceholderValue(value)) return "";
+    return asPlainString(value).toLowerCase().replace(/[\s-]+/g, "_").trim();
+}
+
+function normalizeMode(value: unknown): ArticleStudioMode {
+    const normalized = normalizeEnumValue(value);
+    return VALID_MODES.includes(normalized as ArticleStudioMode) ? normalized as ArticleStudioMode : "editorial";
+}
+
+function normalizeStatus(value: unknown, mode: ArticleStudioMode): ArticleStudioStatus {
+    const normalized = normalizeEnumValue(value);
+    if (VALID_STATUSES.includes(normalized as ArticleStudioStatus)) return normalized as ArticleStudioStatus;
+    return mode === "structured" ? "draft_bank" : "needs_human_insight";
+}
+
+function normalizeDifficulty(value: unknown): ArticleStudioDifficulty {
+    const normalized = normalizeEnumValue(value);
+    return VALID_DIFFICULTIES.includes(normalized as ArticleStudioDifficulty) ? normalized as ArticleStudioDifficulty : "intermediate";
+}
+
+function normalizeVisualStatus(value: unknown): ArticleStudioVisualStatus {
+    const normalized = normalizeEnumValue(value);
+    return VALID_VISUAL_STATUSES.includes(normalized as ArticleStudioVisualStatus) ? normalized as ArticleStudioVisualStatus : "not_needed_yet";
+}
+
+function normalizeTopicId(value: unknown) {
+    return isPlaceholderValue(value) ? "" : asPlainString(value);
+}
+
+function isInvalidTopicId(value: string) {
+    const normalized = value.trim().toUpperCase();
+    return !normalized || normalized === "GF-CONTENT-XXX" || normalized === "TOPIC-ID";
 }
 
 function stripFence(input: string) {
@@ -209,8 +309,18 @@ function buildMarkdownPackage(input: string): ArticleStudioPreview {
             byField[field] = safeJson(value, []) as never;
         } else if (field === "schema_article") {
             byField[field] = safeJson(value, {}) as never;
+        } else if (field === "mode") {
+            byField[field] = normalizeMode(value) as never;
         } else if (field === "status") {
-            byField[field] = (asString(value) || "Needs Review") as ArticleStudioStatus;
+            byField[field] = asPlainString(value) as never;
+        } else if (field === "difficulty") {
+            byField[field] = normalizeDifficulty(value) as never;
+        } else if (field === "visual_status") {
+            byField[field] = normalizeVisualStatus(value) as never;
+        } else if (field === "topic_id") {
+            byField[field] = normalizeTopicId(value) as never;
+        } else if (field === "meta_description") {
+            byField[field] = asPlainString(value) as never;
         } else {
             byField[field] = asString(value) as never;
         }
@@ -223,12 +333,64 @@ function buildMarkdownPackage(input: string): ArticleStudioPreview {
         ])
     ) as Record<ArticleStudioSectionKey, string>;
 
-    if (!byField.article_markdown) byField.article_markdown = sections.draft || input.trim();
+    if (!byField.article_markdown) byField.article_markdown = sections.draft || (blocks.length === 0 ? input.trim() : "");
     if (!byField.visual_brief) byField.visual_brief = sections.visual_brief;
     if (!byField.title) byField.title = blocks[0]?.heading ?? "";
 
     return withPreviewMetadata(byField, sections, blocks.map((block) => block.heading));
 }
+
+export function normalizeArticleStudioPackage(input: Partial<ArticleStudioPackage> & { draft?: unknown }): ArticleStudioPackage {
+    const mode = normalizeMode(input.mode);
+    const title = isPlaceholderValue(input.title) ? "" : asPlainString(input.title);
+    const articleMarkdown = asPlainString(input.article_markdown) || asPlainString(input.draft);
+    const metaDescription = isPlaceholderValue(input.meta_description) ? "" : asPlainString(input.meta_description);
+
+    return {
+        ...EMPTY_PACKAGE,
+        ...input,
+        mode,
+        topic_id: normalizeTopicId(input.topic_id),
+        title,
+        meta_title: isPlaceholderValue(input.meta_title) ? "" : asPlainString(input.meta_title),
+        meta_description: metaDescription,
+        keywords: asStringArray(input.keywords),
+        slug: isPlaceholderValue(input.slug) ? "" : asPlainString(input.slug),
+        internal_links_prerequisite: asStringArray(input.internal_links_prerequisite),
+        internal_links_next_step: asStringArray(input.internal_links_next_step),
+        internal_links_related: asStringArray(input.internal_links_related),
+        schema_faq: input.schema_faq ?? [],
+        schema_article: input.schema_article ?? {},
+        article_markdown: articleMarkdown,
+        group_post: asPlainString(input.group_post),
+        page_post: asPlainString(input.page_post),
+        visual_brief: asPlainString(input.visual_brief),
+        status: normalizeStatus(input.status, mode),
+        difficulty: normalizeDifficulty(input.difficulty),
+        visual_status: normalizeVisualStatus(input.visual_status),
+    };
+}
+
+export function validateArticleStudioPackage(pkg: ArticleStudioPackage) {
+    const missingFields: string[] = [];
+    const validationMessages: string[] = [];
+
+    if (isInvalidTopicId(pkg.topic_id)) {
+        missingFields.push("topic_id");
+        validationMessages.push("กรุณาเติม Topic ID จริง ห้ามใช้ค่าว่าง, GF-CONTENT-XXX หรือ TOPIC-ID");
+    }
+    if (!pkg.title) {
+        missingFields.push("title");
+        validationMessages.push("กรุณาเติม Title ก่อนสร้าง Article Package");
+    }
+    if (!pkg.article_markdown) {
+        missingFields.push("article_markdown");
+        validationMessages.push("กรุณาเติม Article Markdown / Draft ก่อนสร้าง Article Package");
+    }
+
+    return { missingFields, validationMessages };
+}
+
 
 function withPreviewMetadata(
     pkg: ArticleStudioPackage,
@@ -236,30 +398,31 @@ function withPreviewMetadata(
     detectedHeadings: string[]
 ): ArticleStudioPreview {
     const generatedFields: string[] = [];
-    const title = pkg.title || detectedHeadings[0] || "Untitled Article";
+    const normalizedPkg = normalizeArticleStudioPackage(pkg);
+    const title = normalizedPkg.title || detectedHeadings[0] || "";
 
-    if (!pkg.meta_title && title) {
-        pkg.meta_title = title.length > 58 ? title.slice(0, 55).trimEnd() + "..." : title;
+    if (!normalizedPkg.meta_title && title) {
+        normalizedPkg.meta_title = title.length > 58 ? title.slice(0, 55).trimEnd() + "..." : title;
         generatedFields.push("meta_title");
     }
 
-    if (!pkg.meta_description && pkg.article_markdown) {
-        pkg.meta_description = firstSentence(pkg.article_markdown);
+    if (!normalizedPkg.meta_description && normalizedPkg.article_markdown) {
+        normalizedPkg.meta_description = shortDescription(title, normalizedPkg.article_markdown);
         generatedFields.push("meta_description");
     }
 
-    if (pkg.keywords.length === 0 && (title || pkg.article_markdown)) {
-        pkg.keywords = keywordCandidates(title, pkg.article_markdown);
-        if (pkg.keywords.length > 0) generatedFields.push("keywords");
+    if (normalizedPkg.keywords.length === 0 && (title || normalizedPkg.article_markdown)) {
+        normalizedPkg.keywords = keywordCandidates(title, normalizedPkg.article_markdown);
+        if (normalizedPkg.keywords.length > 0) generatedFields.push("keywords");
     }
 
-    if (!pkg.slug && title) {
-        pkg.slug = slugify(title);
+    if (!normalizedPkg.slug && title) {
+        normalizedPkg.slug = slugify(title);
         generatedFields.push("slug");
     }
 
-    if (!pkg.visual_brief && (title || pkg.article_markdown)) {
-        pkg.visual_brief = [
+    if (!normalizedPkg.visual_brief && (title || normalizedPkg.article_markdown)) {
+        normalizedPkg.visual_brief = [
             `ภาพหลักสำหรับบทความ "${title}"`,
             "โทนสะอาด น่าเชื่อถือ เหมาะกับ Green Fineness",
             "สื่อสารประเด็นหลักของบทความให้เข้าใจเร็ว และหลีกเลี่ยงภาพ stock ที่คลุมเครือ",
@@ -267,23 +430,10 @@ function withPreviewMetadata(
         generatedFields.push("visual_brief");
     }
 
-    const required: (keyof ArticleStudioPackage)[] = ["topic_id", "title", "slug", "article_markdown"];
-    const missingFields = required.filter((field) => {
-        const value = pkg[field];
-        return Array.isArray(value) ? value.length === 0 : !asString(value);
-    });
-
-    const fieldLabels: Partial<Record<keyof ArticleStudioPackage, string>> = {
-        topic_id: "Topic ID",
-        title: "Title",
-        slug: "Slug",
-        article_markdown: "Article Markdown / Draft",
-    };
-    const validationMessages = missingFields.map((field) => `กรุณาเติม ${fieldLabels[field] ?? field} ก่อนสร้าง Article Package`);
+    const { missingFields, validationMessages } = validateArticleStudioPackage(normalizedPkg);
 
     return {
-        ...pkg,
-        status: pkg.status || "Needs Review",
+        ...normalizedPkg,
         sections,
         detectedHeadings,
         missingFields,
@@ -304,17 +454,7 @@ export function slugify(value: string) {
 export function parseArborArticlePackage(input: string): ArticleStudioPreview {
     const jsonPackage = readJsonPackage(input);
     if (jsonPackage) {
-        const pkg: ArticleStudioPackage = {
-            ...EMPTY_PACKAGE,
-            ...jsonPackage,
-            keywords: asStringArray(jsonPackage.keywords),
-            internal_links_prerequisite: asStringArray(jsonPackage.internal_links_prerequisite),
-            internal_links_next_step: asStringArray(jsonPackage.internal_links_next_step),
-            internal_links_related: asStringArray(jsonPackage.internal_links_related),
-            schema_faq: jsonPackage.schema_faq ?? [],
-            schema_article: jsonPackage.schema_article ?? {},
-            status: (jsonPackage.status as ArticleStudioStatus) || "Needs Review",
-        };
+        const pkg = normalizeArticleStudioPackage(jsonPackage);
 
         return withPreviewMetadata(
             pkg,
@@ -337,7 +477,10 @@ export function formatArticlePackageMarkdown(pkg: ArticleStudioPackage) {
 
 ## Research Direction
 - Topic ID: ${pkg.topic_id || "-"}
-- Status: ${pkg.status || "Needs Review"}
+- Mode: ${pkg.mode || "editorial"}
+- Status: ${pkg.status || "needs_human_insight"}
+- Difficulty: ${pkg.difficulty || "intermediate"}
+- Visual Status: ${pkg.visual_status || "not_needed_yet"}
 
 ## Draft
 ${pkg.article_markdown || "_No draft provided._"}
@@ -387,10 +530,13 @@ export function buildPublishPackJson(pkg: ArticleStudioPackage) {
         version: "article_studio_v1",
         exported_at: new Date().toISOString(),
         article: {
+            mode: pkg.mode,
             topic_id: pkg.topic_id,
             title: pkg.title,
             slug: pkg.slug,
-            status: pkg.status || "Needs Review",
+            status: pkg.status || "needs_human_insight",
+            difficulty: pkg.difficulty || "intermediate",
+            visual_status: pkg.visual_status || "not_needed_yet",
         },
         seo: {
             meta_title: pkg.meta_title,

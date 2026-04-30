@@ -5,7 +5,13 @@ import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 import { AGENT_TEMPLATES } from "@/lib/agent/templates";
 import { toErrorMessage } from "@/lib/error";
-import { ArticleStudioPackage, formatArticlePackageMarkdown, slugify } from "@/lib/content/articleStudio";
+import {
+  ArticleStudioPackage,
+  formatArticlePackageMarkdown,
+  normalizeArticleStudioPackage,
+  slugify,
+  validateArticleStudioPackage,
+} from "@/lib/content/articleStudio";
 
 function uniqueListSlug(db: ReturnType<typeof getDb>, base: string) {
   const cleanBase = slugify(base).replace(/[^a-z0-9-]/g, "") || `article-${nanoid(6).toLowerCase()}`;
@@ -36,29 +42,6 @@ status_label: ${params.pkg.status || "Needs Review"}
 ---
 
 ${params.checklist.map((item) => `- [ ] ${item}`).join("\n")}`;
-}
-
-function normalizeArticlePackage(input: Partial<ArticleStudioPackage>): ArticleStudioPackage {
-  const title = String(input.title ?? "").trim();
-
-  return {
-    topic_id: String(input.topic_id ?? "").trim(),
-    title,
-    meta_title: String(input.meta_title ?? title).trim(),
-    meta_description: String(input.meta_description ?? "").trim(),
-    keywords: Array.isArray(input.keywords) ? input.keywords.map(String).filter(Boolean) : [],
-    slug: String(input.slug ?? slugify(title)).trim(),
-    internal_links_prerequisite: Array.isArray(input.internal_links_prerequisite) ? input.internal_links_prerequisite.map(String).filter(Boolean) : [],
-    internal_links_next_step: Array.isArray(input.internal_links_next_step) ? input.internal_links_next_step.map(String).filter(Boolean) : [],
-    internal_links_related: Array.isArray(input.internal_links_related) ? input.internal_links_related.map(String).filter(Boolean) : [],
-    schema_faq: input.schema_faq ?? [],
-    schema_article: input.schema_article ?? {},
-    article_markdown: String(input.article_markdown ?? "").trim(),
-    group_post: String(input.group_post ?? "").trim(),
-    page_post: String(input.page_post ?? "").trim(),
-    visual_brief: String(input.visual_brief ?? "").trim(),
-    status: input.status || "Needs Review",
-  };
 }
 
 function findDuplicateArticlePackage(db: ReturnType<typeof getDb>, pkg: ArticleStudioPackage) {
@@ -106,18 +89,14 @@ export async function POST(req: NextRequest) {
     const { topicId, topicTitle, templateKey, publishDate } = body;
 
     if (body.articlePackage) {
-      const pkg = normalizeArticlePackage(body.articlePackage);
+      const pkg = normalizeArticleStudioPackage(body.articlePackage);
+      const validation = validateArticleStudioPackage(pkg);
 
-      if (!pkg.topic_id || !pkg.title || !pkg.slug || !pkg.article_markdown) {
+      if (validation.missingFields.length > 0) {
         return NextResponse.json(
           {
             error: "Article Package ยังไม่พร้อมสร้าง",
-            details: [
-              !pkg.topic_id ? "กรุณาเติม topic_id" : null,
-              !pkg.title ? "กรุณาเติม title" : null,
-              !pkg.slug ? "กรุณาเติม slug" : null,
-              !pkg.article_markdown ? "กรุณาเติม article_markdown หรือ Draft" : null,
-            ].filter(Boolean),
+            details: validation.validationMessages,
           },
           { status: 400 }
         );
