@@ -5,10 +5,249 @@ import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 import { AGENT_TEMPLATES } from "@/lib/agent/templates";
 import { toErrorMessage } from "@/lib/error";
+import { ArticleStudioPackage, formatArticlePackageMarkdown, slugify } from "@/lib/content/articleStudio";
+
+function uniqueListSlug(db: ReturnType<typeof getDb>, base: string) {
+  const cleanBase = slugify(base).replace(/[^a-z0-9-]/g, "") || `article-${nanoid(6).toLowerCase()}`;
+  let candidate = cleanBase;
+  let idx = 2;
+
+  while (db.prepare("SELECT id FROM lists WHERE workspace = 'content' AND slug = ?").get(candidate)) {
+    candidate = `${cleanBase}-${idx}`;
+    idx += 1;
+  }
+
+  return candidate;
+}
+
+function buildArticleTaskNotes(params: {
+  pkg: ArticleStudioPackage;
+  stage: string;
+  docId: string;
+  checklist: string[];
+}) {
+  return `---
+topic_id: ${params.pkg.topic_id}
+topic_title: ${params.pkg.title}
+template_key: article
+stage: ${params.stage}
+doc_ref: ${params.docId}
+status_label: ${params.pkg.status || "Needs Review"}
+---
+
+${params.checklist.map((item) => `- [ ] ${item}`).join("\n")}`;
+}
+
+function normalizeArticlePackage(input: Partial<ArticleStudioPackage>): ArticleStudioPackage {
+  const title = String(input.title ?? "").trim();
+
+  return {
+    topic_id: String(input.topic_id ?? "").trim(),
+    title,
+    meta_title: String(input.meta_title ?? title).trim(),
+    meta_description: String(input.meta_description ?? "").trim(),
+    keywords: Array.isArray(input.keywords) ? input.keywords.map(String).filter(Boolean) : [],
+    slug: String(input.slug ?? slugify(title)).trim(),
+    internal_links_prerequisite: Array.isArray(input.internal_links_prerequisite) ? input.internal_links_prerequisite.map(String).filter(Boolean) : [],
+    internal_links_next_step: Array.isArray(input.internal_links_next_step) ? input.internal_links_next_step.map(String).filter(Boolean) : [],
+    internal_links_related: Array.isArray(input.internal_links_related) ? input.internal_links_related.map(String).filter(Boolean) : [],
+    schema_faq: input.schema_faq ?? [],
+    schema_article: input.schema_article ?? {},
+    article_markdown: String(input.article_markdown ?? "").trim(),
+    group_post: String(input.group_post ?? "").trim(),
+    page_post: String(input.page_post ?? "").trim(),
+    visual_brief: String(input.visual_brief ?? "").trim(),
+    status: input.status || "Needs Review",
+  };
+}
+
+function findDuplicateArticlePackage(db: ReturnType<typeof getDb>, pkg: ArticleStudioPackage) {
+  const topicPattern = `%topic_id: ${pkg.topic_id}%`;
+  const titlePattern = `%[${pkg.topic_id}]%`;
+  const listSlug = slugify(pkg.slug || pkg.topic_id).replace(/[^a-z0-9-]/g, "");
+  const matches: { type: "task" | "doc" | "list"; id: string; title: string }[] = [];
+
+  const existingTasks = db.prepare(`
+    SELECT id, title
+    FROM tasks
+    WHERE workspace = 'content'
+      AND (notes LIKE @topicPattern OR title LIKE @titlePattern)
+    LIMIT 5
+  `).all({ topicPattern, titlePattern }) as { id: string; title: string }[];
+
+  const existingDocs = db.prepare(`
+    SELECT id, title
+    FROM docs
+    WHERE (workspace = 'content' OR workspace IS NULL)
+      AND title LIKE @titlePattern
+    LIMIT 5
+  `).all({ titlePattern }) as { id: string; title: string }[];
+
+  const existingLists = listSlug
+    ? db.prepare(`
+        SELECT id, title
+        FROM lists
+        WHERE workspace = 'content'
+          AND (slug = @listSlug OR title LIKE @titlePattern)
+        LIMIT 5
+      `).all({ listSlug, titlePattern }) as { id: string; title: string }[]
+    : [];
+
+  existingTasks.forEach((row) => matches.push({ type: "task", id: row.id, title: row.title }));
+  existingDocs.forEach((row) => matches.push({ type: "doc", id: row.id, title: row.title }));
+  existingLists.forEach((row) => matches.push({ type: "list", id: row.id, title: row.title }));
+
+  return matches;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const { topicId, topicTitle, templateKey, publishDate } = await req.json();
+    const body = await req.json();
+    const { topicId, topicTitle, templateKey, publishDate } = body;
+
+    if (body.articlePackage) {
+      const pkg = normalizeArticlePackage(body.articlePackage);
+
+      if (!pkg.topic_id || !pkg.title || !pkg.slug || !pkg.article_markdown) {
+        return NextResponse.json(
+          {
+            error: "Article Package ยังไม่พร้อมสร้าง",
+            details: [
+              !pkg.topic_id ? "กรุณาเติม topic_id" : null,
+              !pkg.title ? "กรุณาเติม title" : null,
+              !pkg.slug ? "กรุณาเติม slug" : null,
+              !pkg.article_markdown ? "กรุณาเติม article_markdown หรือ Draft" : null,
+            ].filter(Boolean),
+          },
+          { status: 400 }
+        );
+      }
+
+      const db = getDb();
+      const duplicates = findDuplicateArticlePackage(db, pkg);
+      if (duplicates.length > 0) {
+        return NextResponse.json(
+          {
+            error: `พบ Article Package ที่อาจซ้ำกับ ${pkg.topic_id}`,
+            code: "DUPLICATE_ARTICLE_PACKAGE",
+            duplicates,
+          },
+          { status: 409 }
+        );
+      }
+
+      const now = new Date().toISOString();
+      const listId = nanoid();
+      const docId = nanoid();
+      const taskIds: string[] = [];
+      const listSlug = uniqueListSlug(db, pkg.slug || pkg.topic_id);
+      const docTitle = `[${pkg.topic_id}] Article Hub — ${pkg.title}`;
+      const docMarkdown = formatArticlePackageMarkdown(pkg);
+
+      const stages = [
+        {
+          title: "Research Direction",
+          checklist: [
+            "Confirm learning intent and target reader",
+            "Review prerequisite and related links",
+            "Check source direction before drafting",
+          ],
+        },
+        {
+          title: "Draft",
+          checklist: [
+            "Review article body for clarity and Thai-first flow",
+            "Check claims and examples",
+            "Prepare revision notes",
+          ],
+        },
+        {
+          title: "SEO & Schema",
+          checklist: [
+            "Review slug, meta title, and meta description",
+            "Validate internal links",
+            "Review FAQ and Article schema",
+          ],
+        },
+        {
+          title: "Visual Package",
+          checklist: [
+            "Prepare cover or hero image direction",
+            "Prepare supporting visual assets",
+            "Match visuals with article promise",
+          ],
+        },
+        {
+          title: "Review / Publish",
+          checklist: [
+            "Final editorial review",
+            "Publish article",
+            "Post group and page distribution copy",
+          ],
+        },
+      ];
+
+      const tx = db.transaction(() => {
+        db.prepare(`
+          INSERT INTO lists (id, workspace, slug, title, description, created_at, updated_at)
+          VALUES (@id, 'content', @slug, @title, @description, @created_at, @updated_at)
+        `).run({
+          id: listId,
+          slug: listSlug,
+          title: `${pkg.topic_id} — ${pkg.title}`,
+          description: `Article Studio package for ${pkg.title}`,
+          created_at: now,
+          updated_at: now,
+        });
+
+        db.prepare(`
+          INSERT INTO docs (id, title, content_md, workspace, created_at, updated_at)
+          VALUES (@id, @title, @content_md, 'content', @created_at, @updated_at)
+        `).run({
+          id: docId,
+          title: docTitle,
+          content_md: docMarkdown,
+          created_at: now,
+          updated_at: now,
+        });
+
+        stages.forEach((stage, index) => {
+          const taskId = nanoid();
+          taskIds.push(taskId);
+
+          db.prepare(`
+            INSERT INTO tasks (
+              id, title, workspace, list_id, status, notes, doc_id,
+              sort_order, review_status, created_at, updated_at
+            ) VALUES (
+              @id, @title, 'content', @list_id, 'review', @notes, @doc_id,
+              @sort_order, 'in_review', @created_at, @updated_at
+            )
+          `).run({
+            id: taskId,
+            title: `[${pkg.topic_id}] ${stage.title} — ${pkg.title}`,
+            list_id: listId,
+            notes: buildArticleTaskNotes({ pkg, stage: stage.title, docId, checklist: stage.checklist }),
+            doc_id: docId,
+            sort_order: index + 1,
+            created_at: now,
+            updated_at: now,
+          });
+        });
+      });
+
+      tx();
+
+      return NextResponse.json({
+        ok: true,
+        mode: "article_studio",
+        topicId: pkg.topic_id,
+        topicTitle: pkg.title,
+        listId,
+        noteId: docId,
+        taskIds,
+      });
+    }
 
     if (!topicId || !topicTitle) {
       return NextResponse.json({ error: "Missing topicId or topicTitle" }, { status: 400 });

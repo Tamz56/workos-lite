@@ -1,5 +1,6 @@
 import React from "react";
-import { Plus, Search, Zap } from "lucide-react";
+import Link from "next/link";
+import { FileText, Plus, Search, Zap } from "lucide-react";
 import { AreasViewState } from "./useAreasState";
 import { FocusModeToggle } from "../FocusModeToggle";
 
@@ -45,12 +46,21 @@ export default function AreasToolbar({
                     </button>
                 )}
                 {workspaceId === "content" && onNewPackage && (
-                    <button
-                        onClick={onNewPackage}
-                        className="bg-blue-50 text-blue-700 border border-blue-100 px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-100 transition-all active:scale-95"
-                    >
-                        New Content Package
-                    </button>
+                    <>
+                        <Link
+                            href="/workspaces/content/article-studio"
+                            className="bg-theme-card text-blue-700 border border-blue-100 px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-50 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <FileText className="w-4 h-4" />
+                            Article Studio
+                        </Link>
+                        <button
+                            onClick={onNewPackage}
+                            className="bg-blue-50 text-blue-700 border border-blue-100 px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-100 transition-all active:scale-95"
+                        >
+                            New Content Package
+                        </button>
+                    </>
                 )}
                 
                 {onToggleFocusMode && (
