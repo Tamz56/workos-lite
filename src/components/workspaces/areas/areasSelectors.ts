@@ -160,10 +160,15 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
             if (topicKey) {
                 key = isContentWorkspace ? `topic:${topicKey}` : `package:${topicKey}`;
                 
-                // RC65: Resolve canonical title (Prefer Metadata > Parsed Title > Topic ID)
-                const metadataTitle = t.topic_title;
-                const titleCandidate = t.title.includes(" — ") ? t.title.split(" — ")[1] : null;
-                const canonicalName = metadataTitle || titleCandidate || topicName;
+                // RC65: Resolve canonical title (Prefer Metadata > episode_title from notes > Topic Title > Topic Name)
+                // 1) Try topic_title field
+                // 2) Try episode_title inside notes frontmatter
+                // 3) Fallback to topicName/list_name/topic_id
+                const notesEpisodeMatch = t.notes ? t.notes.match(/episode_title:\s*([^\n\r]+)/i) : null;
+                const notesEpisodeTitle = notesEpisodeMatch ? notesEpisodeMatch[1].trim() : null;
+                const metadataTitle = t.topic_title || notesEpisodeTitle;
+                // NOTE: Do NOT use the right-hand side of `t.title.split(" — ")` (stage/task role) as package title.
+                const canonicalName = metadataTitle || topicName;
 
                 if (!groupMeta[key]) {
                     groupMeta[key] = {
