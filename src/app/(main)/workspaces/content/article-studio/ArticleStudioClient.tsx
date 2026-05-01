@@ -243,8 +243,8 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
                 <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
                     <h3 className="text-sm font-black text-theme-primary">Detected Headings</h3>
                     <div className="mt-4 flex flex-wrap gap-2">
-                        {preview.detectedHeadings.length ? preview.detectedHeadings.map((heading) => (
-                            <span key={heading} className="rounded-md border border-theme-border bg-theme-card px-2.5 py-1 text-xs font-bold text-theme-secondary">
+                        {preview.detectedHeadings.length ? preview.detectedHeadings.map((heading, idx) => (
+                            <span key={`${heading}-${idx}`} className="rounded-md border border-theme-border bg-theme-card px-2.5 py-1 text-xs font-bold text-theme-secondary">
                                 {heading}
                             </span>
                         )) : (
