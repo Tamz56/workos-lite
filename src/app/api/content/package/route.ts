@@ -9,22 +9,15 @@ import {
   ArticleStudioPackage,
   formatArticlePackageMarkdown,
   normalizeArticleStudioPackage,
-  slugify,
   validateArticleStudioPackage,
 } from "@/lib/content/articleStudio";
-
-function uniqueListSlug(db: ReturnType<typeof getDb>, base: string) {
-  const cleanBase = slugify(base).replace(/[^a-z0-9-]/g, "") || `article-${nanoid(6).toLowerCase()}`;
-  let candidate = cleanBase;
-  let idx = 2;
-
-  while (db.prepare("SELECT id FROM lists WHERE workspace = 'content' AND slug = ?").get(candidate)) {
-    candidate = `${cleanBase}-${idx}`;
-    idx += 1;
-  }
-
-  return candidate;
-}
+import {
+  findContentSlugConflict,
+  findExistingTopicDoc,
+  findExistingTopicStageTask,
+  normalizeContentTopicId,
+  resolveContentListForTopic,
+} from "@/lib/content/topicLists";
 
 function buildArticleTaskNotes(params: {
   pkg: ArticleStudioPackage;
@@ -44,49 +37,15 @@ status_label: ${params.pkg.status || "Needs Review"}
 ${params.checklist.map((item) => `- [ ] ${item}`).join("\n")}`;
 }
 
-function findDuplicateArticlePackage(db: ReturnType<typeof getDb>, pkg: ArticleStudioPackage) {
-  const topicPattern = `%topic_id: ${pkg.topic_id}%`;
-  const titlePattern = `%[${pkg.topic_id}]%`;
-  const listSlug = slugify(pkg.slug || pkg.topic_id).replace(/[^a-z0-9-]/g, "");
-  const matches: { type: "task" | "doc" | "list"; id: string; title: string }[] = [];
-
-  const existingTasks = db.prepare(`
-    SELECT id, title
-    FROM tasks
-    WHERE workspace = 'content'
-      AND (notes LIKE @topicPattern OR title LIKE @titlePattern)
-    LIMIT 5
-  `).all({ topicPattern, titlePattern }) as { id: string; title: string }[];
-
-  const existingDocs = db.prepare(`
-    SELECT id, title
-    FROM docs
-    WHERE (workspace = 'content' OR workspace IS NULL)
-      AND title LIKE @titlePattern
-    LIMIT 5
-  `).all({ titlePattern }) as { id: string; title: string }[];
-
-  const existingLists = listSlug
-    ? db.prepare(`
-        SELECT id, title
-        FROM lists
-        WHERE workspace = 'content'
-          AND (slug = @listSlug OR title LIKE @titlePattern)
-        LIMIT 5
-      `).all({ listSlug, titlePattern }) as { id: string; title: string }[]
-    : [];
-
-  existingTasks.forEach((row) => matches.push({ type: "task", id: row.id, title: row.title }));
-  existingDocs.forEach((row) => matches.push({ type: "doc", id: row.id, title: row.title }));
-  existingLists.forEach((row) => matches.push({ type: "list", id: row.id, title: row.title }));
-
-  return matches;
+function readStageFromNotes(notes: string | null | undefined) {
+  const match = notes?.match(/(?:^|\n)stage:\s*(.+)/);
+  return match?.[1]?.trim() || null;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { topicId, topicTitle, templateKey, publishDate } = body;
+    const { topicId, topicTitle, templateKey, publishDate, listId } = body;
 
     if (body.articlePackage) {
       const pkg = normalizeArticleStudioPackage(body.articlePackage);
@@ -103,25 +62,22 @@ export async function POST(req: NextRequest) {
       }
 
       const db = getDb();
-      const duplicates = findDuplicateArticlePackage(db, pkg);
-      if (duplicates.length > 0) {
-        return NextResponse.json(
-          {
-            error: `พบ Article Package ที่อาจซ้ำกับ ${pkg.topic_id}`,
-            code: "DUPLICATE_ARTICLE_PACKAGE",
-            duplicates,
-          },
-          { status: 409 }
-        );
-      }
-
       const now = new Date().toISOString();
-      const listId = nanoid();
-      const docId = nanoid();
+      const warnings: string[] = [];
       const taskIds: string[] = [];
-      const listSlug = uniqueListSlug(db, pkg.slug || pkg.topic_id);
       const docTitle = `[${pkg.topic_id}] Article Hub — ${pkg.title}`;
       const docMarkdown = formatArticlePackageMarkdown(pkg);
+      let resolvedListId = "";
+      let docId = "";
+      let reusedList = false;
+      let reusedDoc = false;
+
+      const slugConflict = findContentSlugConflict(db, pkg.slug || "", pkg.topic_id);
+      if (slugConflict) {
+        warnings.push(
+          `พบ slug "${slugConflict.list.slug}" อยู่ใน list "${slugConflict.list.title}" แต่ topic_id ไม่ตรงกัน (${slugConflict.topicIds.join(", ") || "ไม่พบ topic_id"})`
+        );
+      }
 
       const stages = [
         {
@@ -167,30 +123,56 @@ export async function POST(req: NextRequest) {
       ];
 
       const tx = db.transaction(() => {
-        db.prepare(`
-          INSERT INTO lists (id, workspace, slug, title, description, created_at, updated_at)
-          VALUES (@id, 'content', @slug, @title, @description, @created_at, @updated_at)
-        `).run({
-          id: listId,
-          slug: listSlug,
-          title: `${pkg.topic_id} — ${pkg.title}`,
-          description: `Article Studio package for ${pkg.title}`,
-          created_at: now,
-          updated_at: now,
+        const listResolution = resolveContentListForTopic(db, {
+          topicId: pkg.topic_id,
+          topicTitle: pkg.title,
+          createIfMissing: true,
+          now,
         });
+        resolvedListId = listResolution.list.id;
+        reusedList = !listResolution.created;
+        warnings.push(...listResolution.warnings);
 
-        db.prepare(`
-          INSERT INTO docs (id, title, content_md, workspace, created_at, updated_at)
-          VALUES (@id, @title, @content_md, 'content', @created_at, @updated_at)
-        `).run({
-          id: docId,
-          title: docTitle,
-          content_md: docMarkdown,
-          created_at: now,
-          updated_at: now,
-        });
+        const existingDoc = findExistingTopicDoc(db, pkg.topic_id);
+        if (existingDoc) {
+          docId = existingDoc.id;
+          reusedDoc = true;
+        } else {
+          docId = nanoid();
+
+          db.prepare(`
+            INSERT INTO docs (id, title, content_md, workspace, created_at, updated_at)
+            VALUES (@id, @title, @content_md, 'content', @created_at, @updated_at)
+          `).run({
+            id: docId,
+            title: docTitle,
+            content_md: docMarkdown,
+            created_at: now,
+            updated_at: now,
+          });
+        }
 
         stages.forEach((stage, index) => {
+          const existingTask = findExistingTopicStageTask(db, pkg.topic_id, stage.title);
+          if (existingTask) {
+            taskIds.push(existingTask.id);
+            if (existingTask.list_id !== resolvedListId) {
+              db.prepare(`
+                UPDATE tasks
+                SET list_id = @list_id,
+                    doc_id = COALESCE(doc_id, @doc_id),
+                    updated_at = @updated_at
+                WHERE id = @id
+              `).run({
+                id: existingTask.id,
+                list_id: resolvedListId,
+                doc_id: docId,
+                updated_at: now,
+              });
+            }
+            return;
+          }
+
           const taskId = nanoid();
           taskIds.push(taskId);
 
@@ -205,7 +187,7 @@ export async function POST(req: NextRequest) {
           `).run({
             id: taskId,
             title: `[${pkg.topic_id}] ${stage.title} — ${pkg.title}`,
-            list_id: listId,
+            list_id: resolvedListId,
             notes: buildArticleTaskNotes({ pkg, stage: stage.title, docId, checklist: stage.checklist }),
             doc_id: docId,
             sort_order: index + 1,
@@ -222,9 +204,12 @@ export async function POST(req: NextRequest) {
         mode: "article_studio",
         topicId: pkg.topic_id,
         topicTitle: pkg.title,
-        listId,
+        listId: resolvedListId,
         noteId: docId,
         taskIds,
+        reusedList,
+        reusedDoc,
+        warnings,
       });
     }
 
@@ -240,52 +225,91 @@ export async function POST(req: NextRequest) {
     const db = getDb();
     const now = new Date().toISOString();
 
-    const results: any[] = [];
+    const results: Array<{ type: "doc" | "task"; id: string; title: string; reused?: boolean }> = [];
     const refMap = new Map<string, string>(); // saveAs -> id
+    const topicIdNormalized = normalizeContentTopicId(topicId);
+    const warnings: string[] = [];
+    let resolvedListId = "";
+    let reusedList = false;
 
     // 2. Execute actions in a transaction
     const executeTx = db.transaction(() => {
+      const listResolution = resolveContentListForTopic(db, {
+        topicId: topicIdNormalized,
+        topicTitle,
+        preferredListId: typeof listId === "string" ? listId : null,
+        createIfMissing: true,
+        now,
+      });
+      resolvedListId = listResolution.list.id;
+      reusedList = !listResolution.created;
+      warnings.push(...listResolution.warnings);
+
       for (const action of payload.actions) {
         if (action.type === "doc.create") {
-          const id = nanoid();
           const d = action.data;
+          const existingDoc = findExistingTopicDoc(db, topicIdNormalized);
+          const id = existingDoc?.id ?? nanoid();
           
-          db.prepare(`
-            INSERT INTO docs (id, title, content_md, created_at, updated_at)
-            VALUES (@id, @title, @content_md, @created_at, @updated_at)
-          `).run({
-            id,
-            title: d.title,
-            content_md: d.content_md ?? "",
-            created_at: now,
-            updated_at: now,
-          });
+          if (!existingDoc) {
+            db.prepare(`
+              INSERT INTO docs (id, title, content_md, workspace, created_at, updated_at)
+              VALUES (@id, @title, @content_md, 'content', @created_at, @updated_at)
+            `).run({
+              id,
+              title: d.title,
+              content_md: d.content_md ?? "",
+              created_at: now,
+              updated_at: now,
+            });
+          }
 
           if (action.saveAs) refMap.set(action.saveAs, id);
-          results.push({ type: "doc", id, title: d.title });
+          results.push({ type: "doc", id, title: existingDoc?.title ?? d.title, reused: !!existingDoc });
         }
 
         if (action.type === "task.create") {
-          const id = nanoid();
           const t = action.data;
+          const stage = readStageFromNotes(t.notes);
 
           // Resolve doc reference like the agent/execute route
           const docIdResolved = t.doc_id_ref
             ? (refMap.get(t.doc_id_ref) ?? null)
             : (t.doc_id ? (refMap.get(t.doc_id) ?? t.doc_id) : null);
 
+          const existingTask = stage ? findExistingTopicStageTask(db, topicIdNormalized, stage) : null;
+          if (existingTask) {
+            db.prepare(`
+              UPDATE tasks
+              SET list_id = @list_id,
+                  doc_id = COALESCE(doc_id, @doc_id),
+                  updated_at = @updated_at
+              WHERE id = @id
+            `).run({
+              id: existingTask.id,
+              list_id: resolvedListId,
+              doc_id: docIdResolved,
+              updated_at: now,
+            });
+            results.push({ type: "task", id: existingTask.id, title: existingTask.title, reused: true });
+            continue;
+          }
+
+          const id = nanoid();
+
           db.prepare(`
             INSERT INTO tasks (
-              id, title, workspace, status, 
+              id, title, workspace, list_id, status, 
               notes, doc_id, scheduled_date, created_at, updated_at
             ) VALUES (
-              @id, @title, @workspace, @status,
+              @id, @title, @workspace, @list_id, @status,
               @notes, @doc_id, @scheduled_date, @created_at, @updated_at
             )
           `).run({
             id: id,
             title: t.title,
             workspace: t.workspace,
+            list_id: resolvedListId,
             status: t.status,
             notes: t.notes ?? null,
             doc_id: docIdResolved,
@@ -309,8 +333,11 @@ export async function POST(req: NextRequest) {
       ok: true,
       topicId,
       topicTitle,
+      listId: resolvedListId,
       noteId,
-      taskIds
+      taskIds,
+      reusedList,
+      warnings,
     });
 
   } catch (e: unknown) {

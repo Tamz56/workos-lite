@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Download, FileText, Loader2, PackagePlus, Sparkles } from "lucide-react";
@@ -38,6 +38,17 @@ const STAGE_PREVIEW = [
     "Visual Package",
     "Review / Publish",
 ];
+
+function useDebouncedValue<T>(value: T, delayMs: number) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setDebouncedValue(value), delayMs);
+        return () => window.clearTimeout(timer);
+    }, [value, delayMs]);
+
+    return debouncedValue;
+}
 
 function EmptyPreview() {
     return (
@@ -262,15 +273,15 @@ export default function ArticleStudioClient() {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const previewInput = useDebouncedValue(rawInput, 250);
 
     const preview = useMemo(() => {
-        if (!rawInput.trim()) return null;
         try {
-            return parseArborArticlePackage(rawInput);
+            return parseArborArticlePackage(previewInput);
         } catch {
             return null;
         }
-    }, [rawInput]);
+    }, [previewInput]);
 
     const canSave = !!preview && preview.missingFields.length === 0 && !isSaving;
 
@@ -310,7 +321,11 @@ export default function ArticleStudioClient() {
                 throw new Error(`${data.error || "Create package failed"}${detailText}${duplicateText}`);
             }
 
-            setSuccess(`สร้าง Article Package แล้ว: ${data.topicTitle}`);
+            const warningText = Array.isArray(data.warnings) && data.warnings.length > 0
+                ? `\nWarning: ${data.warnings.join(" | ")}`
+                : "";
+            const reuseText = data.reusedList ? " (reuse list เดิม)" : "";
+            setSuccess(`สร้าง Article Package แล้ว: ${data.topicTitle}${reuseText}${warningText}`);
             window.dispatchEvent(new Event("task-updated"));
             router.refresh();
         } catch (err) {

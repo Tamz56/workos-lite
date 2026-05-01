@@ -7,6 +7,7 @@ import { z } from "zod";
 import { toErrorMessage } from "@/lib/error";
 
 import { WORKSPACES, normalizeWorkspace } from "@/lib/workspaces";
+import { resolveContentListForTopic } from "@/lib/content/topicLists";
 
 const Workspace = z.enum(WORKSPACES);
 const Status = z.enum(["inbox", "planned", "in_progress", "done"]);
@@ -373,6 +374,17 @@ export async function POST(req: NextRequest) {
             if (!t.list_id && parent.list_id) {
                 t.list_id = parent.list_id;
             }
+        }
+
+        if (t.workspace === "content" && t.topic_id) {
+            const resolution = resolveContentListForTopic(getDb(), {
+                topicId: t.topic_id,
+                topicTitle: t.topic_title || t.title,
+                preferredListId: t.list_id,
+                createIfMissing: true,
+                now,
+            });
+            t.list_id = resolution.list.id;
         }
 
         // schedule consistency: if scheduled_date missing -> bucket should be 'none'

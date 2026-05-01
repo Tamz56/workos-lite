@@ -510,14 +510,16 @@ export function resolveArticleStudioContentHealth(pkg: ArticleStudioPackage): Ar
         references === "ready" ? "references" : "",
     ].filter(Boolean).length;
 
+    const hasMostRecommendedFields = recommendedScore >= 4;
+
     let status: ArticleStudioHealthStatus = "Draft Ready";
     if (requiredComplete < 3) {
         status = "Incomplete";
-    } else if (pkg.status === "publish_ready" && recommendedScore >= 4) {
+    } else if (pkg.status === "publish_ready" && hasMostRecommendedFields) {
         status = "Publish Ready";
-    } else if (pkg.mode === "editorial" || pkg.status === "needs_human_insight") {
+    } else if (hasMostRecommendedFields && (pkg.mode === "editorial" || pkg.status === "needs_human_insight")) {
         status = "Review Needed";
-    } else if (recommendedScore < 6) {
+    } else {
         status = "Draft Ready";
     }
 

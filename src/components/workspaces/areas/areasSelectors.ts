@@ -113,15 +113,7 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
         const gfPattern = /GF-CONTENT-\d+/g;
         const topicPattern = /TOPIC-\d+/g;
 
-        // 1. Check metadata (notes) - Highest Priority
-        if (t.notes) {
-            const gfMatch = t.notes.match(gfPattern);
-            if (gfMatch) return gfMatch[0];
-            const topicMatch = t.notes.match(topicPattern);
-            if (topicMatch) return topicMatch[0];
-        }
-
-        // 2. Check explicit topic_id field
+        // 1. Check explicit topic_id field - canonical grouping key for Content.
         if (t.topic_id) {
             const gfMatch = t.topic_id.match(gfPattern);
             if (gfMatch) return gfMatch[0];
@@ -129,7 +121,23 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
             if (topicMatch) return topicMatch[0];
         }
 
-        // 3. Check title - Fallback
+        // 2. Check metadata (notes)
+        if (t.notes) {
+            const gfMatch = t.notes.match(gfPattern);
+            if (gfMatch) return gfMatch[0];
+            const topicMatch = t.notes.match(topicPattern);
+            if (topicMatch) return topicMatch[0];
+        }
+
+        // 3. Check list title/name for legacy package lists
+        if (t.list_name) {
+            const gfMatch = t.list_name.match(gfPattern);
+            if (gfMatch) return gfMatch[0];
+            const topicMatch = t.list_name.match(topicPattern);
+            if (topicMatch) return topicMatch[0];
+        }
+
+        // 4. Check title - Fallback
         const gfMatchTitle = t.title.match(gfPattern);
         if (gfMatchTitle) return gfMatchTitle[0];
         const topicMatchTitle = t.title.match(topicPattern);
@@ -143,8 +151,8 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
 
         if (isPackageGroup) {
             const extractedCode = extractCode(t);
-            // Canonical Key resolution: Extracted Code > list_id > topic_id
-            const topicKey = extractedCode || t.list_id || t.topic_id || (isContentWorkspace ? "legacy-topic" : null);
+            // Canonical Key resolution: topic_id/code first. list_id is only a legacy fallback.
+            const topicKey = extractedCode || t.topic_id || (isContentWorkspace ? null : t.list_id) || (isContentWorkspace ? "legacy-topic" : null);
             
             // Name resolution: if we extracted a code, try to find a nice name from the title
             const topicName = t.list_name || t.topic_id || (isContentWorkspace ? "Legacy / Needs Topic Mapping" : "Uncategorized");
@@ -178,10 +186,13 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
                         _metricsRaw: t.performance_metrics
                     };
                 } else {
-                    // Title recovery: If the current group title is generic, update it with best candidate
+                    // Title recovery: prefer explicit topic_title over stage/task-derived labels.
                     const currentTitle = groupMeta[key].title;
+                    if (metadataTitle && extractedCode) {
+                        groupMeta[key].title = `${extractedCode} — ${metadataTitle}`;
+                    }
                     const isCurrentGeneric = currentTitle === "Legacy / Needs Topic Mapping" || !currentTitle.includes(" — ");
-                    if (isCurrentGeneric && canonicalName && canonicalName !== topicName) {
+                    if (!metadataTitle && isCurrentGeneric && canonicalName && canonicalName !== topicName) {
                         groupMeta[key].title = extractedCode ? `${extractedCode} — ${canonicalName}` : canonicalName;
                     }
 

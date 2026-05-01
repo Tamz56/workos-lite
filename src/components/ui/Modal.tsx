@@ -25,9 +25,17 @@ export function Modal(props: ModalProps) {
     const [mounted, setMounted] = React.useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
     const modalId = React.useId();
+    const onCloseRef = React.useRef(onClose);
+
+    React.useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
 
     React.useEffect(() => {
         setMounted(true);
+    }, []);
+
+    React.useEffect(() => {
         if (!isOpen) return;
 
         // Add to stack only if not already present (stable mount order)
@@ -39,8 +47,16 @@ export function Modal(props: ModalProps) {
         const originalOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
 
-        // Focus trap initial focus
-        setTimeout(() => containerRef.current?.focus(), 10);
+        // Focus the modal shell only when nothing inside it has already claimed focus.
+        // This prevents controlled inputs from losing focus after each parent render.
+        const focusTimer = window.setTimeout(() => {
+            const container = containerRef.current;
+            if (!container) return;
+            const activeElement = document.activeElement;
+            if (!activeElement || activeElement === document.body || !container.contains(activeElement)) {
+                container.focus();
+            }
+        }, 10);
 
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
@@ -48,7 +64,7 @@ export function Modal(props: ModalProps) {
                 if (modalList[modalList.length - 1] === modalId) {
                     e.preventDefault();
                     e.stopPropagation();
-                    onClose();
+                    onCloseRef.current();
                 }
             }
         };
@@ -57,10 +73,11 @@ export function Modal(props: ModalProps) {
         return () => {
             modalList = modalList.filter(id => id !== modalId);
             
+            window.clearTimeout(focusTimer);
             window.removeEventListener("keydown", handleEsc, true);
             document.body.style.overflow = originalOverflow || "unset";
         };
-    }, [isOpen, onClose, modalId]);
+    }, [isOpen, modalId]);
 
     if (!isOpen || !mounted) return null;
 
