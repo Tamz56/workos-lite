@@ -324,6 +324,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
     const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
     const [loadingTasks, setLoadingTasks] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [lists, setLists] = useState<any[]>([]);
@@ -383,9 +384,11 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     }, [workspaceId]);
 
     // Fetch Tasks with Server-side Filtering & Pagination
-    const fetchTasks = useCallback(async (isLoadMore = false) => {
-        const currentOffset = isLoadMore ? offset + LIMIT : 0;
-        if (!isLoadMore) setLoadingTasks(true);
+    // Accept explicit offset to avoid closure staleness and dependency loops
+    const fetchTasks = useCallback(async (isLoadMore = false, explicitOffset?: number) => {
+        const currentOffset = isLoadMore ? (typeof explicitOffset === 'number' ? explicitOffset : 0) : 0;
+        if (isLoadMore) setLoadingMore(true);
+        else setLoadingTasks(true);
 
         try {
             const params = new URLSearchParams();
@@ -409,19 +412,26 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             const data = (await res.json()) as Task[];
 
             if (isLoadMore) {
-                setTasks(prev => [...prev, ...data]);
+                // Append with dedupe by id to avoid duplicates
+                setTasks(prev => {
+                    const existingIds = new Set(prev.map(t => t.id));
+                    const newItems = data.filter(d => !existingIds.has(d.id));
+                    if (newItems.length === 0) return prev;
+                    return [...prev, ...newItems];
+                });
             } else {
                 setTasks(data);
             }
-            
+
             setOffset(currentOffset);
             setHasMore(data.length === LIMIT);
         } catch (e) {
             console.error("Failed to fetch tasks", e);
         } finally {
-            setLoadingTasks(false);
+            if (isLoadMore) setLoadingMore(false);
+            else setLoadingTasks(false);
         }
-    }, [workspaceId, state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter, state.templateFilter, state.reviewStatusFilter, state.scheduleFilter, state.dateRange.start, state.dateRange.end, state.search, offset]);
+    }, [workspaceId, state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter, state.templateFilter, state.reviewStatusFilter, state.scheduleFilter, state.dateRange.start, state.dateRange.end, state.search]);
 
     // RC37: Keyboard-First Flow
     useEffect(() => {
@@ -1133,8 +1143,8 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                                 <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => { setIsCommandPaletteOpen(false); lastActiveElement.current?.focus(); }} commands={commands} />
                                 {hasMore && (
                                     <div className="p-8 flex justify-center pb-32">
-                                        <button onClick={() => fetchTasks(true)} disabled={loadingTasks} className="px-6 py-2 bg-white border border-neutral-200 rounded-full text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-all shadow-sm active:scale-95 disabled:opacity-50">
-                                            {loadingTasks ? "Loading..." : "Load More Tasks"}
+                                        <button onClick={() => fetchTasks(true, offset + LIMIT)} disabled={loadingTasks || loadingMore} className="px-6 py-2 bg-white border border-neutral-200 rounded-full text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-all shadow-sm active:scale-95 disabled:opacity-50">
+                                            {loadingMore ? "Loading..." : "Load More Tasks"}
                                         </button>
                                     </div>
                                 )}
