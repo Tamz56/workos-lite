@@ -143,11 +143,47 @@ const VALID_VISUAL_STATUSES: ArticleStudioVisualStatus[] = ["not_needed_yet", "n
 
 const SECTION_ALIASES: Record<ArticleStudioSectionKey, string[]> = {
     research_direction: ["research direction", "research", "direction"],
-    draft: ["draft", "article draft", "article_markdown", "article markdown"],
+    draft: [
+        "draft",
+        "article draft",
+        "article_markdown",
+        "article markdown",
+        "article",
+        "full article",
+        "article markdown / draft",
+        "article hub markdown",
+        "เนื้อหาบทความ",
+        "บทความ",
+    ],
     seo_schema: ["seo & schema", "seo and schema", "seo schema", "seo", "schema"],
     visual_brief: ["visual brief", "visual package", "visual"],
     publish_checklist: ["publish checklist", "review / publish", "publish"],
 };
+
+function isMeaningfulDraft(body: string) {
+    if (!body) return false;
+    const cleaned = body.trim();
+    // Reject if body is mostly lists / headings / inline fields
+    const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return false;
+    const nonListLines = lines.filter(l => !/^([-*+]\s|\d+\.|#{1,4}\s|\w+\s*:\s)/.test(l));
+    if (nonListLines.length === 0) return false;
+
+    if (cleaned.length < 80) {
+        // If short, check for sentence-like content (contains punctuation or Thai sentence end)
+        if (/[\.\!\?。]|\n\n/.test(cleaned)) return true;
+        // Accept shorter content if it's reasonably long (covers short Thai sentences)
+        if (cleaned.length >= 30) return true;
+        return false;
+    }
+
+    // If any non-list line has substantial length, accept
+    if (nonListLines.some(l => l.length > 40)) return true;
+
+    // Otherwise, check for paragraph separators
+    if (/\n\s*\n/.test(body)) return true;
+    return false;
+}
 
 function normalizeKey(value: string) {
     return value.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
@@ -385,7 +421,28 @@ function buildMarkdownPackage(input: string): ArticleStudioPreview {
         ])
     ) as Record<ArticleStudioSectionKey, string>;
 
-    if (!byField.article_markdown) byField.article_markdown = sections.draft || (blocks.length === 0 ? input.trim() : "");
+    // Determine article/draft body robustly
+    let draftCandidate = sections.draft || "";
+    if (draftCandidate && !isMeaningfulDraft(draftCandidate)) {
+        // If the explicit draft section exists but doesn't look like a full draft,
+        // try to find any other heading block that contains meaningful body.
+        const found = blocks.find((b) => isMeaningfulDraft(b.body));
+        if (found) draftCandidate = found.body;
+        else draftCandidate = "";
+    }
+
+    // If no explicit draft found, try to pick the first meaningful block body
+    if (!draftCandidate) {
+        const found = blocks.find((b) => isMeaningfulDraft(b.body));
+        if (found) draftCandidate = found.body;
+    }
+
+    // Final fallback: if there are no headings and input looks like a body, use input
+    if (!draftCandidate && blocks.length === 0) {
+        draftCandidate = input.trim();
+    }
+
+    if (!byField.article_markdown) byField.article_markdown = draftCandidate || "";
     if (!byField.visual_brief) byField.visual_brief = sections.visual_brief;
     if (!byField.title) byField.title = blocks[0]?.heading ?? "";
 
