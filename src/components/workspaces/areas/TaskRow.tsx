@@ -102,8 +102,8 @@ export default function TaskRow({
                 id={`task-row-${task.id}`}
                 onClick={onClick}
                 onMouseEnter={() => prefetchTaskDetail(task.id)}
-                className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-1.5 px-4 border-b hover:bg-indigo-50/30 transition-all duration-300 cursor-pointer ${
-                    isSelected ? "bg-indigo-50/50 border-blue-100 ring-1 ring-blue-500/20 shadow-md z-10" : "bg-theme-card border-neutral-100"
+                className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-2 px-4 border-b hover:bg-indigo-50/40 transition-all duration-200 cursor-pointer ${
+                    isSelected ? "bg-indigo-50/60 border-blue-100 ring-1 ring-blue-500/20 shadow-sm z-10" : "bg-theme-card border-neutral-100"
                 } ${isDone ? "opacity-60" : ""} ${dimmingClass}`}
             >
                 {/* Column 1: Task Name & Topic Cue */}
@@ -166,11 +166,11 @@ export default function TaskRow({
                 </div>
 
                 {/* Column 3: Date */}
-                <div className={`px-4 border-l border-neutral-100/30 h-full flex items-center text-[10px] font-black tracking-tight ${
+                <div className={`px-4 border-l border-neutral-100/50 h-full flex items-center text-[11px] font-bold tracking-tight ${
                     !task.scheduled_date ? 'text-neutral-300' : 
-                    isOverdue ? 'text-red-500' : 'text-neutral-500'
+                    isOverdue ? 'text-red-600' : 'text-neutral-600'
                 }`}>
-                    <Calendar size={10} className="mr-2 shrink-0 opacity-40" />
+                    <Calendar size={11} className="mr-2 shrink-0 opacity-50" />
                     {task.scheduled_date || "NO DATE"}
                 </div>
 
