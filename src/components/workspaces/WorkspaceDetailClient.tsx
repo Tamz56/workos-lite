@@ -95,6 +95,26 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const [suggestions, setSuggestions] = useState<SuggestedAction[]>([]);
     const [microInsight, setMicroInsight] = useState<MicroInsight | null>(null);
     const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
+    
+    // Focus Mode (RC: Workspace Ergonomics)
+    const [isFocusMode, setIsFocusMode] = useState(false);
+    const [isFocusHydrated, setIsFocusHydrated] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && workspaceId) {
+            const saved = localStorage.getItem(`workos.workspace.focusMode.${workspaceId}`);
+            if (saved !== null) setIsFocusMode(saved === "true");
+            setIsFocusHydrated(true);
+        }
+    }, [workspaceId]);
+
+    const toggleFocusMode = useCallback(() => {
+        setIsFocusMode(prev => {
+            const next = !prev;
+            localStorage.setItem(`workos.workspace.focusMode.${workspaceId}`, String(next));
+            return next;
+        });
+    }, [workspaceId]);
 
     const intelligence: IntelligenceContext = useMemo(() => ({
         skips,
@@ -350,10 +370,8 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const [viewHintDismissed, setViewHintDismissed] = useState(false);
     const [viewHintAccepted, setViewHintAccepted] = useState(false);
 
-    // RC41: Feedback & Focus
+    // RC41: Feedback
     const [feedbackStore, setFeedbackStore] = useState<FeedbackStore>({});
-    const [isFocusMode, setIsFocusMode] = useState(false);
-    const toggleFocusMode = () => setIsFocusMode(!isFocusMode);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && workspaceId) {
@@ -1059,7 +1077,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             )}
 
             <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col px-4">
-                {smartQueueItems.length > 0 && (
+                {smartQueueItems.length > 0 && !isFocusMode && (
                     <SmartQueueStrip items={smartQueueItems} onItemClick={handleQueueItemClick} onItemShown={handleQueueItemShown} onDismiss={() => setIsQueueDismissed(true)} />
                 )}
                 {suggestedView && !isFocusMode && !state.isFlowMode && (
