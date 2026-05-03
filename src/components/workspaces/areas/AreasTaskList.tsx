@@ -273,15 +273,15 @@ export default function AreasTaskList({
     return (
         <div className="flex flex-col h-full min-h-0 bg-white overflow-hidden relative">
             {/* Field Headers (Fixed above the list) */}
-            <div className="hidden sm:flex items-center py-2 px-4 border-b border-neutral-200 bg-neutral-50/80 text-[10px] uppercase font-bold text-neutral-400 tracking-wider z-20 backdrop-blur-sm shrink-0">
+            <div className="hidden sm:flex items-center py-1.5 px-4 border-b border-neutral-200 bg-neutral-50/80 text-[9px] uppercase font-bold text-neutral-400 tracking-wider z-20 backdrop-blur-sm shrink-0">
                 <div className="flex-1 ml-5">Task Name</div>
-                <div className="flex items-center gap-6 ml-4">
+                <div className="flex items-center gap-4 ml-4">
                     <div className="w-20">Status</div>
-                    <div className="w-24">Date</div>
-                    <div className="w-16">Priority</div>
-                    <div className="hidden md:block w-32">List</div>
+                    <div className="w-20">Date</div>
+                    <div className="w-14">Priority</div>
+                    <div className="hidden md:block w-28">List</div>
                     <div className="hidden lg:block w-20">Sprint</div>
-                    <div className="w-16 text-right">Links</div>
+                    <div className="w-12 text-right">Links</div>
                 </div>
             </div>
 
@@ -296,9 +296,9 @@ export default function AreasTaskList({
                             const isTodoGroup = group.key === "To-Do";
                             return (
                                 <div className="flex flex-col">
-                                    <div className="bg-neutral-50/80 backdrop-blur-sm py-1 px-4 border-b border-neutral-100 flex items-center justify-between">
-                                        <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">{group.key}</h3>
-                                        <span className="text-[9px] font-bold text-neutral-300">
+                                    <div className="bg-neutral-50/80 backdrop-blur-sm py-0.5 px-4 border-b border-neutral-100 flex items-center justify-between">
+                                        <h3 className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">{group.key}</h3>
+                                        <span className="text-[8px] font-bold text-neutral-300">
                                             {group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}
                                         </span>
                                     </div>

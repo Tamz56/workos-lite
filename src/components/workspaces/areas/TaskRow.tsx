@@ -102,7 +102,7 @@ export default function TaskRow({
                 id={`task-row-${task.id}`}
                 onClick={onClick}
                 onMouseEnter={() => prefetchTaskDetail(task.id)}
-                className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-2 px-4 border-b hover:bg-indigo-50/40 transition-all duration-200 cursor-pointer ${
+                className={`group grid grid-cols-[1fr_120px_120px_40px] items-center py-1.5 px-4 border-b hover:bg-indigo-50/40 transition-all duration-200 cursor-pointer ${
                     isSelected ? "bg-indigo-50/60 border-blue-100 ring-1 ring-blue-500/20 shadow-sm z-10" : "bg-theme-card border-neutral-100"
                 } ${isDone ? "opacity-60" : ""} ${dimmingClass}`}
             >
@@ -213,7 +213,7 @@ export default function TaskRow({
             id={`task-row-${task.id}`}
             onClick={onClick}
             onMouseEnter={() => prefetchTaskDetail(task.id)}
-            className={`relative group w-full flex flex-col sm:flex-row sm:items-center py-2 px-3 sm:px-4 border-b hover:bg-neutral-50 cursor-pointer transition-all duration-300 ${rowClass} ${
+            className={`relative group w-full flex flex-col sm:flex-row sm:items-center py-1.5 px-3 sm:px-4 border-b hover:bg-neutral-50 cursor-pointer transition-all duration-300 ${rowClass} ${
                 isDone ? "opacity-60 hover:opacity-100" : ""
             } ${dimmingClass} ${isActiveExecution ? "ring-2 ring-blue-500/20 shadow-lg z-20 scale-[1.01] -mx-1 px-5 rounded-md" : ""} ${
                 isMultiSelected ? "bg-indigo-50/30" : ""

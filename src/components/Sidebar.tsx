@@ -62,11 +62,11 @@ export function Sidebar() {
 
     // Avoid flash of expanded sidebar during hydration
     if (!isHydrated) {
-        return <aside className="w-64 bg-theme-sidebar border-r border-white/10 h-screen sticky top-0 z-40" />;
+        return <aside className="w-56 bg-theme-sidebar border-r border-white/10 h-screen sticky top-0 z-40" />;
     }
 
     return (
-        <aside className={`${isCollapsed ? "w-20" : "w-64"} bg-theme-sidebar border-r border-white/10 shadow-[1px_0_0_rgba(0,0,0,0.03)] flex flex-col h-screen sticky top-0 z-40 transition-all duration-300 transition-theme overflow-hidden`}>
+        <aside className={`${isCollapsed ? "w-18" : "w-56"} bg-theme-sidebar border-r border-white/10 shadow-[1px_0_0_rgba(0,0,0,0.03)] flex flex-col h-screen sticky top-0 z-40 transition-all duration-300 transition-theme overflow-hidden`}>
             {/* Logo */}
             <div className={`h-16 flex items-center ${isCollapsed ? "justify-center px-0" : "px-6"} border-b border-white/10 mb-4 transition-all duration-300`}>
                 {isCollapsed ? (

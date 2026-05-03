@@ -353,7 +353,14 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
     };
 
     return (
-        <Modal isOpen={isOpen} title="Task Details" onClose={handleClose} maxWidth="max-w-5xl">
+        <Modal 
+            isOpen={isOpen} 
+            title="Task Details" 
+            onClose={handleClose} 
+            maxWidth="max-w-[1400px]"
+            panelClassName="!w-[92vw] !h-[92vh] !max-h-[92vh]"
+            contentClassName="!pb-12"
+        >
             <div className="flex flex-col h-full animate-in fade-in duration-500 relative">
                 {/* Dismissal Overlay - Reactive UI feedback */}
                 {isDismissing && (
@@ -400,10 +407,9 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                 {/* Body */}
                 <div className="py-6 overflow-y-auto flex-1 space-y-12 scrollbar-hide-until-hover pb-24">
                     {/* OVERVIEW SECTION */}
-                    <section className="space-y-6">
-                        <h3 className="text-[10px] font-black text-theme-muted uppercase tracking-widest">Overview</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                            <div>
+                    <section className="space-y-4">
+                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                            <div className="lg:col-span-1">
                                 <label className={LABEL_BASE}>Status</label>
                                 <select className={INPUT_BASE} value={status?.toLowerCase() || 'inbox'} onChange={(e) => handleStatusChange(e.target.value)} disabled={readOnly}>
                                     <option value="inbox">Inbox</option>
@@ -436,26 +442,66 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                                     <option value={4}>Urgent</option>
                                 </select>
                             </div>
+                            <div className="col-span-2 lg:col-span-1">
+                                <label className={LABEL_BASE}>Scheduled</label>
+                                <input type="date" className={INPUT_BASE} value={scheduledDate || ""} onChange={(e) => { setScheduledDate(normalizeDate(e.target.value)); triggerSave(); }} disabled={readOnly} />
+                            </div>
                         </div>
 
-                        <div>
-                            <label className={LABEL_BASE}>Summary / Checkpoints</label>
-                            <div className="overflow-hidden rounded-xl border border-transparent bg-theme-input/50 transition-all focus-within:border-theme-accent/50 focus-within:bg-theme-card hover:bg-theme-input/80">
-                                <MarkdownToolbar
-                                    value={description}
-                                    onChange={handleDescriptionChange}
-                                    textareaRef={descriptionTextareaRef}
-                                    disabled={readOnly}
-                                    className="rounded-none border-x-0 border-t-0 bg-theme-panel/50"
-                                />
-                                <textarea
-                                    ref={descriptionTextareaRef}
-                                    className="w-full min-h-[100px] bg-transparent px-3 py-2 font-mono text-sm leading-relaxed resize-y outline-none placeholder:text-theme-muted text-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                                    value={description}
-                                    onChange={e => handleDescriptionChange(e.target.value)}
-                                    placeholder="Add highlights or execution steps here..."
-                                    readOnly={readOnly}
-                                />
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2">
+                                <label className={LABEL_BASE}>Summary / Checkpoints</label>
+                                <div className="overflow-hidden rounded-xl border border-transparent bg-theme-input/50 transition-all focus-within:border-theme-accent/50 focus-within:bg-theme-card hover:bg-theme-input/80">
+                                    <MarkdownToolbar
+                                        value={description}
+                                        onChange={handleDescriptionChange}
+                                        textareaRef={descriptionTextareaRef}
+                                        disabled={readOnly}
+                                        className="rounded-none border-x-0 border-t-0 bg-theme-panel/50"
+                                    />
+                                    <textarea
+                                        ref={descriptionTextareaRef}
+                                        className="w-full min-h-[300px] bg-transparent px-3 py-2 font-mono text-sm leading-relaxed resize-y outline-none placeholder:text-theme-muted text-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                        value={description}
+                                        onChange={e => handleDescriptionChange(e.target.value)}
+                                        placeholder="Add highlights or execution steps here..."
+                                        readOnly={readOnly}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* SUBTASKS & CHECKLIST moved here for density */}
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <label className={LABEL_BASE + " !mb-0"}>Subtasks</label>
+                                        <button onClick={handleCreateSubtask} className="text-[10px] uppercase font-black tracking-widest text-blue-500 hover:text-blue-600 bg-blue-500/10 px-2.5 py-1 rounded-lg transition-all duration-150 interactive-scale">
+                                            + Add
+                                        </button>
+                                    </div>
+                                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                        {realSubtasks.map(s => (
+                                            <div key={s.id} className="flex items-center gap-2 p-2 bg-theme-card border border-theme-border rounded-lg hover:border-theme-accent transition-all cursor-pointer" onClick={() => { const qs = new URLSearchParams(window.location.search); qs.set("taskId", s.id); router.replace(`?${qs.toString()}`, { scroll: false }); }}>
+                                                <div className="font-bold text-xs text-theme-primary flex-1 truncate">{s.title || "Untitled"}</div>
+                                                <div className="text-[9px] px-1.5 py-0.5 rounded-full bg-theme-input text-theme-muted uppercase font-black">{s.status}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className={LABEL_BASE + " block"}>Checklist</label>
+                                    <div className="space-y-1 mb-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                        {checklistItems.map((s, idx) => (
+                                            <div key={s.id} className="flex items-start gap-2 py-1 group">
+                                                <input type="checkbox" checked={s.done} onChange={() => toggleChecklist(idx)} className="mt-0.5 w-3.5 h-3.5 rounded border-theme-border bg-theme-input text-theme-accent focus:ring-theme-accent cursor-pointer shadow-sm transition-colors" />
+                                                <span className={`flex-1 text-xs font-medium leading-tight transition-colors ${s.done ? "text-theme-muted line-through" : "text-theme-primary"}`}>{s.text}</span>
+                                                <button onClick={() => removeChecklist(idx)} className="opacity-0 group-hover:opacity-100 text-theme-muted hover:text-red-500 transition-opacity font-black text-sm leading-none">&times;</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <input className={INPUT_BASE} placeholder="+ Add item..." onKeyDown={e => { if (e.key === "Enter") { handleAddChecklist(e.currentTarget.value); e.currentTarget.value = ""; } }} />
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -524,39 +570,7 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                         </section>
                     )}
 
-                    {/* SUBTASKS & CHECKLIST */}
-                    <section className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-2 border-t border-theme-border">
-                        <div>
-                            <div className="flex justify-between items-center mb-4">
-                                <label className={LABEL_BASE + " !mb-0"}>Subtasks</label>
-                                <button onClick={handleCreateSubtask} className="text-[10px] uppercase font-black tracking-widest text-blue-500 hover:text-blue-600 bg-blue-500/10 px-2.5 py-1 rounded-lg transition-all duration-150 interactive-scale">
-                                    + Add Subtask
-                                </button>
-                            </div>
-                            <div className="space-y-2">
-                                {realSubtasks.map(s => (
-                                    <div key={s.id} className="flex items-center gap-3 p-2.5 bg-theme-card border border-theme-border rounded-xl hover:border-theme-accent transition-all cursor-pointer" onClick={() => { const qs = new URLSearchParams(window.location.search); qs.set("taskId", s.id); router.replace(`?${qs.toString()}`, { scroll: false }); }}>
-                                        <div className="font-black text-sm text-theme-primary flex-1 truncate">{s.title || "Untitled Subtask"}</div>
-                                        <div className="text-[10px] px-2 py-0.5 rounded-full bg-theme-input text-theme-muted uppercase font-black tracking-widest">{s.status}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
 
-                        <div>
-                            <label className={LABEL_BASE + " mb-4 block"}>Checklist</label>
-                            <div className="space-y-1 mb-3">
-                                {checklistItems.map((s, idx) => (
-                                    <div key={s.id} className="flex items-start gap-3 py-1.5 group">
-                                        <input type="checkbox" checked={s.done} onChange={() => toggleChecklist(idx)} className="mt-0.5 w-4 h-4 rounded border-theme-border bg-theme-input text-theme-accent focus:ring-theme-accent cursor-pointer shadow-sm transition-colors" />
-                                        <span className={`flex-1 text-sm font-medium leading-tight transition-colors ${s.done ? "text-theme-muted line-through" : "text-theme-primary"}`}>{s.text}</span>
-                                        <button onClick={() => removeChecklist(idx)} className="opacity-0 group-hover:opacity-100 text-theme-muted hover:text-red-500 transition-opacity font-black text-lg leading-none">&times;</button>
-                                    </div>
-                                ))}
-                            </div>
-                            <input className={INPUT_BASE} placeholder="+ Add checklist item..." onKeyDown={e => { if (e.key === "Enter") { handleAddChecklist(e.currentTarget.value); e.currentTarget.value = ""; } }} />
-                        </div>
-                    </section>
 
                     {/* AGENT AUTOMATION */}
                     <section className={`space-y-6 pt-6 border-l-4 ${agentEnabled ? 'border-theme-accent bg-theme-accent/5' : 'border-transparent'} px-5 py-6 transition-all`}>

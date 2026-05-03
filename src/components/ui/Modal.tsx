@@ -11,6 +11,8 @@ interface ModalProps {
     maxWidth?: string; // e.g. "max-w-2xl" or "max-w-4xl"
     hideBackdrop?: boolean;
     closeOnOutsideClick?: boolean;
+    panelClassName?: string;
+    contentClassName?: string;
 }
 
 // Global list to track open modals in mount order
@@ -21,7 +23,14 @@ export function isAnyModalOpen() {
 }
 
 export function Modal(props: ModalProps) {
-    const { isOpen, title, onClose, children, maxWidth = "max-w-2xl", hideBackdrop = false, closeOnOutsideClick = true } = props;
+    const { 
+        isOpen, title, onClose, children, 
+        maxWidth = "max-w-2xl", 
+        hideBackdrop = false, 
+        closeOnOutsideClick = true,
+        panelClassName = "",
+        contentClassName = ""
+    } = props;
     const [mounted, setMounted] = React.useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
     const modalId = React.useId();
@@ -99,7 +108,7 @@ export function Modal(props: ModalProps) {
             <div 
                 ref={containerRef}
                 tabIndex={-1}
-                className={`relative w-full ${maxWidth} rounded-[24px] border border-theme-border bg-theme-overlay shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300 flex flex-col max-h-[90vh] outline-none`}
+                className={`relative w-full ${maxWidth} rounded-[24px] border border-theme-border bg-theme-overlay shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300 flex flex-col max-h-[90vh] outline-none ${panelClassName}`}
             >
                 {/* Header - Compact */}
                 <div className="px-8 pt-8 pb-4 flex items-center justify-between gap-3 shrink-0">
@@ -117,7 +126,7 @@ export function Modal(props: ModalProps) {
                 </div>
                 
                 {/* Scrollable Body - Compact */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-8">
+                <div className={`flex-1 overflow-y-auto custom-scrollbar px-8 pb-8 ${contentClassName}`}>
                     {children}
                 </div>
             </div>

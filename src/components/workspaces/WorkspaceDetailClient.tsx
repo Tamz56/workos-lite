@@ -1076,7 +1076,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 <AreasFilterBar workspaceId={workspaceId} tasks={tasks} lists={lists} sprints={sprints} state={state} updateState={updateState} />
             )}
 
-            <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col px-4">
+            <div className={`flex-1 min-h-0 overflow-hidden relative flex flex-col transition-all duration-300 ${isFocusMode ? 'px-1 md:px-2' : 'px-4'}`}>
                 {smartQueueItems.length > 0 && !isFocusMode && (
                     <SmartQueueStrip items={smartQueueItems} onItemClick={handleQueueItemClick} onItemShown={handleQueueItemShown} onDismiss={() => setIsQueueDismissed(true)} />
                 )}
