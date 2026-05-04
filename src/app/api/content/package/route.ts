@@ -77,8 +77,6 @@ export async function POST(req: NextRequest) {
       const now = new Date().toISOString();
       const warnings: string[] = [];
       const taskIds: string[] = [];
-      const docTitle = `[${pkg.topic_id}] Article Hub — ${pkg.title}`;
-      const docMarkdown = formatArticlePackageMarkdown(pkg);
       let resolvedListId = "";
       let docId = "";
       let reusedList = false;
@@ -91,49 +89,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const stages = [
-        {
-          title: "Research Direction",
-          checklist: [
-            "Confirm learning intent and target reader",
-            "Review prerequisite and related links",
-            "Check source direction before drafting",
-          ],
-        },
-        {
-          title: "Draft",
-          checklist: [
-            "Review article body for clarity and Thai-first flow",
-            "Check claims and examples",
-            "Prepare revision notes",
-          ],
-        },
-        {
-          title: "SEO & Schema",
-          checklist: [
-            "Review slug, meta title, and meta description",
-            "Validate internal links",
-            "Review FAQ and Article schema",
-          ],
-        },
-        {
-          title: "Visual Package",
-          checklist: [
-            "Prepare cover or hero image direction",
-            "Prepare supporting visual assets",
-            "Match visuals with article promise",
-          ],
-        },
-        {
-          title: "Review / Publish",
-          checklist: [
-            "Final editorial review",
-            "Publish article",
-            "Post group and page distribution copy",
-          ],
-        },
-      ];
-
       const tx = db.transaction(() => {
         const listResolution = resolveContentListForTopic(db, {
           topicId: pkg.topic_id,
@@ -144,25 +99,6 @@ export async function POST(req: NextRequest) {
         resolvedListId = listResolution.list.id;
         reusedList = !listResolution.created;
         warnings.push(...listResolution.warnings);
-
-        const existingDoc = findExistingTopicDoc(db, pkg.topic_id);
-        if (existingDoc) {
-          docId = existingDoc.id;
-          reusedDoc = true;
-        } else {
-          docId = nanoid();
-
-          db.prepare(`
-            INSERT INTO docs (id, title, content_md, workspace, created_at, updated_at)
-            VALUES (@id, @title, @content_md, 'content', @created_at, @updated_at)
-          `).run({
-            id: docId,
-            title: docTitle,
-            content_md: pkg.mode === "partial" ? "" : docMarkdown,
-            created_at: now,
-            updated_at: now,
-          });
-        }
 
         if (pkg.mode === "partial") {
           const stepRole = pkg.detectedStepRole || "general";
@@ -187,28 +123,32 @@ export async function POST(req: NextRequest) {
              db.prepare(`
                 UPDATE tasks
                 SET list_id = @list_id,
-                    doc_id = COALESCE(doc_id, @doc_id),
                     notes = @notes,
                     updated_at = @updated_at
                 WHERE id = @id
               `).run({
                 id: existingTask.id,
                 list_id: resolvedListId,
-                doc_id: docId,
                 notes: newNotes,
                 updated_at: now,
               });
           } else {
              const taskId = nanoid();
              taskIds.push(taskId);
-             const notes = buildArticleTaskNotes({ pkg, stage: stageTitle, docId, checklist: [] }) + `\n\n${markedBlock}`;
+             const notes = `---
+topic_id: ${pkg.topic_id}
+topic_title: ${pkg.title}
+template_key: article
+stage: ${stageTitle}
+status_label: ${pkg.status || "Needs Review"}
+---\n\n${markedBlock}`;
              
              db.prepare(`
                 INSERT INTO tasks (
                   id, title, workspace, list_id, status, notes, doc_id,
                   sort_order, review_status, created_at, updated_at
                 ) VALUES (
-                  @id, @title, 'content', @list_id, 'review', @notes, @doc_id,
+                  @id, @title, 'content', @list_id, 'review', @notes, NULL,
                   @sort_order, 'in_review', @created_at, @updated_at
                 )
               `).run({
@@ -216,14 +156,78 @@ export async function POST(req: NextRequest) {
                 title: `[${pkg.topic_id}] ${stageTitle} — ${pkg.title}`,
                 list_id: resolvedListId,
                 notes,
-                doc_id: docId,
                 sort_order: 1,
                 created_at: now,
                 updated_at: now,
               });
           }
         } else {
-            // Full Package mode: Create/update all 5 tasks
+            // Full Package mode: Create/update all 5 tasks and shared doc
+            const docTitle = `[${pkg.topic_id}] Article Hub — ${pkg.title}`;
+            const docMarkdown = formatArticlePackageMarkdown(pkg);
+
+            const stages = [
+              {
+                title: "Research Direction",
+                checklist: [
+                  "Confirm learning intent and target reader",
+                  "Review prerequisite and related links",
+                  "Check source direction before drafting",
+                ],
+              },
+              {
+                title: "Draft",
+                checklist: [
+                  "Review article body for clarity and Thai-first flow",
+                  "Check claims and examples",
+                  "Prepare revision notes",
+                ],
+              },
+              {
+                title: "SEO & Schema",
+                checklist: [
+                  "Review slug, meta title, and meta description",
+                  "Validate internal links",
+                  "Review FAQ and Article schema",
+                ],
+              },
+              {
+                title: "Visual Package",
+                checklist: [
+                  "Prepare cover or hero image direction",
+                  "Prepare supporting visual assets",
+                  "Match visuals with article promise",
+                ],
+              },
+              {
+                title: "Review / Publish",
+                checklist: [
+                  "Final editorial review",
+                  "Publish article",
+                  "Post group and page distribution copy",
+                ],
+              },
+            ];
+
+            const existingDoc = findExistingTopicDoc(db, pkg.topic_id);
+            if (existingDoc) {
+              docId = existingDoc.id;
+              reusedDoc = true;
+            } else {
+              docId = nanoid();
+    
+              db.prepare(`
+                INSERT INTO docs (id, title, content_md, workspace, created_at, updated_at)
+                VALUES (@id, @title, @content_md, 'content', @created_at, @updated_at)
+              `).run({
+                id: docId,
+                title: docTitle,
+                content_md: docMarkdown,
+                created_at: now,
+                updated_at: now,
+              });
+            }
+
             stages.forEach((stage, index) => {
               const existingTask = findExistingTopicStageTask(db, pkg.topic_id, stage.title);
               if (existingTask) {

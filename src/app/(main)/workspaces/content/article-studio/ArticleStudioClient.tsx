@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Download, FileText, Loader2, PackagePlus, Sparkles } from "lucide-react";
@@ -211,7 +211,8 @@ function MissingFieldsCard({ groups, isPartial }: { groups: ArticleStudioPreview
 }
 
 function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
-    const markdown = formatArticlePackageMarkdown(preview);
+    const isPartial = preview.mode === "partial";
+    const markdown = isPartial ? preview.article_markdown : formatArticlePackageMarkdown(preview);
 
     return (
         <div className="space-y-5">
@@ -312,10 +313,10 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
             <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
                 <div className="mb-3 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-blue-600" />
-                    <h3 className="text-sm font-black text-theme-primary">Article Hub Markdown</h3>
+                    <h3 className="text-sm font-black text-theme-primary">{isPartial ? "Partial Step Markdown" : "Article Hub Markdown"}</h3>
                 </div>
                 <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-theme-border bg-theme-input p-4 text-xs leading-6 text-theme-secondary custom-scrollbar">
-                    {markdown}
+                    {markdown || <span className="text-theme-muted italic">No content yet.</span>}
                 </pre>
             </section>
         </div>
@@ -343,7 +344,27 @@ export default function ArticleStudioClient() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [importMode, setImportMode] = useState<ArticleStudioMode>("editorial");
+    const [isManualMode, setIsManualMode] = useState(false);
+    const prevRawInput = useRef(rawInput);
     const previewInput = useDebouncedValue(rawInput, 250);
+
+    useEffect(() => {
+        const isClearingInput = rawInput.trim() === "" && prevRawInput.current.trim() !== "";
+        prevRawInput.current = rawInput;
+
+        if (isClearingInput) {
+            setImportMode("editorial");
+            setIsManualMode(false);
+            return;
+        }
+
+        if (!isManualMode && rawInput.trim() !== "") {
+            const hasPartialKeywords = /step_role|Research Raw|Research Direction|Brief|Script & Caption|Assets \/ Canva|SEO & Schema|Publish/i.test(rawInput);
+            if (hasPartialKeywords) {
+                setImportMode("partial");
+            }
+        }
+    }, [rawInput, isManualMode]);
 
     const preview = useMemo(() => {
         try {
@@ -448,13 +469,19 @@ export default function ArticleStudioClient() {
 
                             <div className="flex p-1 bg-theme-input rounded-xl border border-theme-border/50">
                                 <button
-                                    onClick={() => setImportMode("editorial")}
+                                    onClick={() => {
+                                        setImportMode("editorial");
+                                        setIsManualMode(true);
+                                    }}
                                     className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${importMode !== "partial" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
                                 >
                                     Full Package
                                 </button>
                                 <button
-                                    onClick={() => setImportMode("partial")}
+                                    onClick={() => {
+                                        setImportMode("partial");
+                                        setIsManualMode(true);
+                                    }}
                                     className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${importMode === "partial" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
                                 >
                                     Partial Step
