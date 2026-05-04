@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2, Download, FileText, Loader2, PackagePlus, Spar
 import { PageShell } from "@/components/layout/PageShell";
 import {
     ArticleStudioPreview,
+    ArticleStudioMode,
     buildPublishPackJson,
     formatArticlePackageMarkdown,
     parseArborArticlePackage,
@@ -133,14 +134,14 @@ function MissingFieldGroup({
     emptyLabel,
     tone,
 }: {
-    title: string;
+    title?: string;
     items: ArticleStudioPreview["missingFieldGroups"]["required"];
     emptyLabel: string;
     tone: string;
 }) {
     return (
         <div className="flex flex-col gap-1.5">
-            <div className="text-[10px] font-black uppercase tracking-wider text-theme-muted">{title}</div>
+            {title && <div className="text-[10px] font-black uppercase tracking-wider text-theme-muted">{title}</div>}
             {items.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                     {items.map((item) => (
@@ -156,7 +157,36 @@ function MissingFieldGroup({
     );
 }
 
-function MissingFieldsCard({ groups }: { groups: ArticleStudioPreview["missingFieldGroups"] }) {
+function MissingFieldsCard({ groups, isPartial }: { groups: ArticleStudioPreview["missingFieldGroups"], isPartial?: boolean }) {
+    if (isPartial) {
+        return (
+            <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
+                <div className="space-y-6">
+                    <div>
+                        <div className="mb-3">
+                            <h3 className="text-[11px] font-black uppercase tracking-widest text-red-600">Required Now / Blocking</h3>
+                        </div>
+                        <MissingFieldGroup
+                            items={groups.required}
+                            emptyLabel="Ready for Update"
+                            tone="border-red-100 bg-red-50 text-red-600"
+                        />
+                    </div>
+                    <div className="pt-4 border-t border-theme-border/50">
+                        <div className="mb-3">
+                            <h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Later Fields</h3>
+                        </div>
+                        <MissingFieldGroup
+                            items={[...groups.recommended, ...groups.optional]}
+                            emptyLabel="– none –"
+                            tone="border-theme-border bg-theme-input text-theme-secondary"
+                        />
+                    </div>
+                </div>
+            </section>
+        );
+    }
+
     return (
         <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
             <div className="mb-4">
@@ -166,7 +196,7 @@ function MissingFieldsCard({ groups }: { groups: ArticleStudioPreview["missingFi
                 <MissingFieldGroup
                     title="Required"
                     items={groups.required}
-                    emptyLabel="– none –"
+                    emptyLabel="พร้อมสร้าง"
                     tone="border-red-100 bg-red-50 text-red-600"
                 />
                 <MissingFieldGroup
@@ -188,8 +218,17 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
             <div className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                        <div className="text-[11px] font-black uppercase tracking-widest text-blue-600">Preview Required</div>
-                        <h2 className="mt-1 break-words text-lg font-black tracking-tight text-theme-primary sm:text-xl">{preview.title || "Untitled Article"}</h2>
+                        <div className="flex items-center gap-2">
+                            <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${preview.mode === 'partial' ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-blue-50 border-blue-200 text-blue-600'}`}>
+                                {preview.mode === 'partial' ? 'Partial Step' : 'Full Package'}
+                            </div>
+                            {preview.detectedStepRole && preview.detectedStepRole !== 'general' && (
+                                <div className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-theme-input border border-theme-border text-theme-secondary">
+                                    {getStepLabel(preview.detectedStepRole)}
+                                </div>
+                            )}
+                        </div>
+                        <h2 className="mt-2 break-words text-lg font-black tracking-tight text-theme-primary sm:text-xl">{preview.title || "Untitled Article"}</h2>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {preview.status === "needs_human_insight" && (
@@ -219,7 +258,7 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
 
                 <div className="mb-4 grid gap-3 border-y border-theme-border py-4 lg:grid-cols-2">
                     <ContentHealthCard health={preview.contentHealth} />
-                    <MissingFieldsCard groups={preview.missingFieldGroups} />
+                    <MissingFieldsCard groups={preview.missingFieldGroups} isPartial={preview.mode === 'partial'} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
@@ -283,21 +322,36 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
     );
 }
 
+function getStepLabel(role: string) {
+    const labels: Record<string, string> = {
+        research_raw: "Research Raw — NotebookLM",
+        research_direction: "Research Direction — Arbor Questions",
+        brief: "Brief",
+        script_caption: "Script & Caption",
+        outline_web_article: "Outline Web Article",
+        assets_canva: "Assets / Canva",
+        seo_schema: "SEO & Schema",
+        publish: "Publish",
+    };
+    return labels[role] || role.replace('_', ' ');
+}
+
 export default function ArticleStudioClient() {
     const router = useRouter();
     const [rawInput, setRawInput] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [importMode, setImportMode] = useState<ArticleStudioMode>("editorial");
     const previewInput = useDebouncedValue(rawInput, 250);
 
     const preview = useMemo(() => {
         try {
-            return parseArborArticlePackage(previewInput);
+            return parseArborArticlePackage(previewInput, importMode);
         } catch {
             return null;
         }
-    }, [previewInput]);
+    }, [previewInput, importMode]);
 
     const canSave = !!preview && preview.missingFields.length === 0 && !isSaving;
 
@@ -377,18 +431,35 @@ export default function ArticleStudioClient() {
                 {/* Left Panel: Writing Workspace (Fixed-ish width but responsive) */}
                 <div className="relative flex flex-col">
                     <section className="sticky top-6 flex flex-col h-[calc(100vh-140px)] rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
-                        <div className="px-6 py-5 border-b border-theme-border/50 flex items-center justify-between bg-theme-card">
-                            <div>
-                                <h2 className="text-sm font-black text-theme-primary uppercase tracking-widest">Arbor Editor</h2>
-                                <p className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter mt-0.5">Markdown or JSON Input</p>
+                        <div className="px-6 py-5 border-b border-theme-border/50 flex flex-col gap-4 bg-theme-card">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-sm font-black text-theme-primary uppercase tracking-widest">Arbor Editor</h2>
+                                    <p className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter mt-0.5">Markdown or JSON Input</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setRawInput(EXAMPLE_PACKAGE)}
+                                    className="px-3 py-1.5 rounded-full bg-theme-input text-[10px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover transition-colors border border-theme-border"
+                                >
+                                    Load Example
+                                </button>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setRawInput(EXAMPLE_PACKAGE)}
-                                className="px-3 py-1.5 rounded-full bg-theme-input text-[10px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover transition-colors border border-theme-border"
-                            >
-                                Load Example
-                            </button>
+
+                            <div className="flex p-1 bg-theme-input rounded-xl border border-theme-border/50">
+                                <button
+                                    onClick={() => setImportMode("editorial")}
+                                    className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${importMode !== "partial" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
+                                >
+                                    Full Package
+                                </button>
+                                <button
+                                    onClick={() => setImportMode("partial")}
+                                    className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${importMode === "partial" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
+                                >
+                                    Partial Step
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex-1 relative group">
@@ -436,11 +507,13 @@ export default function ArticleStudioClient() {
                                     className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
                                 >
                                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
-                                    Create Package
+                                    {preview?.mode === 'partial' ? 'Update Package' : 'Create Package'}
                                 </button>
                             </div>
-                            <p className="mt-4 text-[9px] text-center font-bold text-theme-muted uppercase tracking-widest">
-                                Required fields must be satisfied to enable package creation
+                            <p className="mt-4 text-[9px] text-center font-bold text-theme-muted uppercase tracking-widest leading-relaxed">
+                                {preview?.mode === 'partial' 
+                                    ? "Partial mode: topic_id and content are required. SEO, FAQ, references, visuals, and social posts can be added later."
+                                    : "Full mode: All required fields must be satisfied to enable package creation."}
                             </p>
                         </div>
                     </section>

@@ -1,4 +1,14 @@
-export type ArticleStudioMode = "editorial" | "structured";
+export type ArticleStudioMode = "editorial" | "structured" | "partial";
+export type ArticleStudioStepRole = 
+    | "research_raw"
+    | "research_direction"
+    | "brief"
+    | "script_caption"
+    | "outline_web_article"
+    | "assets_canva"
+    | "seo_schema"
+    | "publish"
+    | "general";
 export type ArticleStudioStatus =
     | "idea"
     | "research"
@@ -66,6 +76,7 @@ export type ArticleStudioSectionKey =
 export type ArticleStudioPreview = ArticleStudioPackage & {
     sections: Record<ArticleStudioSectionKey, string>;
     detectedHeadings: string[];
+    detectedStepRole?: ArticleStudioStepRole;
     missingFields: string[];
     validationMessages: string[];
     generatedFields: string[];
@@ -127,7 +138,7 @@ const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     visual_status: ["visual_status", "visual status"],
 };
 
-const VALID_MODES: ArticleStudioMode[] = ["editorial", "structured"];
+const VALID_MODES: ArticleStudioMode[] = ["editorial", "structured", "partial"];
 const VALID_STATUSES: ArticleStudioStatus[] = [
     "idea",
     "research",
@@ -332,6 +343,54 @@ function stripFence(input: string) {
     return input.trim().replace(/^```(?:json|markdown|md)?\s*/i, "").replace(/```$/i, "").trim();
 }
 
+function detectStepRole(headings: string[], body: string): ArticleStudioStepRole {
+    const combined = [...headings, body.slice(0, 500)].join(" ").toLowerCase();
+    
+    // Check Research Raw first to avoid being caught by generic research patterns
+    if (combined.includes("research raw") || combined.includes("ข้อมูลดิบ") || combined.includes("notebooklm")) return "research_raw";
+    if (combined.includes("research direction") || combined.includes("แนวทางการวิจัย")) return "research_direction";
+    if (combined.includes("brief") || combined.includes("บรีฟ")) return "brief";
+    if (combined.includes("script & caption") || combined.includes("script") || combined.includes("caption")) return "script_caption";
+    if (combined.includes("outline web article") || combined.includes("outline")) return "outline_web_article";
+    if (combined.includes("assets") || combined.includes("canva")) return "assets_canva";
+    if (combined.includes("seo & schema") || combined.includes("seo") || combined.includes("schema")) return "seo_schema";
+    if (combined.includes("publish") || combined.includes("เผยแพร่")) return "publish";
+    
+    return "general";
+}
+
+function extractTopicId(input: string): string {
+    // 1. YAML: topic_id: GF-CONTENT-010
+    const yamlMatch = input.match(/topic_id:\s*(GF-CONTENT-\d+|GF-ARTICLE-\d+|TOPIC-\d+)/i);
+    if (yamlMatch) return yamlMatch[1].toUpperCase();
+
+    // 2. Thai: รหัส: GF-CONTENT-010
+    const thaiMatch = input.match(/(?:รหัส|รหัสงาน|ID)\s*[:：]\s*(GF-CONTENT-\d+|GF-ARTICLE-\d+|TOPIC-\d+)/i);
+    if (thaiMatch) return thaiMatch[1].toUpperCase();
+
+    // 3. H1: # GF-CONTENT-010 — Title
+    const h1Match = input.match(/^#\s+(GF-CONTENT-\d+|GF-ARTICLE-\d+|TOPIC-\d+)/m);
+    if (h1Match) return h1Match[1].toUpperCase();
+
+    return "";
+}
+
+function extractTopicTitle(input: string): string {
+    // 1. YAML: topic_title: ... or title: ...
+    const yamlMatch = input.match(/topic_title:\s*([^\n\r]+)/i) || input.match(/title:\s*([^\n\r]+)/i);
+    if (yamlMatch) return yamlMatch[1].trim();
+
+    // 2. H1 dash: # GF-CONTENT-010 — Title
+    const h1DashMatch = input.match(/^#\s+(?:GF-CONTENT-\d+|GF-ARTICLE-\d+|TOPIC-\d+)\s*(?:—|-|:)\s*([^\n\r]+)/m);
+    if (h1DashMatch) return h1DashMatch[1].trim();
+
+    // 3. Plain H1
+    const h1Match = input.match(/^#\s+(?!GF-CONTENT|GF-ARTICLE|TOPIC)([^\n\r]+)/m);
+    if (h1Match) return h1Match[1].trim();
+
+    return "";
+}
+
 function readJsonPackage(input: string): Partial<ArticleStudioPackage> | null {
     try {
         const parsed = JSON.parse(stripFence(input));
@@ -487,17 +546,22 @@ export function validateArticleStudioPackage(pkg: ArticleStudioPackage) {
     const missingFields: string[] = [];
     const validationMessages: string[] = [];
 
+    const isPartial = pkg.mode === "partial";
+
     if (isInvalidTopicId(pkg.topic_id)) {
         missingFields.push("topic_id");
         validationMessages.push("กรุณาเติม Topic ID จริง ห้ามใช้ค่าว่าง, GF-CONTENT-XXX หรือ TOPIC-ID");
     }
-    if (!pkg.title) {
+    
+    // Title is required for Full Package, but optional (though recommended) for Partial Step
+    if (!pkg.title && !isPartial) {
         missingFields.push("title");
-        validationMessages.push("กรุณาเติม Title ก่อนสร้าง Article Package");
+        validationMessages.push("กรุณาเติม Title ก่อนดำเนินการต่อ");
     }
+
     if (!pkg.article_markdown) {
         missingFields.push("article_markdown");
-        validationMessages.push("กรุณาเติม Article Markdown / Draft ก่อนสร้าง Article Package");
+        validationMessages.push("กรุณาเติมเนื้อหา (Content / Draft) ก่อนดำเนินการต่อ");
     }
 
     return { missingFields, validationMessages };
@@ -505,6 +569,8 @@ export function validateArticleStudioPackage(pkg: ArticleStudioPackage) {
 
 export function resolveArticleStudioMissingGroups(pkg: ArticleStudioPackage): ArticleStudioPreview["missingFieldGroups"] {
     const validation = validateArticleStudioPackage(pkg);
+    const isPartial = pkg.mode === "partial";
+
     const requiredLabels: Record<string, string> = {
         topic_id: "topic_id",
         title: "title",
@@ -518,24 +584,42 @@ export function resolveArticleStudioMissingGroups(pkg: ArticleStudioPackage): Ar
     }));
 
     const recommended: ArticleStudioMissingItem[] = [];
-    if (!pkg.meta_description) recommended.push({ field: "meta_description", label: "meta_description", state: "warning" });
-    if (pkg.keywords.length === 0) recommended.push({ field: "keywords", label: "keywords", state: "warning" });
-    if (
-        pkg.internal_links_prerequisite.length === 0 ||
-        pkg.internal_links_next_step.length === 0 ||
-        pkg.internal_links_related.length === 0
-    ) {
-        recommended.push({ field: "internal_links", label: "internal_links", state: "warning" });
-    }
-    if (!pkg.visual_brief && pkg.visual_status === "not_needed_yet") recommended.push({ field: "visual_brief", label: "visual_brief", state: "warning" });
-    if (!hasFaqContent(pkg)) recommended.push({ field: "schema_faq", label: "faq / schema_faq", state: "warning" });
-    if (!hasReferencesContent(pkg)) recommended.push({ field: "references", label: "references", state: "warning" });
-
     const optional: ArticleStudioMissingItem[] = [];
-    if (!pkg.group_post) optional.push({ field: "group_post", label: "group_post", state: "info" });
-    if (!pkg.page_post) optional.push({ field: "page_post", label: "page_post", state: "info" });
-    if (!pkg.canva_url) optional.push({ field: "canva_url", label: "canva_url", state: "info" });
-    if (!pkg.published_url) optional.push({ field: "published_url", label: "published_url", state: "info" });
+
+    if (isPartial) {
+        // Required Now in Partial mode: topic_id and article_markdown
+        // Title is recommended if missing
+        if (!pkg.title) recommended.push({ field: "title", label: "title", state: "warning" });
+        
+        // Everything else is Later Fields (Info)
+        if (!pkg.meta_description) optional.push({ field: "meta_description", label: "meta_description", state: "info" });
+        if (pkg.keywords.length === 0) optional.push({ field: "keywords", label: "keywords", state: "info" });
+        if (!hasFaqContent(pkg)) optional.push({ field: "schema_faq", label: "faq", state: "info" });
+        if (!hasReferencesContent(pkg)) optional.push({ field: "references", label: "references", state: "info" });
+        if (!pkg.visual_brief) optional.push({ field: "visual_brief", label: "visual_brief", state: "info" });
+        if (!pkg.canva_url) optional.push({ field: "canva_url", label: "canva_url", state: "info" });
+        if (!pkg.published_url) optional.push({ field: "published_url", label: "published_url", state: "info" });
+        if (!pkg.group_post) optional.push({ field: "group_post", label: "group_post", state: "info" });
+        if (!pkg.page_post) optional.push({ field: "page_post", label: "page_post", state: "info" });
+    } else {
+        if (!pkg.meta_description) recommended.push({ field: "meta_description", label: "meta_description", state: "warning" });
+        if (pkg.keywords.length === 0) recommended.push({ field: "keywords", label: "keywords", state: "warning" });
+        if (
+            pkg.internal_links_prerequisite.length === 0 ||
+            pkg.internal_links_next_step.length === 0 ||
+            pkg.internal_links_related.length === 0
+        ) {
+            recommended.push({ field: "internal_links", label: "internal_links", state: "warning" });
+        }
+        if (!pkg.visual_brief && pkg.visual_status === "not_needed_yet") recommended.push({ field: "visual_brief", label: "visual_brief", state: "warning" });
+        if (!hasFaqContent(pkg)) recommended.push({ field: "schema_faq", label: "faq / schema_faq", state: "warning" });
+        if (!hasReferencesContent(pkg)) recommended.push({ field: "references", label: "references", state: "warning" });
+
+        if (!pkg.group_post) optional.push({ field: "group_post", label: "group_post", state: "info" });
+        if (!pkg.page_post) optional.push({ field: "page_post", label: "page_post", state: "info" });
+        if (!pkg.canva_url) optional.push({ field: "canva_url", label: "canva_url", state: "info" });
+        if (!pkg.published_url) optional.push({ field: "published_url", label: "published_url", state: "info" });
+    }
 
     return { required, recommended, optional };
 }
@@ -636,10 +720,13 @@ function withPreviewMetadata(
     const missingFieldGroups = resolveArticleStudioMissingGroups(normalizedPkg);
     const contentHealth = resolveArticleStudioContentHealth(normalizedPkg);
 
+    const detectedStepRole = detectStepRole(detectedHeadings, normalizedPkg.article_markdown);
+
     return {
         ...normalizedPkg,
         sections,
         detectedHeadings,
+        detectedStepRole,
         missingFields,
         validationMessages,
         generatedFields,
@@ -657,12 +744,13 @@ export function slugify(value: string) {
         .slice(0, 96);
 }
 
-export function parseArborArticlePackage(input: string): ArticleStudioPreview {
+export function parseArborArticlePackage(input: string, modeOverride?: ArticleStudioMode): ArticleStudioPreview {
     const jsonPackage = readJsonPackage(input);
+    let preview: ArticleStudioPreview;
+
     if (jsonPackage) {
         const pkg = normalizeArticleStudioPackage(jsonPackage);
-
-        return withPreviewMetadata(
+        preview = withPreviewMetadata(
             pkg,
             {
                 research_direction: "",
@@ -673,9 +761,27 @@ export function parseArborArticlePackage(input: string): ArticleStudioPreview {
             },
             []
         );
+    } else {
+        preview = buildMarkdownPackage(input);
     }
 
-    return buildMarkdownPackage(input);
+    // Phase 3: Enhance detection for Partial mode
+    if (modeOverride) {
+        preview.mode = modeOverride;
+    }
+
+    if (preview.mode === "partial" || modeOverride === "partial") {
+        if (!preview.topic_id) preview.topic_id = extractTopicId(input);
+        if (!preview.title) preview.title = extractTopicTitle(input);
+    }
+
+    // Re-resolve health and groups if mode was overridden
+    if (modeOverride) {
+        preview.missingFieldGroups = resolveArticleStudioMissingGroups(preview);
+        preview.contentHealth = resolveArticleStudioContentHealth(preview);
+    }
+
+    return preview;
 }
 
 export function formatArticlePackageMarkdown(pkg: ArticleStudioPackage) {
