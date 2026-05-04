@@ -231,12 +231,16 @@ export default function AreasFilterBar({ workspaceId, tasks, lists, sprints, sta
                     <select 
                         className="bg-transparent text-sm font-semibold text-neutral-700 focus:outline-none cursor-pointer"
                         value={state.groupBy}
-                        onChange={(e) => updateState({ groupBy: e.target.value as GroupMode })}
+                        onChange={(e) => {
+                            const val = e.target.value as GroupMode;
+                            updateState({ groupBy: val });
+                        }}
                     >
                         <option value="status">Status</option>
                         <option value="package">Package</option>
-                        <option value="list">List / Workspace</option>
+                        <option value="list">Workspace</option>
                         <option value="sprint">Sprint</option>
+                        <option value="none">None</option>
                     </select>
                 </div>
 

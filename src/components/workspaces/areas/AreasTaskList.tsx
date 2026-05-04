@@ -510,6 +510,8 @@ export default function AreasTaskList({
                             );
                         }
                         
+                        if (state.groupBy === 'none') return null;
+                        
                         return (
                             <div className="bg-white/95 backdrop-blur-md py-3 px-4 flex items-center gap-3 border-b border-neutral-100">
                                 <h3 className="text-xs font-black text-neutral-800 uppercase tracking-tight">{group.key}</h3>

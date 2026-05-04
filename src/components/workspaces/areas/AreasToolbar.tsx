@@ -20,7 +20,7 @@ export default function AreasToolbar({
     isFocusMode = false, onToggleFocusMode 
 }: AreasToolbarProps) {
     return (
-        <div className="px-6 py-4 bg-theme-panel border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm z-10 shrink-0">
+        <div className="px-6 py-2.5 bg-theme-panel border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm z-10 shrink-0">
             {/* Left: Title & Search */}
             <div className="flex items-center gap-6 flex-1 max-w-2xl">
                 <h1 className="text-xl font-bold text-neutral-900 shrink-0 capitalize">{title}</h1>

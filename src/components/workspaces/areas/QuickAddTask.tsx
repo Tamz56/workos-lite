@@ -107,7 +107,7 @@ export default function QuickAddTask({
     };
 
     return (
-        <div className="group relative flex items-center bg-theme-card border border-neutral-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 mx-4 my-1">
+        <div className="group relative flex items-center bg-theme-card border border-neutral-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 mx-4 my-0.5">
             <form onSubmit={handleSubmit} className="flex-1 flex items-center px-3 py-2 gap-3 min-w-0">
                 <div className={`w-2 h-2 shrink-0 rounded-full ${initialTopicId ? 'bg-indigo-500' : 'bg-blue-500'}`} />
                 <input

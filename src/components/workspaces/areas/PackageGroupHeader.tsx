@@ -171,7 +171,7 @@ export default function PackageGroupHeader({
                 e.stopPropagation();
                 onToggle();
             }}
-            className={`group py-2 px-4 flex items-center border-b border-neutral-100 cursor-pointer select-none transition-all duration-300 sticky top-0 z-30 backdrop-blur-xl ${bgClass} ${accentClass} border-l-4 active:opacity-95`}
+            className={`group py-1.5 px-4 flex items-center border-b border-neutral-100 cursor-pointer select-none transition-all duration-300 sticky top-0 z-30 backdrop-blur-xl ${bgClass} ${accentClass} border-l-4 active:opacity-95`}
         >
             <div className="w-6 h-6 flex items-center justify-center text-neutral-400 group-hover:text-black mr-3 bg-white/50 rounded-md transition-all border border-black/5 group-hover:scale-105">
                 {isCollapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronDown size={14} strokeWidth={3} />}

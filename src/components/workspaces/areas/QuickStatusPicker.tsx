@@ -68,7 +68,11 @@ export default function QuickStatusPicker({ status, onStatusChange, disabled }: 
                 leaveFrom="transform opacity-100 scale-100"
                 leaveTo="transform opacity-0 scale-95"
             >
-                <Menu.Items className="absolute left-0 mt-1 w-32 origin-top-left rounded-md bg-white shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none z-50 overflow-hidden">
+                <Menu.Items 
+                    anchor="bottom start"
+                    portal
+                    className="mt-1 w-32 origin-top-left rounded-md bg-white shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none z-50 overflow-hidden"
+                >
                     <div className="py-1">
                         {(Object.keys(statusConfig) as TaskStatus[]).map((s) => {
                             const config = statusConfig[s];

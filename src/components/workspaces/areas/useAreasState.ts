@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-export type GroupMode = "status" | "list" | "sprint" | "package";
+export type GroupMode = "status" | "list" | "sprint" | "package" | "none";
 export type SortMode = "scheduled_date" | "updated_at" | "priority" | "created_at" | "performance";
 
 const PREFS_KEY_PREFIX = "workos-areas-prefs-";
@@ -58,7 +58,7 @@ export function useAreasState(workspaceId: string, initialState?: Partial<AreasV
         activePreset: "all",
         sortBy: "scheduled_date",
         sortDir: "asc",
-        groupBy: "status",
+        groupBy: "package",
         selectedTaskId: null,
         isQuickAddOpen: false,
         isTableQuickAddOpen: false,
@@ -76,7 +76,7 @@ export function useAreasState(workspaceId: string, initialState?: Partial<AreasV
         if (key === "viewMode") return ["package", "list"].includes(value);
         if (key === "sortBy") return ["scheduled_date", "updated_at", "priority", "created_at", "performance"].includes(value);
         if (key === "sortDir") return ["asc", "desc"].includes(value);
-        if (key === "groupBy") return ["status", "list", "sprint", "package"].includes(value);
+        if (key === "groupBy") return ["status", "list", "sprint", "package", "none"].includes(value);
         if (key === "scheduleFilter") return ["all", "scheduled", "unscheduled"].includes(value);
         if (key === "collapsedTopicIds") return Array.isArray(value) && value.every(v => typeof v === "string");
         if (["statusFilter", "templateFilter", "reviewStatusFilter"].includes(key)) return Array.isArray(value);

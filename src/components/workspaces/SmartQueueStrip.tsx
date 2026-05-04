@@ -44,8 +44,8 @@ export const SmartQueueStrip: React.FC<SmartQueueStripProps> = ({ items, onItemC
   }
 
   return (
-    <div className="w-full py-3 animate-in fade-in slide-in-from-top-2 duration-700 overflow-hidden shrink-0">
-      <div className="flex items-center justify-between mb-2 px-1">
+    <div className="w-full py-1.5 animate-in fade-in slide-in-from-top-2 duration-700 overflow-hidden shrink-0">
+      <div className="flex items-center justify-between mb-1 px-1">
         <h4 className="text-[10px] font-black uppercase text-neutral-400 tracking-[0.2em] flex items-center gap-2 pl-2">
           <Zap size={10} fill="currentColor" className="text-amber-500" /> Next Best Action
         </h4>
@@ -59,7 +59,7 @@ export const SmartQueueStrip: React.FC<SmartQueueStripProps> = ({ items, onItemC
         )}
       </div>
 
-      <div className="flex items-center gap-2.5 overflow-x-auto pb-2 px-2 custom-scrollbar-hide">
+      <div className="flex items-center gap-2.5 overflow-x-auto pb-1 px-2 custom-scrollbar-hide">
         {items.map((item) => (
           <button
             key={item.id}

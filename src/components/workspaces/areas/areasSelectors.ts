@@ -103,7 +103,8 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
     // V5: Strict 1:1 mapping. 
     // RC65: Enhanced content code detection (GF-CONTENT-### > TOPIC-###)
     const isContentWorkspace = workspaceId === 'content';
-    const isPackageGroup = state.groupBy === "package" || isContentWorkspace;
+    // RC: Force package grouping for Content unless specifically overridden by status/list/sprint/none
+    const isPackageGroup = state.groupBy === "package" || (isContentWorkspace && !["status", "list", "sprint", "none"].includes(state.groupBy));
 
     const groups: Record<string, Task[]> = {};
     const groupMeta: Record<string, any> = {};
@@ -218,9 +219,11 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
                 key = t.status || "inbox";
                 key = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
             } else if (state.groupBy === "list") {
-                key = t.list_name || "Unassigned";
+                key = t.list_name || t.workspace || "Unassigned";
             } else if (state.groupBy === "sprint") {
                 key = t.sprint_name || "Backlog";
+            } else if (state.groupBy === "none") {
+                key = "none";
             }
         }
         
