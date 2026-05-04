@@ -510,7 +510,7 @@ export default function AreasTaskList({
                             );
                         }
                         
-                        if (state.groupBy === 'none') return null;
+                        if (state.groupBy === 'none') return <div className="h-px opacity-0" />;
                         
                         return (
                             <div className="bg-white/95 backdrop-blur-md py-3 px-4 flex items-center gap-3 border-b border-neutral-100">
@@ -523,7 +523,7 @@ export default function AreasTaskList({
                     }}
                     itemContent={(index) => {
                         const row = flattenedTasksExtended[index];
-                        if (!row) return null;
+                        if (!row) return <div className="h-px opacity-0" />;
                         
                         const { task, isFirst, isLast } = row;
                         // RC33: Pass mode='table' if in list mode
@@ -645,7 +645,7 @@ export default function AreasTaskList({
                         Footer: () => <div className="h-32" /> // Extra space for better scrolling experience
                     }}
 
-                    style={{ height: "100%" }}
+                    style={{ height: "100%", minHeight: "200px" }}
                     className="custom-scrollbar"
                 />
             </div>

@@ -3,51 +3,43 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Download, FileText, Loader2, PackagePlus, Sparkles } from "lucide-react";
+import { 
+    ArrowLeft, 
+    CheckCircle2, 
+    Download, 
+    FileText, 
+    Loader2, 
+    PackagePlus, 
+    Sparkles,
+    Search, 
+    MessageSquare, 
+    Layout, 
+    Image, 
+    Send, 
+    Circle,
+    Save,
+    Trash2,
+    FileEdit
+} from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import {
     ArticleStudioPreview,
     ArticleStudioMode,
+    ArticleStudioStepRole,
+    ARTICLE_STUDIO_STEPS,
     buildPublishPackJson,
     formatArticlePackageMarkdown,
     parseArborArticlePackage,
 } from "@/lib/content/articleStudio";
 
-const EXAMPLE_PACKAGE = `{
-  "topic_id": "GF-ARTICLE-001",
-  "title": "จุลินทรีย์สังเคราะห์แสงช่วยดินอย่างไร",
-  "meta_title": "จุลินทรีย์สังเคราะห์แสงช่วยดินอย่างไร | Green Fineness",
-  "meta_description": "สรุปบทบาทของจุลินทรีย์สังเคราะห์แสงต่อดิน ราก และการจัดการแปลงแบบเข้าใจง่าย",
-  "keywords": ["จุลินทรีย์สังเคราะห์แสง", "PNSB", "ดิน", "เกษตร"],
-  "slug": "pnsb-soil-benefits",
-  "internal_links_prerequisite": [],
-  "internal_links_next_step": [],
-  "internal_links_related": [],
-  "schema_faq": [],
-  "schema_article": {},
-  "article_markdown": "## บทนำ\\n...",
-  "group_post": "โพสต์สำหรับกลุ่ม...",
-  "page_post": "โพสต์สำหรับเพจ...",
-  "visual_brief": "ภาพรากพืช ดิน และจุลินทรีย์ในโทนสะอาด",
-  "status": "Needs Review"
-}`;
-
-const STAGE_PREVIEW = [
-    "Research Direction",
-    "Draft",
-    "SEO & Schema",
-    "Visual Package",
-    "Review / Publish",
-];
+// --- Helpers ---
 
 function useDebouncedValue<T>(value: T, delayMs: number) {
     const [debouncedValue, setDebouncedValue] = useState(value);
-
     useEffect(() => {
         const timer = window.setTimeout(() => setDebouncedValue(value), delayMs);
         return () => window.clearTimeout(timer);
     }, [value, delayMs]);
-
     return debouncedValue;
 }
 
@@ -57,9 +49,9 @@ function EmptyPreview() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                 <Sparkles className="h-6 w-6" />
             </div>
-            <h2 className="text-base font-black text-theme-primary">รอ Arbor Package</h2>
+            <h2 className="text-base font-black text-theme-primary">Preview Area</h2>
             <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-theme-secondary">
-                วาง JSON หรือ Markdown จาก Arbor แล้วระบบจะ parse headings, preview fields และเปิดปุ่มสร้าง Article Package
+                เลือกขั้นตอนและเริ่มเขียนเพื่อดู Preview และการตรวจสอบ Content Health
             </p>
         </div>
     );
@@ -99,55 +91,25 @@ function ContentHealthCard({ health }: { health: ArticleStudioPreview["contentHe
                 </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-[11px] font-bold text-theme-secondary">
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">Fields</span>
-                    <span>{health.requiredComplete}/{health.requiredTotal}</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">SEO</span>
-                    <span>{health.seoComplete}/{health.seoTotal}</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">Internal</span>
-                    <span>{health.internalLinksComplete}/{health.internalLinksTotal}</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">Visual</span>
-                    <span className={health.visualNotes === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.visualNotes)}</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">FAQ</span>
-                    <span className={health.faq === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.faq)}</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">Refs</span>
-                    <span className={health.references === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.references)}</span>
-                </div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Fields</span><span>{health.requiredComplete}/{health.requiredTotal}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">SEO</span><span>{health.seoComplete}/{health.seoTotal}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Internal</span><span>{health.internalLinksComplete}/{health.internalLinksTotal}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Visual</span><span className={health.visualNotes === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.visualNotes)}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">FAQ</span><span className={health.faq === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.faq)}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Refs</span><span className={health.references === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.references)}</span></div>
             </div>
         </section>
     );
 }
 
-function MissingFieldGroup({
-    title,
-    items,
-    emptyLabel,
-    tone,
-}: {
-    title?: string;
-    items: ArticleStudioPreview["missingFieldGroups"]["required"];
-    emptyLabel: string;
-    tone: string;
-}) {
+function MissingFieldGroup({ title, items, emptyLabel, tone }: { title?: string; items: ArticleStudioPreview["missingFieldGroups"]["required"]; emptyLabel: string; tone: string; }) {
     return (
         <div className="flex flex-col gap-1.5">
             {title && <div className="text-[10px] font-black uppercase tracking-wider text-theme-muted">{title}</div>}
             {items.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                     {items.map((item) => (
-                        <span key={item.field} className={`rounded px-2 py-0.5 text-[10px] font-bold border ${tone}`}>
-                            {item.label}
-                        </span>
+                        <span key={item.field} className={`rounded px-2 py-0.5 text-[10px] font-bold border ${tone}`}>{item.label}</span>
                     ))}
                 </div>
             ) : (
@@ -163,48 +125,23 @@ function MissingFieldsCard({ groups, isPartial }: { groups: ArticleStudioPreview
             <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
                 <div className="space-y-6">
                     <div>
-                        <div className="mb-3">
-                            <h3 className="text-[11px] font-black uppercase tracking-widest text-red-600">Required Now / Blocking</h3>
-                        </div>
-                        <MissingFieldGroup
-                            items={groups.required}
-                            emptyLabel="Ready for Update"
-                            tone="border-red-100 bg-red-50 text-red-600"
-                        />
+                        <div className="mb-3"><h3 className="text-[11px] font-black uppercase tracking-widest text-red-600">Required Now / Blocking</h3></div>
+                        <MissingFieldGroup items={groups.required} emptyLabel="Ready for Update" tone="border-red-100 bg-red-50 text-red-600" />
                     </div>
                     <div className="pt-4 border-t border-theme-border/50">
-                        <div className="mb-3">
-                            <h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Later Fields</h3>
-                        </div>
-                        <MissingFieldGroup
-                            items={[...groups.recommended, ...groups.optional]}
-                            emptyLabel="– none –"
-                            tone="border-theme-border bg-theme-input text-theme-secondary"
-                        />
+                        <div className="mb-3"><h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Later Fields</h3></div>
+                        <MissingFieldGroup items={[...groups.recommended, ...groups.optional]} emptyLabel="– none –" tone="border-theme-border bg-theme-input text-theme-secondary" />
                     </div>
                 </div>
             </section>
         );
     }
-
     return (
         <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
-            <div className="mb-4">
-                <h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Missing Blocks</h3>
-            </div>
+            <div className="mb-4"><h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Missing Blocks</h3></div>
             <div className="space-y-4">
-                <MissingFieldGroup
-                    title="Required"
-                    items={groups.required}
-                    emptyLabel="พร้อมสร้าง"
-                    tone="border-red-100 bg-red-50 text-red-600"
-                />
-                <MissingFieldGroup
-                    title="Recommended"
-                    items={groups.recommended}
-                    emptyLabel="– none –"
-                    tone="border-amber-100 bg-amber-50 text-amber-600"
-                />
+                <MissingFieldGroup title="Required" items={groups.required} emptyLabel="พร้อมสร้าง" tone="border-red-100 bg-red-50 text-red-600" />
+                <MissingFieldGroup title="Recommended" items={groups.recommended} emptyLabel="– none –" tone="border-amber-100 bg-amber-50 text-amber-600" />
             </div>
         </section>
     );
@@ -213,7 +150,6 @@ function MissingFieldsCard({ groups, isPartial }: { groups: ArticleStudioPreview
 function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
     const isPartial = preview.mode === "partial";
     const markdown = isPartial ? preview.article_markdown : formatArticlePackageMarkdown(preview);
-
     return (
         <div className="space-y-5">
             <div className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
@@ -232,149 +168,257 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
                         <h2 className="mt-2 break-words text-lg font-black tracking-tight text-theme-primary sm:text-xl">{preview.title || "Untitled Article"}</h2>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {preview.status === "needs_human_insight" && (
-                            <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
-                                Human Insight
-                            </span>
-                        )}
-                        <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
-                            {preview.status || "needs_human_insight"}
-                        </span>
+                        {preview.status === "needs_human_insight" && <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">Human Insight</span>}
+                        <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">{preview.status || "needs_human_insight"}</span>
                     </div>
                 </div>
-
-                {preview.validationMessages.length > 0 && (
-                    <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold leading-6 text-red-700">
-                        {preview.validationMessages.map((message) => (
-                            <div key={message}>{message}</div>
-                        ))}
-                    </div>
-                )}
-
-                {preview.generatedFields.length > 0 && (
-                    <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold leading-6 text-blue-700">
-                        Auto-generated fields: {preview.generatedFields.join(", ")}
-                    </div>
-                )}
-
-                <div className="mb-4 grid gap-3 border-y border-theme-border py-4 lg:grid-cols-2">
-                    <ContentHealthCard health={preview.contentHealth} />
-                    <MissingFieldsCard groups={preview.missingFieldGroups} isPartial={preview.mode === 'partial'} />
-                </div>
-
+                {preview.validationMessages.length > 0 && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold leading-6 text-red-700">{preview.validationMessages.map((message) => <div key={message}>{message}</div>)}</div>}
+                {preview.generatedFields.length > 0 && <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold leading-6 text-blue-700">Auto-generated fields: {preview.generatedFields.join(", ")}</div>}
+                <div className="mb-4 grid gap-3 border-y border-theme-border py-4 lg:grid-cols-2"><ContentHealthCard health={preview.contentHealth} /><MissingFieldsCard groups={preview.missingFieldGroups} isPartial={preview.mode === 'partial'} /></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
-                    <FieldRow label="mode" value={preview.mode} />
-                    <FieldRow label="status" value={preview.status} />
-                    <FieldRow label="difficulty" value={preview.difficulty} />
-                    <FieldRow label="visual" value={preview.visual_status} />
-                    <FieldRow label="topic_id" value={preview.topic_id} />
-                    <FieldRow label="slug" value={preview.slug} />
-                    <div className="md:col-span-2">
-                        <FieldRow label="meta_title" value={preview.meta_title} />
-                    </div>
-                    <div className="md:col-span-2">
-                        <FieldRow label="meta_desc" value={preview.meta_description} />
-                    </div>
+                    <FieldRow label="mode" value={preview.mode} /><FieldRow label="status" value={preview.status} /><FieldRow label="difficulty" value={preview.difficulty} /><FieldRow label="visual" value={preview.visual_status} /><FieldRow label="topic_id" value={preview.topic_id} /><FieldRow label="slug" value={preview.slug} />
+                    <div className="md:col-span-2"><FieldRow label="meta_title" value={preview.meta_title} /></div>
+                    <div className="md:col-span-2"><FieldRow label="meta_desc" value={preview.meta_description} /></div>
                 </div>
-
-                <div className="mt-2 pt-2 border-t border-theme-border/50 space-y-1">
-                    <ListField label="keywords" value={preview.keywords} />
-                    <ListField label="internal" value={[...preview.internal_links_prerequisite, ...preview.internal_links_next_step, ...preview.internal_links_related]} />
-                </div>
+                <div className="mt-2 pt-2 border-t border-theme-border/50 space-y-1"><ListField label="keywords" value={preview.keywords} /><ListField label="internal" value={[...preview.internal_links_prerequisite, ...preview.internal_links_next_step, ...preview.internal_links_related]} /></div>
             </div>
-
             <div className="grid gap-4 lg:grid-cols-2">
                 <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
                     <h3 className="text-sm font-black text-theme-primary">Sections</h3>
-                    <div className="mt-4 grid gap-2">
-                        {STAGE_PREVIEW.map((stage) => (
-                            <div key={stage} className="flex items-center gap-2 rounded-md border border-theme-border bg-theme-card px-3 py-2">
-                                <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                                <span className="text-sm font-bold text-theme-primary">{stage}</span>
-                            </div>
-                        ))}
-                    </div>
+                    <div className="mt-4 grid gap-2">{STAGE_PREVIEW.map((stage) => <div key={stage} className="flex items-center gap-2 rounded-md border border-theme-border bg-theme-card px-3 py-2"><CheckCircle2 className="h-4 w-4 text-blue-600" /><span className="text-sm font-bold text-theme-primary">{stage}</span></div>)}</div>
                 </section>
-
                 <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
                     <h3 className="text-sm font-black text-theme-primary">Detected Headings</h3>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        {preview.detectedHeadings.length ? preview.detectedHeadings.map((heading, idx) => (
-                            <span key={`${heading}-${idx}`} className="rounded-md border border-theme-border bg-theme-card px-2.5 py-1 text-xs font-bold text-theme-secondary">
-                                {heading}
-                            </span>
-                        )) : (
-                            <span className="text-sm font-medium text-theme-muted">JSON package detected</span>
-                        )}
-                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">{preview.detectedHeadings.length ? preview.detectedHeadings.map((heading, idx) => <span key={`${heading}-${idx}`} className="rounded-md border border-theme-border bg-theme-card px-2.5 py-1 text-xs font-bold text-theme-secondary">{heading}</span>) : <span className="text-sm font-medium text-theme-muted">JSON package detected</span>}</div>
                 </section>
             </div>
-
             <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
-                <div className="mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                    <h3 className="text-sm font-black text-theme-primary">{isPartial ? "Partial Step Markdown" : "Article Hub Markdown"}</h3>
-                </div>
-                <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-theme-border bg-theme-input p-4 text-xs leading-6 text-theme-secondary custom-scrollbar">
-                    {markdown || <span className="text-theme-muted italic">No content yet.</span>}
-                </pre>
+                <div className="mb-3 flex items-center gap-2"><FileText className="h-4 w-4 text-blue-600" /><h3 className="text-sm font-black text-theme-primary">{isPartial ? "Partial Step Markdown" : "Article Hub Markdown"}</h3></div>
+                <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-theme-border bg-theme-input p-4 text-xs leading-6 text-theme-secondary custom-scrollbar">{markdown || <span className="text-theme-muted italic">No content yet.</span>}</pre>
             </section>
         </div>
     );
 }
 
 function getStepLabel(role: string) {
-    const labels: Record<string, string> = {
-        research_raw: "Research Raw — NotebookLM",
-        research_direction: "Research Direction — Arbor Questions",
-        brief: "Brief",
-        script_caption: "Script & Caption",
-        outline_web_article: "Outline Web Article",
-        assets_canva: "Assets / Canva",
-        seo_schema: "SEO & Schema",
-        publish: "Publish",
-    };
+    const labels: Record<string, string> = { research_raw: "Research Raw — NotebookLM", research_direction: "Research Direction — Arbor Questions", brief: "Brief", script_caption: "Script & Caption", outline_web_article: "Outline Web Article", assets_canva: "Assets / Canva", seo_schema: "SEO & Schema", publish: "Publish" };
     return labels[role] || role.replace('_', ' ');
+}
+
+// --- Constants ---
+
+const EXAMPLE_PACKAGE = `{
+  "topic_id": "GF-ARTICLE-001",
+  "title": "จุลินทรีย์สังเคราะห์แสงช่วยดินอย่างไร",
+  "meta_title": "จุลินทรีย์สังเคราะห์แสงช่วยดินอย่างไร | Green Fineness",
+  "meta_description": "สรุปบทบาทของจุลินทรีย์สังเคราะห์แสงต่อดิน ราก และการจัดการแปลงแบบเข้าใจง่าย",
+  "keywords": ["จุลินทรีย์สังเคราะห์แสง", "PNSB", "ดิน", "เกษตร"],
+  "slug": "pnsb-soil-benefits",
+  "internal_links_prerequisite": [],
+  "internal_links_next_step": [],
+  "internal_links_related": [],
+  "schema_faq": [],
+  "schema_article": {},
+  "article_markdown": "## บทนำ\\n...",
+  "group_post": "โพสต์สำหรับกลุ่ม...",
+  "page_post": "โพสต์สำหรับเพจ...",
+  "visual_brief": "ภาพรากพืช ดิน และจุลินทรีย์ในโทนสะอาด",
+  "status": "Needs Review"
+}`;
+
+const STAGE_PREVIEW = [ "Research Direction", "Draft", "SEO & Schema", "Visual Package", "Review / Publish" ];
+
+const STEP_ICONS: Record<ArticleStudioStepRole, any> = {
+    research_raw: Search,
+    research_direction: MessageSquare,
+    brief: FileText,
+    script_caption: MessageSquare,
+    outline_web_article: Layout,
+    assets_canva: Image,
+    seo_schema: Search,
+    publish: Send,
+    general: FileEdit
+};
+
+// --- Main Components ---
+
+function GuidedStepNavigator({ 
+    activeStep, 
+    onStepSelect,
+    stepContents,
+    savedSteps
+}: { 
+    activeStep: ArticleStudioStepRole; 
+    onStepSelect: (step: ArticleStudioStepRole) => void;
+    stepContents: Record<string, string>;
+    savedSteps: Set<string>;
+}) {
+    const roles: ArticleStudioStepRole[] = [
+        "research_raw",
+        "research_direction",
+        "brief",
+        "script_caption",
+        "outline_web_article",
+        "assets_canva",
+        "seo_schema",
+        "publish"
+    ];
+
+    return (
+        <nav className="flex flex-col gap-1">
+            {roles.map((role) => {
+                const Icon = STEP_ICONS[role] || Circle;
+                const isActive = activeStep === role;
+                const hasContent = !!stepContents[role]?.trim();
+                const isSaved = savedSteps.has(role);
+
+                return (
+                    <button
+                        key={role}
+                        onClick={() => onStepSelect(role)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${isActive ? "bg-theme-card border border-theme-border shadow-sm" : "hover:bg-theme-hover border border-transparent"}`}
+                    >
+                        <div className={`p-2 rounded-lg ${isActive ? "bg-blue-50 text-blue-600" : "bg-theme-input text-theme-secondary"}`}>
+                            <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className={`text-xs font-black truncate ${isActive ? "text-theme-primary" : "text-theme-secondary"}`}>
+                                {ARTICLE_STUDIO_STEPS[role].title.split(" — ")[0]}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className={`w-1.5 h-1.5 rounded-full ${isSaved ? "bg-green-500" : hasContent ? "bg-amber-500" : "bg-theme-border"}`} />
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-theme-muted">
+                                    {isSaved ? "Saved" : hasContent ? "Draft" : "Empty"}
+                                </span>
+                            </div>
+                        </div>
+                    </button>
+                );
+            })}
+        </nav>
+    );
 }
 
 export default function ArticleStudioClient() {
     const router = useRouter();
+    
+    // --- State: View Mode ---
+    const [viewMode, setViewMode] = useState<"guided" | "advanced">("guided");
+    
+    // --- State: Topic Context ---
+    const [topicContext, setTopicContext] = useState({ topic_id: "", topic_title: "" });
+    
+    // --- State: Guided Flow ---
+    const [activeStep, setActiveStep] = useState<ArticleStudioStepRole>("research_raw");
+    const [stepContents, setStepContents] = useState<Record<string, string>>({});
+    const [savedSteps, setSavedSteps] = useState<Set<string>>(new Set());
+
+    // --- State: Advanced Import ---
     const [rawInput, setRawInput] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [importMode, setImportMode] = useState<ArticleStudioMode>("editorial");
     const [isManualMode, setIsManualMode] = useState(false);
+    
     const prevRawInput = useRef(rawInput);
-    const previewInput = useDebouncedValue(rawInput, 250);
+    const previewInput = useDebouncedValue(viewMode === 'advanced' ? rawInput : (stepContents[activeStep] || ""), 250);
 
     useEffect(() => {
-        const isClearingInput = rawInput.trim() === "" && prevRawInput.current.trim() !== "";
-        prevRawInput.current = rawInput;
+        if (viewMode === 'advanced') {
+            const isClearingInput = rawInput.trim() === "" && prevRawInput.current.trim() !== "";
+            prevRawInput.current = rawInput;
 
-        if (isClearingInput) {
-            setImportMode("editorial");
-            setIsManualMode(false);
-            return;
-        }
+            if (isClearingInput) {
+                setImportMode("editorial");
+                setIsManualMode(false);
+                return;
+            }
 
-        if (!isManualMode && rawInput.trim() !== "") {
-            const hasPartialKeywords = /step_role|Research Raw|Research Direction|Brief|Script & Caption|Assets \/ Canva|SEO & Schema|Publish/i.test(rawInput);
-            if (hasPartialKeywords) {
-                setImportMode("partial");
+            if (!isManualMode && rawInput.trim() !== "") {
+                const hasPartialKeywords = /step_role|Research Raw|Research Direction|Brief|Script & Caption|Assets \/ Canva|SEO & Schema|Publish/i.test(rawInput);
+                if (hasPartialKeywords) {
+                    setImportMode("partial");
+                }
             }
         }
-    }, [rawInput, isManualMode]);
+    }, [rawInput, isManualMode, viewMode]);
 
     const preview = useMemo(() => {
         try {
-            return parseArborArticlePackage(previewInput, importMode);
+            if (viewMode === 'advanced') {
+                return parseArborArticlePackage(previewInput, importMode);
+            } else {
+                // Construct a virtual preview for the active step in guided mode
+                const pkg = {
+                    mode: "partial" as ArticleStudioMode,
+                    detectedStepRole: activeStep,
+                    topic_id: topicContext.topic_id,
+                    title: topicContext.topic_title,
+                    article_markdown: previewInput,
+                };
+                return parseArborArticlePackage(JSON.stringify(pkg), "partial");
+            }
         } catch {
             return null;
         }
-    }, [previewInput, importMode]);
+    }, [previewInput, importMode, viewMode, activeStep, topicContext]);
 
-    const canSave = !!preview && preview.missingFields.length === 0 && !isSaving;
+    const canSave = viewMode === 'advanced' 
+        ? (!!preview && preview.missingFields.length === 0 && !isSaving)
+        : (!!topicContext.topic_id && !!previewInput.trim() && !isSaving);
+
+    async function handleSaveStep() {
+        if (isSaving) return;
+        setIsSaving(true);
+        setError(null);
+        setSuccess(null);
+
+        const payload = viewMode === 'advanced' ? { articlePackage: preview } : {
+            articlePackage: {
+                mode: "partial",
+                detectedStepRole: activeStep,
+                topic_id: topicContext.topic_id,
+                title: topicContext.topic_title,
+                article_markdown: stepContents[activeStep] || "",
+            }
+        };
+
+        try {
+            const res = await fetch("/api/content/package", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Save failed");
+
+            setSuccess(`Saved ${ARTICLE_STUDIO_STEPS[activeStep]?.title || 'Step'} successfully`);
+            if (viewMode === 'guided') {
+                setSavedSteps(prev => new Set(prev).add(activeStep));
+            }
+            window.dispatchEvent(new Event("task-updated"));
+            router.refresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
+    function handleClearDraft() {
+        if (viewMode === 'guided') {
+            setStepContents(prev => ({ ...prev, [activeStep]: "" }));
+            setSavedSteps(prev => {
+                const next = new Set(prev);
+                next.delete(activeStep);
+                return next;
+            });
+        } else {
+            setRawInput("");
+        }
+    }
 
     function handleExportPublishPack() {
         if (!preview) return;
@@ -390,119 +434,139 @@ export default function ArticleStudioClient() {
         URL.revokeObjectURL(url);
     }
 
-    async function handleCreatePackage() {
-        if (!preview) return;
-        setIsSaving(true);
-        setError(null);
-        setSuccess(null);
-
-        try {
-            const res = await fetch("/api/content/package", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ articlePackage: preview }),
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                const detailText = Array.isArray(data.details) ? `\n${data.details.join("\n")}` : "";
-                const duplicateText = Array.isArray(data.duplicates) && data.duplicates.length > 0
-                    ? `\nรายการที่พบ: ${data.duplicates.map((item: { type: string; title: string }) => `${item.type}: ${item.title}`).join(" | ")}`
-                    : "";
-                throw new Error(`${data.error || "Create package failed"}${detailText}${duplicateText}`);
-            }
-
-            const warningText = Array.isArray(data.warnings) && data.warnings.length > 0
-                ? `\nWarning: ${data.warnings.join(" | ")}`
-                : "";
-            const reuseText = data.reusedList ? " (reuse list เดิม)" : "";
-            setSuccess(`สร้าง Article Package แล้ว: ${data.topicTitle}${reuseText}${warningText}`);
-            window.dispatchEvent(new Event("task-updated"));
-            router.refresh();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setIsSaving(false);
-        }
-    }
-
     return (
         <PageShell className="max-w-none px-6 2xl:px-8">
+            {/* Header */}
             <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
-                        <Link
-                            href="/workspaces/content"
-                            className="p-2 -ml-2 rounded-full hover:bg-theme-hover transition-colors text-theme-secondary"
-                        >
+                        <Link href="/workspaces/content" className="p-2 -ml-2 rounded-full hover:bg-theme-hover transition-colors text-theme-secondary">
                             <ArrowLeft className="h-5 w-5" />
                         </Link>
                         <h1 className="text-2xl font-black tracking-tight text-theme-primary">Article Studio</h1>
-                        <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-700">
-                            v1.1
-                        </span>
+                        <div className="flex p-1 bg-theme-input rounded-xl border border-theme-border/50 ml-4">
+                            <button
+                                onClick={() => setViewMode("guided")}
+                                className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${viewMode === "guided" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
+                            >
+                                Guided Flow
+                            </button>
+                            <button
+                                onClick={() => setViewMode("advanced")}
+                                className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${viewMode === "advanced" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
+                            >
+                                Advanced Import
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <p className="hidden md:block max-w-md text-right text-xs font-bold leading-5 text-theme-muted uppercase tracking-wider">
-                    Arbor Import Mode & Editorial Preview
-                </p>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[420px_1fr] xl:grid-cols-[480px_1fr] 2xl:grid-cols-[540px_1fr]">
-                {/* Left Panel: Writing Workspace (Fixed-ish width but responsive) */}
-                <div className="relative flex flex-col">
-                    <section className="sticky top-6 flex flex-col h-[calc(100vh-140px)] rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
-                        <div className="px-6 py-5 border-b border-theme-border/50 flex flex-col gap-4 bg-theme-card">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-sm font-black text-theme-primary uppercase tracking-widest">Arbor Editor</h2>
-                                    <p className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter mt-0.5">Markdown or JSON Input</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setRawInput(EXAMPLE_PACKAGE)}
-                                    className="px-3 py-1.5 rounded-full bg-theme-input text-[10px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover transition-colors border border-theme-border"
-                                >
-                                    Load Example
-                                </button>
-                            </div>
+            <div className={viewMode === 'guided' 
+                ? "grid gap-6 lg:grid-cols-[280px_1fr_1fr] xl:grid-cols-[300px_1fr_1fr] 2xl:grid-cols-[320px_1fr_1fr]"
+                : "grid gap-6 lg:grid-cols-2"
+            }>
+                {/* 1. Sidebar Navigator (Guided Only) */}
+                <aside className={viewMode === 'guided' ? 'block' : 'hidden'}>
+                    <div className="sticky top-6">
+                        <h2 className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-4 px-4">Steps</h2>
+                        <GuidedStepNavigator 
+                            activeStep={activeStep} 
+                            onStepSelect={setActiveStep} 
+                            stepContents={stepContents}
+                            savedSteps={savedSteps}
+                        />
+                    </div>
+                </aside>
 
-                            <div className="flex p-1 bg-theme-input rounded-xl border border-theme-border/50">
-                                <button
-                                    onClick={() => {
-                                        setImportMode("editorial");
-                                        setIsManualMode(true);
-                                    }}
-                                    className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${importMode !== "partial" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
-                                >
-                                    Full Package
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setImportMode("partial");
-                                        setIsManualMode(true);
-                                    }}
-                                    className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${importMode === "partial" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
-                                >
-                                    Partial Step
-                                </button>
-                            </div>
+                {/* 2. Main Workspace */}
+                <main className={`flex flex-col min-w-0 ${viewMode === 'advanced' ? 'lg:col-span-1' : ''}`}>
+                    <section className="flex flex-col h-[calc(100vh-140px)] rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
+                        {/* Editor Header */}
+                        <div className="px-6 py-5 border-b border-theme-border/50 flex flex-col gap-4 bg-theme-card">
+                            {viewMode === 'guided' ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-sm font-black text-theme-primary uppercase tracking-widest">{ARTICLE_STUDIO_STEPS[activeStep]?.title}</h2>
+                                            <p className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter mt-0.5">{ARTICLE_STUDIO_STEPS[activeStep]?.instruction}</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black uppercase tracking-widest text-theme-muted ml-1">Topic ID</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.topic_id}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, topic_id: e.target.value.toUpperCase() }))}
+                                                placeholder="GF-CONTENT-XXX"
+                                                className="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-2 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black uppercase tracking-widest text-theme-muted ml-1">Topic Title</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.topic_title}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, topic_title: e.target.value }))}
+                                                placeholder="ชื่อหัวข้อ..."
+                                                className="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-2 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-sm font-black text-theme-primary uppercase tracking-widest">Arbor Editor</h2>
+                                            <p className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter mt-0.5">Markdown or JSON Input</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setRawInput(EXAMPLE_PACKAGE)}
+                                            className="px-3 py-1.5 rounded-full bg-theme-input text-[10px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover transition-colors border border-theme-border"
+                                        >
+                                            Load Example
+                                        </button>
+                                    </div>
+                                    <div className="flex p-1 bg-theme-input rounded-xl border border-theme-border/50">
+                                        <button
+                                            onClick={() => { setImportMode("editorial"); setIsManualMode(true); }}
+                                            className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${importMode !== "partial" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
+                                        >
+                                            Full Package
+                                        </button>
+                                        <button
+                                            onClick={() => { setImportMode("partial"); setIsManualMode(true); }}
+                                            className={`flex-1 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${importMode === "partial" ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}
+                                        >
+                                            Partial Step
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
+                        {/* Textarea Area */}
                         <div className="flex-1 relative group">
                             <textarea
-                                value={rawInput}
+                                value={viewMode === 'guided' ? (stepContents[activeStep] || "") : rawInput}
                                 onChange={(event) => {
-                                    setRawInput(event.target.value);
+                                    if (viewMode === 'guided') {
+                                        setStepContents(prev => ({ ...prev, [activeStep]: event.target.value }));
+                                    } else {
+                                        setRawInput(event.target.value);
+                                    }
                                     setError(null);
                                     setSuccess(null);
                                 }}
                                 className="absolute inset-0 w-full h-full p-8 font-mono text-[13px] leading-[1.8] text-theme-primary bg-theme-input/20 outline-none transition-theme placeholder:text-theme-muted resize-none custom-scrollbar"
-                                placeholder="Paste Arbor Package content here..."
+                                placeholder={viewMode === 'guided' ? `Write ${ARTICLE_STUDIO_STEPS[activeStep]?.title} here...` : "Paste Arbor Package content here..."}
                             />
                         </div>
 
-                        {/* Sticky Action Bar */}
+                        {/* Action Bar */}
                         <div className="p-6 bg-theme-card border-t border-theme-border/50">
                             {error && (
                                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-bold text-red-600 flex items-center gap-2">
@@ -518,35 +582,49 @@ export default function ArticleStudioClient() {
                             )}
 
                             <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    type="button"
-                                    disabled={!preview}
-                                    onClick={handleExportPublishPack}
-                                    className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
-                                >
-                                    <Download className="h-4 w-4" />
-                                    Export
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleClearDraft}
+                                        className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary transition-all active:scale-95"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        Clear
+                                    </button>
+                                    {viewMode === 'advanced' && (
+                                        <button
+                                            type="button"
+                                            disabled={!preview}
+                                            onClick={handleExportPublishPack}
+                                            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                            Export
+                                        </button>
+                                    )}
+                                </div>
                                 <button
                                     type="button"
                                     disabled={!canSave}
-                                    onClick={handleCreatePackage}
+                                    onClick={handleSaveStep}
                                     className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
                                 >
-                                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
-                                    {preview?.mode === 'partial' ? 'Update Package' : 'Create Package'}
+                                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                    {viewMode === 'guided' ? 'Save Step' : (preview?.mode === 'partial' ? 'Update Package' : 'Create Package')}
                                 </button>
                             </div>
-                            <p className="mt-4 text-[9px] text-center font-bold text-theme-muted uppercase tracking-widest leading-relaxed">
-                                {preview?.mode === 'partial' 
-                                    ? "Partial mode: topic_id and content are required. SEO, FAQ, references, visuals, and social posts can be added later."
-                                    : "Full mode: All required fields must be satisfied to enable package creation."}
-                            </p>
+                            {viewMode === 'advanced' && (
+                                <p className="mt-4 text-[9px] text-center font-bold text-theme-muted uppercase tracking-widest leading-relaxed">
+                                    {preview?.mode === 'partial' 
+                                        ? "Partial mode: topic_id and content are required. SEO, FAQ, references, visuals, and social posts can be added later."
+                                        : "Full mode: All required fields must be satisfied to enable package creation."}
+                                </p>
+                            )}
                         </div>
                     </section>
-                </div>
+                </main>
 
-                {/* Right Panel: Editorial Preview */}
+                {/* 3. Preview Panel */}
                 <section className="flex-1 min-w-0">
                     {preview ? <PreviewPanel preview={preview} /> : <EmptyPreview />}
                 </section>

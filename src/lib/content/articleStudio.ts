@@ -172,6 +172,45 @@ const SECTION_ALIASES: Record<ArticleStudioSectionKey, string[]> = {
     publish_checklist: ["publish checklist", "review / publish", "publish"],
 };
 
+export const ARTICLE_STUDIO_STEPS: Record<ArticleStudioStepRole, { title: string; instruction: string }> = {
+    research_raw: {
+        title: "Research Raw — NotebookLM",
+        instruction: "วางข้อมูลดิบหรือสรุปจาก NotebookLM เพื่อใช้เป็นฐานข้อมูลในการเขียน",
+    },
+    research_direction: {
+        title: "Research Direction — Arbor Questions",
+        instruction: "ระบุแนวทางการวิจัยและคำถามสำคัญจาก Arbor เพื่อกำหนดทิศทางเนื้อหา",
+    },
+    brief: {
+        title: "Brief",
+        instruction: "สรุปบรีฟงาน (Goal, Target, Tone) ให้ชัดเจนก่อนเริ่มเขียน",
+    },
+    script_caption: {
+        title: "Script & Caption",
+        instruction: "เขียนสคริปต์วิดีโอสั้นหรือแคปชั่นสำหรับ Social Media",
+    },
+    outline_web_article: {
+        title: "Web Article Outline / Full Article",
+        instruction: "ร่างโครงสร้างบทความ (Outline) หรือเขียนเนื้อหาฉบับเต็ม (Full Draft)",
+    },
+    assets_canva: {
+        title: "Assets / Canva",
+        instruction: "ระบุรายละเอียดภาพประกอบ (Visual Brief) หรือ URL ของ Canva",
+    },
+    seo_schema: {
+        title: "SEO & Schema",
+        instruction: "ตรวจสอบ Meta Title, Description และ Schema Markup",
+    },
+    publish: {
+        title: "Publish / Tracking",
+        instruction: "ตรวจสอบความเรียบร้อยก่อนเผยแพร่และระบุช่องทางติดตามผล",
+    },
+    general: {
+        title: "General Draft",
+        instruction: "เนื้อหาทั่วไปที่ไม่ได้ระบุขั้นตอนเฉพาะ",
+    },
+};
+
 function isMeaningfulDraft(body: string) {
     if (!body) return false;
     const cleaned = body.trim();
