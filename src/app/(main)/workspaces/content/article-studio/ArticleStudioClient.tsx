@@ -66,9 +66,9 @@ function EmptyPreview() {
 
 function FieldRow({ label, value }: { label: string; value: string }) {
     return (
-        <div className="grid gap-1 border-b border-theme-border py-3 last:border-0 sm:grid-cols-[minmax(128px,180px)_1fr]">
-            <div className="text-[11px] font-black uppercase tracking-wider text-theme-muted">{label}</div>
-            <div className="min-w-0 break-words text-sm font-semibold text-theme-primary">{value || "-"}</div>
+        <div className="grid gap-1 py-1.5 sm:grid-cols-[100px_1fr] group">
+            <div className="text-[10px] font-black uppercase tracking-wider text-theme-muted group-hover:text-theme-secondary transition-colors">{label}</div>
+            <div className="min-w-0 break-words text-xs font-bold text-theme-primary leading-tight">{value || "-"}</div>
         </div>
     );
 }
@@ -90,20 +90,38 @@ function readinessLabel(value: "ready" | "missing") {
 
 function ContentHealthCard({ health }: { health: ArticleStudioPreview["contentHealth"] }) {
     return (
-        <section>
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <h3 className="text-sm font-black text-theme-primary">Content Health</h3>
-                <span className={`w-fit rounded-md border px-2.5 py-1 text-xs font-black ${healthTone(health.status)}`}>
+        <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
+            <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Content Health</h3>
+                <span className={`w-fit rounded-full border px-3 py-0.5 text-[10px] font-black uppercase tracking-tight ${healthTone(health.status)}`}>
                     {health.status}
                 </span>
             </div>
-            <div className="grid gap-2 text-sm font-semibold text-theme-secondary sm:grid-cols-2">
-                <div>Required fields: {health.requiredComplete}/{health.requiredTotal}</div>
-                <div>SEO fields: {health.seoComplete}/{health.seoTotal}</div>
-                <div>Internal links: {health.internalLinksComplete}/{health.internalLinksTotal}</div>
-                <div>Visual notes: {readinessLabel(health.visualNotes)}</div>
-                <div>FAQ: {readinessLabel(health.faq)}</div>
-                <div>References: {readinessLabel(health.references)}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-[11px] font-bold text-theme-secondary">
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">Fields</span>
+                    <span>{health.requiredComplete}/{health.requiredTotal}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">SEO</span>
+                    <span>{health.seoComplete}/{health.seoTotal}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">Internal</span>
+                    <span>{health.internalLinksComplete}/{health.internalLinksTotal}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">Visual</span>
+                    <span className={health.visualNotes === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.visualNotes)}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">FAQ</span>
+                    <span className={health.faq === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.faq)}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] text-theme-muted uppercase tracking-tighter">Refs</span>
+                    <span className={health.references === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.references)}</span>
+                </div>
             </div>
         </section>
     );
@@ -121,18 +139,18 @@ function MissingFieldGroup({
     tone: string;
 }) {
     return (
-        <div className="border-l-2 border-theme-border pl-3">
-            <div className="mb-2 text-xs font-black uppercase tracking-wider text-theme-muted">{title}</div>
+        <div className="flex flex-col gap-1.5">
+            <div className="text-[10px] font-black uppercase tracking-wider text-theme-muted">{title}</div>
             {items.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                     {items.map((item) => (
-                        <span key={item.field} className={`rounded-md border px-2.5 py-1 text-xs font-black ${tone}`}>
+                        <span key={item.field} className={`rounded px-2 py-0.5 text-[10px] font-bold border ${tone}`}>
                             {item.label}
                         </span>
                     ))}
                 </div>
             ) : (
-                <div className="text-sm font-semibold text-theme-secondary">{emptyLabel}</div>
+                <div className="text-[11px] font-bold text-theme-secondary opacity-60">{emptyLabel}</div>
             )}
         </div>
     );
@@ -140,31 +158,22 @@ function MissingFieldGroup({
 
 function MissingFieldsCard({ groups }: { groups: ArticleStudioPreview["missingFieldGroups"] }) {
     return (
-        <section>
-            <div className="mb-3">
-                <h3 className="text-sm font-black text-theme-primary">Missing Fields</h3>
-                <p className="mt-1 text-xs font-semibold leading-5 text-theme-muted">
-                    Required blocks create package, recommended is warning, optional is informational.
-                </p>
+        <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
+            <div className="mb-4">
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Missing Blocks</h3>
             </div>
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="space-y-4">
                 <MissingFieldGroup
-                    title="Required / Blocking"
+                    title="Required"
                     items={groups.required}
-                    emptyLabel="พร้อมสร้าง"
-                    tone="border-red-200 bg-red-50 text-red-700"
+                    emptyLabel="– none –"
+                    tone="border-red-100 bg-red-50 text-red-600"
                 />
                 <MissingFieldGroup
-                    title="Recommended / Warning"
+                    title="Recommended"
                     items={groups.recommended}
-                    emptyLabel="ครบสำหรับรีวิว"
-                    tone="border-amber-200 bg-amber-50 text-amber-700"
-                />
-                <MissingFieldGroup
-                    title="Optional / Info"
-                    items={groups.optional}
-                    emptyLabel="ครบแล้ว"
-                    tone="border-blue-200 bg-blue-50 text-blue-700"
+                    emptyLabel="– none –"
+                    tone="border-amber-100 bg-amber-50 text-amber-600"
                 />
             </div>
         </section>
@@ -208,23 +217,30 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
                     </div>
                 )}
 
-                <div className="mb-4 grid gap-4 border-y border-theme-border py-4 xl:grid-cols-[0.9fr_1.1fr]">
+                <div className="mb-4 grid gap-3 border-y border-theme-border py-4 lg:grid-cols-2">
                     <ContentHealthCard health={preview.contentHealth} />
                     <MissingFieldsCard groups={preview.missingFieldGroups} />
                 </div>
 
-                <FieldRow label="mode" value={preview.mode} />
-                <FieldRow label="status" value={preview.status} />
-                <FieldRow label="difficulty" value={preview.difficulty} />
-                <FieldRow label="visual_status" value={preview.visual_status} />
-                <FieldRow label="topic_id" value={preview.topic_id} />
-                <FieldRow label="slug" value={preview.slug} />
-                <FieldRow label="meta_title" value={preview.meta_title} />
-                <FieldRow label="meta_description" value={preview.meta_description} />
-                <ListField label="keywords" value={preview.keywords} />
-                <ListField label="prerequisite links" value={preview.internal_links_prerequisite} />
-                <ListField label="next step links" value={preview.internal_links_next_step} />
-                <ListField label="related links" value={preview.internal_links_related} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+                    <FieldRow label="mode" value={preview.mode} />
+                    <FieldRow label="status" value={preview.status} />
+                    <FieldRow label="difficulty" value={preview.difficulty} />
+                    <FieldRow label="visual" value={preview.visual_status} />
+                    <FieldRow label="topic_id" value={preview.topic_id} />
+                    <FieldRow label="slug" value={preview.slug} />
+                    <div className="md:col-span-2">
+                        <FieldRow label="meta_title" value={preview.meta_title} />
+                    </div>
+                    <div className="md:col-span-2">
+                        <FieldRow label="meta_desc" value={preview.meta_description} />
+                    </div>
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-theme-border/50 space-y-1">
+                    <ListField label="keywords" value={preview.keywords} />
+                    <ListField label="internal" value={[...preview.internal_links_prerequisite, ...preview.internal_links_next_step, ...preview.internal_links_related]} />
+                </div>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
@@ -336,98 +352,102 @@ export default function ArticleStudioClient() {
     }
 
     return (
-        <PageShell className="max-w-7xl px-4 sm:px-6 2xl:px-10">
-            <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <PageShell className="max-w-none px-6 2xl:px-8">
+            <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="text-2xl font-bold tracking-tight text-theme-primary">Article Studio</h1>
-                        <span className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-wider text-blue-700">
-                            v1
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Link
+                            href="/workspaces/content"
+                            className="p-2 -ml-2 rounded-full hover:bg-theme-hover transition-colors text-theme-secondary"
+                        >
+                            <ArrowLeft className="h-5 w-5" />
+                        </Link>
+                        <h1 className="text-2xl font-black tracking-tight text-theme-primary">Article Studio</h1>
+                        <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-700">
+                            v1.1
                         </span>
                     </div>
-                    <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-theme-secondary">
-                        Arbor Import Mode สำหรับสร้าง Article Package ของ Green Fineness แบบ preview ก่อน save
-                    </p>
                 </div>
-                <div className="flex shrink-0">
-                    <Link
-                        href="/workspaces/content"
-                        className="inline-flex items-center gap-2 rounded-lg border border-theme-border bg-theme-card px-3 py-2 text-sm font-bold text-theme-secondary transition-theme hover:bg-theme-hover hover:text-theme-primary"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        กลับ Content
-                    </Link>
-                </div>
+                <p className="hidden md:block max-w-md text-right text-xs font-bold leading-5 text-theme-muted uppercase tracking-wider">
+                    Arbor Import Mode & Editorial Preview
+                </p>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]">
-                <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
-                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                            <h2 className="text-base font-black text-theme-primary">Arbor Import Box</h2>
-                            <p className="mt-1 text-sm font-medium leading-6 text-theme-secondary">
-                                วาง Markdown หรือ JSON จาก Arbor แล้วตรวจ preview ก่อนสร้าง package
+            <div className="grid gap-6 lg:grid-cols-[420px_1fr] xl:grid-cols-[480px_1fr] 2xl:grid-cols-[540px_1fr]">
+                {/* Left Panel: Writing Workspace (Fixed-ish width but responsive) */}
+                <div className="relative flex flex-col">
+                    <section className="sticky top-6 flex flex-col h-[calc(100vh-140px)] rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
+                        <div className="px-6 py-5 border-b border-theme-border/50 flex items-center justify-between bg-theme-card">
+                            <div>
+                                <h2 className="text-sm font-black text-theme-primary uppercase tracking-widest">Arbor Editor</h2>
+                                <p className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter mt-0.5">Markdown or JSON Input</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setRawInput(EXAMPLE_PACKAGE)}
+                                className="px-3 py-1.5 rounded-full bg-theme-input text-[10px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover transition-colors border border-theme-border"
+                            >
+                                Load Example
+                            </button>
+                        </div>
+
+                        <div className="flex-1 relative group">
+                            <textarea
+                                value={rawInput}
+                                onChange={(event) => {
+                                    setRawInput(event.target.value);
+                                    setError(null);
+                                    setSuccess(null);
+                                }}
+                                className="absolute inset-0 w-full h-full p-8 font-mono text-[13px] leading-[1.8] text-theme-primary bg-theme-input/20 outline-none transition-theme placeholder:text-theme-muted resize-none custom-scrollbar"
+                                placeholder="Paste Arbor Package content here..."
+                            />
+                        </div>
+
+                        {/* Sticky Action Bar */}
+                        <div className="p-6 bg-theme-card border-t border-theme-border/50">
+                            {error && (
+                                <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-bold text-red-600 flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                    {error}
+                                </div>
+                            )}
+                            {success && (
+                                <div className="mb-4 rounded-xl border border-green-100 bg-green-50 p-3 text-xs font-bold text-green-600 flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                    {success}
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    disabled={!preview}
+                                    onClick={handleExportPublishPack}
+                                    className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Export
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={!canSave}
+                                    onClick={handleCreatePackage}
+                                    className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                >
+                                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
+                                    Create Package
+                                </button>
+                            </div>
+                            <p className="mt-4 text-[9px] text-center font-bold text-theme-muted uppercase tracking-widest">
+                                Required fields must be satisfied to enable package creation
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setRawInput(EXAMPLE_PACKAGE)}
-                            className="rounded-lg border border-theme-border bg-theme-card px-3 py-2 text-xs font-black text-theme-secondary transition-theme hover:bg-theme-hover hover:text-theme-primary"
-                        >
-                            เติมตัวอย่าง
-                        </button>
-                    </div>
+                    </section>
+                </div>
 
-                    <textarea
-                        value={rawInput}
-                        onChange={(event) => {
-                            setRawInput(event.target.value);
-                            setError(null);
-                            setSuccess(null);
-                        }}
-                        className="min-h-[360px] w-full resize-y rounded-lg border border-theme-input-border bg-theme-input p-4 font-mono text-sm leading-6 text-theme-primary outline-none transition-theme placeholder:text-theme-muted focus:border-theme-accent focus:ring-4 focus:ring-theme-ring sm:min-h-[520px]"
-                        placeholder="Paste Arbor Package JSON หรือ Markdown ที่มี headings เช่น Research Direction, Draft, SEO & Schema, Visual Brief, Publish Checklist"
-                    />
-
-                    <div className="mt-4 flex flex-col gap-3 border-t border-theme-border pt-4">
-                        <div className="text-xs font-semibold text-theme-muted">
-                            Save จะเปิดได้เมื่อ preview ผ่าน field หลักครบ ส่วน SEO และ Visual Brief จะเติมให้อัตโนมัติถ้าว่าง
-                        </div>
-                        <div className="grid gap-2 sm:flex sm:justify-end">
-                            <button
-                                type="button"
-                                disabled={!preview}
-                                onClick={handleExportPublishPack}
-                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-theme-border bg-theme-card px-5 py-3 text-sm font-black text-theme-secondary shadow-theme-soft transition-theme hover:bg-theme-hover hover:text-theme-primary disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                <Download className="h-4 w-4" />
-                                Export Publish Pack
-                            </button>
-                            <button
-                                type="button"
-                                disabled={!canSave}
-                                onClick={handleCreatePackage}
-                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-theme-soft transition-theme hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
-                                Create Article Package
-                            </button>
-                        </div>
-                    </div>
-
-                    {error && (
-                        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
-                            {error}
-                        </div>
-                    )}
-                    {success && (
-                        <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-bold text-green-700">
-                            {success}
-                        </div>
-                    )}
-                </section>
-
-                <section>
+                {/* Right Panel: Editorial Preview */}
+                <section className="flex-1 min-w-0">
                     {preview ? <PreviewPanel preview={preview} /> : <EmptyPreview />}
                 </section>
             </div>
