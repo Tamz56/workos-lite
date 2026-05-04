@@ -43,6 +43,7 @@ export type ArticleStudioContentHealth = {
 
 export type ArticleStudioPackage = {
     mode: ArticleStudioMode;
+    detectedStepRole?: ArticleStudioStepRole;
     topic_id: string;
     title: string;
     meta_title: string;
@@ -76,7 +77,6 @@ export type ArticleStudioSectionKey =
 export type ArticleStudioPreview = ArticleStudioPackage & {
     sections: Record<ArticleStudioSectionKey, string>;
     detectedHeadings: string[];
-    detectedStepRole?: ArticleStudioStepRole;
     missingFields: string[];
     validationMessages: string[];
     generatedFields: string[];
@@ -115,6 +115,7 @@ const EMPTY_PACKAGE: ArticleStudioPackage = {
 
 const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     mode: ["mode", "article mode"],
+    detectedStepRole: ["step_role", "detected_step", "stage"],
     topic_id: ["topic_id", "topic id", "topic-id"],
     title: ["title", "article title", "working title"],
     meta_title: ["meta_title", "meta title", "seo title"],
@@ -510,6 +511,7 @@ function buildMarkdownPackage(input: string): ArticleStudioPreview {
 
 export function normalizeArticleStudioPackage(input: Partial<ArticleStudioPackage> & { draft?: unknown }): ArticleStudioPackage {
     const mode = normalizeMode(input.mode);
+    const detectedStepRole = input.detectedStepRole;
     const title = isPlaceholderValue(input.title) ? "" : asPlainString(input.title);
     const articleMarkdown = asPlainString(input.article_markdown) || asPlainString(input.draft);
     const metaDescription = isPlaceholderValue(input.meta_description) ? "" : asPlainString(input.meta_description);
@@ -518,6 +520,7 @@ export function normalizeArticleStudioPackage(input: Partial<ArticleStudioPackag
         ...EMPTY_PACKAGE,
         ...input,
         mode,
+        detectedStepRole,
         topic_id: normalizeTopicId(input.topic_id),
         title,
         meta_title: isPlaceholderValue(input.meta_title) ? "" : asPlainString(input.meta_title),
@@ -721,12 +724,12 @@ function withPreviewMetadata(
     const contentHealth = resolveArticleStudioContentHealth(normalizedPkg);
 
     const detectedStepRole = detectStepRole(detectedHeadings, normalizedPkg.article_markdown);
+    normalizedPkg.detectedStepRole = detectedStepRole;
 
     return {
         ...normalizedPkg,
         sections,
         detectedHeadings,
-        detectedStepRole,
         missingFields,
         validationMessages,
         generatedFields,
@@ -770,16 +773,17 @@ export function parseArborArticlePackage(input: string, modeOverride?: ArticleSt
         preview.mode = modeOverride;
     }
 
-    if (preview.mode === "partial" || modeOverride === "partial") {
+    if (preview.mode === "partial") {
         if (!preview.topic_id) preview.topic_id = extractTopicId(input);
         if (!preview.title) preview.title = extractTopicTitle(input);
     }
 
-    // Re-resolve health and groups if mode was overridden
-    if (modeOverride) {
-        preview.missingFieldGroups = resolveArticleStudioMissingGroups(preview);
-        preview.contentHealth = resolveArticleStudioContentHealth(preview);
-    }
+    // Re-resolve everything since topic_id/title/mode might have changed
+    const validation = validateArticleStudioPackage(preview);
+    preview.missingFields = validation.missingFields;
+    preview.validationMessages = validation.validationMessages;
+    preview.missingFieldGroups = resolveArticleStudioMissingGroups(preview);
+    preview.contentHealth = resolveArticleStudioContentHealth(preview);
 
     return preview;
 }

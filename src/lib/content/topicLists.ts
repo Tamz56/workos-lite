@@ -220,7 +220,7 @@ export function findExistingTopicStageTask(db: Db, topicId: string, stage: strin
     const titlePattern = `%[${normalizedTopicId}] ${stage} —%`;
 
     const row = db.prepare(`
-        SELECT id, title, list_id
+        SELECT id, title, list_id, notes
         FROM tasks
         WHERE workspace = 'content'
           AND (
@@ -229,7 +229,7 @@ export function findExistingTopicStageTask(db: Db, topicId: string, stage: strin
           )
         ORDER BY datetime(updated_at) ASC, id ASC
         LIMIT 1
-    `).get({ topicPattern, stagePattern, titlePattern }) as { id: string; title: string; list_id: string | null } | undefined;
+    `).get({ topicPattern, stagePattern, titlePattern }) as { id: string; title: string; list_id: string | null; notes: string | null } | undefined;
 
     return row ?? null;
 }

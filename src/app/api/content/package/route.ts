@@ -42,6 +42,18 @@ function readStageFromNotes(notes: string | null | undefined) {
   return match?.[1]?.trim() || null;
 }
 
+const STEP_ROLE_MAP: Record<string, string> = {
+  research_raw: "Research Raw — NotebookLM",
+  research_direction: "Research Direction — Arbor Questions",
+  brief: "Brief",
+  script_caption: "Script & Caption",
+  outline_web_article: "Outline web article",
+  assets_canva: "Visual Package",
+  seo_schema: "SEO & Schema",
+  publish: "Review / Publish",
+  general: "Draft",
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -146,55 +158,116 @@ export async function POST(req: NextRequest) {
           `).run({
             id: docId,
             title: docTitle,
-            content_md: docMarkdown,
+            content_md: pkg.mode === "partial" ? "" : docMarkdown,
             created_at: now,
             updated_at: now,
           });
         }
 
-        stages.forEach((stage, index) => {
-          const existingTask = findExistingTopicStageTask(db, pkg.topic_id, stage.title);
+        if (pkg.mode === "partial") {
+          const stepRole = pkg.detectedStepRole || "general";
+          const stageTitle = STEP_ROLE_MAP[stepRole] || "Draft";
+          
+          const existingTask = findExistingTopicStageTask(db, pkg.topic_id, stageTitle);
+          
+          const markerStart = `<!-- ARTICLE_STUDIO_PARTIAL:${stepRole}:${pkg.topic_id}:start -->`;
+          const markerEnd = `<!-- ARTICLE_STUDIO_PARTIAL:${stepRole}:${pkg.topic_id}:end -->`;
+          const markedBlock = `${markerStart}\n${pkg.article_markdown}\n${markerEnd}`;
+          
           if (existingTask) {
-            taskIds.push(existingTask.id);
-            if (existingTask.list_id !== resolvedListId) {
-              db.prepare(`
+             taskIds.push(existingTask.id);
+             let newNotes = existingTask.notes || "";
+             if (newNotes.includes(markerStart) && newNotes.includes(markerEnd)) {
+                 const regex = new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}`);
+                 newNotes = newNotes.replace(regex, markedBlock);
+             } else {
+                 newNotes = newNotes ? `${newNotes}\n\n${markedBlock}` : markedBlock;
+             }
+             
+             db.prepare(`
                 UPDATE tasks
                 SET list_id = @list_id,
                     doc_id = COALESCE(doc_id, @doc_id),
+                    notes = @notes,
                     updated_at = @updated_at
                 WHERE id = @id
               `).run({
                 id: existingTask.id,
                 list_id: resolvedListId,
                 doc_id: docId,
+                notes: newNotes,
                 updated_at: now,
               });
-            }
-            return;
+          } else {
+             const taskId = nanoid();
+             taskIds.push(taskId);
+             const notes = buildArticleTaskNotes({ pkg, stage: stageTitle, docId, checklist: [] }) + `\n\n${markedBlock}`;
+             
+             db.prepare(`
+                INSERT INTO tasks (
+                  id, title, workspace, list_id, status, notes, doc_id,
+                  sort_order, review_status, created_at, updated_at
+                ) VALUES (
+                  @id, @title, 'content', @list_id, 'review', @notes, @doc_id,
+                  @sort_order, 'in_review', @created_at, @updated_at
+                )
+              `).run({
+                id: taskId,
+                title: `[${pkg.topic_id}] ${stageTitle} — ${pkg.title}`,
+                list_id: resolvedListId,
+                notes,
+                doc_id: docId,
+                sort_order: 1,
+                created_at: now,
+                updated_at: now,
+              });
           }
+        } else {
+            // Full Package mode: Create/update all 5 tasks
+            stages.forEach((stage, index) => {
+              const existingTask = findExistingTopicStageTask(db, pkg.topic_id, stage.title);
+              if (existingTask) {
+                taskIds.push(existingTask.id);
+                if (existingTask.list_id !== resolvedListId) {
+                  db.prepare(`
+                    UPDATE tasks
+                    SET list_id = @list_id,
+                        doc_id = COALESCE(doc_id, @doc_id),
+                        updated_at = @updated_at
+                    WHERE id = @id
+                  `).run({
+                    id: existingTask.id,
+                    list_id: resolvedListId,
+                    doc_id: docId,
+                    updated_at: now,
+                  });
+                }
+                return;
+              }
 
-          const taskId = nanoid();
-          taskIds.push(taskId);
+              const taskId = nanoid();
+              taskIds.push(taskId);
 
-          db.prepare(`
-            INSERT INTO tasks (
-              id, title, workspace, list_id, status, notes, doc_id,
-              sort_order, review_status, created_at, updated_at
-            ) VALUES (
-              @id, @title, 'content', @list_id, 'review', @notes, @doc_id,
-              @sort_order, 'in_review', @created_at, @updated_at
-            )
-          `).run({
-            id: taskId,
-            title: `[${pkg.topic_id}] ${stage.title} — ${pkg.title}`,
-            list_id: resolvedListId,
-            notes: buildArticleTaskNotes({ pkg, stage: stage.title, docId, checklist: stage.checklist }),
-            doc_id: docId,
-            sort_order: index + 1,
-            created_at: now,
-            updated_at: now,
-          });
-        });
+              db.prepare(`
+                INSERT INTO tasks (
+                  id, title, workspace, list_id, status, notes, doc_id,
+                  sort_order, review_status, created_at, updated_at
+                ) VALUES (
+                  @id, @title, 'content', @list_id, 'review', @notes, @doc_id,
+                  @sort_order, 'in_review', @created_at, @updated_at
+                )
+              `).run({
+                id: taskId,
+                title: `[${pkg.topic_id}] ${stage.title} — ${pkg.title}`,
+                list_id: resolvedListId,
+                notes: buildArticleTaskNotes({ pkg, stage: stage.title, docId, checklist: stage.checklist }),
+                doc_id: docId,
+                sort_order: index + 1,
+                created_at: now,
+                updated_at: now,
+              });
+            });
+        }
       });
 
       tx();
