@@ -137,6 +137,13 @@ export function Sidebar() {
                     active={pathname.startsWith("/notes")}
                     isCollapsed={isCollapsed}
                 />
+                <NavItem
+                    href="/workspaces/content/gf-hub"
+                    label="GF Content Hub"
+                    icon={<BriefcaseIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/workspaces/content/gf-hub")}
+                    isCollapsed={isCollapsed}
+                />
             </nav>
 
             {/* Footer */}

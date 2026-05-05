@@ -249,3 +249,90 @@ CREATE TABLE IF NOT EXISTS note_links (
 
 CREATE INDEX IF NOT EXISTS idx_note_links_note_id ON note_links(note_id);
 CREATE INDEX IF NOT EXISTS idx_note_links_entity ON note_links(linked_entity_type, linked_entity_id);
+
+-- Green Fineness Content Operating Model
+CREATE TABLE IF NOT EXISTS seasons (
+  season_id          TEXT PRIMARY KEY,
+  season_title       TEXT NOT NULL,
+  season_description TEXT NULL,
+  status             TEXT NOT NULL DEFAULT 'active',
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS episodes (
+  episode_id         TEXT PRIMARY KEY,
+  season_id          TEXT NOT NULL,
+  episode_no         INTEGER NOT NULL,
+  episode_title      TEXT NOT NULL,
+  episode_role       TEXT NULL,
+  journey_stage      TEXT NULL,
+  primary_system     TEXT NULL,
+  secondary_systems  TEXT NULL, -- JSON array
+  main_article_title TEXT NULL,
+  supporting_article_backlog TEXT NULL, -- JSON array
+  bridge_from        TEXT NULL,
+  bridge_to          TEXT NULL,
+  priority           INTEGER DEFAULT 2,
+  status             TEXT DEFAULT 'planned',
+  notes              TEXT NULL,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(season_id) REFERENCES seasons(season_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS articles (
+  article_id         TEXT PRIMARY KEY,
+  topic_id           TEXT NULL, -- Links to content packages
+  season_id          TEXT NULL,
+  episode_id         TEXT NULL,
+  article_type       TEXT DEFAULT 'main', -- main | supporting | faq | reference
+  title              TEXT NOT NULL,
+  slug               TEXT NULL,
+  website_url        TEXT NULL,
+  website_draft_url  TEXT NULL,
+  content_pillar     TEXT NULL,
+  journey_stage      TEXT NULL,
+  primary_system     TEXT NULL,
+  secondary_systems  TEXT NULL, -- JSON array
+  status             TEXT DEFAULT 'idea',
+  priority           INTEGER DEFAULT 2,
+  current_step       TEXT DEFAULT '0', -- 0 to 7
+  publish_pack_status TEXT DEFAULT 'not_started',
+  group_post_status  TEXT DEFAULT 'not_started',
+  page_post_status   TEXT DEFAULT 'not_started',
+  personal_post_status TEXT DEFAULT 'not_started',
+  canva_status       TEXT DEFAULT 'not_started',
+  image_folder       TEXT NULL,
+  references_status  TEXT DEFAULT 'pending',
+  next_action        TEXT NULL,
+  notes              TEXT NULL,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(season_id) REFERENCES seasons(season_id) ON DELETE SET NULL,
+  FOREIGN KEY(episode_id) REFERENCES episodes(episode_id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_articles_topic_id ON articles(topic_id);
+CREATE INDEX IF NOT EXISTS idx_articles_season_episode ON articles(season_id, episode_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_seasons_updated_at
+AFTER UPDATE ON seasons
+FOR EACH ROW
+BEGIN
+  UPDATE seasons SET updated_at = datetime('now') WHERE season_id = OLD.season_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_episodes_updated_at
+AFTER UPDATE ON episodes
+FOR EACH ROW
+BEGIN
+  UPDATE episodes SET updated_at = datetime('now') WHERE episode_id = OLD.episode_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_articles_updated_at
+AFTER UPDATE ON articles
+FOR EACH ROW
+BEGIN
+  UPDATE articles SET updated_at = datetime('now') WHERE article_id = OLD.article_id;
+END;

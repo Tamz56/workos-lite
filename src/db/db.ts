@@ -667,9 +667,148 @@ function cleanupLegacyAvaDemoDataOnce() {
 }
 
 ensureProjectsAndSprints();
+function ensureGreenFinenessModel() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS seasons (
+          season_id          TEXT PRIMARY KEY,
+          season_title       TEXT NOT NULL,
+          season_description TEXT NULL,
+          status             TEXT NOT NULL DEFAULT 'active',
+          created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS episodes (
+          episode_id         TEXT PRIMARY KEY,
+          season_id          TEXT NOT NULL,
+          episode_no         INTEGER NOT NULL,
+          episode_title      TEXT NOT NULL,
+          episode_role       TEXT NULL,
+          journey_stage      TEXT NULL,
+          primary_system     TEXT NULL,
+          secondary_systems  TEXT NULL, -- JSON array
+          main_article_title TEXT NULL,
+          supporting_article_backlog TEXT NULL, -- JSON array
+          bridge_from        TEXT NULL,
+          bridge_to          TEXT NULL,
+          priority           INTEGER DEFAULT 2,
+          status             TEXT DEFAULT 'planned',
+          notes              TEXT NULL,
+          created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(season_id) REFERENCES seasons(season_id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS articles (
+          article_id         TEXT PRIMARY KEY,
+          topic_id           TEXT NULL, -- Links to content packages
+          season_id          TEXT NULL,
+          episode_id         TEXT NULL,
+          article_type       TEXT DEFAULT 'main', -- main | supporting | faq | reference
+          title              TEXT NOT NULL,
+          slug               TEXT NULL,
+          website_url        TEXT NULL,
+          website_draft_url  TEXT NULL,
+          content_pillar     TEXT NULL,
+          journey_stage      TEXT NULL,
+          primary_system     TEXT NULL,
+          secondary_systems  TEXT NULL, -- JSON array
+          status             TEXT DEFAULT 'idea',
+          priority           INTEGER DEFAULT 2,
+          current_step       TEXT DEFAULT '0', -- 0 to 7
+          publish_pack_status TEXT DEFAULT 'not_started',
+          group_post_status  TEXT DEFAULT 'not_started',
+          page_post_status   TEXT DEFAULT 'not_started',
+          personal_post_status TEXT DEFAULT 'not_started',
+          canva_status       TEXT DEFAULT 'not_started',
+          image_folder       TEXT NULL,
+          references_status  TEXT DEFAULT 'pending',
+          next_action        TEXT NULL,
+          notes              TEXT NULL,
+          created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(season_id) REFERENCES seasons(season_id) ON DELETE SET NULL,
+          FOREIGN KEY(episode_id) REFERENCES episodes(episode_id) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_articles_topic_id ON articles(topic_id);
+        CREATE INDEX IF NOT EXISTS idx_articles_season_episode ON articles(season_id, episode_id);
+        
+        -- Triggers for updated_at
+        CREATE TRIGGER IF NOT EXISTS trg_seasons_updated_at
+        AFTER UPDATE ON seasons
+        FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+        BEGIN
+          UPDATE seasons SET updated_at = datetime('now') WHERE season_id = NEW.season_id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_episodes_updated_at
+        AFTER UPDATE ON episodes
+        FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+        BEGIN
+          UPDATE episodes SET updated_at = datetime('now') WHERE episode_id = NEW.episode_id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_articles_updated_at
+        AFTER UPDATE ON articles
+        FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+        BEGIN
+          UPDATE articles SET updated_at = datetime('now') WHERE article_id = NEW.article_id;
+        END;
+    `);
+}
+
+export function seedGreenFinenessSeason1() {
+    const seasonId = "GF-SEASON-01";
+    const seasonTitle = "ชีวิตของพืชหนึ่งต้น";
+    
+    db.prepare(`
+        INSERT INTO seasons (season_id, season_title, season_description, status)
+        VALUES (?, ?, ?, 'active')
+        ON CONFLICT(season_id) DO UPDATE SET
+            season_title = excluded.season_title,
+            updated_at = datetime('now')
+    `).run(seasonId, seasonTitle, "Green Fineness Season 1: The Life of a Plant");
+
+    const episodes = [
+        { id: "GF-S01-E01", no: 1, title: "ดิน: จุดเริ่มต้นของชีวิตพืช" },
+        { id: "GF-S01-E02", no: 2, title: "อินทรียวัตถุ: อาหารของดินและพลังงานของระบบ" },
+        { id: "GF-S01-E03", no: 3, title: "จุลินทรีย์ในดิน: ผู้ทำงานเล็ก ๆ ที่ทำให้ดินมีชีวิต" },
+        { id: "GF-S01-E04", no: 4, title: "ไรโซสเฟียร์: พื้นที่รอบรากที่พืช ดิน และจุลินทรีย์พบกัน" },
+        { id: "GF-S01-E05", no: 5, title: "เมล็ดเริ่มงอก: จุดเริ่มต้นของชีวิตใหม่" },
+        { id: "GF-S01-E06", no: 6, title: "ราก: ประตูที่พืชใช้เชื่อมกับดิน" },
+        { id: "GF-S01-E07", no: 7, title: "ธาตุอาหาร: วัตถุดิบที่พืชใช้สร้างชีวิต" },
+        { id: "GF-S01-E08", no: 8, title: "ใบ: โรงงานสังเคราะห์แสงของพืช" },
+        { id: "GF-S01-E09", no: 9, title: "ลำต้น: เส้นทางลำเลียงน้ำ ธาตุอาหาร และน้ำตาล" },
+        { id: "GF-S01-E10", no: 10, title: "ดอก: เมื่อพืชเปลี่ยนจากการเติบโตสู่การสืบพันธุ์" },
+        { id: "GF-S01-E11", no: 11, title: "ผลและเมล็ด: คุณภาพ ผลผลิต และชีวิตรุ่นต่อไป" },
+        { id: "GF-S01-E12", no: 12, title: "กลับคืนสู่ดิน: ซากพืช จุลินทรีย์ และการหมุนเวียนธาตุอาหาร" }
+    ];
+
+    const stmt = db.prepare(`
+        INSERT INTO episodes (episode_id, season_id, episode_no, episode_title, status)
+        VALUES (?, ?, ?, ?, 'planned')
+        ON CONFLICT(episode_id) DO UPDATE SET
+            episode_no = excluded.episode_no,
+            episode_title = excluded.episode_title,
+            updated_at = datetime('now')
+    `);
+
+    const tx = db.transaction(() => {
+        for (const ep of episodes) {
+            stmt.run(ep.id, seasonId, ep.no, ep.title);
+        }
+    });
+    tx();
+}
+
 ensureNotes();
 ensureAppMeta();
 cleanupLegacyAvaDemoDataOnce();
+ensureGreenFinenessModel();
 if (!shouldSkipSeed) {
     ensureSeedProjects();
 }

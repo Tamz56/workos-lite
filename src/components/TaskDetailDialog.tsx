@@ -20,6 +20,7 @@ import {
     KNOWN_PLATFORMS 
 } from "../lib/content/utils";
 import { Modal } from "./ui/Modal";
+import ArticleControlBlock from "./content/ArticleControlBlock";
 
 const INPUT_BASE = "w-full text-sm bg-theme-input/50 hover:bg-theme-input/80 border border-transparent focus:border-theme-accent/50 focus:bg-theme-card rounded-xl px-3 py-2 outline-none transition-all placeholder:text-theme-muted text-theme-primary disabled:opacity-50 disabled:cursor-not-allowed";
 
@@ -571,6 +572,14 @@ function TaskDetailDialogInner({ task, isLoading, readOnly, onUpdate, onClose, i
                     )}
 
 
+
+                    {/* ARTICLE CONTROL BLOCK */}
+                    {(task.topic_id || task.workspace === "content") && (
+                        <section className="space-y-4 pt-8 border-t border-theme-border">
+                            <h3 className="text-[10px] font-black text-theme-muted uppercase tracking-[0.2em] mb-4">Green Fineness Mapping</h3>
+                            <ArticleControlBlock topicId={task.topic_id || task.id} defaultTitle={task.title} />
+                        </section>
+                    )}
 
                     {/* AGENT AUTOMATION */}
                     <section className={`space-y-6 pt-6 border-l-4 ${agentEnabled ? 'border-theme-accent bg-theme-accent/5' : 'border-transparent'} px-5 py-6 transition-all`}>
