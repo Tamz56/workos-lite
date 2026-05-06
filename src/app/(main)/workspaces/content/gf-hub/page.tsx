@@ -23,7 +23,7 @@ import {
     Trash2
 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
-import { buildGreenFinenessUtmUrl, extractGreenFinenessTopicId } from "@/lib/content/utm";
+import { buildGreenFinenessUtmUrl, extractGreenFinenessTopicId, extractGreenFinenessArticleTitle, extractGreenFinenessTaskRole } from "@/lib/content/utm";
 
 type TabKey = "strategy" | "backlog" | "production" | "draft_stock" | "publish_queue";
 
@@ -79,11 +79,17 @@ export default function GreenFinenessHub() {
             console.error("updateArticle called with null/undefined topicId — skipping PATCH", fields);
             return null;
         }
+        
+        const processedFields = Object.keys(fields).reduce((acc: any, key) => {
+            acc[key] = fields[key] === "" ? null : fields[key];
+            return acc;
+        }, {});
+
         try {
             const res = await fetch(`/api/content/articles/${encodeURIComponent(topicId)}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(fields)
+                body: JSON.stringify(processedFields)
             });
             if (res.ok) {
                 const data = await res.json();
@@ -307,10 +313,12 @@ export default function GreenFinenessHub() {
                             {articles.map(article => {
                                 const resolvedTopicId = article.topic_id || extractGreenFinenessTopicId(article.title || "");
                                 const isOrphan = !resolvedTopicId;
+                                const cleanTitle = extractGreenFinenessArticleTitle(article.title || "");
+                                const taskRole = extractGreenFinenessTaskRole(article.title || "");
                                 return (
                                 <div key={article.article_id} className={`bg-white border rounded-2xl p-5 shadow-sm hover:border-neutral-900/20 transition-all flex items-center justify-between gap-6 group ${isOrphan ? 'border-amber-200 bg-amber-50/30' : 'border-neutral-200'}`}>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1.5">
+                                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                             {isOrphan ? (
                                                 <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-amber-100 text-amber-600">
                                                     Missing topic_id
@@ -322,11 +330,18 @@ export default function GreenFinenessHub() {
                                                     )}
                                                 </span>
                                             )}
+                                            {taskRole && (
+                                                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-neutral-100 text-neutral-500">
+                                                    {taskRole}
+                                                </span>
+                                            )}
                                             <span className="text-[9px] font-bold text-neutral-400 uppercase truncate">
                                                 {article.season_title} / {article.episode_title}
                                             </span>
                                         </div>
-                                        <h3 className="text-base font-black text-neutral-900 truncate" title={article.title}>{article.title}</h3>
+                                        <h3 className="text-base font-black text-neutral-900 truncate" title={article.title}>
+                                            {article.article_title || article.topic_title || cleanTitle || (resolvedTopicId ? `${resolvedTopicId} — Untitled` : article.title)}
+                                        </h3>
                                         <div className="flex items-center gap-4 mt-2">
                                             <div className="flex items-center gap-1.5">
                                                 <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isOrphan ? 'bg-amber-400' : 'bg-emerald-500'}`} />
@@ -387,13 +402,22 @@ export default function GreenFinenessHub() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-neutral-100">
-                                {articles.filter(a => a.status === 'website_draft' || a.status === 'waiting_publish' || a.website_draft_url || a.publish_pack_status !== 'ready').map(article => {
+                                {articles.filter(a => a.status === 'website_draft' || a.publish_status === 'waiting_publish' || !!a.website_draft_url).map(article => {
                                     const resolvedTopicId = article.topic_id || extractGreenFinenessTopicId(article.title || "");
                                     return (
                                     <tr key={article.article_id} className="hover:bg-neutral-50/50 transition-colors">
                                         <td className="px-6 py-4">
-                                            <div className="font-bold text-neutral-900">{article.title}</div>
-                                            <div className="text-[10px] font-mono text-neutral-400">{resolvedTopicId || <span className="text-amber-500">NO-TOPIC</span>}</div>
+                                            <div className="font-bold text-neutral-900">
+                                                {article.article_title || article.topic_title || extractGreenFinenessArticleTitle(article.title || "") || (resolvedTopicId ? `${resolvedTopicId} — Untitled` : article.title)}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="text-[10px] font-mono text-neutral-400">{resolvedTopicId || <span className="text-amber-500">NO-TOPIC</span>}</div>
+                                                {extractGreenFinenessTaskRole(article.title || "") && (
+                                                    <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500">
+                                                        {extractGreenFinenessTaskRole(article.title || "")}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
@@ -445,7 +469,7 @@ export default function GreenFinenessHub() {
                                 })}
                             </tbody>
                         </table>
-                        {articles.filter(a => a.status === 'website_draft' || a.status === 'waiting_publish' || a.website_draft_url || a.publish_pack_status !== 'ready').length === 0 && (
+                        {articles.filter(a => a.status === 'website_draft' || a.publish_status === 'waiting_publish' || !!a.website_draft_url).length === 0 && (
                             <div className="py-20 text-center">
                                 <Archive className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
                                 <p className="text-neutral-500 font-bold">No website drafts yet.</p>
@@ -459,7 +483,7 @@ export default function GreenFinenessHub() {
                 {activeTab === "publish_queue" && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 gap-6">
-                            {articles.filter(a => ['waiting_url', 'needs_utm', 'publish_pack_ready', 'scheduled', 'website_published', 'group_posted', 'page_posted', 'personal_posted'].includes(a.publish_status) || a.publish_pack_status === 'ready' || a.ready_to_publish === 1).map(article => {
+                            {articles.filter(a => !!a.final_url || a.publish_pack_status === 'ready' || ['waiting_publish', 'needs_utm', 'scheduled', 'publish_pack_ready', 'website_published', 'group_posted', 'page_posted', 'personal_posted', 'complete'].includes(a.publish_status)).map(article => {
                             // Resolve effective topic_id — try to infer from title if column is null
                             const resolvedTopicId = article.topic_id || extractGreenFinenessTopicId(article.title || "");
 
@@ -469,13 +493,24 @@ export default function GreenFinenessHub() {
                                     <div key={article.article_id} className="bg-amber-50 border border-amber-200 rounded-3xl p-6 flex items-start gap-4">
                                         <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
                                         <div>
-                                            <p className="font-black text-amber-900 text-sm">{article.title || "Untitled Article"}</p>
+                                                            <p className="font-black text-amber-900 text-sm">{extractGreenFinenessArticleTitle(article.title || "Untitled Article")}</p>
                                             <p className="text-xs text-amber-700 mt-1">Missing topic_id. Please remap this article — the task title must contain a GF-CONTENT-### code.</p>
                                             <p className="text-[10px] font-mono text-amber-500 mt-1">Article ID: {article.article_id}</p>
                                         </div>
                                     </div>
                                 );
                             }
+
+                            const cleanTitle = extractGreenFinenessArticleTitle(article.title || "Untitled Article");
+                            
+                            // Determine Badge
+                            let badgeText = "UTM Ready";
+                            let badgeColor = "bg-blue-50 text-blue-600";
+                            if (article.publish_status === 'complete') { badgeText = "Complete"; badgeColor = "bg-emerald-50 text-emerald-600"; }
+                            else if (['group_posted', 'page_posted', 'personal_posted'].includes(article.publish_status)) { badgeText = "Posted"; badgeColor = "bg-indigo-50 text-indigo-600"; }
+                            else if (article.publish_status === 'scheduled') { badgeText = "Scheduled"; badgeColor = "bg-purple-50 text-purple-600"; }
+                            else if (!article.final_url) { badgeText = "Waiting Final URL"; badgeColor = "bg-amber-50 text-amber-600"; }
+                            else if (article.final_url && (!article.utm_group && !article.utm_page && !article.utm_personal)) { badgeText = "Needs UTM"; badgeColor = "bg-rose-50 text-rose-600"; }
 
                             return (
                                 <div key={article.article_id} className="bg-white border border-neutral-200 rounded-3xl shadow-sm overflow-hidden">
@@ -487,11 +522,13 @@ export default function GreenFinenessHub() {
                                                 <Clock className="w-5 h-5 text-white" />
                                             </div>
                                             <div className="min-w-0">
-                                                <h3 className="text-base font-black text-neutral-900 leading-tight truncate">{article.title}</h3>
+                                                <h3 className="text-base font-black text-neutral-900 leading-tight truncate" title={article.title}>
+                                                    {article.article_title || article.topic_title || cleanTitle || (resolvedTopicId ? `${resolvedTopicId} — Untitled` : article.title)}
+                                                </h3>
                                                 <div className="flex items-center gap-2 mt-0.5">
                                                     <span className="text-[10px] font-mono text-neutral-400">{resolvedTopicId}</span>
                                                     <span className="w-1 h-1 rounded-full bg-neutral-200 flex-shrink-0" />
-                                                    <span className="text-[10px] font-black uppercase text-neutral-400">{article.status}</span>
+                                                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${badgeColor}`}>{badgeText}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -539,6 +576,10 @@ export default function GreenFinenessHub() {
                                                 )}
                                                 <button
                                                     onClick={async () => {
+                                                        if (!resolvedTopicId && !article.slug) {
+                                                            setToast({ isVisible: true, message: "❌ Missing Topic ID and Slug. Cannot generate UTM." });
+                                                            return;
+                                                        }
                                                         const g = buildGreenFinenessUtmUrl({ finalUrl: article.final_url, channel: "group", slug: article.slug, topicId: resolvedTopicId });
                                                         const p = buildGreenFinenessUtmUrl({ finalUrl: article.final_url, channel: "page", slug: article.slug, topicId: resolvedTopicId });
                                                         const per = buildGreenFinenessUtmUrl({ finalUrl: article.final_url, channel: "personal", slug: article.slug, topicId: resolvedTopicId });
@@ -557,7 +598,7 @@ export default function GreenFinenessHub() {
                                                             setToast({ isVisible: true, message: "❌ Failed to save UTMs. Please try again." });
                                                         }
                                                     }}
-                                                    disabled={!article.final_url || !resolvedTopicId}
+                                                    disabled={!article.final_url}
                                                     className="flex-shrink-0 px-5 py-2.5 bg-black text-white rounded-xl text-xs font-black hover:bg-neutral-800 transition-all shadow-md shadow-black/10 disabled:opacity-40 disabled:cursor-not-allowed"
                                                 >
                                                     Generate UTMs

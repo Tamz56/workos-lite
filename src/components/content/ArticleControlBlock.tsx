@@ -18,7 +18,7 @@ import {
     Plus,
     ExternalLink
 } from "lucide-react";
-import { extractGreenFinenessTopicId } from "@/lib/content/utm";
+import { extractGreenFinenessTopicId, extractGreenFinenessArticleTitle } from "@/lib/content/utm";
 
 interface ArticleMapping {
     article_id: string;
@@ -26,6 +26,8 @@ interface ArticleMapping {
     season_id: string | null;
     episode_id: string | null;
     title: string;
+    article_title: string | null;
+    topic_title: string | null;
     slug: string | null;
     website_url: string | null;
     website_draft_url: string | null;
@@ -76,6 +78,21 @@ const PUBLISH_PACK_STATUSES = ["not_started", "needed", "in_progress", "ready", 
 const SOCIAL_STATUSES = ["not_started", "draft_needed", "draft_ready", "posted", "skipped"];
 const REF_STATUSES = ["pending", "ready", "checked", "published"];
 const IMAGE_STATUSES = ["not_started", "brief_ready", "generated", "uploaded", "published"];
+
+function getExpectedMinStatus(step: number): string | null {
+    switch(step) {
+        case 0: return "mini_research";
+        case 1: return "research";
+        case 2: return "research_direction";
+        case 3: return "brief";
+        case 4: return "outline";
+        case 5: return "article_draft";
+        case 6: return "article_draft";
+        case 7: return "website_draft";
+        case 8: return "published";
+        default: return null;
+    }
+}
 
 export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId: string, defaultTitle?: string }) {
     // Resolve the canonical GF topic_id:
@@ -164,10 +181,24 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
         if (!mapping || !effectiveTopicId) return;
         setSaving(true);
         try {
+            const body: any = { [field]: value === "" ? null : value };
+            
+            // P0 Fix 3: Sync article status with current step
+            if (field === "current_step") {
+                const step = parseInt(value);
+                const minStatus = getExpectedMinStatus(step);
+                const currentStatus = mapping.status || "idea";
+                if (minStatus && ["idea", "planned", "selected"].includes(currentStatus)) {
+                    body.status = minStatus;
+                    // Optimistic update
+                    setMapping(prev => prev ? { ...prev, status: minStatus } : prev);
+                }
+            }
+
             const res = await fetch(`/api/content/articles/${encodeURIComponent(effectiveTopicId)}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ [field]: value })
+                body: JSON.stringify(body)
             });
             if (res.ok) {
                 const data = await res.json();
@@ -226,7 +257,9 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                     </div>
                     <div>
                         <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-0.5">Article Control Block</div>
-                        <h3 className="text-xl font-black truncate max-w-[400px]">{mapping.title}</h3>
+                        <h3 className="text-xl font-black truncate max-w-[400px]">
+                            {mapping.article_title || mapping.topic_title || extractGreenFinenessArticleTitle(mapping.title || "") || mapping.title || effectiveTopicId}
+                        </h3>
                     </div>
                 </div>
                 
@@ -269,6 +302,38 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
 
                 {/* Status Column */}
                 <div className="lg:col-span-7 space-y-10">
+                    {/* Manual Override */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1 flex items-center gap-2">
+                                Manual Article Title
+                                <span className="text-[9px] font-medium lowercase text-neutral-300 italic">(Overrides parsing)</span>
+                            </label>
+                            <input 
+                                type="text"
+                                placeholder="Enter the real article title..."
+                                className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-300"
+                                value={mapping.article_title || ""}
+                                onChange={(e) => setMapping(prev => prev ? { ...prev, article_title: e.target.value } : null)}
+                                onBlur={(e) => updateField("article_title", e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1 flex items-center gap-2">
+                                Topic Title
+                                <span className="text-[9px] font-medium lowercase text-neutral-300 italic">(Secondary override)</span>
+                            </label>
+                            <input 
+                                type="text"
+                                placeholder="Enter the topic title..."
+                                className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-300"
+                                value={mapping.topic_title || ""}
+                                onChange={(e) => setMapping(prev => prev ? { ...prev, topic_title: e.target.value } : null)}
+                                onBlur={(e) => updateField("topic_title", e.target.value)}
+                            />
+                        </div>
+                    </div>
+
                     {/* Primary Mapping */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">

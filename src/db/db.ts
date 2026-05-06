@@ -332,6 +332,17 @@ function ensureSeedLists() {
 }
 
 function ensureDocsAndAttachments() {
+    // Migration for GF Hub Phase 2.2
+    const articlesInfo = db.prepare("PRAGMA table_info(articles)").all() as any[];
+    const hasArticleTitle = articlesInfo.some((c: any) => c.name === "article_title");
+    if (!hasArticleTitle) {
+        db.exec("ALTER TABLE articles ADD COLUMN article_title TEXT NULL");
+    }
+    const hasTopicTitle = articlesInfo.some((c: any) => c.name === "topic_title");
+    if (!hasTopicTitle) {
+        db.exec("ALTER TABLE articles ADD COLUMN topic_title TEXT NULL");
+    }
+
     const rowDocs = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='docs'`).get();
     if (!rowDocs) {
         db.exec(`
@@ -706,6 +717,7 @@ function ensureGreenFinenessModel() {
           episode_id         TEXT NULL,
           article_type       TEXT DEFAULT 'main', -- main | supporting | faq | reference
           title              TEXT NOT NULL,
+          article_title      TEXT NULL,
           slug               TEXT NULL,
           website_url        TEXT NULL,
           website_draft_url  TEXT NULL,

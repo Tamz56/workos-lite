@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 
 // Whitelist of columns that are safe to update via PATCH
 const ALLOWED_FIELDS = new Set([
-    "title", "slug", "status", "publish_status", "publish_date",
+    "title", "article_title", "topic_title", "slug", "status", "publish_status", "publish_date",
     "current_step", "season_id", "episode_id", "article_type",
     "website_url", "website_draft_url", "final_url",
     "utm_group", "utm_page", "utm_personal",

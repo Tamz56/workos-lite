@@ -288,6 +288,8 @@ CREATE TABLE IF NOT EXISTS articles (
   episode_id         TEXT NULL,
   article_type       TEXT DEFAULT 'main', -- main | supporting | faq | reference
   title              TEXT NOT NULL,
+  article_title      TEXT NULL,
+  topic_title        TEXT NULL,
   slug               TEXT NULL,
   website_url        TEXT NULL,
   website_draft_url  TEXT NULL,
