@@ -103,28 +103,58 @@ export async function POST(req: NextRequest) {
 
         // Sync to articles table (GF Hub Metadata)
         const existingArticle = db.prepare("SELECT article_id FROM articles WHERE topic_id = ?").get(pkg.topic_id) as { article_id: string } | undefined;
+        
+        const kw = pkg.keywords.length > 0 ? pkg.keywords.join(",") : null;
+        const sys = pkg.secondary_systems.length > 0 ? pkg.secondary_systems.join(",") : null;
+
         if (existingArticle) {
             db.prepare(`
                 UPDATE articles 
-                SET article_title = @article_title,
-                    season_id = @season_id,
-                    episode_id = @episode_id,
-                    journey_stage = @journey_stage,
-                    primary_system = @primary_system,
-                    secondary_systems = @secondary_systems,
-                    current_step = @current_step,
-                    status = COALESCE(@status, status),
-                    slug = COALESCE(@slug, slug),
+                SET article_title = COALESCE(NULLIF(@article_title, ''), article_title),
+                    topic_title = COALESCE(NULLIF(@topic_title, ''), topic_title),
+                    season_id = COALESCE(NULLIF(@season_id, ''), season_id),
+                    episode_id = COALESCE(NULLIF(@episode_id, ''), episode_id),
+                    story_set = COALESCE(NULLIF(@story_set, ''), story_set),
+                    story_order = COALESCE(NULLIF(@story_order, ''), story_order),
+                    content_layer = COALESCE(NULLIF(@content_layer, ''), content_layer),
+                    article_type = COALESCE(NULLIF(@article_type, ''), article_type),
+                    article_role = COALESCE(NULLIF(@article_role, ''), article_role),
+                    narrative_status = COALESCE(NULLIF(@narrative_status, ''), narrative_status),
+                    primary_system = COALESCE(NULLIF(@primary_system, ''), primary_system),
+                    secondary_systems = COALESCE(NULLIF(@secondary_systems, ''), secondary_systems),
+                    publish_pack_status = COALESCE(NULLIF(@publish_pack_status, ''), publish_pack_status),
+                    references_status = COALESCE(NULLIF(@references_status, ''), references_status),
+                    next_action = COALESCE(NULLIF(@next_action, ''), next_action),
+                    notes = COALESCE(NULLIF(@notes, ''), notes),
+                    meta_title = COALESCE(NULLIF(@meta_title, ''), meta_title),
+                    meta_description = COALESCE(NULLIF(@meta_description, ''), meta_description),
+                    keywords = COALESCE(NULLIF(@keywords, ''), keywords),
+                    current_step = COALESCE(NULLIF(@current_step, ''), current_step),
+                    status = COALESCE(NULLIF(@status, ''), status),
+                    slug = COALESCE(NULLIF(@slug, ''), slug),
                     updated_at = @updated_at
                 WHERE topic_id = @topic_id
             `).run({
                 topic_id: pkg.topic_id,
                 article_title: pkg.article_title || pkg.title,
+                topic_title: pkg.topic_title,
                 season_id: pkg.season_id,
                 episode_id: pkg.episode_id,
-                journey_stage: pkg.journey_stage,
+                story_set: pkg.story_set,
+                story_order: pkg.story_order,
+                content_layer: pkg.content_layer,
+                article_type: pkg.article_type,
+                article_role: pkg.article_role,
+                narrative_status: pkg.narrative_status,
                 primary_system: pkg.primary_system,
-                secondary_systems: pkg.secondary_systems,
+                secondary_systems: sys,
+                publish_pack_status: pkg.publish_pack_status,
+                references_status: pkg.references_status,
+                next_action: pkg.next_action,
+                notes: pkg.notes,
+                meta_title: pkg.meta_title,
+                meta_description: pkg.meta_description,
+                keywords: kw,
                 current_step: pkg.current_step,
                 status: pkg.article_status,
                 slug: pkg.slug,
@@ -133,26 +163,45 @@ export async function POST(req: NextRequest) {
         } else {
             db.prepare(`
                 INSERT INTO articles (
-                    article_id, topic_id, article_title, title,
-                    season_id, episode_id, journey_stage,
-                    primary_system, secondary_systems, current_step,
-                    status, slug, created_at, updated_at
+                    article_id, topic_id, article_title, topic_title, title,
+                    season_id, episode_id, story_set, story_order,
+                    content_layer, article_type, article_role, narrative_status,
+                    primary_system, secondary_systems, publish_pack_status,
+                    references_status, next_action, notes,
+                    meta_title, meta_description, keywords,
+                    current_step, status, slug, created_at, updated_at
                 ) VALUES (
-                    @article_id, @topic_id, @article_title, @title,
-                    @season_id, @episode_id, @journey_stage,
-                    @primary_system, @secondary_systems, @current_step,
-                    @status, @slug, @created_at, @updated_at
+                    @article_id, @topic_id, @article_title, @topic_title, @title,
+                    @season_id, @episode_id, @story_set, @story_order,
+                    @content_layer, @article_type, @article_role, @narrative_status,
+                    @primary_system, @secondary_systems, @publish_pack_status,
+                    @references_status, @next_action, @notes,
+                    @meta_title, @meta_description, @keywords,
+                    @current_step, @status, @slug, @created_at, @updated_at
                 )
             `).run({
                 article_id: nanoid(),
                 topic_id: pkg.topic_id,
                 article_title: pkg.article_title || pkg.title,
+                topic_title: pkg.topic_title,
                 title: pkg.title,
                 season_id: pkg.season_id,
                 episode_id: pkg.episode_id,
-                journey_stage: pkg.journey_stage,
+                story_set: pkg.story_set,
+                story_order: pkg.story_order,
+                content_layer: pkg.content_layer,
+                article_type: pkg.article_type,
+                article_role: pkg.article_role,
+                narrative_status: pkg.narrative_status,
                 primary_system: pkg.primary_system,
-                secondary_systems: pkg.secondary_systems,
+                secondary_systems: sys,
+                publish_pack_status: pkg.publish_pack_status || 'not_started',
+                references_status: pkg.references_status || 'pending',
+                next_action: pkg.next_action,
+                notes: pkg.notes,
+                meta_title: pkg.meta_title,
+                meta_description: pkg.meta_description,
+                keywords: kw,
                 current_step: pkg.current_step,
                 status: pkg.article_status || 'idea',
                 slug: pkg.slug,
@@ -214,7 +263,7 @@ status_label: ${pkg.status || "Needs Review"}
                 )
               `).run({
                 id: taskId,
-                title: `[${pkg.topic_id}] ${stageTitle} — ${pkg.title}`,
+                title: `[${pkg.topic_id}] ${stageTitle}`,
                 list_id: resolvedListId,
                 notes,
                 sort_order: 1,
@@ -323,7 +372,7 @@ status_label: ${pkg.status || "Needs Review"}
                 )
               `).run({
                 id: taskId,
-                title: `[${pkg.topic_id}] ${stage.title} — ${pkg.title}`,
+                title: `[${pkg.topic_id}] ${stage.title}`,
                 list_id: resolvedListId,
                 notes: buildArticleTaskNotes({ pkg, stage: stage.title, docId, checklist: stage.checklist }),
                 doc_id: docId,
@@ -337,11 +386,14 @@ status_label: ${pkg.status || "Needs Review"}
 
       tx();
 
+      const updatedArticle = db.prepare("SELECT * FROM articles WHERE topic_id = ?").get(pkg.topic_id);
+
       return NextResponse.json({
         ok: true,
         mode: "article_studio",
         topicId: pkg.topic_id,
         topicTitle: pkg.title,
+        article: updatedArticle,
         listId: resolvedListId,
         noteId: docId,
         taskIds,

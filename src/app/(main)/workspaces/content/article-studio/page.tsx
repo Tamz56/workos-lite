@@ -1,8 +1,10 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 import ArticleStudioClient from "./ArticleStudioClient";
+import { Suspense } from "react";
 
 export default function ArticleStudioPage() {
-    return <ArticleStudioClient />;
+    return (
+        <Suspense fallback={<div>Loading Article Studio...</div>}>
+            <ArticleStudioClient />
+        </Suspense>
+    );
 }

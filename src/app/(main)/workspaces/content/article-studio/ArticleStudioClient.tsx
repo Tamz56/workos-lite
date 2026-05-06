@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
     ArrowLeft, 
     CheckCircle2, 
@@ -29,6 +29,8 @@ import {
     ARTICLE_STUDIO_STEPS,
     buildPublishPackJson,
     formatArticlePackageMarkdown,
+    isInvalidTopicId,
+    isPlaceholderValue,
     parseArborArticlePackage,
 } from "@/lib/content/articleStudio";
 
@@ -172,11 +174,28 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
                     <MissingFieldsCard groups={preview.missingFieldGroups} isPartial={preview.mode === 'partial'} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 min-w-0">
-                    <FieldRow label="mode" value={preview.mode} /><FieldRow label="status" value={preview.status} /><FieldRow label="difficulty" value={preview.difficulty} /><FieldRow label="visual" value={preview.visual_status} /><FieldRow label="topic_id" value={preview.topic_id} /><FieldRow label="slug" value={preview.slug} />
+                    <FieldRow label="layer" value={preview.content_layer} />
+                    <FieldRow label="type" value={preview.article_type} />
+                    <FieldRow label="role" value={preview.article_role} />
+                    <FieldRow label="narrative" value={preview.narrative_status} />
+                    <FieldRow label="season" value={preview.season_id} />
+                    <FieldRow label="episode" value={preview.episode_id} />
+                    <FieldRow label="story set" value={preview.story_set} />
+                    <FieldRow label="order" value={preview.story_order} />
+                    <FieldRow label="topic_id" value={preview.topic_id} />
+                    <FieldRow label="status" value={preview.status} />
+                    <FieldRow label="primary system" value={preview.primary_system} />
+                    <ListField label="systems" value={preview.secondary_systems} />
+                    <FieldRow label="publish pack" value={preview.publish_pack_status} />
+                    <FieldRow label="references" value={preview.references_status} />
+                    <FieldRow label="next action" value={preview.next_action} />
+                    <FieldRow label="slug" value={preview.slug} />
                     <div className="sm:col-span-2 min-w-0"><FieldRow label="meta_title" value={preview.meta_title} /></div>
                     <div className="sm:col-span-2 min-w-0"><FieldRow label="meta_desc" value={preview.meta_description} /></div>
                 </div>
-                <div className="mt-2 pt-2 border-t border-theme-border/50 space-y-1 min-w-0"><ListField label="keywords" value={preview.keywords} /><ListField label="internal" value={[...preview.internal_links_prerequisite, ...preview.internal_links_next_step, ...preview.internal_links_related]} /></div>
+                <div className="mt-2 pt-2 border-t border-theme-border/50 space-y-1 min-w-0">
+                    <ListField label="keywords" value={preview.keywords} />
+                </div>
             </div>
             <div className="grid gap-6 lg:grid-cols-2 min-w-0">
                 <section className="rounded-xl border border-theme-border bg-theme-card p-6 shadow-sm min-w-0">
@@ -317,13 +336,26 @@ export default function ArticleStudioClient() {
     const [topicContext, setTopicContext] = useState({ 
         topic_id: "", 
         article_title: "", 
+        topic_title: "",
         season_id: "", 
         episode_id: "",
-        journey_stage: "",
-        primary_system: "",
-        secondary_systems: "",
+        story_set: "",
+        story_order: "",
+        content_layer: "knowledge",
+        article_type: "knowledge_article",
         article_role: "",
-        article_status: "idea"
+        primary_system: "",
+        systems: [] as string[],
+        narrative_status: "not_started",
+        article_status: "idea",
+        publish_pack_status: "not_started",
+        references_status: "pending",
+        next_action: "",
+        notes: "",
+        meta_title: "",
+        meta_description: "",
+        slug: "",
+        keywords: [] as string[]
     });
     
     // --- State: Guided Flow ---
@@ -339,8 +371,60 @@ export default function ArticleStudioClient() {
     const [importMode, setImportMode] = useState<ArticleStudioMode>("editorial");
     const [isManualMode, setIsManualMode] = useState(false);
     
+    const searchParams = useSearchParams();
+    const urlTopicId = searchParams.get("topic");
+
+    useEffect(() => {
+        if (urlTopicId && urlTopicId !== topicContext.topic_id) {
+            setTopicContext(prev => ({ ...prev, topic_id: urlTopicId }));
+        }
+    }, [urlTopicId]);
+
     const prevRawInput = useRef(rawInput);
     const previewInput = useDebouncedValue(viewMode === 'advanced' ? rawInput : (stepContents[activeStep] || ""), 250);
+
+    // Fetch existing article metadata when topic_id changes
+    useEffect(() => {
+        if (!topicContext.topic_id || topicContext.topic_id.length < 5) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/content/articles/${encodeURIComponent(topicContext.topic_id)}`);
+                const data = await res.json();
+                if (data.found && data.article) {
+                    const a = data.article;
+                    setTopicContext(prev => ({
+                        ...prev,
+                        article_title: a.article_title || a.title || prev.article_title,
+                        topic_title: a.topic_title || prev.topic_title,
+                        season_id: a.season_id || prev.season_id,
+                        episode_id: a.episode_id || prev.episode_id,
+                        story_set: a.story_set || prev.story_set,
+                        story_order: a.story_order || prev.story_order,
+                        content_layer: a.content_layer || prev.content_layer,
+                        article_type: a.article_type || prev.article_type,
+                        article_role: a.article_role || prev.article_role,
+                        primary_system: a.primary_system || prev.primary_system,
+                        systems: a.secondary_systems ? (typeof a.secondary_systems === 'string' ? a.secondary_systems.split(',') : a.secondary_systems) : prev.systems,
+                        narrative_status: a.narrative_status || prev.narrative_status,
+                        article_status: a.status || prev.article_status,
+                        publish_pack_status: a.publish_pack_status || prev.publish_pack_status,
+                        references_status: a.references_status || prev.references_status,
+                        next_action: a.next_action || prev.next_action,
+                        notes: a.notes || prev.notes,
+                        meta_title: a.meta_title || prev.meta_title,
+                        meta_description: a.meta_description || prev.meta_description,
+                        slug: a.slug || prev.slug,
+                        keywords: a.keywords ? (typeof a.keywords === 'string' ? a.keywords.split(',') : a.keywords) : prev.keywords,
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed to fetch article metadata:", err);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [topicContext.topic_id]);
 
     useEffect(() => {
         if (viewMode === 'advanced') {
@@ -386,6 +470,14 @@ export default function ArticleStudioClient() {
         ? (!!preview && preview.missingFields.length === 0 && !isSaving)
         : (!!topicContext.topic_id && !!previewInput.trim() && !isSaving);
 
+    const canSendToWebsiteDraft = useMemo(() => {
+        if (!topicContext.topic_id || isInvalidTopicId(topicContext.topic_id)) return false;
+        if (isPlaceholderValue(topicContext.article_title) && isPlaceholderValue(topicContext.topic_title)) return false;
+        if (!preview?.article_markdown?.trim()) return false;
+        if (preview?.missingFieldGroups?.required?.length > 0) return false;
+        return !isSaving;
+    }, [topicContext, preview, isSaving]);
+
     async function handleSaveStep() {
         if (isSaving) return;
         setIsSaving(true);
@@ -413,6 +505,36 @@ export default function ArticleStudioClient() {
             if (!res.ok) throw new Error(data.error || "Save failed");
 
             setSuccess(`Saved ${ARTICLE_STUDIO_STEPS[activeStep]?.title || 'Step'} successfully`);
+            
+            // Sync local state with what was just saved to prevent "disappearing" data
+            if (data.article) {
+                const a = data.article;
+                setTopicContext(prev => ({
+                    ...prev,
+                    article_title: a.article_title || a.title || prev.article_title,
+                    topic_title: a.topic_title || prev.topic_title,
+                    season_id: a.season_id || prev.season_id,
+                    episode_id: a.episode_id || prev.episode_id,
+                    story_set: a.story_set || prev.story_set,
+                    story_order: a.story_order || prev.story_order,
+                    content_layer: a.content_layer || prev.content_layer,
+                    article_type: a.article_type || prev.article_type,
+                    article_role: a.article_role || prev.article_role,
+                    primary_system: a.primary_system || prev.primary_system,
+                    systems: a.secondary_systems ? (typeof a.secondary_systems === 'string' ? a.secondary_systems.split(',') : a.secondary_systems) : prev.systems,
+                    narrative_status: a.narrative_status || prev.narrative_status,
+                    article_status: a.status || prev.article_status,
+                    publish_pack_status: a.publish_pack_status || prev.publish_pack_status,
+                    references_status: a.references_status || prev.references_status,
+                    next_action: a.next_action || prev.next_action,
+                    notes: a.notes || prev.notes,
+                    meta_title: a.meta_title || prev.meta_title,
+                    meta_description: a.meta_description || prev.meta_description,
+                    slug: a.slug || prev.slug,
+                    keywords: a.keywords ? (typeof a.keywords === 'string' ? a.keywords.split(',') : a.keywords) : prev.keywords,
+                }));
+            }
+
             if (viewMode === 'guided') {
                 setSavedSteps(prev => new Set(prev).add(activeStep));
             }
@@ -438,13 +560,24 @@ export default function ArticleStudioClient() {
                 body: JSON.stringify({ 
                     status, 
                     article_title: topicContext.article_title,
+                    topic_title: topicContext.topic_title,
                     season_id: topicContext.season_id,
-                    episode_id: topicContext.episode_id
+                    episode_id: topicContext.episode_id,
+                    content_layer: topicContext.content_layer,
+                    article_type: topicContext.article_type,
+                    article_role: topicContext.article_role,
+                    narrative_status: topicContext.narrative_status,
+                    story_set: topicContext.story_set,
+                    story_order: topicContext.story_order,
+                    meta_title: topicContext.meta_title,
+                    meta_description: topicContext.meta_description,
+                    slug: topicContext.slug,
+                    keywords: topicContext.keywords
                 }),
             });
 
             if (!res.ok) throw new Error("Sync failed");
-            setSuccess(`Article marked as ${status}`);
+            setSuccess(`Article metadata synced and marked as ${status}`);
             setTopicContext(prev => ({ ...prev, article_status: status }));
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
@@ -509,8 +642,8 @@ export default function ArticleStudioClient() {
             </div>
 
             <div className={viewMode === 'guided' 
-                ? "grid w-full gap-6 lg:grid-cols-[260px_minmax(0,1fr)_minmax(0,1fr)]"
-                : "grid w-full gap-6 lg:grid-cols-2"
+                ? "grid w-full gap-6 lg:grid-cols-[260px_minmax(0,1fr)_minmax(0,1fr)] items-stretch"
+                : "grid w-full gap-6 lg:grid-cols-2 items-stretch"
             }>
                 {/* 1. Sidebar Navigator (Guided Only) */}
                 <aside className={`min-w-0 ${viewMode === 'guided' ? 'block' : 'hidden'}`}>
@@ -527,7 +660,7 @@ export default function ArticleStudioClient() {
 
                 {/* 2. Main Workspace */}
                 <main className={`flex flex-col min-w-0 ${viewMode === 'advanced' ? 'lg:col-span-1' : ''}`}>
-                    <section className="flex flex-col h-[calc(100vh-20px)] min-w-0 rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
+                    <section className="flex flex-col h-full min-h-[960px] min-w-0 rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
                         {/* Editor Header */}
                         <div className="px-6 py-3 border-b border-theme-border/50 flex flex-col gap-3 bg-theme-card">
                             {viewMode === 'guided' ? (
@@ -560,44 +693,12 @@ export default function ArticleStudioClient() {
                                             />
                                         </div>
                                         <div className="space-y-1 min-w-0">
-                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Season</label>
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Topic Title</label>
                                             <input 
                                                 type="text"
-                                                value={topicContext.season_id}
-                                                onChange={(e) => setTopicContext(prev => ({ ...prev, season_id: e.target.value }))}
-                                                placeholder="S..."
-                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
-                                            />
-                                        </div>
-                                        <div className="space-y-1 min-w-0">
-                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Episode</label>
-                                            <input 
-                                                type="text"
-                                                value={topicContext.episode_id}
-                                                onChange={(e) => setTopicContext(prev => ({ ...prev, episode_id: e.target.value }))}
-                                                placeholder="E..."
-                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 min-w-0">
-                                        <div className="space-y-1 min-w-0">
-                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Journey Stage</label>
-                                            <input 
-                                                type="text"
-                                                value={topicContext.journey_stage}
-                                                onChange={(e) => setTopicContext(prev => ({ ...prev, journey_stage: e.target.value }))}
-                                                placeholder="Stage..."
-                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
-                                            />
-                                        </div>
-                                        <div className="space-y-1 min-w-0">
-                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Primary System</label>
-                                            <input 
-                                                type="text"
-                                                value={topicContext.primary_system}
-                                                onChange={(e) => setTopicContext(prev => ({ ...prev, primary_system: e.target.value }))}
-                                                placeholder="System..."
+                                                value={topicContext.topic_title}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, topic_title: e.target.value }))}
+                                                placeholder="หัวข้อหลัก..."
                                                 className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
                                             />
                                         </div>
@@ -610,6 +711,61 @@ export default function ArticleStudioClient() {
                                                 placeholder="Role..."
                                                 className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
                                             />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 min-w-0">
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Season ID</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.season_id}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, season_id: e.target.value }))}
+                                                placeholder="GF-SEASON-XX"
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Episode ID</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.episode_id}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, episode_id: e.target.value }))}
+                                                placeholder="GF-SXX-EXX"
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 min-w-0">
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Story Set</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.story_set}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, story_set: e.target.value }))}
+                                                placeholder="Story Set..."
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Order</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.story_order}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, story_order: e.target.value }))}
+                                                placeholder="00"
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Layer</label>
+                                            <select
+                                                value={topicContext.content_layer}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, content_layer: e.target.value }))}
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            >
+                                                <option value="knowledge">Knowledge</option>
+                                                <option value="narrative">Narrative</option>
+                                            </select>
                                         </div>
                                         <div className="space-y-1 min-w-0">
                                             <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Step</label>
@@ -656,7 +812,7 @@ export default function ArticleStudioClient() {
                         </div>
 
                         {/* Textarea Area */}
-                        <div className="flex-1 relative group min-w-0">
+                        <div className="flex-1 relative min-w-0 bg-theme-input/5">
                             <textarea
                                 value={viewMode === 'guided' ? (stepContents[activeStep] || "") : rawInput}
                                 onChange={(event) => {
@@ -668,7 +824,7 @@ export default function ArticleStudioClient() {
                                     setError(null);
                                     setSuccess(null);
                                 }}
-                                className="absolute inset-0 w-full h-full p-10 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-input/5 outline-none transition-theme placeholder:text-theme-muted resize-none custom-scrollbar"
+                                className="absolute inset-0 w-full h-full p-8 lg:p-12 font-mono text-[14px] leading-[1.8] text-theme-primary bg-transparent outline-none transition-theme placeholder:text-theme-muted resize-none custom-scrollbar"
                                 placeholder={viewMode === 'guided' ? `Write ${ARTICLE_STUDIO_STEPS[activeStep]?.title} here...` : "Paste Arbor Package content here..."}
                             />
                         </div>
@@ -688,12 +844,12 @@ export default function ArticleStudioClient() {
                                 </div>
                             )}
 
-                            <div className="flex flex-wrap items-center justify-between gap-4">
-                                <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
                                         onClick={handleClearDraft}
-                                        className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary transition-all active:scale-95"
+                                        className="h-11 flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 text-[10px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary transition-all active:scale-95"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                         Clear
@@ -703,56 +859,74 @@ export default function ArticleStudioClient() {
                                             type="button"
                                             disabled={!preview}
                                             onClick={handleExportPublishPack}
-                                            className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                            className="h-11 flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 text-[10px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
                                         >
                                             <Download className="h-4 w-4" />
                                             Export
                                         </button>
                                     )}
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2 justify-end flex-1 min-w-0">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 flex-1 md:max-w-[700px] lg:max-w-[850px]">
                                     <button
                                         type="button"
-                                        disabled={!topicContext.topic_id || isSaving}
+                                        disabled={!topicContext.topic_id || isInvalidTopicId(topicContext.topic_id) || isSaving}
                                         onClick={() => handleSyncStatus("draft")}
-                                        className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 transition-all active:scale-95 text-nowrap"
+                                        className="h-11 flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-3 text-[10px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 transition-all active:scale-95"
                                     >
                                         Mark as Draft
                                     </button>
                                     <button
                                         type="button"
-                                        disabled={!topicContext.topic_id || isSaving}
+                                        disabled={!topicContext.topic_id || isInvalidTopicId(topicContext.topic_id) || !preview?.article_markdown?.trim() || isSaving}
                                         onClick={() => handleSyncStatus("seo_ready")}
-                                        className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 transition-all active:scale-95 text-nowrap"
+                                        className="h-11 flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-3 text-[10px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 transition-all active:scale-95"
                                     >
                                         SEO Ready
                                     </button>
                                     <button
                                         type="button"
-                                        disabled={!topicContext.topic_id || isSaving}
+                                        disabled={!canSendToWebsiteDraft}
                                         onClick={() => handleSyncStatus("website_draft")}
-                                        className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 disabled:opacity-40 transition-all active:scale-95 text-nowrap"
+                                        className="h-11 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/10 hover:bg-emerald-700 disabled:opacity-40 disabled:grayscale transition-all active:scale-95"
                                     >
-                                        Send to Website Draft
+                                        Website Draft
                                     </button>
                                     <button
                                         type="button"
                                         disabled={!canSave}
                                         onClick={handleSaveStep}
-                                        className="min-w-[140px] flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                        className="h-11 flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-500/10 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
                                     >
                                         {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                        {viewMode === 'guided' ? 'Save Step' : (preview?.mode === 'partial' ? 'Update Package' : 'Create Package')}
+                                        {viewMode === 'guided' ? 'Save Step' : (preview?.mode === 'partial' ? 'Update' : 'Create')}
                                     </button>
                                 </div>
                             </div>
-                            {viewMode === 'advanced' && (
-                                <p className="mt-4 text-[9px] text-center font-bold text-theme-muted uppercase tracking-widest leading-relaxed">
-                                    {preview?.mode === 'partial' 
-                                        ? "Partial mode: topic_id and content are required. SEO, FAQ, references, visuals, and social posts can be added later."
-                                        : "Full mode: All required fields must be satisfied to enable package creation."}
-                                </p>
-                            )}
+
+                            {/* Validation & Helper Row */}
+                            <div className="mt-4 pt-4 border-t border-theme-border/30 flex items-center justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                    {!canSendToWebsiteDraft && !isSaving && (
+                                        <div className="flex items-center gap-2 text-red-500">
+                                            <div className="w-1 h-1 rounded-full bg-red-500 shrink-0" />
+                                            <span className="text-[10px] font-bold uppercase tracking-tight truncate">
+                                                {!topicContext.topic_id || isInvalidTopicId(topicContext.topic_id) 
+                                                    ? "Topic ID Required (e.g. GF-CONTENT-012, no placeholders)" 
+                                                    : !preview?.article_markdown?.trim() 
+                                                        ? "Add article draft content before sending to Website Draft" 
+                                                        : preview?.missingFieldGroups?.required?.length > 0 
+                                                            ? "Resolve required fields in Content Health first" 
+                                                            : "Complete metadata first"}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                                {viewMode === 'advanced' && (
+                                    <p className="text-[9px] font-bold text-theme-muted uppercase tracking-widest whitespace-nowrap">
+                                        {preview?.mode === 'partial' ? "Partial mode active" : "Full mode active"}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </section>
                 </main>

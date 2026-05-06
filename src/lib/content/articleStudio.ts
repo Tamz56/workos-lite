@@ -47,12 +47,15 @@ export type ArticleStudioPackage = {
     detectedStepRole?: ArticleStudioStepRole;
     topic_id: string;
     article_title: string;
+    topic_title: string;
     season_id: string;
     episode_id: string;
-    journey_stage: string;
-    primary_system: string;
-    secondary_systems: string;
+    story_set: string;
+    story_order: string;
+    content_layer: string;
+    article_type: string;
     article_role: string;
+    narrative_status: string;
     current_step: string;
     article_status: string;
     title: string;
@@ -75,6 +78,12 @@ export type ArticleStudioPackage = {
     status: ArticleStudioStatus;
     difficulty: ArticleStudioDifficulty;
     visual_status: ArticleStudioVisualStatus;
+    primary_system: string;
+    secondary_systems: string[];
+    publish_pack_status: string;
+    references_status: string;
+    next_action: string;
+    notes: string;
 };
 
 export type ArticleStudioSectionKey =
@@ -102,12 +111,15 @@ const EMPTY_PACKAGE: ArticleStudioPackage = {
     mode: "editorial",
     topic_id: "",
     article_title: "",
+    topic_title: "",
     season_id: "",
     episode_id: "",
-    journey_stage: "",
-    primary_system: "",
-    secondary_systems: "",
+    story_set: "",
+    story_order: "",
+    content_layer: "knowledge",
+    article_type: "knowledge_article",
     article_role: "",
+    narrative_status: "not_started",
     current_step: "0",
     article_status: "idea",
     title: "",
@@ -130,21 +142,30 @@ const EMPTY_PACKAGE: ArticleStudioPackage = {
     status: "needs_human_insight",
     difficulty: "intermediate",
     visual_status: "not_needed_yet",
+    primary_system: "",
+    secondary_systems: [],
+    publish_pack_status: "not_started",
+    references_status: "pending",
+    next_action: "",
+    notes: "",
 };
 
 const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     mode: ["mode", "article mode"],
     detectedStepRole: ["step_role", "detected_step", "stage"],
     topic_id: ["topic_id", "topic id", "topic-id"],
-    article_title: ["article_title", "article title", "manual title"],
+    article_title: ["article_title", "article title", "manual article title"],
+    topic_title: ["topic_title", "topic title"],
     season_id: ["season_id", "season"],
     episode_id: ["episode_id", "episode"],
-    journey_stage: ["journey_stage", "journey"],
-    primary_system: ["primary_system", "primary"],
-    secondary_systems: ["secondary_systems", "secondary"],
-    article_role: ["article_role", "role"],
-    current_step: ["current_step", "step"],
-    article_status: ["article_status", "status"],
+    story_set: ["story_set", "story set"],
+    story_order: ["story_order", "story order"],
+    content_layer: ["content_layer", "content layer", "layer"],
+    article_type: ["article_type", "article type"],
+    article_role: ["article_role", "article role", "role"],
+    narrative_status: ["narrative_status", "narrative status"],
+    current_step: ["current_step", "current step", "step"],
+    article_status: ["article_status", "article status", "status"],
     title: ["title", "working title"],
     meta_title: ["meta_title", "meta title", "seo title"],
     meta_description: ["meta_description", "meta description", "seo description"],
@@ -165,6 +186,12 @@ const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     status: ["status"],
     difficulty: ["difficulty", "level"],
     visual_status: ["visual_status", "visual status"],
+    primary_system: ["primary_system", "primary system", "system"],
+    secondary_systems: ["secondary_systems", "secondary systems", "systems"],
+    publish_pack_status: ["publish_pack_status", "publish pack status", "publish pack"],
+    references_status: ["references_status", "references status"],
+    next_action: ["next_action", "next action"],
+    notes: ["notes", "internal notes"],
 };
 
 const VALID_MODES: ArticleStudioMode[] = ["editorial", "structured", "partial"];
@@ -354,7 +381,7 @@ function safeJson(value: unknown, fallback: unknown) {
     }
 }
 
-function isPlaceholderValue(value: unknown) {
+export function isPlaceholderValue(value: unknown) {
     if (typeof value !== "string") return false;
     const normalized = normalizeKey(value);
     if (!normalized) return true;
@@ -406,7 +433,7 @@ function normalizeTopicId(value: unknown) {
     return isPlaceholderValue(value) ? "" : asPlainString(value);
 }
 
-function isInvalidTopicId(value: string) {
+export function isInvalidTopicId(value: string) {
     const normalized = value.trim().toUpperCase();
     return !normalized || normalized === "GF-CONTENT-XXX" || normalized === "TOPIC-ID";
 }
@@ -595,12 +622,15 @@ export function normalizeArticleStudioPackage(input: Partial<ArticleStudioPackag
         detectedStepRole,
         topic_id: normalizeTopicId(input.topic_id),
         article_title: asPlainString(input.article_title),
+        topic_title: asPlainString(input.topic_title),
         season_id: asPlainString(input.season_id),
         episode_id: asPlainString(input.episode_id),
-        journey_stage: asPlainString(input.journey_stage),
-        primary_system: asPlainString(input.primary_system),
-        secondary_systems: asPlainString(input.secondary_systems),
+        story_set: asPlainString(input.story_set),
+        story_order: asPlainString(input.story_order),
+        content_layer: asPlainString(input.content_layer) || "knowledge",
+        article_type: asPlainString(input.article_type) || "knowledge_article",
         article_role: asPlainString(input.article_role),
+        narrative_status: asPlainString(input.narrative_status) || "not_started",
         current_step: asPlainString(input.current_step),
         article_status: asPlainString(input.article_status),
         title,
@@ -623,6 +653,12 @@ export function normalizeArticleStudioPackage(input: Partial<ArticleStudioPackag
         status: normalizeStatus(input.status, mode),
         difficulty: normalizeDifficulty(input.difficulty),
         visual_status: normalizeVisualStatus(input.visual_status),
+        primary_system: asPlainString(input.primary_system),
+        secondary_systems: asStringArray(input.secondary_systems || (input as any).systems),
+        publish_pack_status: asPlainString(input.publish_pack_status),
+        references_status: asPlainString(input.references_status),
+        next_action: asPlainString(input.next_action),
+        notes: asPlainString(input.notes),
     };
 }
 
@@ -772,24 +808,51 @@ function withPreviewMetadata(
     }
 
     normalizedPkg.title = resolvedTitle;
+    
+    // SEO Guard: Auto-generated meta fields must NOT use topic_id, task metadata, or internal technical fields.
+    // We achieve this by sanitizing the source text before generating.
+    const sanitizeForSeo = (text: string) => {
+        if (!text) return "";
+        return text
+            .replace(/GF-CONTENT-\d+/gi, "")
+            .replace(/GF-ARTICLE-\d+/gi, "")
+            .replace(/template_key:\s*\S+/gi, "")
+            .replace(/stage:\s*\S+/gi, "")
+            .replace(/task_role:\s*\S+/gi, "")
+            .replace(/content_layer:\s*\S+/gi, "")
+            .replace(/article_type:\s*\S+/gi, "")
+            .replace(/systems:\s*\S+/gi, "")
+            // Cleanup leftover colons/dashes from removed patterns
+            .replace(/^\s*[:—–-]\s*/, "")
+            .trim();
+    };
 
-    if (!normalizedPkg.meta_title && resolvedTitle) {
-        normalizedPkg.meta_title = resolvedTitle.length > 58 ? resolvedTitle.slice(0, 55).trimEnd() + "..." : resolvedTitle;
+    const seoTitleSource = sanitizeForSeo(resolvedTitle);
+
+    if (normalizedPkg.meta_title) {
+        normalizedPkg.meta_title = sanitizeForSeo(normalizedPkg.meta_title);
+    } else if (seoTitleSource) {
+        normalizedPkg.meta_title = seoTitleSource.length > 58 ? seoTitleSource.slice(0, 55).trimEnd() + "..." : seoTitleSource;
         generatedFields.push("meta_title");
     }
 
-    if (!normalizedPkg.meta_description && normalizedPkg.article_markdown) {
-        normalizedPkg.meta_description = shortDescription(resolvedTitle, normalizedPkg.article_markdown);
+    if (normalizedPkg.meta_description) {
+        normalizedPkg.meta_description = sanitizeForSeo(normalizedPkg.meta_description);
+    } else if (normalizedPkg.article_markdown) {
+        // Sanitize first few lines of markdown for description
+        const cleanBody = sanitizeForSeo(normalizedPkg.article_markdown.slice(0, 1000));
+        normalizedPkg.meta_description = shortDescription(seoTitleSource, cleanBody);
         generatedFields.push("meta_description");
     }
 
-    if (normalizedPkg.keywords.length === 0 && (resolvedTitle || normalizedPkg.article_markdown)) {
-        normalizedPkg.keywords = keywordCandidates(resolvedTitle, normalizedPkg.article_markdown);
+    if (normalizedPkg.keywords.length === 0 && (seoTitleSource || normalizedPkg.article_markdown)) {
+        const cleanBody = sanitizeForSeo(normalizedPkg.article_markdown.slice(0, 1000));
+        normalizedPkg.keywords = keywordCandidates(seoTitleSource, cleanBody);
         if (normalizedPkg.keywords.length > 0) generatedFields.push("keywords");
     }
 
-    if (!normalizedPkg.slug && resolvedTitle) {
-        normalizedPkg.slug = slugify(resolvedTitle);
+    if (!normalizedPkg.slug && seoTitleSource) {
+        normalizedPkg.slug = slugify(seoTitleSource);
         generatedFields.push("slug");
     }
 
@@ -877,9 +940,19 @@ export function formatArticlePackageMarkdown(pkg: ArticleStudioPackage) {
 ## Research Direction
 - Topic ID: ${pkg.topic_id || "-"}
 - Mode: ${pkg.mode || "editorial"}
+- Layer: ${pkg.content_layer || "knowledge"}
+- Type: ${pkg.article_type || "knowledge_article"}
+- Role: ${pkg.article_role || "-"}
 - Status: ${pkg.status || "needs_human_insight"}
+- Narrative: ${pkg.narrative_status || "not_started"}
 - Difficulty: ${pkg.difficulty || "intermediate"}
 - Visual Status: ${pkg.visual_status || "not_needed_yet"}
+
+## Context
+- Season: ${pkg.season_id || "-"}
+- Episode: ${pkg.episode_id || "-"}
+- Story Set: ${pkg.story_set || "-"}
+- Story Order: ${pkg.story_order || "-"}
 
 ## Draft
 ${pkg.article_markdown || "_No draft provided._"}
@@ -933,7 +1006,15 @@ export function buildPublishPackJson(pkg: ArticleStudioPackage) {
             topic_id: pkg.topic_id,
             title: pkg.title,
             slug: pkg.slug,
+            content_layer: pkg.content_layer,
+            article_type: pkg.article_type,
+            article_role: pkg.article_role,
+            season_id: pkg.season_id,
+            episode_id: pkg.episode_id,
+            story_set: pkg.story_set,
+            story_order: pkg.story_order,
             status: pkg.status || "needs_human_insight",
+            narrative_status: pkg.narrative_status,
             difficulty: pkg.difficulty || "intermediate",
             visual_status: pkg.visual_status || "not_needed_yet",
         },

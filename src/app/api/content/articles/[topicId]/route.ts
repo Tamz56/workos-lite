@@ -12,8 +12,10 @@ const ALLOWED_FIELDS = new Set([
     "personal_post_status", "hashtags_status", "publish_log_status",
     "canva_status", "image_folder", "references_status",
     "seo_status", "schema_status", "ready_to_publish",
-    "content_pillar", "journey_stage", "primary_system", "secondary_systems",
+    "meta_title", "meta_description", "keywords",
+    "content_layer", "article_role", "story_set", "story_order", "narrative_status",
     "next_action", "notes", "priority",
+    "primary_system", "secondary_systems",
 ]);
 
 export async function GET(
@@ -82,6 +84,13 @@ export async function PATCH(
             }
         }
 
+        const processValue = (k: string, v: unknown) => {
+            if (k === "keywords" || k === "secondary_systems") {
+                if (Array.isArray(v)) return v.join(",");
+            }
+            return v;
+        };
+
         if (!existing) {
             // Create a minimal new article row
             const articleId = nanoid();
@@ -91,7 +100,7 @@ export async function PATCH(
             const values: unknown[] = [
                 articleId,
                 topicId,
-                ...insertFields.map(f => body[f]),
+                ...insertFields.map(f => processValue(f, body[f])),
                 now,
                 now,
             ];
@@ -102,7 +111,7 @@ export async function PATCH(
                 db.prepare(
                     `INSERT INTO articles (article_id, topic_id, title${columns}, created_at, updated_at)
                      VALUES (?, ?, ?${placeholders}, ?, ?)`
-                ).run(articleId, topicId, titleVal, ...insertFields.map(f => body[f]), now, now);
+                ).run(articleId, topicId, titleVal, ...insertFields.map(f => processValue(f, body[f])), now, now);
             } else {
                 db.prepare(
                     `INSERT INTO articles (article_id, topic_id${columns}, created_at, updated_at)
@@ -121,7 +130,7 @@ export async function PATCH(
         }
 
         const setClause = fields.map(f => `${f} = ?`).join(", ");
-        const updateValues = [...fields.map(f => body[f]), now, topicId];
+        const updateValues = [...fields.map(f => processValue(f, body[f])), now, topicId];
 
         db.prepare(`UPDATE articles SET ${setClause}, updated_at = ? WHERE topic_id = ?`)
             .run(...updateValues);
