@@ -694,7 +694,7 @@ export default function ArticleStudioClient() {
 
                 {/* 2. Main Workspace */}
                 <main className={`flex flex-col min-w-0 ${viewMode === 'advanced' ? 'lg:col-span-1' : ''}`}>
-                    <section className="flex flex-col h-full min-h-[960px] min-w-0 rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
+                    <section className="flex flex-col min-h-[960px] min-w-0 rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-visible">
                         {/* Editor Header */}
                         <div className="px-6 py-3 border-b border-theme-border/50 flex flex-col gap-3 bg-theme-card">
                             {viewMode === 'guided' ? (
@@ -846,21 +846,21 @@ export default function ArticleStudioClient() {
                         </div>
 
                         {/* Textarea Area */}
-                        <div className="flex-1 relative min-w-0 bg-theme-input/5 overflow-y-auto custom-scrollbar">
+                        <div className="flex-1 min-w-0 bg-theme-input/5">
                             {viewMode === 'guided' && activeStep === 'outline_web_article' ? (
-                                <div className="p-6 lg:p-8 space-y-8">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                            Body Content
-                                        </label>
-                                        <textarea
-                                            value={topicContext.body_markdown}
-                                            onChange={(e) => setTopicContext(prev => ({ ...prev, body_markdown: e.target.value }))}
-                                            className="w-full min-h-[620px] xl:min-h-[680px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 resize-none"
-                                            placeholder="Write main article body here..."
-                                        />
-                                    </div>
+                                    <div className="p-6 lg:p-8 space-y-12">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                                Body Content
+                                            </label>
+                                            <textarea
+                                                value={topicContext.body_markdown}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, body_markdown: e.target.value }))}
+                                                className="w-full min-h-[620px] xl:min-h-[680px] p-8 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 resize-y overflow-y-auto custom-scrollbar shadow-sm"
+                                                placeholder="Write main article body here..."
+                                            />
+                                        </div>
 
                                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                                         <div className="space-y-2">
@@ -919,9 +919,8 @@ export default function ArticleStudioClient() {
                                 />
                             )}
                         </div>
-
                         {/* Action Bar */}
-                        <div className="p-6 bg-theme-card border-t border-theme-border/50 min-w-0">
+                        <div className="sticky bottom-0 p-6 bg-theme-card border-t border-theme-border/50 z-20 flex-none rounded-b-[24px]">
                             {error && (
                                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-bold text-red-600 flex items-center gap-2">
                                     <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
