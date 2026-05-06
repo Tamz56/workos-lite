@@ -310,7 +310,12 @@ export default function GreenFinenessHub() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
-                            {articles.map(article => {
+                            {articles.filter(a => 
+                                a.status !== 'website_draft' && 
+                                !a.website_draft_url && 
+                                !a.final_url && 
+                                a.publish_pack_status !== 'ready'
+                            ).map(article => {
                                 const resolvedTopicId = article.topic_id || extractGreenFinenessTopicId(article.title || "");
                                 const isOrphan = !resolvedTopicId;
                                 const cleanTitle = extractGreenFinenessArticleTitle(article.title || "");
@@ -402,7 +407,7 @@ export default function GreenFinenessHub() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-neutral-100">
-                                {articles.filter(a => a.status === 'website_draft' || a.publish_status === 'waiting_publish' || !!a.website_draft_url).map(article => {
+                                {articles.filter(a => a.status === 'website_draft' || !!a.website_draft_url).map(article => {
                                     const resolvedTopicId = article.topic_id || extractGreenFinenessTopicId(article.title || "");
                                     return (
                                     <tr key={article.article_id} className="hover:bg-neutral-50/50 transition-colors">
@@ -469,7 +474,7 @@ export default function GreenFinenessHub() {
                                 })}
                             </tbody>
                         </table>
-                        {articles.filter(a => a.status === 'website_draft' || a.publish_status === 'waiting_publish' || !!a.website_draft_url).length === 0 && (
+                        {articles.filter(a => a.status === 'website_draft' || !!a.website_draft_url).length === 0 && (
                             <div className="py-20 text-center">
                                 <Archive className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
                                 <p className="text-neutral-500 font-bold">No website drafts yet.</p>
@@ -483,7 +488,7 @@ export default function GreenFinenessHub() {
                 {activeTab === "publish_queue" && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 gap-6">
-                            {articles.filter(a => !!a.final_url || a.publish_pack_status === 'ready' || ['waiting_publish', 'needs_utm', 'scheduled', 'publish_pack_ready', 'website_published', 'group_posted', 'page_posted', 'personal_posted', 'complete'].includes(a.publish_status)).map(article => {
+                            {articles.filter(a => !!a.final_url || a.publish_pack_status === 'ready').map(article => {
                             // Resolve effective topic_id — try to infer from title if column is null
                             const resolvedTopicId = article.topic_id || extractGreenFinenessTopicId(article.title || "");
 
@@ -690,7 +695,7 @@ export default function GreenFinenessHub() {
                                 </div>
                             );
                             })}
-                            {articles.filter(a => ['waiting_url', 'needs_utm', 'publish_pack_ready', 'scheduled', 'website_published', 'group_posted', 'page_posted', 'personal_posted'].includes(a.publish_status) || a.publish_pack_status === 'ready' || a.ready_to_publish === 1).length === 0 && (
+                            {articles.filter(a => !!a.final_url || a.publish_pack_status === 'ready').length === 0 && (
                                 <div className="py-20 text-center bg-white border border-neutral-200 rounded-3xl shadow-sm">
                                     <Send className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
                                     <p className="text-neutral-500 font-bold">No articles in the publish queue yet.</p>

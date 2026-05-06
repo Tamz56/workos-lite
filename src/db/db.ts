@@ -718,6 +718,15 @@ function ensureGreenFinenessModel() {
           article_type       TEXT DEFAULT 'main', -- main | supporting | faq | reference
           title              TEXT NOT NULL,
           article_title      TEXT NULL,
+          topic_title        TEXT NULL,
+          content_layer      TEXT NULL,
+          article_role       TEXT NULL,
+          story_set          TEXT NULL,
+          story_order        TEXT NULL,
+          narrative_status   TEXT NULL,
+          meta_title         TEXT NULL,
+          meta_description   TEXT NULL,
+          keywords           TEXT NULL, -- JSON array
           slug               TEXT NULL,
           website_url        TEXT NULL,
           website_draft_url  TEXT NULL,
@@ -798,7 +807,16 @@ function ensureGreenFinenessModel() {
         { name: 'publish_log_status', type: 'TEXT', default: "'not_started'" },
         { name: 'seo_status', type: 'TEXT', default: "'pending'" },
         { name: 'schema_status', type: 'TEXT', default: "'pending'" },
-        { name: 'ready_to_publish', type: 'INTEGER', default: '0' }
+        { name: 'ready_to_publish', type: 'INTEGER', default: '0' },
+        { name: 'topic_title', type: 'TEXT' },
+        { name: 'content_layer', type: 'TEXT' },
+        { name: 'article_role', type: 'TEXT' },
+        { name: 'story_set', type: 'TEXT' },
+        { name: 'story_order', type: 'TEXT' },
+        { name: 'narrative_status', type: 'TEXT', default: "'not_started'" },
+        { name: 'meta_title', type: 'TEXT' },
+        { name: 'meta_description', type: 'TEXT' },
+        { name: 'keywords', type: 'TEXT' }
     ];
 
     for (const col of additiveCols) {
