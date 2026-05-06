@@ -709,20 +709,31 @@ function ensureGreenFinenessModel() {
           slug               TEXT NULL,
           website_url        TEXT NULL,
           website_draft_url  TEXT NULL,
+          final_url          TEXT NULL,
+          publish_date       TEXT NULL,
+          utm_group          TEXT NULL,
+          utm_page           TEXT NULL,
+          utm_personal       TEXT NULL,
           content_pillar     TEXT NULL,
           journey_stage      TEXT NULL,
           primary_system     TEXT NULL,
           secondary_systems  TEXT NULL, -- JSON array
           status             TEXT DEFAULT 'idea',
+          publish_status     TEXT DEFAULT 'waiting_url',
           priority           INTEGER DEFAULT 2,
           current_step       TEXT DEFAULT '0', -- 0 to 7
           publish_pack_status TEXT DEFAULT 'not_started',
           group_post_status  TEXT DEFAULT 'not_started',
           page_post_status   TEXT DEFAULT 'not_started',
           personal_post_status TEXT DEFAULT 'not_started',
+          hashtags_status    TEXT DEFAULT 'not_started',
+          publish_log_status TEXT DEFAULT 'not_started',
           canva_status       TEXT DEFAULT 'not_started',
           image_folder       TEXT NULL,
           references_status  TEXT DEFAULT 'pending',
+          seo_status         TEXT DEFAULT 'pending',
+          schema_status      TEXT DEFAULT 'pending',
+          ready_to_publish   INTEGER DEFAULT 0,
           next_action        TEXT NULL,
           notes              TEXT NULL,
           created_at         TEXT NOT NULL DEFAULT (datetime('now')),
@@ -759,6 +770,32 @@ function ensureGreenFinenessModel() {
           UPDATE articles SET updated_at = datetime('now') WHERE article_id = NEW.article_id;
         END;
     `);
+
+    // Additive Migrations for articles table
+    const columns = db.prepare("PRAGMA table_info(articles)").all() as any[];
+    const colNames = columns.map(c => c.name);
+
+    const additiveCols = [
+        { name: 'final_url', type: 'TEXT' },
+        { name: 'publish_date', type: 'TEXT' },
+        { name: 'utm_group', type: 'TEXT' },
+        { name: 'utm_page', type: 'TEXT' },
+        { name: 'utm_personal', type: 'TEXT' },
+        { name: 'publish_status', type: 'TEXT', default: "'waiting_url'" },
+        { name: 'hashtags_status', type: 'TEXT', default: "'not_started'" },
+        { name: 'publish_log_status', type: 'TEXT', default: "'not_started'" },
+        { name: 'seo_status', type: 'TEXT', default: "'pending'" },
+        { name: 'schema_status', type: 'TEXT', default: "'pending'" },
+        { name: 'ready_to_publish', type: 'INTEGER', default: '0' }
+    ];
+
+    for (const col of additiveCols) {
+        if (!colNames.includes(col.name)) {
+            let sql = `ALTER TABLE articles ADD COLUMN ${col.name} ${col.type}`;
+            if (col.default) sql += ` DEFAULT ${col.default}`;
+            db.exec(sql);
+        }
+    }
 }
 
 export function seedGreenFinenessSeason1() {

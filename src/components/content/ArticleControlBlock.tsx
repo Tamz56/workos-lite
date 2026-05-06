@@ -15,8 +15,10 @@ import {
     AlertCircle,
     Loader2,
     BookOpen,
-    Plus
+    Plus,
+    ExternalLink
 } from "lucide-react";
+import { extractGreenFinenessTopicId } from "@/lib/content/utm";
 
 interface ArticleMapping {
     article_id: string;
@@ -27,6 +29,9 @@ interface ArticleMapping {
     slug: string | null;
     website_url: string | null;
     website_draft_url: string | null;
+    final_url: string | null;
+    publish_status: string;
+    publish_date: string | null;
     status: string;
     current_step: string;
     publish_pack_status: string;
@@ -36,6 +41,9 @@ interface ArticleMapping {
     canva_status: string;
     image_folder: string | null;
     references_status: string;
+    seo_status: string;
+    schema_status: string;
+    ready_to_publish: number;
     next_action: string | null;
     notes: string | null;
 }
@@ -59,12 +67,27 @@ const ARTICLE_STATUSES = [
     "published", "social_posted", "repurposed", "archived"
 ];
 
+const PUBLISH_STATUSES = [
+    "waiting_url", "needs_utm", "publish_pack_ready", "scheduled", 
+    "website_published", "group_posted", "page_posted", "personal_posted", "complete"
+];
+
 const PUBLISH_PACK_STATUSES = ["not_started", "needed", "in_progress", "ready", "published", "complete"];
 const SOCIAL_STATUSES = ["not_started", "draft_needed", "draft_ready", "posted", "skipped"];
 const REF_STATUSES = ["pending", "ready", "checked", "published"];
 const IMAGE_STATUSES = ["not_started", "brief_ready", "generated", "uploaded", "published"];
 
 export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId: string, defaultTitle?: string }) {
+    // Resolve the canonical GF topic_id:
+    // 1. Try to extract from topicId itself (might already be GF-CONTENT-###)
+    // 2. Try to extract from defaultTitle (task title often contains GF-CONTENT-###)
+    // 3. Fall back to topicId as-is (e.g. task.id UUID — will show unmapped)
+    const effectiveTopicId: string | null = (
+        extractGreenFinenessTopicId(topicId) ||
+        extractGreenFinenessTopicId(defaultTitle || "") ||
+        (topicId && !topicId.match(/^[0-9a-f-]{36}$/i) ? topicId : null)
+    );
+
     const [mapping, setMapping] = useState<ArticleMapping | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -72,10 +95,17 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
     const [episodes, setEpisodes] = useState<any[]>([]);
 
     const fetchMapping = useCallback(async () => {
-        if (!topicId) return;
+        if (!effectiveTopicId) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
-            const res = await fetch(`/api/content/articles/${topicId}`);
+            const res = await fetch(`/api/content/articles/${encodeURIComponent(effectiveTopicId)}`);
+            if (!res.ok) {
+                setMapping(null);
+                return;
+            }
             const data = await res.json();
             if (data.found) {
                 setMapping(data.article);
@@ -84,10 +114,11 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
             }
         } catch (error) {
             console.error("Failed to fetch article mapping", error);
+            setMapping(null);
         } finally {
             setLoading(false);
         }
-    }, [topicId]);
+    }, [effectiveTopicId]);
 
     const fetchGfData = async () => {
         try {
@@ -106,9 +137,13 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
     }, [fetchMapping]);
 
     const handleCreateMapping = async () => {
+        if (!effectiveTopicId) {
+            console.error("Cannot create mapping: no valid GF topic_id resolved.", { topicId, defaultTitle });
+            return;
+        }
         setSaving(true);
         try {
-            const res = await fetch(`/api/content/articles/${topicId}`, {
+            const res = await fetch(`/api/content/articles/${encodeURIComponent(effectiveTopicId)}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -126,10 +161,10 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
     };
 
     const updateField = async (field: keyof ArticleMapping, value: string) => {
-        if (!mapping) return;
+        if (!mapping || !effectiveTopicId) return;
         setSaving(true);
         try {
-            const res = await fetch(`/api/content/articles/${topicId}`, {
+            const res = await fetch(`/api/content/articles/${encodeURIComponent(effectiveTopicId)}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ [field]: value })
@@ -145,27 +180,41 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-neutral-400 font-bold flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading Control Block...</div>;
+    if (loading) return <div className="p-8 text-center text-neutral-400 font-bold flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading Content Model...</div>;
+
+    // If we can't resolve a valid GF topic_id at all, show a clear warning
+    if (!effectiveTopicId) {
+        return (
+            <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 flex items-start gap-4">
+                <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div>
+                    <h4 className="font-black text-amber-900 text-sm">Cannot resolve Green Fineness Topic ID</h4>
+                    <p className="text-xs text-amber-700 mt-1">This task title does not contain a recognizable GF-CONTENT-### code. Please rename the task to include the correct topic ID.</p>
+                    <p className="text-[10px] font-mono text-amber-500 mt-2">Task ID: {topicId}</p>
+                </div>
+            </div>
+        );
+    }
 
     if (!mapping) {
         return (
             <div className="bg-neutral-50 border border-neutral-200 rounded-3xl p-8 text-center">
                 <MapPin className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
-                <h4 className="text-lg font-black text-neutral-900 mb-2">Unmapped Article</h4>
-                <p className="text-sm text-neutral-500 mb-6">This topic is not yet part of the Green Fineness Content Operating Model.</p>
+                <h4 className="text-lg font-black text-neutral-900 mb-2">Unmapped Topic</h4>
+                <p className="text-sm text-neutral-500 mb-6">This task is not yet part of the Green Fineness Operating Model.</p>
                 <button 
                     onClick={handleCreateMapping}
                     disabled={saving}
                     className="bg-black text-white px-8 py-3 rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all flex items-center gap-2 mx-auto"
                 >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    Initialize Article Mapping
+                    Map to Green Fineness
                 </button>
             </div>
         );
     }
 
-    const currentStepIdx = parseInt(mapping.current_step || "0");
+    const currentStepIdx = parseInt(mapping.current_step || "0") || 0;
 
     return (
         <div className="bg-white border border-neutral-200 rounded-[2rem] overflow-hidden shadow-xl shadow-black/5 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -241,7 +290,7 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                                 onChange={(e) => updateField("episode_id", e.target.value)}
                             >
                                 <option value="">None</option>
-                                {episodes.filter(e => e.season_id === mapping.season_id).map(e => <option key={e.episode_id} value={e.episode_id}>{e.episode_title}</option>)}
+                                {(episodes || []).filter(e => e && e.season_id === mapping.season_id).map(e => <option key={e.episode_id} value={e.episode_id || ""}>{e.episode_title || "Untitled Episode"}</option>)}
                             </select>
                         </div>
                     </div>
@@ -252,7 +301,7 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                             <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1">Article Status</label>
                             <select 
                                 className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none"
-                                value={mapping.status}
+                                value={mapping.status || "idea"}
                                 onChange={(e) => updateField("status", e.target.value)}
                             >
                                 {ARTICLE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -262,7 +311,7 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                             <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1">Publish Pack</label>
                             <select 
                                 className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none"
-                                value={mapping.publish_pack_status}
+                                value={mapping.publish_pack_status || "not_started"}
                                 onChange={(e) => updateField("publish_pack_status", e.target.value)}
                             >
                                 {PUBLISH_PACK_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -272,7 +321,7 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                             <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1">References</label>
                             <select 
                                 className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none"
-                                value={mapping.references_status}
+                                value={mapping.references_status || "pending"}
                                 onChange={(e) => updateField("references_status", e.target.value)}
                             >
                                 {REF_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -285,7 +334,7 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                             <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1 flex items-center gap-1.5"><Share2 className="w-3 h-3" /> Group Post</label>
                             <select 
                                 className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none"
-                                value={mapping.group_post_status}
+                                value={mapping.group_post_status || "not_started"}
                                 onChange={(e) => updateField("group_post_status", e.target.value)}
                             >
                                 {SOCIAL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -295,7 +344,7 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                             <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1 flex items-center gap-1.5"><Share2 className="w-3 h-3" /> Page Post</label>
                             <select 
                                 className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none"
-                                value={mapping.page_post_status}
+                                value={mapping.page_post_status || "not_started"}
                                 onChange={(e) => updateField("page_post_status", e.target.value)}
                             >
                                 {SOCIAL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -305,7 +354,7 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                             <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1 flex items-center gap-1.5"><ImageIcon className="w-3 h-3" /> Canva/Image</label>
                             <select 
                                 className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-black/5 outline-none"
-                                value={mapping.canva_status}
+                                value={mapping.canva_status || "not_started"}
                                 onChange={(e) => updateField("canva_status", e.target.value)}
                             >
                                 {IMAGE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -313,28 +362,66 @@ export default function ArticleControlBlock({ topicId, defaultTitle }: { topicId
                         </div>
                     </div>
 
-                    {/* URLs */}
-                    <div className="space-y-4 pt-4 border-t border-neutral-100">
+                    {/* Publishing & Distribution */}
+                    <div className="space-y-4 pt-6 border-t border-neutral-100">
+                        <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1">Publishing & Distribution</label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1 flex items-center gap-1.5"><Link2 className="w-3 h-3" /> Website Draft URL</label>
+                                <label className="text-[10px] font-bold text-neutral-400 uppercase px-1">Publish Status</label>
+                                <select 
+                                    className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-xs font-bold outline-none"
+                                    value={mapping.publish_status || "waiting_url"}
+                                    onChange={(e) => updateField("publish_status", e.target.value)}
+                                >
+                                    {PUBLISH_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-neutral-400 uppercase px-1">Publish Date</label>
                                 <input 
-                                    className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-black/5 outline-none"
+                                    type="date"
+                                    className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-xs font-bold outline-none"
+                                    value={mapping.publish_date || ""}
+                                    onChange={(e) => updateField("publish_date", e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-neutral-400 uppercase px-1">Final Website URL</label>
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    className="flex-1 bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-black/5 outline-none"
+                                    value={mapping.final_url || ""}
+                                    placeholder="https://greenfineness.com/..."
+                                    onChange={(e) => setMapping({...mapping, final_url: e.target.value})}
+                                    onBlur={(e) => updateField("final_url", e.target.value)}
+                                />
+                                {mapping.final_url && (
+                                    <a href={mapping.final_url} target="_blank" className="p-2 bg-neutral-50 text-neutral-400 hover:text-black rounded-xl transition-all border border-transparent hover:border-neutral-200">
+                                        <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* URLs */}
+                    <div className="space-y-4 pt-6 border-t border-neutral-100">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1 flex items-center gap-1.5"><Link2 className="w-3 h-3" /> Website Draft URL</label>
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    className="flex-1 bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-black/5 outline-none"
                                     value={mapping.website_draft_url || ""}
                                     placeholder="https://..."
                                     onChange={(e) => setMapping({...mapping, website_draft_url: e.target.value})}
                                     onBlur={(e) => updateField("website_draft_url", e.target.value)}
                                 />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest px-1 flex items-center gap-1.5"><Link2 className="w-3 h-3" /> Final Website URL</label>
-                                <input 
-                                    className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-black/5 outline-none"
-                                    value={mapping.website_url || ""}
-                                    placeholder="https://..."
-                                    onChange={(e) => setMapping({...mapping, website_url: e.target.value})}
-                                    onBlur={(e) => updateField("website_url", e.target.value)}
-                                />
+                                {mapping.website_draft_url && (
+                                    <a href={mapping.website_draft_url} target="_blank" className="p-2 bg-neutral-50 text-neutral-400 hover:text-black rounded-xl transition-all border border-transparent hover:border-neutral-200">
+                                        <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                )}
                             </div>
                         </div>
                     </div>
