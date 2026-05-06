@@ -59,9 +59,9 @@ function EmptyPreview() {
 
 function FieldRow({ label, value }: { label: string; value: string }) {
     return (
-        <div className="grid gap-1 py-1.5 sm:grid-cols-[100px_1fr] group">
-            <div className="text-[10px] font-black uppercase tracking-wider text-theme-muted group-hover:text-theme-secondary transition-colors">{label}</div>
-            <div className="min-w-0 break-words text-xs font-bold text-theme-primary leading-tight">{value || "-"}</div>
+        <div className="grid gap-1 py-1.5 sm:grid-cols-[90px_1fr] group border-b border-theme-border/30 last:border-0 min-w-0">
+            <div className="text-[9px] font-black uppercase tracking-widest text-theme-muted/80 group-hover:text-theme-secondary transition-colors shrink-0">{label}</div>
+            <div className="min-w-0 break-words text-[11px] font-bold text-theme-primary leading-tight">{value || "—"}</div>
         </div>
     );
 }
@@ -83,8 +83,8 @@ function readinessLabel(value: "ready" | "missing") {
 
 function ContentHealthCard({ health }: { health: ArticleStudioPreview["contentHealth"] }) {
     return (
-        <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
-            <div className="mb-3 flex items-center justify-between">
+        <section className="bg-theme-card border border-theme-border rounded-[20px] p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Content Health</h3>
                 <span className={`w-fit rounded-full border px-3 py-0.5 text-[10px] font-black uppercase tracking-tight ${healthTone(health.status)}`}>
                     {health.status}
@@ -119,29 +119,22 @@ function MissingFieldGroup({ title, items, emptyLabel, tone }: { title?: string;
     );
 }
 
-function MissingFieldsCard({ groups, isPartial }: { groups: ArticleStudioPreview["missingFieldGroups"], isPartial?: boolean }) {
-    if (isPartial) {
-        return (
-            <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
-                <div className="space-y-6">
-                    <div>
-                        <div className="mb-3"><h3 className="text-[11px] font-black uppercase tracking-widest text-red-600">Required Now / Blocking</h3></div>
-                        <MissingFieldGroup items={groups.required} emptyLabel="Ready for Update" tone="border-red-100 bg-red-50 text-red-600" />
-                    </div>
-                    <div className="pt-4 border-t border-theme-border/50">
-                        <div className="mb-3"><h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Later Fields</h3></div>
-                        <MissingFieldGroup items={[...groups.recommended, ...groups.optional]} emptyLabel="– none –" tone="border-theme-border bg-theme-input text-theme-secondary" />
-                    </div>
-                </div>
-            </section>
-        );
-    }
+function MissingFieldsCard({ groups }: { groups: ArticleStudioPreview["missingFieldGroups"], isPartial?: boolean }) {
     return (
-        <section className="bg-theme-card/50 rounded-xl p-4 border border-theme-border/50">
-            <div className="mb-4"><h3 className="text-[11px] font-black uppercase tracking-widest text-theme-muted">Missing Blocks</h3></div>
-            <div className="space-y-4">
-                <MissingFieldGroup title="Required" items={groups.required} emptyLabel="พร้อมสร้าง" tone="border-red-100 bg-red-50 text-red-600" />
-                <MissingFieldGroup title="Recommended" items={groups.recommended} emptyLabel="– none –" tone="border-amber-100 bg-amber-50 text-amber-600" />
+        <section className="bg-theme-card border border-theme-border rounded-[20px] p-5 shadow-sm">
+            <div className="space-y-5">
+                <div>
+                    <div className="mb-2.5"><h3 className="text-[10px] font-black uppercase tracking-widest text-red-600">1. Required</h3></div>
+                    <MissingFieldGroup items={groups.required} emptyLabel="Ready" tone="border-red-100 bg-red-50 text-red-600" />
+                </div>
+                <div>
+                    <div className="mb-2.5"><h3 className="text-[10px] font-black uppercase tracking-widest text-amber-600">2. GF Hub Sync</h3></div>
+                    <MissingFieldGroup items={groups.recommended} emptyLabel="Synced" tone="border-amber-100 bg-amber-50 text-amber-600" />
+                </div>
+                <div>
+                    <div className="mb-2.5"><h3 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">3. Publish / SEO</h3></div>
+                    <MissingFieldGroup items={groups.optional} emptyLabel="Ready" tone="border-theme-border bg-theme-input text-theme-secondary" />
+                </div>
             </div>
         </section>
     );
@@ -151,57 +144,70 @@ function PreviewPanel({ preview }: { preview: ArticleStudioPreview }) {
     const isPartial = preview.mode === "partial";
     const markdown = isPartial ? preview.article_markdown : formatArticlePackageMarkdown(preview);
     return (
-        <div className="space-y-5">
-            <div className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-6 min-w-0">
+            <div className="rounded-[24px] border border-theme-border bg-theme-card p-6 shadow-theme-soft min-w-0">
+                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between min-w-0">
                     <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${preview.mode === 'partial' ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-blue-50 border-blue-200 text-blue-600'}`}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border shrink-0 ${preview.mode === 'partial' ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-blue-50 border-blue-200 text-blue-600'}`}>
                                 {preview.mode === 'partial' ? 'Partial Step' : 'Full Package'}
                             </div>
                             {preview.detectedStepRole && preview.detectedStepRole !== 'general' && (
-                                <div className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-theme-input border border-theme-border text-theme-secondary">
+                                <div className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-theme-input border border-theme-border text-theme-secondary shrink-0">
                                     {getStepLabel(preview.detectedStepRole)}
                                 </div>
                             )}
                         </div>
-                        <h2 className="mt-2 break-words text-lg font-black tracking-tight text-theme-primary sm:text-xl">{preview.title || "Untitled Article"}</h2>
+                        <h2 className="mt-3 break-words text-lg font-black tracking-tight text-theme-primary sm:text-xl line-clamp-3 leading-tight">{preview.title || "Untitled Article"}</h2>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {preview.status === "needs_human_insight" && <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">Human Insight</span>}
-                        <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">{preview.status || "needs_human_insight"}</span>
+                    <div className="flex flex-wrap gap-2 shrink-0 items-start">
+                        {preview.status === "needs_human_insight" && <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700 uppercase tracking-tight">Human Insight</span>}
+                        <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700 uppercase tracking-tight">{preview.status || "needs_human_insight"}</span>
                     </div>
                 </div>
                 {preview.validationMessages.length > 0 && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold leading-6 text-red-700">{preview.validationMessages.map((message) => <div key={message}>{message}</div>)}</div>}
-                {preview.generatedFields.length > 0 && <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold leading-6 text-blue-700">Auto-generated fields: {preview.generatedFields.join(", ")}</div>}
-                <div className="mb-4 grid gap-3 border-y border-theme-border py-4 lg:grid-cols-2"><ContentHealthCard health={preview.contentHealth} /><MissingFieldsCard groups={preview.missingFieldGroups} isPartial={preview.mode === 'partial'} /></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
-                    <FieldRow label="mode" value={preview.mode} /><FieldRow label="status" value={preview.status} /><FieldRow label="difficulty" value={preview.difficulty} /><FieldRow label="visual" value={preview.visual_status} /><FieldRow label="topic_id" value={preview.topic_id} /><FieldRow label="slug" value={preview.slug} />
-                    <div className="md:col-span-2"><FieldRow label="meta_title" value={preview.meta_title} /></div>
-                    <div className="md:col-span-2"><FieldRow label="meta_desc" value={preview.meta_description} /></div>
+                {preview.generatedFields.length > 0 && <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold leading-6 text-blue-700">Auto-generated fields: {preview.generatedFields.join(", ")}</div>}
+                <div className="mb-6 flex flex-col gap-4 border-y border-theme-border/50 py-6 min-w-0">
+                    <ContentHealthCard health={preview.contentHealth} />
+                    <MissingFieldsCard groups={preview.missingFieldGroups} isPartial={preview.mode === 'partial'} />
                 </div>
-                <div className="mt-2 pt-2 border-t border-theme-border/50 space-y-1"><ListField label="keywords" value={preview.keywords} /><ListField label="internal" value={[...preview.internal_links_prerequisite, ...preview.internal_links_next_step, ...preview.internal_links_related]} /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 min-w-0">
+                    <FieldRow label="mode" value={preview.mode} /><FieldRow label="status" value={preview.status} /><FieldRow label="difficulty" value={preview.difficulty} /><FieldRow label="visual" value={preview.visual_status} /><FieldRow label="topic_id" value={preview.topic_id} /><FieldRow label="slug" value={preview.slug} />
+                    <div className="sm:col-span-2 min-w-0"><FieldRow label="meta_title" value={preview.meta_title} /></div>
+                    <div className="sm:col-span-2 min-w-0"><FieldRow label="meta_desc" value={preview.meta_description} /></div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-theme-border/50 space-y-1 min-w-0"><ListField label="keywords" value={preview.keywords} /><ListField label="internal" value={[...preview.internal_links_prerequisite, ...preview.internal_links_next_step, ...preview.internal_links_related]} /></div>
             </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-                <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
-                    <h3 className="text-sm font-black text-theme-primary">Sections</h3>
-                    <div className="mt-4 grid gap-2">{STAGE_PREVIEW.map((stage) => <div key={stage} className="flex items-center gap-2 rounded-md border border-theme-border bg-theme-card px-3 py-2"><CheckCircle2 className="h-4 w-4 text-blue-600" /><span className="text-sm font-bold text-theme-primary">{stage}</span></div>)}</div>
+            <div className="grid gap-6 lg:grid-cols-2 min-w-0">
+                <section className="rounded-xl border border-theme-border bg-theme-card p-6 shadow-sm min-w-0">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-theme-muted mb-4">Sections</h3>
+                    <div className="grid gap-2.5 min-w-0">{STAGE_PREVIEW.map((stage) => <div key={stage} className="flex items-center gap-2.5 rounded-lg border border-theme-border bg-theme-input/50 px-3.5 py-2.5 min-w-0"><CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" /><span className="text-sm font-bold text-theme-primary truncate">{stage}</span></div>)}</div>
                 </section>
-                <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
-                    <h3 className="text-sm font-black text-theme-primary">Detected Headings</h3>
-                    <div className="mt-4 flex flex-wrap gap-2">{preview.detectedHeadings.length ? preview.detectedHeadings.map((heading, idx) => <span key={`${heading}-${idx}`} className="rounded-md border border-theme-border bg-theme-card px-2.5 py-1 text-xs font-bold text-theme-secondary">{heading}</span>) : <span className="text-sm font-medium text-theme-muted">JSON package detected</span>}</div>
+                <section className="rounded-xl border border-theme-border bg-theme-card p-6 shadow-sm min-w-0">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-theme-muted mb-4">Headings Detected</h3>
+                    <div className="flex flex-wrap gap-2.5 min-w-0">{preview.detectedHeadings.length ? preview.detectedHeadings.map((heading, idx) => <span key={`${heading}-${idx}`} className="rounded-lg border border-theme-border bg-theme-input/50 px-3 py-1.5 text-xs font-bold text-theme-secondary truncate max-w-full">{heading}</span>) : <span className="text-sm font-medium text-theme-muted italic">JSON package detected</span>}</div>
                 </section>
             </div>
-            <section className="rounded-lg border border-theme-border bg-theme-card-elevated p-5 shadow-theme-soft">
-                <div className="mb-3 flex items-center gap-2"><FileText className="h-4 w-4 text-blue-600" /><h3 className="text-sm font-black text-theme-primary">{isPartial ? "Partial Step Markdown" : "Article Hub Markdown"}</h3></div>
-                <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-theme-border bg-theme-input p-4 text-xs leading-6 text-theme-secondary custom-scrollbar">{markdown || <span className="text-theme-muted italic">No content yet.</span>}</pre>
+            <section className="rounded-[24px] border border-theme-border bg-theme-card p-6 shadow-theme-soft min-w-0">
+                <div className="mb-4 flex items-center gap-2.5 min-w-0"><FileText className="h-4 w-4 text-blue-600 shrink-0" /><h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">Markdown Preview</h3></div>
+                <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-theme-border bg-theme-input/30 p-5 text-xs leading-7 text-theme-secondary custom-scrollbar font-mono min-w-0">{markdown || <span className="text-theme-muted italic">No content yet.</span>}</pre>
             </section>
         </div>
     );
 }
 
 function getStepLabel(role: string) {
-    const labels: Record<string, string> = { research_raw: "Research Raw — NotebookLM", research_direction: "Research Direction — Arbor Questions", brief: "Brief", script_caption: "Script & Caption", outline_web_article: "Outline Web Article", assets_canva: "Assets / Canva", seo_schema: "SEO & Schema", publish: "Publish" };
+    const labels: Record<string, string> = { 
+        mini_research_brief: "0. Mini Research Brief",
+        research_raw: "1. Research Raw — NotebookLM", 
+        research_direction: "2. Research Direction — Arbor Questions", 
+        brief: "3. Brief", 
+        outline_web_article: "4. Web Article Outline / Full Article",
+        script_caption: "5. Script & Caption", 
+        assets_canva: "6. Assets / Canva", 
+        seo_schema: "7. SEO & Schema", 
+        publish: "8. Publish / Tracking" 
+    };
     return labels[role] || role.replace('_', ' ');
 }
 
@@ -229,11 +235,12 @@ const EXAMPLE_PACKAGE = `{
 const STAGE_PREVIEW = [ "Research Direction", "Draft", "SEO & Schema", "Visual Package", "Review / Publish" ];
 
 const STEP_ICONS: Record<ArticleStudioStepRole, any> = {
+    mini_research_brief: Search,
     research_raw: Search,
     research_direction: MessageSquare,
     brief: FileText,
-    script_caption: MessageSquare,
     outline_web_article: Layout,
+    script_caption: MessageSquare,
     assets_canva: Image,
     seo_schema: Search,
     publish: Send,
@@ -254,11 +261,12 @@ function GuidedStepNavigator({
     savedSteps: Set<string>;
 }) {
     const roles: ArticleStudioStepRole[] = [
+        "mini_research_brief",
         "research_raw",
         "research_direction",
         "brief",
-        "script_caption",
         "outline_web_article",
+        "script_caption",
         "assets_canva",
         "seo_schema",
         "publish"
@@ -276,9 +284,9 @@ function GuidedStepNavigator({
                     <button
                         key={role}
                         onClick={() => onStepSelect(role)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${isActive ? "bg-theme-card border border-theme-border shadow-sm" : "hover:bg-theme-hover border border-transparent"}`}
+                        className={`flex items-center gap-2 px-2.5 py-2 rounded-xl transition-all text-left ${isActive ? "bg-theme-card border border-theme-border shadow-sm" : "hover:bg-theme-hover border border-transparent"}`}
                     >
-                        <div className={`p-2 rounded-lg ${isActive ? "bg-blue-50 text-blue-600" : "bg-theme-input text-theme-secondary"}`}>
+                        <div className={`p-1.5 rounded-lg ${isActive ? "bg-blue-50 text-blue-600" : "bg-theme-input text-theme-secondary/70"}`}>
                             <Icon className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -306,10 +314,20 @@ export default function ArticleStudioClient() {
     const [viewMode, setViewMode] = useState<"guided" | "advanced">("guided");
     
     // --- State: Topic Context ---
-    const [topicContext, setTopicContext] = useState({ topic_id: "", topic_title: "" });
+    const [topicContext, setTopicContext] = useState({ 
+        topic_id: "", 
+        article_title: "", 
+        season_id: "", 
+        episode_id: "",
+        journey_stage: "",
+        primary_system: "",
+        secondary_systems: "",
+        article_role: "",
+        article_status: "idea"
+    });
     
     // --- State: Guided Flow ---
-    const [activeStep, setActiveStep] = useState<ArticleStudioStepRole>("research_raw");
+    const [activeStep, setActiveStep] = useState<ArticleStudioStepRole>("mini_research_brief");
     const [stepContents, setStepContents] = useState<Record<string, string>>({});
     const [savedSteps, setSavedSteps] = useState<Set<string>>(new Set());
 
@@ -353,8 +371,8 @@ export default function ArticleStudioClient() {
                 const pkg = {
                     mode: "partial" as ArticleStudioMode,
                     detectedStepRole: activeStep,
-                    topic_id: topicContext.topic_id,
-                    title: topicContext.topic_title,
+                    ...topicContext,
+                    title: topicContext.article_title,
                     article_markdown: previewInput,
                 };
                 return parseArborArticlePackage(JSON.stringify(pkg), "partial");
@@ -378,8 +396,8 @@ export default function ArticleStudioClient() {
             articlePackage: {
                 mode: "partial",
                 detectedStepRole: activeStep,
-                topic_id: topicContext.topic_id,
-                title: topicContext.topic_title,
+                ...topicContext,
+                title: topicContext.article_title,
                 article_markdown: stepContents[activeStep] || "",
             }
         };
@@ -400,6 +418,34 @@ export default function ArticleStudioClient() {
             }
             window.dispatchEvent(new Event("task-updated"));
             router.refresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
+    async function handleSyncStatus(status: string) {
+        if (isSaving || !topicContext.topic_id) return;
+        setIsSaving(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const res = await fetch(`/api/content/articles/${encodeURIComponent(topicContext.topic_id)}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    status, 
+                    article_title: topicContext.article_title,
+                    season_id: topicContext.season_id,
+                    episode_id: topicContext.episode_id
+                }),
+            });
+
+            if (!res.ok) throw new Error("Sync failed");
+            setSuccess(`Article marked as ${status}`);
+            setTopicContext(prev => ({ ...prev, article_status: status }));
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
         } finally {
@@ -435,7 +481,7 @@ export default function ArticleStudioClient() {
     }
 
     return (
-        <PageShell className="max-w-none px-6 2xl:px-8">
+        <PageShell className="max-w-[1820px] mx-auto px-6 2xl:px-8 overflow-x-hidden">
             {/* Header */}
             <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
@@ -463,11 +509,11 @@ export default function ArticleStudioClient() {
             </div>
 
             <div className={viewMode === 'guided' 
-                ? "grid gap-6 lg:grid-cols-[280px_1fr_1fr] xl:grid-cols-[300px_1fr_1fr] 2xl:grid-cols-[320px_1fr_1fr]"
-                : "grid gap-6 lg:grid-cols-2"
+                ? "grid w-full gap-6 lg:grid-cols-[260px_minmax(0,1fr)_minmax(0,1fr)]"
+                : "grid w-full gap-6 lg:grid-cols-2"
             }>
                 {/* 1. Sidebar Navigator (Guided Only) */}
-                <aside className={viewMode === 'guided' ? 'block' : 'hidden'}>
+                <aside className={`min-w-0 ${viewMode === 'guided' ? 'block' : 'hidden'}`}>
                     <div className="sticky top-6">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-4 px-4">Steps</h2>
                         <GuidedStepNavigator 
@@ -481,36 +527,97 @@ export default function ArticleStudioClient() {
 
                 {/* 2. Main Workspace */}
                 <main className={`flex flex-col min-w-0 ${viewMode === 'advanced' ? 'lg:col-span-1' : ''}`}>
-                    <section className="flex flex-col h-[calc(100vh-140px)] rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
+                    <section className="flex flex-col h-[calc(100vh-20px)] min-w-0 rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-hidden">
                         {/* Editor Header */}
-                        <div className="px-6 py-5 border-b border-theme-border/50 flex flex-col gap-4 bg-theme-card">
+                        <div className="px-6 py-3 border-b border-theme-border/50 flex flex-col gap-3 bg-theme-card">
                             {viewMode === 'guided' ? (
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <h2 className="text-sm font-black text-theme-primary uppercase tracking-widest">{ARTICLE_STUDIO_STEPS[activeStep]?.title}</h2>
-                                            <p className="text-[10px] font-bold text-theme-muted uppercase tracking-tighter mt-0.5">{ARTICLE_STUDIO_STEPS[activeStep]?.instruction}</p>
+                                            <h2 className="text-[11px] font-black text-theme-primary uppercase tracking-widest leading-none">{ARTICLE_STUDIO_STEPS[activeStep]?.title}</h2>
+                                            <p className="text-[9px] font-bold text-theme-muted uppercase tracking-tighter mt-0.5">{ARTICLE_STUDIO_STEPS[activeStep]?.instruction}</p>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black uppercase tracking-widest text-theme-muted ml-1">Topic ID</label>
+                                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 min-w-0">
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Topic ID</label>
                                             <input 
                                                 type="text"
                                                 value={topicContext.topic_id}
                                                 onChange={(e) => setTopicContext(prev => ({ ...prev, topic_id: e.target.value.toUpperCase() }))}
                                                 placeholder="GF-CONTENT-XXX"
-                                                className="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black uppercase tracking-widest text-theme-muted ml-1">Topic Title</label>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Article Title</label>
                                             <input 
                                                 type="text"
-                                                value={topicContext.topic_title}
-                                                onChange={(e) => setTopicContext(prev => ({ ...prev, topic_title: e.target.value }))}
-                                                placeholder="ชื่อหัวข้อ..."
-                                                className="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                value={topicContext.article_title}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, article_title: e.target.value }))}
+                                                placeholder="ชื่อบทความ..."
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Season</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.season_id}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, season_id: e.target.value }))}
+                                                placeholder="S..."
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Episode</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.episode_id}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, episode_id: e.target.value }))}
+                                                placeholder="E..."
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 min-w-0">
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Journey Stage</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.journey_stage}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, journey_stage: e.target.value }))}
+                                                placeholder="Stage..."
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Primary System</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.primary_system}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, primary_system: e.target.value }))}
+                                                placeholder="System..."
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Article Role</label>
+                                            <input 
+                                                type="text"
+                                                value={topicContext.article_role}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, article_role: e.target.value }))}
+                                                placeholder="Role..."
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-[11px] font-bold text-theme-primary placeholder:text-theme-muted outline-none focus:ring-1 focus:ring-blue-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <label className="text-[8px] font-black uppercase tracking-widest text-theme-muted ml-1">Step</label>
+                                            <input 
+                                                type="text"
+                                                value={activeStep}
+                                                disabled
+                                                className="w-full px-3 py-1.5 rounded-lg bg-theme-input/50 border border-theme-border text-[11px] font-bold text-theme-muted outline-none"
                                             />
                                         </div>
                                     </div>
@@ -549,7 +656,7 @@ export default function ArticleStudioClient() {
                         </div>
 
                         {/* Textarea Area */}
-                        <div className="flex-1 relative group">
+                        <div className="flex-1 relative group min-w-0">
                             <textarea
                                 value={viewMode === 'guided' ? (stepContents[activeStep] || "") : rawInput}
                                 onChange={(event) => {
@@ -561,13 +668,13 @@ export default function ArticleStudioClient() {
                                     setError(null);
                                     setSuccess(null);
                                 }}
-                                className="absolute inset-0 w-full h-full p-8 font-mono text-[13px] leading-[1.8] text-theme-primary bg-theme-input/20 outline-none transition-theme placeholder:text-theme-muted resize-none custom-scrollbar"
+                                className="absolute inset-0 w-full h-full p-10 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-input/5 outline-none transition-theme placeholder:text-theme-muted resize-none custom-scrollbar"
                                 placeholder={viewMode === 'guided' ? `Write ${ARTICLE_STUDIO_STEPS[activeStep]?.title} here...` : "Paste Arbor Package content here..."}
                             />
                         </div>
 
                         {/* Action Bar */}
-                        <div className="p-6 bg-theme-card border-t border-theme-border/50">
+                        <div className="p-6 bg-theme-card border-t border-theme-border/50 min-w-0">
                             {error && (
                                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-bold text-red-600 flex items-center gap-2">
                                     <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -581,12 +688,12 @@ export default function ArticleStudioClient() {
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex gap-2">
+                            <div className="flex flex-wrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-2 shrink-0">
                                     <button
                                         type="button"
                                         onClick={handleClearDraft}
-                                        className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary transition-all active:scale-95"
+                                        className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary transition-all active:scale-95"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                         Clear
@@ -596,22 +703,48 @@ export default function ArticleStudioClient() {
                                             type="button"
                                             disabled={!preview}
                                             onClick={handleExportPublishPack}
-                                            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                            className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
                                         >
                                             <Download className="h-4 w-4" />
                                             Export
                                         </button>
                                     )}
                                 </div>
-                                <button
-                                    type="button"
-                                    disabled={!canSave}
-                                    onClick={handleSaveStep}
-                                    className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
-                                >
-                                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                    {viewMode === 'guided' ? 'Save Step' : (preview?.mode === 'partial' ? 'Update Package' : 'Create Package')}
-                                </button>
+                                <div className="flex flex-wrap items-center gap-2 justify-end flex-1 min-w-0">
+                                    <button
+                                        type="button"
+                                        disabled={!topicContext.topic_id || isSaving}
+                                        onClick={() => handleSyncStatus("draft")}
+                                        className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 transition-all active:scale-95 text-nowrap"
+                                    >
+                                        Mark as Draft
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={!topicContext.topic_id || isSaving}
+                                        onClick={() => handleSyncStatus("seo_ready")}
+                                        className="flex items-center justify-center gap-2 rounded-xl border border-theme-border bg-theme-card px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-theme-secondary shadow-sm hover:bg-theme-hover hover:text-theme-primary disabled:opacity-40 transition-all active:scale-95 text-nowrap"
+                                    >
+                                        SEO Ready
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={!topicContext.topic_id || isSaving}
+                                        onClick={() => handleSyncStatus("website_draft")}
+                                        className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 disabled:opacity-40 transition-all active:scale-95 text-nowrap"
+                                    >
+                                        Send to Website Draft
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={!canSave}
+                                        onClick={handleSaveStep}
+                                        className="min-w-[140px] flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                    >
+                                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                        {viewMode === 'guided' ? 'Save Step' : (preview?.mode === 'partial' ? 'Update Package' : 'Create Package')}
+                                    </button>
+                                </div>
                             </div>
                             {viewMode === 'advanced' && (
                                 <p className="mt-4 text-[9px] text-center font-bold text-theme-muted uppercase tracking-widest leading-relaxed">

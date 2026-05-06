@@ -43,6 +43,7 @@ function readStageFromNotes(notes: string | null | undefined) {
 }
 
 const STEP_ROLE_MAP: Record<string, string> = {
+  mini_research_brief: "Mini Research Brief",
   research_raw: "Research Raw — NotebookLM",
   research_direction: "Research Direction — Arbor Questions",
   brief: "Brief",
@@ -99,6 +100,66 @@ export async function POST(req: NextRequest) {
         resolvedListId = listResolution.list.id;
         reusedList = !listResolution.created;
         warnings.push(...listResolution.warnings);
+
+        // Sync to articles table (GF Hub Metadata)
+        const existingArticle = db.prepare("SELECT article_id FROM articles WHERE topic_id = ?").get(pkg.topic_id) as { article_id: string } | undefined;
+        if (existingArticle) {
+            db.prepare(`
+                UPDATE articles 
+                SET article_title = @article_title,
+                    season_id = @season_id,
+                    episode_id = @episode_id,
+                    journey_stage = @journey_stage,
+                    primary_system = @primary_system,
+                    secondary_systems = @secondary_systems,
+                    current_step = @current_step,
+                    status = COALESCE(@status, status),
+                    slug = COALESCE(@slug, slug),
+                    updated_at = @updated_at
+                WHERE topic_id = @topic_id
+            `).run({
+                topic_id: pkg.topic_id,
+                article_title: pkg.article_title || pkg.title,
+                season_id: pkg.season_id,
+                episode_id: pkg.episode_id,
+                journey_stage: pkg.journey_stage,
+                primary_system: pkg.primary_system,
+                secondary_systems: pkg.secondary_systems,
+                current_step: pkg.current_step,
+                status: pkg.article_status,
+                slug: pkg.slug,
+                updated_at: now
+            });
+        } else {
+            db.prepare(`
+                INSERT INTO articles (
+                    article_id, topic_id, article_title, title,
+                    season_id, episode_id, journey_stage,
+                    primary_system, secondary_systems, current_step,
+                    status, slug, created_at, updated_at
+                ) VALUES (
+                    @article_id, @topic_id, @article_title, @title,
+                    @season_id, @episode_id, @journey_stage,
+                    @primary_system, @secondary_systems, @current_step,
+                    @status, @slug, @created_at, @updated_at
+                )
+            `).run({
+                article_id: nanoid(),
+                topic_id: pkg.topic_id,
+                article_title: pkg.article_title || pkg.title,
+                title: pkg.title,
+                season_id: pkg.season_id,
+                episode_id: pkg.episode_id,
+                journey_stage: pkg.journey_stage,
+                primary_system: pkg.primary_system,
+                secondary_systems: pkg.secondary_systems,
+                current_step: pkg.current_step,
+                status: pkg.article_status || 'idea',
+                slug: pkg.slug,
+                created_at: now,
+                updated_at: now
+            });
+        }
 
         if (pkg.mode === "partial") {
           const stepRole = pkg.detectedStepRole || "general";

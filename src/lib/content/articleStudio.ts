@@ -1,5 +1,6 @@
 export type ArticleStudioMode = "editorial" | "structured" | "partial";
 export type ArticleStudioStepRole = 
+    | "mini_research_brief"
     | "research_raw"
     | "research_direction"
     | "brief"
@@ -45,6 +46,15 @@ export type ArticleStudioPackage = {
     mode: ArticleStudioMode;
     detectedStepRole?: ArticleStudioStepRole;
     topic_id: string;
+    article_title: string;
+    season_id: string;
+    episode_id: string;
+    journey_stage: string;
+    primary_system: string;
+    secondary_systems: string;
+    article_role: string;
+    current_step: string;
+    article_status: string;
     title: string;
     meta_title: string;
     meta_description: string;
@@ -91,6 +101,15 @@ export type ArticleStudioPreview = ArticleStudioPackage & {
 const EMPTY_PACKAGE: ArticleStudioPackage = {
     mode: "editorial",
     topic_id: "",
+    article_title: "",
+    season_id: "",
+    episode_id: "",
+    journey_stage: "",
+    primary_system: "",
+    secondary_systems: "",
+    article_role: "",
+    current_step: "0",
+    article_status: "idea",
     title: "",
     meta_title: "",
     meta_description: "",
@@ -117,7 +136,16 @@ const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     mode: ["mode", "article mode"],
     detectedStepRole: ["step_role", "detected_step", "stage"],
     topic_id: ["topic_id", "topic id", "topic-id"],
-    title: ["title", "article title", "working title"],
+    article_title: ["article_title", "article title", "manual title"],
+    season_id: ["season_id", "season"],
+    episode_id: ["episode_id", "episode"],
+    journey_stage: ["journey_stage", "journey"],
+    primary_system: ["primary_system", "primary"],
+    secondary_systems: ["secondary_systems", "secondary"],
+    article_role: ["article_role", "role"],
+    current_step: ["current_step", "step"],
+    article_status: ["article_status", "status"],
+    title: ["title", "working title"],
     meta_title: ["meta_title", "meta title", "seo title"],
     meta_description: ["meta_description", "meta description", "seo description"],
     keywords: ["keywords", "keyword"],
@@ -173,36 +201,40 @@ const SECTION_ALIASES: Record<ArticleStudioSectionKey, string[]> = {
 };
 
 export const ARTICLE_STUDIO_STEPS: Record<ArticleStudioStepRole, { title: string; instruction: string }> = {
+    mini_research_brief: {
+        title: "0. Mini Research Brief",
+        instruction: "สรุปประเด็นสำคัญและทิศทางเบื้องต้นจากการรีเสิร์ชด่วน",
+    },
     research_raw: {
-        title: "Research Raw — NotebookLM",
+        title: "1. Research Raw — NotebookLM",
         instruction: "วางข้อมูลดิบหรือสรุปจาก NotebookLM เพื่อใช้เป็นฐานข้อมูลในการเขียน",
     },
     research_direction: {
-        title: "Research Direction — Arbor Questions",
+        title: "2. Research Direction — Arbor Questions",
         instruction: "ระบุแนวทางการวิจัยและคำถามสำคัญจาก Arbor เพื่อกำหนดทิศทางเนื้อหา",
     },
     brief: {
-        title: "Brief",
+        title: "3. Brief",
         instruction: "สรุปบรีฟงาน (Goal, Target, Tone) ให้ชัดเจนก่อนเริ่มเขียน",
     },
-    script_caption: {
-        title: "Script & Caption",
-        instruction: "เขียนสคริปต์วิดีโอสั้นหรือแคปชั่นสำหรับ Social Media",
-    },
     outline_web_article: {
-        title: "Web Article Outline / Full Article",
+        title: "4. Web Article Outline / Full Article",
         instruction: "ร่างโครงสร้างบทความ (Outline) หรือเขียนเนื้อหาฉบับเต็ม (Full Draft)",
     },
+    script_caption: {
+        title: "5. Script & Caption",
+        instruction: "เขียนสคริปต์วิดีโอสั้นหรือแคปชั่นสำหรับ Social Media",
+    },
     assets_canva: {
-        title: "Assets / Canva",
+        title: "6. Assets / Canva",
         instruction: "ระบุรายละเอียดภาพประกอบ (Visual Brief) หรือ URL ของ Canva",
     },
     seo_schema: {
-        title: "SEO & Schema",
+        title: "7. SEO & Schema",
         instruction: "ตรวจสอบ Meta Title, Description และ Schema Markup",
     },
     publish: {
-        title: "Publish / Tracking",
+        title: "8. Publish / Tracking",
         instruction: "ตรวจสอบความเรียบร้อยก่อนเผยแพร่และระบุช่องทางติดตามผล",
     },
     general: {
@@ -386,7 +418,8 @@ function stripFence(input: string) {
 function detectStepRole(headings: string[], body: string): ArticleStudioStepRole {
     const combined = [...headings, body.slice(0, 500)].join(" ").toLowerCase();
     
-    // Check Research Raw first to avoid being caught by generic research patterns
+    // Check Mini Research Brief
+    if (combined.includes("mini research brief") || combined.includes("สรุปรีเสิร์ช")) return "mini_research_brief";
     if (combined.includes("research raw") || combined.includes("ข้อมูลดิบ") || combined.includes("notebooklm")) return "research_raw";
     if (combined.includes("research direction") || combined.includes("แนวทางการวิจัย")) return "research_direction";
     if (combined.includes("brief") || combined.includes("บรีฟ")) return "brief";
@@ -561,6 +594,15 @@ export function normalizeArticleStudioPackage(input: Partial<ArticleStudioPackag
         mode,
         detectedStepRole,
         topic_id: normalizeTopicId(input.topic_id),
+        article_title: asPlainString(input.article_title),
+        season_id: asPlainString(input.season_id),
+        episode_id: asPlainString(input.episode_id),
+        journey_stage: asPlainString(input.journey_stage),
+        primary_system: asPlainString(input.primary_system),
+        secondary_systems: asPlainString(input.secondary_systems),
+        article_role: asPlainString(input.article_role),
+        current_step: asPlainString(input.current_step),
+        article_status: asPlainString(input.article_status),
         title,
         meta_title: isPlaceholderValue(input.meta_title) ? "" : asPlainString(input.meta_title),
         meta_description: metaDescription,
@@ -615,6 +657,7 @@ export function resolveArticleStudioMissingGroups(pkg: ArticleStudioPackage): Ar
 
     const requiredLabels: Record<string, string> = {
         topic_id: "topic_id",
+        article_title: "article_title",
         title: "title",
         article_markdown: "article_markdown / draft",
     };
@@ -625,43 +668,19 @@ export function resolveArticleStudioMissingGroups(pkg: ArticleStudioPackage): Ar
         state: "blocking" as const,
     }));
 
-    const recommended: ArticleStudioMissingItem[] = [];
-    const optional: ArticleStudioMissingItem[] = [];
+    const recommended: ArticleStudioMissingItem[] = []; // GF Hub Sync
+    const optional: ArticleStudioMissingItem[] = [];    // Publish / Tracking
 
-    if (isPartial) {
-        // Required Now in Partial mode: topic_id and article_markdown
-        // Title is recommended if missing
-        if (!pkg.title) recommended.push({ field: "title", label: "title", state: "warning" });
-        
-        // Everything else is Later Fields (Info)
-        if (!pkg.meta_description) optional.push({ field: "meta_description", label: "meta_description", state: "info" });
-        if (pkg.keywords.length === 0) optional.push({ field: "keywords", label: "keywords", state: "info" });
-        if (!hasFaqContent(pkg)) optional.push({ field: "schema_faq", label: "faq", state: "info" });
-        if (!hasReferencesContent(pkg)) optional.push({ field: "references", label: "references", state: "info" });
-        if (!pkg.visual_brief) optional.push({ field: "visual_brief", label: "visual_brief", state: "info" });
-        if (!pkg.canva_url) optional.push({ field: "canva_url", label: "canva_url", state: "info" });
-        if (!pkg.published_url) optional.push({ field: "published_url", label: "published_url", state: "info" });
-        if (!pkg.group_post) optional.push({ field: "group_post", label: "group_post", state: "info" });
-        if (!pkg.page_post) optional.push({ field: "page_post", label: "page_post", state: "info" });
-    } else {
-        if (!pkg.meta_description) recommended.push({ field: "meta_description", label: "meta_description", state: "warning" });
-        if (pkg.keywords.length === 0) recommended.push({ field: "keywords", label: "keywords", state: "warning" });
-        if (
-            pkg.internal_links_prerequisite.length === 0 ||
-            pkg.internal_links_next_step.length === 0 ||
-            pkg.internal_links_related.length === 0
-        ) {
-            recommended.push({ field: "internal_links", label: "internal_links", state: "warning" });
-        }
-        if (!pkg.visual_brief && pkg.visual_status === "not_needed_yet") recommended.push({ field: "visual_brief", label: "visual_brief", state: "warning" });
-        if (!hasFaqContent(pkg)) recommended.push({ field: "schema_faq", label: "faq / schema_faq", state: "warning" });
-        if (!hasReferencesContent(pkg)) recommended.push({ field: "references", label: "references", state: "warning" });
+    // Required for GF Hub Sync (Recommended)
+    if (!pkg.season_id) recommended.push({ field: "season_id", label: "season_id", state: "warning" });
+    if (!pkg.episode_id) recommended.push({ field: "episode_id", label: "episode_id", state: "warning" });
+    if (!pkg.article_status || pkg.article_status === "idea") recommended.push({ field: "article_status", label: "article_status", state: "warning" });
 
-        if (!pkg.group_post) optional.push({ field: "group_post", label: "group_post", state: "info" });
-        if (!pkg.page_post) optional.push({ field: "page_post", label: "page_post", state: "info" });
-        if (!pkg.canva_url) optional.push({ field: "canva_url", label: "canva_url", state: "info" });
-        if (!pkg.published_url) optional.push({ field: "published_url", label: "published_url", state: "info" });
-    }
+    // Required for Publish / SEO (Optional/Later)
+    if (!pkg.published_url) optional.push({ field: "published_url", label: "final_url", state: "info" });
+    if (!pkg.meta_description) optional.push({ field: "meta_description", label: "meta_description", state: "info" });
+    if (pkg.keywords.length === 0) optional.push({ field: "keywords", label: "keywords", state: "info" });
+    if (!pkg.visual_brief) optional.push({ field: "visual_brief", label: "visual_brief", state: "info" });
 
     return { required, recommended, optional };
 }
@@ -727,31 +746,56 @@ function withPreviewMetadata(
 ): ArticleStudioPreview {
     const generatedFields: string[] = [];
     const normalizedPkg = normalizeArticleStudioPackage(pkg);
-    const title = normalizedPkg.title || detectedHeadings[0] || "";
+    
+    // Title Resolution Priority: article_title > title > meta_title > topic_title > topic_id
+    // But exclude invalid workflow/source labels
+    const INVALID_TITLE_ROLES = [
+        "NotebookLM", "Research Raw", "Research Direction", "Arbor Questions", 
+        "Brief", "Outline web article", "Script & Caption", "Assets / Canva", 
+        "SEO & Schema", "Publish", "Mini Research Brief"
+    ].map(r => r.toLowerCase());
 
-    if (!normalizedPkg.meta_title && title) {
-        normalizedPkg.meta_title = title.length > 58 ? title.slice(0, 55).trimEnd() + "..." : title;
+    const getCleanTitle = (candidate: string) => {
+        if (!candidate) return "";
+        const parts = candidate.split(/\s+[—–-]\s+/);
+        const lastPart = parts[parts.length - 1].trim();
+        if (INVALID_TITLE_ROLES.includes(lastPart.toLowerCase())) return "";
+        return lastPart;
+    };
+
+    let resolvedTitle = normalizedPkg.article_title;
+    if (!resolvedTitle) {
+        resolvedTitle = getCleanTitle(normalizedPkg.title) || getCleanTitle(detectedHeadings[0]) || normalizedPkg.meta_title;
+    }
+    if (!resolvedTitle) {
+        resolvedTitle = normalizedPkg.topic_id;
+    }
+
+    normalizedPkg.title = resolvedTitle;
+
+    if (!normalizedPkg.meta_title && resolvedTitle) {
+        normalizedPkg.meta_title = resolvedTitle.length > 58 ? resolvedTitle.slice(0, 55).trimEnd() + "..." : resolvedTitle;
         generatedFields.push("meta_title");
     }
 
     if (!normalizedPkg.meta_description && normalizedPkg.article_markdown) {
-        normalizedPkg.meta_description = shortDescription(title, normalizedPkg.article_markdown);
+        normalizedPkg.meta_description = shortDescription(resolvedTitle, normalizedPkg.article_markdown);
         generatedFields.push("meta_description");
     }
 
-    if (normalizedPkg.keywords.length === 0 && (title || normalizedPkg.article_markdown)) {
-        normalizedPkg.keywords = keywordCandidates(title, normalizedPkg.article_markdown);
+    if (normalizedPkg.keywords.length === 0 && (resolvedTitle || normalizedPkg.article_markdown)) {
+        normalizedPkg.keywords = keywordCandidates(resolvedTitle, normalizedPkg.article_markdown);
         if (normalizedPkg.keywords.length > 0) generatedFields.push("keywords");
     }
 
-    if (!normalizedPkg.slug && title) {
-        normalizedPkg.slug = slugify(title);
+    if (!normalizedPkg.slug && resolvedTitle) {
+        normalizedPkg.slug = slugify(resolvedTitle);
         generatedFields.push("slug");
     }
 
-    if (!normalizedPkg.visual_brief && (title || normalizedPkg.article_markdown)) {
+    if (!normalizedPkg.visual_brief && (resolvedTitle || normalizedPkg.article_markdown)) {
         normalizedPkg.visual_brief = [
-            `ภาพหลักสำหรับบทความ "${title}"`,
+            `ภาพหลักสำหรับบทความ "${resolvedTitle}"`,
             "โทนสะอาด น่าเชื่อถือ เหมาะกับ Green Fineness",
             "สื่อสารประเด็นหลักของบทความให้เข้าใจเร็ว และหลีกเลี่ยงภาพ stock ที่คลุมเครือ",
         ].join("\n");
