@@ -816,7 +816,12 @@ function ensureGreenFinenessModel() {
         { name: 'narrative_status', type: 'TEXT', default: "'not_started'" },
         { name: 'meta_title', type: 'TEXT' },
         { name: 'meta_description', type: 'TEXT' },
-        { name: 'keywords', type: 'TEXT' }
+        { name: 'keywords', type: 'TEXT' },
+        { name: 'article_markdown', type: 'TEXT' },
+        { name: 'body_markdown', type: 'TEXT' },
+        { name: 'read_more_markdown', type: 'TEXT' },
+        { name: 'faq_markdown', type: 'TEXT' },
+        { name: 'references_markdown', type: 'TEXT' }
     ];
 
     for (const col of additiveCols) {

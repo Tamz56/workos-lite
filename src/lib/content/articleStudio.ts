@@ -40,6 +40,8 @@ export type ArticleStudioContentHealth = {
     visualNotes: "ready" | "missing";
     faq: "ready" | "missing";
     references: "ready" | "missing";
+    body: "ready" | "missing";
+    internalLinks: "ready" | "missing";
 };
 
 export type ArticleStudioPackage = {
@@ -69,6 +71,10 @@ export type ArticleStudioPackage = {
     schema_faq: unknown;
     schema_article: unknown;
     article_markdown: string;
+    body_markdown: string;
+    read_more_markdown: string;
+    faq_markdown: string;
+    references_markdown: string;
     group_post: string;
     page_post: string;
     visual_brief: string;
@@ -133,6 +139,10 @@ const EMPTY_PACKAGE: ArticleStudioPackage = {
     schema_faq: [],
     schema_article: {},
     article_markdown: "",
+    body_markdown: "",
+    read_more_markdown: "",
+    faq_markdown: "",
+    references_markdown: "",
     group_post: "",
     page_post: "",
     visual_brief: "",
@@ -177,6 +187,10 @@ const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     schema_faq: ["schema_faq", "faq schema", "schema faq"],
     schema_article: ["schema_article", "article schema", "schema article"],
     article_markdown: ["article_markdown", "article markdown", "draft", "article draft"],
+    body_markdown: ["body_markdown", "body markdown", "article body"],
+    read_more_markdown: ["read_more_markdown", "read more markdown", "read more", "internal links"],
+    faq_markdown: ["faq_markdown", "faq markdown", "faq"],
+    references_markdown: ["references_markdown", "references markdown", "reference section"],
     group_post: ["group_post", "group post"],
     page_post: ["page_post", "page post"],
     visual_brief: ["visual_brief", "visual brief"],
@@ -644,6 +658,10 @@ export function normalizeArticleStudioPackage(input: Partial<ArticleStudioPackag
         schema_faq: input.schema_faq ?? [],
         schema_article: input.schema_article ?? {},
         article_markdown: articleMarkdown,
+        body_markdown: asPlainString(input.body_markdown),
+        read_more_markdown: asPlainString(input.read_more_markdown),
+        faq_markdown: asPlainString(input.faq_markdown),
+        references_markdown: asPlainString(input.references_markdown),
         group_post: asPlainString(input.group_post),
         page_post: asPlainString(input.page_post),
         visual_brief: asPlainString(input.visual_brief),
@@ -679,9 +697,9 @@ export function validateArticleStudioPackage(pkg: ArticleStudioPackage) {
         validationMessages.push("กรุณาเติม Title ก่อนดำเนินการต่อ");
     }
 
-    if (!pkg.article_markdown) {
-        missingFields.push("article_markdown");
-        validationMessages.push("กรุณาเติมเนื้อหา (Content / Draft) ก่อนดำเนินการต่อ");
+    if (!pkg.article_markdown && !pkg.body_markdown) {
+        missingFields.push("body_markdown");
+        validationMessages.push("กรุณาเติมเนื้อหา (Body / Draft) ก่อนดำเนินการต่อ");
     }
 
     return { missingFields, validationMessages };
@@ -695,7 +713,7 @@ export function resolveArticleStudioMissingGroups(pkg: ArticleStudioPackage): Ar
         topic_id: "topic_id",
         article_title: "article_title",
         title: "title",
-        article_markdown: "article_markdown / draft",
+        body_markdown: "body_markdown / draft",
     };
 
     const required = validation.missingFields.map((field) => ({
@@ -736,13 +754,15 @@ export function resolveArticleStudioContentHealth(pkg: ArticleStudioPackage): Ar
         pkg.internal_links_related.length > 0,
     ].filter(Boolean).length;
     const visualNotes = pkg.visual_brief || pkg.visual_status !== "not_needed_yet" ? "ready" : "missing";
-    const faq = hasFaqContent(pkg) ? "ready" : "missing";
-    const references = hasReferencesContent(pkg) ? "ready" : "missing";
+    const body = pkg.body_markdown || pkg.article_markdown ? "ready" : "missing";
+    const internalLinks = pkg.read_more_markdown || pkg.internal_links_related.length > 0 ? "ready" : "missing";
+    const faq = pkg.faq_markdown || hasFaqContent(pkg) ? "ready" : "missing";
+    const references = pkg.references_markdown || hasReferencesContent(pkg) ? "ready" : "missing";
 
     const recommendedScore = [
         pkg.meta_description,
         pkg.keywords.length > 0 ? "keywords" : "",
-        internalLinksComplete === 3 ? "internal_links" : "",
+        internalLinks === "ready" ? "internal_links" : "",
         visualNotes === "ready" ? "visual" : "",
         faq === "ready" ? "faq" : "",
         references === "ready" ? "references" : "",
@@ -772,6 +792,8 @@ export function resolveArticleStudioContentHealth(pkg: ArticleStudioPackage): Ar
         visualNotes,
         faq,
         references,
+        body,
+        internalLinks,
     };
 }
 

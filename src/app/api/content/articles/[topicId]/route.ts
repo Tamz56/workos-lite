@@ -16,6 +16,7 @@ const ALLOWED_FIELDS = new Set([
     "content_layer", "article_role", "story_set", "story_order", "narrative_status",
     "next_action", "notes", "priority",
     "primary_system", "secondary_systems",
+    "body_markdown", "read_more_markdown", "faq_markdown", "references_markdown", "article_markdown",
 ]);
 
 export async function GET(

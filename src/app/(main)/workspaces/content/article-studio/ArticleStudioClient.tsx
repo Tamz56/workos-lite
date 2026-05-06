@@ -92,10 +92,11 @@ function ContentHealthCard({ health }: { health: ArticleStudioPreview["contentHe
                     {health.status}
                 </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-[11px] font-bold text-theme-secondary">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-[11px] font-bold text-theme-secondary">
                 <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Fields</span><span>{health.requiredComplete}/{health.requiredTotal}</span></div>
                 <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">SEO</span><span>{health.seoComplete}/{health.seoTotal}</span></div>
-                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Internal</span><span>{health.internalLinksComplete}/{health.internalLinksTotal}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Body</span><span className={health.body === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.body)}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Internal</span><span className={health.internalLinks === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.internalLinks)}</span></div>
                 <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Visual</span><span className={health.visualNotes === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.visualNotes)}</span></div>
                 <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">FAQ</span><span className={health.faq === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.faq)}</span></div>
                 <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Refs</span><span className={health.references === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.references)}</span></div>
@@ -344,6 +345,10 @@ export default function ArticleStudioClient() {
         content_layer: "knowledge",
         article_type: "knowledge_article",
         article_role: "",
+        body_markdown: "",
+        read_more_markdown: "",
+        faq_markdown: "",
+        references_markdown: "",
         primary_system: "",
         systems: [] as string[],
         narrative_status: "not_started",
@@ -404,6 +409,10 @@ export default function ArticleStudioClient() {
                         content_layer: a.content_layer || prev.content_layer,
                         article_type: a.article_type || prev.article_type,
                         article_role: a.article_role || prev.article_role,
+                        body_markdown: a.body_markdown || prev.body_markdown,
+                        read_more_markdown: a.read_more_markdown || prev.read_more_markdown,
+                        faq_markdown: a.faq_markdown || prev.faq_markdown,
+                        references_markdown: a.references_markdown || prev.references_markdown,
                         primary_system: a.primary_system || prev.primary_system,
                         systems: a.secondary_systems ? (typeof a.secondary_systems === 'string' ? a.secondary_systems.split(',') : a.secondary_systems) : prev.systems,
                         narrative_status: a.narrative_status || prev.narrative_status,
@@ -452,12 +461,28 @@ export default function ArticleStudioClient() {
                 return parseArborArticlePackage(previewInput, importMode);
             } else {
                 // Construct a virtual preview for the active step in guided mode
+                let finalMarkdown = previewInput;
+                if (activeStep === 'outline_web_article') {
+                    // Combine sections for Step 4 preview
+                    finalMarkdown = [
+                        topicContext.body_markdown,
+                        topicContext.read_more_markdown,
+                        topicContext.faq_markdown,
+                        topicContext.references_markdown
+                    ].filter(Boolean).join("\n\n");
+                    
+                    // Fallback to legacy if everything is empty
+                    if (!finalMarkdown.trim()) {
+                        finalMarkdown = previewInput;
+                    }
+                }
+
                 const pkg = {
                     mode: "partial" as ArticleStudioMode,
                     detectedStepRole: activeStep,
                     ...topicContext,
                     title: topicContext.article_title,
-                    article_markdown: previewInput,
+                    article_markdown: finalMarkdown,
                 };
                 return parseArborArticlePackage(JSON.stringify(pkg), "partial");
             }
@@ -468,13 +493,16 @@ export default function ArticleStudioClient() {
 
     const canSave = viewMode === 'advanced' 
         ? (!!preview && preview.missingFields.length === 0 && !isSaving)
-        : (!!topicContext.topic_id && !!previewInput.trim() && !isSaving);
+        : (!!topicContext.topic_id && (activeStep === 'outline_web_article' ? !!topicContext.body_markdown.trim() : !!previewInput.trim()) && !isSaving);
 
     const canSendToWebsiteDraft = useMemo(() => {
         if (!topicContext.topic_id || isInvalidTopicId(topicContext.topic_id)) return false;
         if (isPlaceholderValue(topicContext.article_title) && isPlaceholderValue(topicContext.topic_title)) return false;
-        if (!preview?.article_markdown?.trim()) return false;
-        if (preview?.missingFieldGroups?.required?.length > 0) return false;
+        
+        const hasContent = (topicContext.body_markdown?.trim() || preview?.article_markdown?.trim());
+        if (!hasContent) return false;
+
+        if ((preview?.missingFieldGroups?.required?.length || 0) > 0) return false;
         return !isSaving;
     }, [topicContext, preview, isSaving]);
 
@@ -490,7 +518,9 @@ export default function ArticleStudioClient() {
                 detectedStepRole: activeStep,
                 ...topicContext,
                 title: topicContext.article_title,
-                article_markdown: stepContents[activeStep] || "",
+                article_markdown: activeStep === 'outline_web_article' 
+                    ? [topicContext.body_markdown, topicContext.read_more_markdown, topicContext.faq_markdown, topicContext.references_markdown].filter(Boolean).join("\n\n")
+                    : (stepContents[activeStep] || ""),
             }
         };
 
@@ -520,6 +550,10 @@ export default function ArticleStudioClient() {
                     content_layer: a.content_layer || prev.content_layer,
                     article_type: a.article_type || prev.article_type,
                     article_role: a.article_role || prev.article_role,
+                    body_markdown: a.body_markdown || prev.body_markdown,
+                    read_more_markdown: a.read_more_markdown || prev.read_more_markdown,
+                    faq_markdown: a.faq_markdown || prev.faq_markdown,
+                    references_markdown: a.references_markdown || prev.references_markdown,
                     primary_system: a.primary_system || prev.primary_system,
                     systems: a.secondary_systems ? (typeof a.secondary_systems === 'string' ? a.secondary_systems.split(',') : a.secondary_systems) : prev.systems,
                     narrative_status: a.narrative_status || prev.narrative_status,
@@ -812,21 +846,78 @@ export default function ArticleStudioClient() {
                         </div>
 
                         {/* Textarea Area */}
-                        <div className="flex-1 relative min-w-0 bg-theme-input/5">
-                            <textarea
-                                value={viewMode === 'guided' ? (stepContents[activeStep] || "") : rawInput}
-                                onChange={(event) => {
-                                    if (viewMode === 'guided') {
-                                        setStepContents(prev => ({ ...prev, [activeStep]: event.target.value }));
-                                    } else {
-                                        setRawInput(event.target.value);
-                                    }
-                                    setError(null);
-                                    setSuccess(null);
-                                }}
-                                className="absolute inset-0 w-full h-full p-8 lg:p-12 font-mono text-[14px] leading-[1.8] text-theme-primary bg-transparent outline-none transition-theme placeholder:text-theme-muted resize-none custom-scrollbar"
-                                placeholder={viewMode === 'guided' ? `Write ${ARTICLE_STUDIO_STEPS[activeStep]?.title} here...` : "Paste Arbor Package content here..."}
-                            />
+                        <div className="flex-1 relative min-w-0 bg-theme-input/5 overflow-y-auto custom-scrollbar">
+                            {viewMode === 'guided' && activeStep === 'outline_web_article' ? (
+                                <div className="p-6 lg:p-8 space-y-8">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                            Body Content
+                                        </label>
+                                        <textarea
+                                            value={topicContext.body_markdown}
+                                            onChange={(e) => setTopicContext(prev => ({ ...prev, body_markdown: e.target.value }))}
+                                            className="w-full min-h-[620px] xl:min-h-[680px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 resize-none"
+                                            placeholder="Write main article body here..."
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                Read More / Internal Links
+                                            </label>
+                                            <textarea
+                                                value={topicContext.read_more_markdown}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, read_more_markdown: e.target.value }))}
+                                                className="w-full min-h-[200px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/10 resize-none"
+                                                placeholder="## อ่านต่อ / บทความที่เกี่ยวข้อง..."
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                                FAQ
+                                            </label>
+                                            <textarea
+                                                value={topicContext.faq_markdown}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, faq_markdown: e.target.value }))}
+                                                className="w-full min-h-[200px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-purple-500/10 resize-none"
+                                                placeholder="## คำถามที่พบบ่อย..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                            References
+                                        </label>
+                                        <textarea
+                                            value={topicContext.references_markdown}
+                                            onChange={(e) => setTopicContext(prev => ({ ...prev, references_markdown: e.target.value }))}
+                                            className="w-full min-h-[180px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-amber-500/10 resize-none"
+                                            placeholder="## เอกสารอ้างอิง..."
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <textarea
+                                    value={viewMode === 'guided' ? (stepContents[activeStep] || "") : rawInput}
+                                    onChange={(event) => {
+                                        if (viewMode === 'guided') {
+                                            setStepContents(prev => ({ ...prev, [activeStep]: event.target.value }));
+                                        } else {
+                                            setRawInput(event.target.value);
+                                        }
+                                        setError(null);
+                                        setSuccess(null);
+                                    }}
+                                    className="absolute inset-0 w-full h-full p-8 lg:p-12 font-mono text-[14px] leading-[1.8] text-theme-primary bg-transparent outline-none transition-theme placeholder:text-theme-muted resize-none custom-scrollbar"
+                                    placeholder={viewMode === 'guided' ? `Write ${ARTICLE_STUDIO_STEPS[activeStep]?.title} here...` : "Paste Arbor Package content here..."}
+                                />
+                            )}
                         </div>
 
                         {/* Action Bar */}

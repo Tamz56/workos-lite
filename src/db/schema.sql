@@ -295,6 +295,11 @@ CREATE TABLE IF NOT EXISTS articles (
   story_set          TEXT NULL,
   story_order        TEXT NULL,
   narrative_status   TEXT NULL,
+  article_markdown   TEXT NULL, -- Legacy combined content
+  body_markdown      TEXT NULL, -- Main article body
+  read_more_markdown TEXT NULL, -- Internal links / Read more
+  faq_markdown       TEXT NULL, -- FAQ section
+  references_markdown TEXT NULL, -- References section
   meta_title         TEXT NULL,
   meta_description   TEXT NULL,
   keywords           TEXT NULL, -- JSON array
