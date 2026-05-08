@@ -12,7 +12,9 @@ export async function PATCH(
     const allowedFields = [
       "title", "slug", "status", "summary", "notes",
       "meta_title", "meta_description", "keywords", "excerpt",
-      "internal_links_notes", "references_notes"
+      "internal_links_notes", "references_notes",
+      "group_post_markdown", "page_post_markdown", "personal_post_markdown",
+      "social_caption", "hashtags"
     ];
 
     const updates: string[] = [];

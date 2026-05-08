@@ -19,7 +19,12 @@ import {
     FileText,
     List,
     Globe,
-    Box
+    Box,
+    Hash,
+    MessageCircle,
+    User,
+    Users,
+    Flag
 } from "lucide-react";
 import { WritingProject, WritingBlock } from "@/lib/types/writing-lab";
 
@@ -54,6 +59,14 @@ export default function WritingStudioTab({
         internal_links_notes: "",
         references_notes: ""
     });
+    const [socialFields, setSocialFields] = useState({
+        group_post_markdown: "",
+        page_post_markdown: "",
+        personal_post_markdown: "",
+        social_caption: "",
+        hashtags: ""
+    });
+    const [isStructureCollapsed, setIsStructureCollapsed] = useState(false);
 
     useEffect(() => {
         if (activeProject) {
@@ -66,8 +79,23 @@ export default function WritingStudioTab({
                 internal_links_notes: activeProject.internal_links_notes || "",
                 references_notes: activeProject.references_notes || ""
             });
+            setSocialFields({
+                group_post_markdown: activeProject.group_post_markdown || "",
+                page_post_markdown: activeProject.page_post_markdown || "",
+                personal_post_markdown: activeProject.personal_post_markdown || "",
+                social_caption: activeProject.social_caption || "",
+                hashtags: activeProject.hashtags || ""
+            });
         }
     }, [activeProject]);
+
+    useEffect(() => {
+        if (viewMode === 'preview') {
+            setIsStructureCollapsed(true);
+        } else {
+            setIsStructureCollapsed(false);
+        }
+    }, [viewMode]);
 
     const handleSaveFields = async () => {
         if (!projectId) return;
@@ -93,6 +121,73 @@ export default function WritingStudioTab({
         } finally {
             setSaving(false);
         }
+    };
+    
+    const handleSaveSocialFields = async () => {
+        if (!projectId) return;
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/content/writing-lab/projects/${projectId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(socialFields),
+            });
+            if (res.ok) {
+                setLastSaved(new Date());
+                onRefresh();
+            } else {
+                const errorData = await res.json();
+                alert(`Failed to save social drafts: ${errorData.error || res.statusText}`);
+            }
+        } catch (error) {
+            console.error("Failed to save social drafts", error);
+            alert("Failed to save social drafts. check console.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCopySocial = (type: 'group' | 'page' | 'personal' | 'caption' | 'hashtags' | 'all') => {
+        if (!activeProject) return;
+
+        let content = "";
+        let feedback = "";
+
+        switch (type) {
+            case 'group':
+                content = (socialFields.group_post_markdown || "") + (socialFields.hashtags ? "\n\n" + socialFields.hashtags : "");
+                feedback = "Copied Group Post";
+                break;
+            case 'page':
+                content = (socialFields.page_post_markdown || "") + (socialFields.hashtags ? "\n\n" + socialFields.hashtags : "");
+                feedback = "Copied Page Post";
+                break;
+            case 'personal':
+                content = (socialFields.personal_post_markdown || "") + (socialFields.hashtags ? "\n\n" + socialFields.hashtags : "");
+                feedback = "Copied Personal Post";
+                break;
+            case 'caption':
+                content = socialFields.social_caption || "";
+                feedback = "Copied Caption";
+                break;
+            case 'hashtags':
+                content = socialFields.hashtags || "";
+                feedback = "Copied Hashtags";
+                break;
+            case 'all':
+                content = `# Social Drafts — ${activeProject.title}\n\n` +
+                          `## Facebook Group Post\n${socialFields.group_post_markdown || "—"}\n\n` +
+                          `## Facebook Page Post\n${socialFields.page_post_markdown || "—"}\n\n` +
+                          `## Personal Profile Post\n${socialFields.personal_post_markdown || "—"}\n\n` +
+                          `## Short Caption\n${socialFields.social_caption || "—"}\n\n` +
+                          `## Hashtags\n${socialFields.hashtags || "—"}`;
+                feedback = "Copied All Social Drafts";
+                break;
+        }
+
+        navigator.clipboard.writeText(content);
+        setCopyStatus(feedback);
+        setTimeout(() => setCopyStatus(null), 2000);
     };
 
     const fetchBlocks = useCallback(async () => {
@@ -355,43 +450,10 @@ Episode Role: ${activeProject.episode_role || "—"}
                     </div>
                 </div>
 
-                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm flex-1 min-h-[200px]">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Layout className="w-4 h-4 text-blue-600" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Structure</h4>
-                    </div>
-                    <div className="space-y-2">
-                        {activeProject ? (
-                            <div className="space-y-3">
-                                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
-                                    <div className="text-[10px] font-black text-neutral-400 uppercase tracking-tight mb-1">Summary</div>
-                                    <p className="text-xs text-neutral-600 leading-relaxed line-clamp-4 hover:line-clamp-none transition-all cursor-help">{activeProject.summary || "No summary provided."}</p>
-                                </div>
-                                
-                                {blocks.length > 0 && (
-                                    <div className="mt-4">
-                                        <div className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">Blocks Outline</div>
-                                        <div className="space-y-1">
-                                            {blocks.map((b, i) => (
-                                                <div key={b.id} className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 py-1.5 px-3 bg-neutral-50 rounded-lg border border-neutral-100 hover:border-neutral-200 transition-colors">
-                                                    <span className="text-neutral-300 w-3">{i + 1}</span>
-                                                    <span className="truncate">{b.label}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] font-bold text-neutral-400 text-center border-dashed">
-                                Select a project to view structure
-                            </div>
-                        )}
-                    </div>
-                </div>
 
                 {activeProject && (
-                    <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                    <>
+                        <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <Globe className="w-4 h-4 text-amber-600" />
@@ -475,6 +537,130 @@ Episode Role: ${activeProject.episode_role || "—"}
                             </div>
                         </div>
                     </div>
+
+                    <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Share2 className="w-4 h-4 text-blue-600" />
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Social Drafts</h4>
+                            </div>
+                            <button 
+                                onClick={handleSaveSocialFields}
+                                disabled={saving}
+                                className="p-1.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-all disabled:opacity-30"
+                                title="Save Social Drafts"
+                            >
+                                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                            </button>
+                        </div>
+                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar-small">
+                            <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Users className="w-3 h-3 text-neutral-400" />
+                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Facebook Group Post</label>
+                                </div>
+                                <textarea 
+                                    value={socialFields.group_post_markdown}
+                                    onChange={(e) => setSocialFields({...socialFields, group_post_markdown: e.target.value})}
+                                    placeholder="Group tailored draft..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-24 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Flag className="w-3 h-3 text-neutral-400" />
+                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Facebook Page Post</label>
+                                </div>
+                                <textarea 
+                                    value={socialFields.page_post_markdown}
+                                    onChange={(e) => setSocialFields({...socialFields, page_post_markdown: e.target.value})}
+                                    placeholder="Page tailored draft..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-24 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <User className="w-3 h-3 text-neutral-400" />
+                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Personal Profile Post</label>
+                                </div>
+                                <textarea 
+                                    value={socialFields.personal_post_markdown}
+                                    onChange={(e) => setSocialFields({...socialFields, personal_post_markdown: e.target.value})}
+                                    placeholder="Personal tailored draft..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-24 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <MessageCircle className="w-3 h-3 text-neutral-400" />
+                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Short Caption</label>
+                                </div>
+                                <textarea 
+                                    value={socialFields.social_caption}
+                                    onChange={(e) => setSocialFields({...socialFields, social_caption: e.target.value})}
+                                    placeholder="Short caption for IG/TikTok..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Hash className="w-3 h-3 text-neutral-400" />
+                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Hashtags</label>
+                                </div>
+                                <textarea 
+                                    value={socialFields.hashtags}
+                                    onChange={(e) => setSocialFields({...socialFields, hashtags: e.target.value})}
+                                    placeholder="#topic #insight..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-16 resize-none"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className={`bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm transition-all duration-300 ${isStructureCollapsed ? 'flex-none' : 'flex-1 min-h-[200px]'}`}>
+                        <button 
+                            onClick={() => setIsStructureCollapsed(!isStructureCollapsed)}
+                            className="w-full flex items-center justify-between mb-2 group"
+                        >
+                            <div className="flex items-center gap-2">
+                                <Layout className="w-4 h-4 text-blue-600" />
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 group-hover:text-black transition-colors">Structure</h4>
+                            </div>
+                            <ChevronDown className={`w-3 h-3 text-neutral-300 transition-transform duration-300 ${isStructureCollapsed ? '-rotate-90' : 'rotate-0'}`} />
+                        </button>
+                        
+                        {!isStructureCollapsed && (
+                            <div className="space-y-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                {activeProject ? (
+                                    <div className="space-y-3">
+                                        <div className="p-2.5 bg-neutral-50 rounded-xl border border-neutral-100">
+                                            <div className="text-[9px] font-black text-neutral-400 uppercase tracking-tight mb-1">Summary</div>
+                                            <p className="text-[10px] text-neutral-500 leading-relaxed line-clamp-2 hover:line-clamp-none transition-all cursor-help">{activeProject.summary || "—"}</p>
+                                        </div>
+                                        
+                                        {blocks.length > 0 && (
+                                            <div className="mt-2">
+                                                <div className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-2 px-1">Blocks Outline</div>
+                                                <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar-small">
+                                                    {blocks.map((b, i) => (
+                                                        <div key={b.id} className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 py-1.5 px-3 bg-neutral-50 rounded-lg border border-neutral-100 hover:border-neutral-200 transition-colors">
+                                                            <span className="text-neutral-300 w-3">{i + 1}</span>
+                                                            <span className="truncate">{b.label}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] font-bold text-neutral-400 text-center border-dashed italic">
+                                        Select project to view structure
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    </>
                 )}
             </div>
 
@@ -633,6 +819,120 @@ Episode Role: ${activeProject.episode_role || "—"}
                                             <p className="text-sm font-bold text-neutral-400 uppercase">No content to preview</p>
                                         </div>
                                     )}
+                                    
+                                    {/* Social Preview Section */}
+                                    <div className="mt-12 space-y-8">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-px bg-neutral-200 flex-1" />
+                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-300">Social Draft Preview</h3>
+                                            <div className="h-px bg-neutral-200 flex-1" />
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* FB Group */}
+                                            <div className="bg-white border border-neutral-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-2 text-blue-600">
+                                                        <Users className="w-4 h-4" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">FB Group Post</span>
+                                                    </div>
+                                                    <button onClick={() => handleCopySocial('group')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all">
+                                                        <Share2 className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                                <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
+                                                    {socialFields.group_post_markdown || <span className="text-neutral-200 italic">No group draft...</span>}
+                                                </div>
+                                                {socialFields.hashtags && (
+                                                    <div className="mt-4 pt-4 border-t border-neutral-50 text-[10px] font-bold text-blue-500">
+                                                        {socialFields.hashtags}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* FB Page */}
+                                            <div className="bg-white border border-neutral-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-2 text-emerald-600">
+                                                        <Flag className="w-4 h-4" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">FB Page Post</span>
+                                                    </div>
+                                                    <button onClick={() => handleCopySocial('page')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all">
+                                                        <Share2 className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                                <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
+                                                    {socialFields.page_post_markdown || <span className="text-neutral-200 italic">No page draft...</span>}
+                                                </div>
+                                                {socialFields.hashtags && (
+                                                    <div className="mt-4 pt-4 border-t border-neutral-50 text-[10px] font-bold text-blue-500">
+                                                        {socialFields.hashtags}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Personal Profile */}
+                                            <div className="bg-white border border-neutral-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-2 text-neutral-900">
+                                                        <User className="w-4 h-4" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">Personal Post</span>
+                                                    </div>
+                                                    <button onClick={() => handleCopySocial('personal')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all">
+                                                        <Share2 className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                                <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
+                                                    {socialFields.personal_post_markdown || <span className="text-neutral-200 italic">No personal draft...</span>}
+                                                </div>
+                                                {socialFields.hashtags && (
+                                                    <div className="mt-4 pt-4 border-t border-neutral-50 text-[10px] font-bold text-blue-500">
+                                                        {socialFields.hashtags}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Caption & Hashtags */}
+                                            <div className="bg-white border border-neutral-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-2 text-amber-600">
+                                                        <MessageCircle className="w-4 h-4" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">Short Caption</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={() => handleCopySocial('caption')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all" title="Copy Caption">
+                                                            <Share2 className="w-3 h-3" />
+                                                        </button>
+                                                        <button onClick={() => handleCopySocial('hashtags')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all" title="Copy Hashtags">
+                                                            <Hash className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed mb-4">
+                                                    {socialFields.social_caption || <span className="text-neutral-200 italic">No short caption...</span>}
+                                                </div>
+                                                <div className="text-[10px] font-bold text-neutral-400 border-t border-neutral-50 pt-4">
+                                                    <div className="flex items-center gap-1 mb-1 opacity-50">
+                                                        <Hash className="w-2 h-2" />
+                                                        <span>HASHTAGS</span>
+                                                    </div>
+                                                    <div className="text-blue-500 leading-relaxed">
+                                                        {socialFields.hashtags || "—"}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex justify-center">
+                                            <button 
+                                                onClick={() => handleCopySocial('all')}
+                                                className="flex items-center gap-2 px-6 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                            >
+                                                <Share2 className="w-3 h-3" />
+                                                Copy All Social Drafts
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             ) : blocks.length > 0 ? (
                                 <div className="max-w-4xl mx-auto space-y-16">

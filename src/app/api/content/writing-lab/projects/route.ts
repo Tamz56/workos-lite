@@ -46,6 +46,11 @@ export async function POST(req: Request) {
       excerpt,
       internal_links_notes,
       references_notes,
+      group_post_markdown,
+      page_post_markdown,
+      personal_post_markdown,
+      social_caption,
+      hashtags,
       attached_to
     } = body;
 
@@ -55,9 +60,11 @@ export async function POST(req: Request) {
         writing_mode, episode_role, journey_stage, status, 
         summary, notes, meta_title, meta_description, keywords,
         excerpt, internal_links_notes, references_notes,
+        group_post_markdown, page_post_markdown, personal_post_markdown,
+        social_caption, hashtags,
         attached_to, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `).run(
       id, 
       topic_id || null, 
@@ -77,6 +84,11 @@ export async function POST(req: Request) {
       excerpt || null,
       internal_links_notes || null,
       references_notes || null,
+      group_post_markdown || null,
+      page_post_markdown || null,
+      personal_post_markdown || null,
+      social_caption || null,
+      hashtags || null,
       attached_to || null
     );
 

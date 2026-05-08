@@ -998,7 +998,12 @@ function ensureArborWritingLab() {
         { name: 'keywords', type: 'TEXT' },
         { name: 'excerpt', type: 'TEXT' },
         { name: 'internal_links_notes', type: 'TEXT' },
-        { name: 'references_notes', type: 'TEXT' }
+        { name: 'references_notes', type: 'TEXT' },
+        { name: 'group_post_markdown', type: 'TEXT' },
+        { name: 'page_post_markdown', type: 'TEXT' },
+        { name: 'personal_post_markdown', type: 'TEXT' },
+        { name: 'social_caption', type: 'TEXT' },
+        { name: 'hashtags', type: 'TEXT' }
     ];
 
     for (const col of additiveProjectCols) {

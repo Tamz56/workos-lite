@@ -84,6 +84,11 @@ export interface WritingProject {
   excerpt: string | null;
   internal_links_notes: string | null;
   references_notes: string | null;
+  group_post_markdown: string | null;
+  page_post_markdown: string | null;
+  personal_post_markdown: string | null;
+  social_caption: string | null;
+  hashtags: string | null;
   attached_to: string | null;
   created_at: string;
   updated_at: string;
