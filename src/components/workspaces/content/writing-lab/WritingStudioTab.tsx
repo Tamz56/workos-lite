@@ -15,7 +15,9 @@ import {
     CheckCircle,
     RefreshCw,
     AlertCircle,
-    Loader2
+    Loader2,
+    FileText,
+    List
 } from "lucide-react";
 import { WritingProject, WritingBlock } from "@/lib/types/writing-lab";
 
@@ -38,7 +40,7 @@ export default function WritingStudioTab({
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
-    const [copied, setCopied] = useState(false);
+    const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
     const fetchBlocks = useCallback(async () => {
         if (!projectId) return;
@@ -101,15 +103,53 @@ export default function WritingStudioTab({
         setBlocks(prev => prev.map(b => b.id === id ? { ...b, content_md } : b));
     };
 
-    const assembledMarkdown = blocks
-        .filter(b => b.content_md?.trim() !== "")
-        .map(b => `## ${b.label}\n\n${b.content_md}`)
-        .join("\n\n");
+    // Export / Copy Pack Logic
+    const getMarkdownBlocks = (skipEmpty = false) => {
+        return blocks
+            .filter(b => !skipEmpty || b.content_md?.trim() !== "")
+            .map(b => `## ${b.label}\n\n${b.content_md || ""}`)
+            .join("\n\n");
+    };
 
-    const handleCopyMarkdown = () => {
-        navigator.clipboard.writeText(assembledMarkdown);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = (type: 'markdown' | 'workos' | 'draft' | 'outline') => {
+        if (!activeProject) return;
+
+        let content = "";
+        let feedback = "";
+
+        switch (type) {
+            case 'markdown':
+                content = getMarkdownBlocks();
+                feedback = "Copied Markdown";
+                break;
+            case 'workos':
+                content = `# ${activeProject.title}\n\n` +
+                          `Project ID: ${activeProject.id}\n` +
+                          `Topic ID: ${activeProject.topic_id || "—"}\n` +
+                          `Writing Mode: ${activeProject.writing_mode || "—"}\n` +
+                          `Episode Role: ${activeProject.episode_role || "—"}\n` +
+                          `Story Set: ${activeProject.story_set_id || "—"}\n` +
+                          `Episode: ${activeProject.episode_id || "—"}\n` +
+                          `Status: ${activeProject.status}\n\n` +
+                          `---\n\n` +
+                          `## Writing Blocks\n\n` +
+                          getMarkdownBlocks();
+                feedback = "Copied WorkOS Note";
+                break;
+            case 'draft':
+                content = `# ${activeProject.title}\n\n` + getMarkdownBlocks(true);
+                feedback = "Copied Article Draft";
+                break;
+            case 'outline':
+                content = `# Outline — ${activeProject.title}\n\n` +
+                          blocks.map((b, i) => `${i + 1}. ${b.label}`).join("\n");
+                feedback = "Copied Outline";
+                break;
+        }
+
+        navigator.clipboard.writeText(content);
+        setCopyStatus(feedback);
+        setTimeout(() => setCopyStatus(null), 2000);
     };
 
     return (
@@ -259,16 +299,46 @@ export default function WritingStudioTab({
 
                             <div className="flex items-center gap-4">
                                 {viewMode === 'preview' && blocks.length > 0 && (
-                                    <button 
-                                        onClick={handleCopyMarkdown}
-                                        className={`flex items-center gap-2 px-6 py-3 border border-neutral-200 rounded-2xl text-xs font-black transition-all transform active:scale-95 ${copied ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white hover:bg-neutral-50 text-neutral-600'}`}
-                                    >
-                                        {copied ? <CheckCircle className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-                                        {copied ? "Copied Markdown" : "Copy Markdown"}
-                                    </button>
+                                    <div className="flex items-center gap-2 bg-neutral-100 p-1.5 rounded-2xl">
+                                        <button 
+                                            onClick={() => handleCopy('markdown')}
+                                            title="Copy As Markdown"
+                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                        >
+                                            <Share2 className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleCopy('workos')}
+                                            title="Copy WorkOS Note"
+                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                        >
+                                            <FileText className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleCopy('draft')}
+                                            title="Copy Article Draft"
+                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                        >
+                                            <Type className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleCopy('outline')}
+                                            title="Copy Outline"
+                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                        >
+                                            <List className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {copyStatus && (
+                                    <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
+                                        <CheckCircle className="w-3 h-3" />
+                                        {copyStatus}
+                                    </span>
                                 )}
                                 
-                                {lastSaved && viewMode === 'edit' && (
+                                {lastSaved && viewMode === 'edit' && !copyStatus && (
                                     <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
                                         <CheckCircle className="w-3 h-3" />
                                         Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
