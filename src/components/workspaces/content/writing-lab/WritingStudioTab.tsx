@@ -18,7 +18,8 @@ import {
     Loader2,
     FileText,
     List,
-    Globe
+    Globe,
+    Box
 } from "lucide-react";
 import { WritingProject, WritingBlock } from "@/lib/types/writing-lab";
 
@@ -163,7 +164,7 @@ export default function WritingStudioTab({
             .join("\n\n");
     };
 
-    const handleCopy = (type: 'markdown' | 'workos' | 'draft' | 'outline' | 'website') => {
+    const handleCopy = (type: 'markdown' | 'workos' | 'draft' | 'outline' | 'website' | 'studio') => {
         if (!activeProject) return;
 
         let content = "";
@@ -208,7 +209,7 @@ export default function WritingStudioTab({
                           `Meta Title:\n${websiteFields.meta_title || "—"}\n\n` +
                           `Meta Description:\n${websiteFields.meta_description || "—"}\n\n` +
                           `Keywords:\n${websiteFields.keywords || "—"}\n\n` +
-                          `Slug:\n${websiteFields.slug || "—"}\n\n` +
+                          `Slug:\n${websiteFields.slug || activeProject.slug || "—"}\n\n` +
                           `Excerpt:\n${websiteFields.excerpt || "—"}\n\n` +
                           `## Internal Links Notes\n\n` +
                           `${websiteFields.internal_links_notes || "—"}\n\n` +
@@ -217,6 +218,76 @@ export default function WritingStudioTab({
                           `## References Notes\n\n` +
                           `${websiteFields.references_notes || "—"}`;
                 feedback = "Copied Website Draft Pack";
+                break;
+            case 'studio':
+                const bodyBlocks = blocks.filter(b => 
+                    b.content_md?.trim() !== "" && 
+                    !["Read More / Bridge", "FAQ Notes", "References Notes"].includes(b.label || "")
+                ).map(b => `### ${b.label}\n\n${b.content_md}`).join("\n\n");
+
+                const readMoreBlock = blocks.find(b => b.label === "Read More / Bridge")?.content_md || "";
+                const faqBlock = blocks.find(b => b.label === "FAQ Notes")?.content_md || "";
+                const refBlock = blocks.find(b => b.label === "References Notes")?.content_md || "";
+
+                content = `---
+topic_id: ${activeProject.topic_id || ""}
+title: ${activeProject.title}
+slug: ${websiteFields.slug || activeProject.slug || ""}
+writing_mode: ${activeProject.writing_mode}
+episode_role: ${activeProject.episode_role || ""}
+status: ${activeProject.status}
+source: arbor_writing_lab
+---
+
+# ${activeProject.title}
+
+## Website Fields
+
+Meta Title:
+${websiteFields.meta_title || "—"}
+
+Meta Description:
+${websiteFields.meta_description || "—"}
+
+Keywords:
+${websiteFields.keywords || "—"}
+
+Slug:
+${websiteFields.slug || activeProject.slug || "—"}
+
+Excerpt:
+${websiteFields.excerpt || "—"}
+
+## Body Markdown
+
+${bodyBlocks || "—"}
+
+## Read More
+
+${readMoreBlock || "—"}
+
+## FAQ
+
+${faqBlock || "—"}
+
+## References
+
+${websiteFields.references_notes || ""}
+${refBlock ? (websiteFields.references_notes ? "\n\n" : "") + refBlock : ""}
+${(!websiteFields.references_notes && !refBlock) ? "—" : ""}
+
+## Internal Links Notes
+
+${websiteFields.internal_links_notes || "—"}
+
+## Source Notes
+
+Generated from Arbor Writing Lab.
+Project ID: ${activeProject.id}
+Writing Mode: ${activeProject.writing_mode}
+Episode Role: ${activeProject.episode_role || "—"}
+`;
+                feedback = "Copied Article Studio Pack";
                 break;
         }
 
@@ -487,6 +558,13 @@ export default function WritingStudioTab({
                                             className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
                                         >
                                             <Globe className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleCopy('studio')}
+                                            title="Copy Article Studio Pack"
+                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                        >
+                                            <Box className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => handleCopy('outline')}
