@@ -100,6 +100,9 @@ function ContentHealthCard({ health }: { health: ArticleStudioPreview["contentHe
                 <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Visual</span><span className={health.visualNotes === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.visualNotes)}</span></div>
                 <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">FAQ</span><span className={health.faq === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.faq)}</span></div>
                 <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Refs</span><span className={health.references === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.references)}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Group</span><span className={health.groupPost === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.groupPost)}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Page</span><span className={health.pagePost === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.pagePost)}</span></div>
+                <div className="flex flex-col gap-0.5"><span className="text-[9px] text-theme-muted uppercase tracking-tighter">Personal</span><span className={health.personalPost === 'ready' ? 'text-green-600' : 'text-amber-600'}>{readinessLabel(health.personalPost)}</span></div>
             </div>
         </section>
     );
@@ -349,6 +352,10 @@ export default function ArticleStudioClient() {
         read_more_markdown: "",
         faq_markdown: "",
         references_markdown: "",
+        group_post_markdown: "",
+        page_post_markdown: "",
+        personal_post_markdown: "",
+        social_extras_markdown: "",
         primary_system: "",
         systems: [] as string[],
         narrative_status: "not_started",
@@ -413,6 +420,10 @@ export default function ArticleStudioClient() {
                         read_more_markdown: a.read_more_markdown || prev.read_more_markdown,
                         faq_markdown: a.faq_markdown || prev.faq_markdown,
                         references_markdown: a.references_markdown || prev.references_markdown,
+                        group_post_markdown: a.group_post_markdown || prev.group_post_markdown,
+                        page_post_markdown: a.page_post_markdown || prev.page_post_markdown,
+                        personal_post_markdown: a.personal_post_markdown || prev.personal_post_markdown,
+                        social_extras_markdown: a.social_extras_markdown || prev.social_extras_markdown,
                         primary_system: a.primary_system || prev.primary_system,
                         systems: a.secondary_systems ? (typeof a.secondary_systems === 'string' ? a.secondary_systems.split(',') : a.secondary_systems) : prev.systems,
                         narrative_status: a.narrative_status || prev.narrative_status,
@@ -693,8 +704,8 @@ export default function ArticleStudioClient() {
                 </aside>
 
                 {/* 2. Main Workspace */}
-                <main className={`flex flex-col min-w-0 ${viewMode === 'advanced' ? 'lg:col-span-1' : ''}`}>
-                    <section className="flex flex-col min-h-[960px] min-w-0 rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-visible">
+                <main className={`flex flex-col min-w-0 h-full ${viewMode === 'advanced' ? 'lg:col-span-1' : ''}`}>
+                    <section className="flex flex-col h-full min-w-0 rounded-[24px] border border-theme-border bg-theme-card shadow-theme-soft overflow-visible">
                         {/* Editor Header */}
                         <div className="px-6 py-3 border-b border-theme-border/50 flex flex-col gap-3 bg-theme-card">
                             {viewMode === 'guided' ? (
@@ -846,7 +857,7 @@ export default function ArticleStudioClient() {
                         </div>
 
                         {/* Textarea Area */}
-                        <div className="flex-1 min-w-0 bg-theme-input/5">
+                        <div className="flex-1 relative min-w-0 bg-theme-input/5">
                             {viewMode === 'guided' && activeStep === 'outline_web_article' ? (
                                     <div className="p-6 lg:p-8 space-y-12">
                                         <div className="space-y-3">
@@ -902,6 +913,66 @@ export default function ArticleStudioClient() {
                                         />
                                     </div>
                                 </div>
+                            ) : viewMode === 'guided' && activeStep === 'script_caption' ? (
+                                <div className="p-6 lg:p-8 space-y-8">
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                        {/* Facebook Group Post */}
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                                Facebook Group Post
+                                            </label>
+                                            <textarea
+                                                value={topicContext.group_post_markdown}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, group_post_markdown: e.target.value }))}
+                                                className="w-full min-h-[420px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 resize-y overflow-y-auto custom-scrollbar shadow-sm"
+                                                placeholder="เขียนโพสต์สำหรับกลุ่ม FB — เนื้อหาเชิงความรู้ยาวขึ้น..."
+                                            />
+                                        </div>
+                                        {/* Facebook Page Post */}
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                                Facebook Page Post
+                                            </label>
+                                            <textarea
+                                                value={topicContext.page_post_markdown}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, page_post_markdown: e.target.value }))}
+                                                className="w-full min-h-[320px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 resize-y overflow-y-auto custom-scrollbar shadow-sm"
+                                                placeholder="เขียนโพสต์สำหรับเพจ — สั้น กระชับ เสียงแบรนด์..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                        {/* Personal Post */}
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                                Personal Post
+                                            </label>
+                                            <textarea
+                                                value={topicContext.personal_post_markdown}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, personal_post_markdown: e.target.value }))}
+                                                className="w-full min-h-[280px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 resize-y overflow-y-auto custom-scrollbar shadow-sm"
+                                                placeholder="เขียนโพสต์ส่วนตัว — เสียงมนุษย์ มุมมองผู้ก่อตั้ง..."
+                                            />
+                                        </div>
+                                        {/* Social Extras */}
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                                Social Extras
+                                            </label>
+                                            <textarea
+                                                value={topicContext.social_extras_markdown}
+                                                onChange={(e) => setTopicContext(prev => ({ ...prev, social_extras_markdown: e.target.value }))}
+                                                className="w-full min-h-[280px] p-6 font-mono text-[14px] leading-[1.8] text-theme-primary bg-theme-card border border-theme-border rounded-2xl outline-none focus:ring-2 focus:ring-amber-500/10 resize-y overflow-y-auto custom-scrollbar shadow-sm"
+                                                placeholder="## Hook Options\n1. ...\n\n## Hashtags\n#GreenFineness #ดินมีชีวิต"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             ) : (
                                 <textarea
                                     value={viewMode === 'guided' ? (stepContents[activeStep] || "") : rawInput}
@@ -920,7 +991,7 @@ export default function ArticleStudioClient() {
                             )}
                         </div>
                         {/* Action Bar */}
-                        <div className="sticky bottom-0 p-6 bg-theme-card border-t border-theme-border/50 z-20 flex-none rounded-b-[24px]">
+                        <div className="mt-auto sticky bottom-0 p-6 bg-theme-card border-t border-theme-border/50 z-20 flex-none rounded-b-[24px]">
                             {error && (
                                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-bold text-red-600 flex items-center gap-2">
                                     <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />

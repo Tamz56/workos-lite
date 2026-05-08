@@ -42,6 +42,10 @@ export type ArticleStudioContentHealth = {
     references: "ready" | "missing";
     body: "ready" | "missing";
     internalLinks: "ready" | "missing";
+    groupPost: "ready" | "missing";
+    pagePost: "ready" | "missing";
+    personalPost: "ready" | "missing";
+    socialExtras: "ready" | "missing";
 };
 
 export type ArticleStudioPackage = {
@@ -75,6 +79,10 @@ export type ArticleStudioPackage = {
     read_more_markdown: string;
     faq_markdown: string;
     references_markdown: string;
+    group_post_markdown: string;
+    page_post_markdown: string;
+    personal_post_markdown: string;
+    social_extras_markdown: string;
     group_post: string;
     page_post: string;
     visual_brief: string;
@@ -143,6 +151,10 @@ const EMPTY_PACKAGE: ArticleStudioPackage = {
     read_more_markdown: "",
     faq_markdown: "",
     references_markdown: "",
+    group_post_markdown: "",
+    page_post_markdown: "",
+    personal_post_markdown: "",
+    social_extras_markdown: "",
     group_post: "",
     page_post: "",
     visual_brief: "",
@@ -191,6 +203,10 @@ const FIELD_ALIASES: Record<keyof ArticleStudioPackage, string[]> = {
     read_more_markdown: ["read_more_markdown", "read more markdown", "read more", "internal links"],
     faq_markdown: ["faq_markdown", "faq markdown", "faq"],
     references_markdown: ["references_markdown", "references markdown", "reference section"],
+    group_post_markdown: ["group_post_markdown", "group post markdown", "facebook group post"],
+    page_post_markdown: ["page_post_markdown", "page post markdown", "facebook page post"],
+    personal_post_markdown: ["personal_post_markdown", "personal post markdown", "personal post"],
+    social_extras_markdown: ["social_extras_markdown", "social extras markdown", "social extras"],
     group_post: ["group_post", "group post"],
     page_post: ["page_post", "page post"],
     visual_brief: ["visual_brief", "visual brief"],
@@ -729,9 +745,15 @@ export function resolveArticleStudioMissingGroups(pkg: ArticleStudioPackage): Ar
     if (!pkg.season_id) recommended.push({ field: "season_id", label: "season_id", state: "warning" });
     if (!pkg.episode_id) recommended.push({ field: "episode_id", label: "episode_id", state: "warning" });
     if (!pkg.article_status || pkg.article_status === "idea") recommended.push({ field: "article_status", label: "article_status", state: "warning" });
+    
+    // Social Copy (Step 5) — recommended, not blocking
+    if (!pkg.group_post_markdown && !pkg.group_post) recommended.push({ field: "group_post_markdown", label: "Group Post", state: "warning" });
+    if (!pkg.page_post_markdown && !pkg.page_post) recommended.push({ field: "page_post_markdown", label: "Page Post", state: "warning" });
 
     // Required for Publish / SEO (Optional/Later)
     if (!pkg.published_url) optional.push({ field: "published_url", label: "final_url", state: "info" });
+    if (!pkg.personal_post_markdown) optional.push({ field: "personal_post_markdown", label: "Personal Post", state: "info" });
+    if (!pkg.social_extras_markdown) optional.push({ field: "social_extras_markdown", label: "Social Extras", state: "info" });
     if (!pkg.meta_description) optional.push({ field: "meta_description", label: "meta_description", state: "info" });
     if (pkg.keywords.length === 0) optional.push({ field: "keywords", label: "keywords", state: "info" });
     if (!pkg.visual_brief) optional.push({ field: "visual_brief", label: "visual_brief", state: "info" });
@@ -758,6 +780,10 @@ export function resolveArticleStudioContentHealth(pkg: ArticleStudioPackage): Ar
     const internalLinks = pkg.read_more_markdown || pkg.internal_links_related.length > 0 ? "ready" : "missing";
     const faq = pkg.faq_markdown || hasFaqContent(pkg) ? "ready" : "missing";
     const references = pkg.references_markdown || hasReferencesContent(pkg) ? "ready" : "missing";
+    const groupPost = pkg.group_post_markdown || pkg.group_post ? "ready" : "missing";
+    const pagePost = pkg.page_post_markdown || pkg.page_post ? "ready" : "missing";
+    const personalPost: "ready" | "missing" = pkg.personal_post_markdown ? "ready" : "missing";
+    const socialExtras: "ready" | "missing" = pkg.social_extras_markdown ? "ready" : "missing";
 
     const recommendedScore = [
         pkg.meta_description,
@@ -794,6 +820,10 @@ export function resolveArticleStudioContentHealth(pkg: ArticleStudioPackage): Ar
         references,
         body,
         internalLinks,
+        groupPost,
+        pagePost,
+        personalPost,
+        socialExtras,
     };
 }
 
@@ -1012,10 +1042,16 @@ ${pkg.visual_brief || "-"}
 
 ## Distribution
 ### Group Post
-${pkg.group_post || "-"}
-
+${pkg.group_post_markdown || pkg.group_post || "-"}
+ 
 ### Page Post
-${pkg.page_post || "-"}
+${pkg.page_post_markdown || pkg.page_post || "-"}
+
+### Personal Post
+${pkg.personal_post_markdown || "-"}
+
+### Social Extras
+${pkg.social_extras_markdown || "-"}
 `;
 }
 
@@ -1052,6 +1088,10 @@ export function buildPublishPackJson(pkg: ArticleStudioPackage) {
         },
         content: {
             article_markdown: pkg.article_markdown,
+            group_post_markdown: pkg.group_post_markdown,
+            page_post_markdown: pkg.page_post_markdown,
+            personal_post_markdown: pkg.personal_post_markdown,
+            social_extras_markdown: pkg.social_extras_markdown,
             group_post: pkg.group_post,
             page_post: pkg.page_post,
             visual_brief: pkg.visual_brief,

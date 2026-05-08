@@ -17,6 +17,7 @@ const ALLOWED_FIELDS = new Set([
     "next_action", "notes", "priority",
     "primary_system", "secondary_systems",
     "body_markdown", "read_more_markdown", "faq_markdown", "references_markdown", "article_markdown",
+    "group_post_markdown", "page_post_markdown", "personal_post_markdown", "social_extras_markdown",
 ]);
 
 export async function GET(
