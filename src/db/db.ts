@@ -992,7 +992,13 @@ function ensureArborWritingLab() {
         { name: 'episode_role', type: 'TEXT' },
         { name: 'journey_stage', type: 'TEXT' },
         { name: 'summary', type: 'TEXT' },
-        { name: 'notes', type: 'TEXT' }
+        { name: 'notes', type: 'TEXT' },
+        { name: 'meta_title', type: 'TEXT' },
+        { name: 'meta_description', type: 'TEXT' },
+        { name: 'keywords', type: 'TEXT' },
+        { name: 'excerpt', type: 'TEXT' },
+        { name: 'internal_links_notes', type: 'TEXT' },
+        { name: 'references_notes', type: 'TEXT' }
     ];
 
     for (const col of additiveProjectCols) {

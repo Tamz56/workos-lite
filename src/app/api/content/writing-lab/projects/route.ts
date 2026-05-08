@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db/db";
 import crypto from "crypto";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const projects = db.prepare(`
@@ -38,6 +40,12 @@ export async function POST(req: Request) {
       status,
       summary,
       notes,
+      meta_title,
+      meta_description,
+      keywords,
+      excerpt,
+      internal_links_notes,
+      references_notes,
       attached_to
     } = body;
 
@@ -45,9 +53,11 @@ export async function POST(req: Request) {
       INSERT INTO gf_writing_projects (
         id, topic_id, title, slug, story_set_id, episode_id, 
         writing_mode, episode_role, journey_stage, status, 
-        summary, notes, attached_to, created_at, updated_at
+        summary, notes, meta_title, meta_description, keywords,
+        excerpt, internal_links_notes, references_notes,
+        attached_to, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `).run(
       id, 
       topic_id || null, 
@@ -61,6 +71,12 @@ export async function POST(req: Request) {
       status || 'draft',
       summary || null,
       notes || null,
+      meta_title || null,
+      meta_description || null,
+      keywords || null,
+      excerpt || null,
+      internal_links_notes || null,
+      references_notes || null,
       attached_to || null
     );
 

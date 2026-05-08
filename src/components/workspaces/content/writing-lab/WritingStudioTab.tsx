@@ -17,7 +17,8 @@ import {
     AlertCircle,
     Loader2,
     FileText,
-    List
+    List,
+    Globe
 } from "lucide-react";
 import { WritingProject, WritingBlock } from "@/lib/types/writing-lab";
 
@@ -26,13 +27,15 @@ interface WritingStudioTabProps {
     projects: WritingProject[];
     onCreateProject: () => void;
     onSelectProject: (id: string) => void;
+    onRefresh: () => void;
 }
 
 export default function WritingStudioTab({ 
     projectId, 
     projects, 
     onCreateProject,
-    onSelectProject 
+    onSelectProject,
+    onRefresh
 }: WritingStudioTabProps) {
     const activeProject = projects.find(p => p.id === projectId);
     const [blocks, setBlocks] = useState<WritingBlock[]>([]);
@@ -41,6 +44,55 @@ export default function WritingStudioTab({
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
     const [copyStatus, setCopyStatus] = useState<string | null>(null);
+    const [websiteFields, setWebsiteFields] = useState({
+        slug: "",
+        meta_title: "",
+        meta_description: "",
+        keywords: "",
+        excerpt: "",
+        internal_links_notes: "",
+        references_notes: ""
+    });
+
+    useEffect(() => {
+        if (activeProject) {
+            setWebsiteFields({
+                slug: activeProject.slug || "",
+                meta_title: activeProject.meta_title || "",
+                meta_description: activeProject.meta_description || "",
+                keywords: activeProject.keywords || "",
+                excerpt: activeProject.excerpt || "",
+                internal_links_notes: activeProject.internal_links_notes || "",
+                references_notes: activeProject.references_notes || ""
+            });
+        }
+    }, [activeProject]);
+
+    const handleSaveFields = async () => {
+        if (!projectId) return;
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/content/writing-lab/projects/${projectId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(websiteFields),
+            });
+            console.log(`Save fields response: ${res.status}`);
+            if (res.ok) {
+                setLastSaved(new Date());
+                onRefresh();
+            } else {
+                const errorData = await res.json();
+                console.error("Save failed:", errorData);
+                alert(`Failed to save fields: ${errorData.error || res.statusText}`);
+            }
+        } catch (error) {
+            console.error("Failed to save fields", error);
+            alert("Failed to save fields. check console.");
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const fetchBlocks = useCallback(async () => {
         if (!projectId) return;
@@ -111,7 +163,7 @@ export default function WritingStudioTab({
             .join("\n\n");
     };
 
-    const handleCopy = (type: 'markdown' | 'workos' | 'draft' | 'outline') => {
+    const handleCopy = (type: 'markdown' | 'workos' | 'draft' | 'outline' | 'website') => {
         if (!activeProject) return;
 
         let content = "";
@@ -132,6 +184,11 @@ export default function WritingStudioTab({
                           `Episode: ${activeProject.episode_id || "—"}\n` +
                           `Status: ${activeProject.status}\n\n` +
                           `---\n\n` +
+                          `## Website Fields\n\n` +
+                          `Meta Title: ${websiteFields.meta_title || "—"}\n` +
+                          `Meta Description: ${websiteFields.meta_description || "—"}\n` +
+                          `Excerpt: ${websiteFields.excerpt || "—"}\n\n` +
+                          `---\n\n` +
                           `## Writing Blocks\n\n` +
                           getMarkdownBlocks();
                 feedback = "Copied WorkOS Note";
@@ -144,6 +201,22 @@ export default function WritingStudioTab({
                 content = `# Outline — ${activeProject.title}\n\n` +
                           blocks.map((b, i) => `${i + 1}. ${b.label}`).join("\n");
                 feedback = "Copied Outline";
+                break;
+            case 'website':
+                content = `# ${activeProject.title}\n\n` +
+                          `## Website Fields\n\n` +
+                          `Meta Title:\n${websiteFields.meta_title || "—"}\n\n` +
+                          `Meta Description:\n${websiteFields.meta_description || "—"}\n\n` +
+                          `Keywords:\n${websiteFields.keywords || "—"}\n\n` +
+                          `Slug:\n${websiteFields.slug || "—"}\n\n` +
+                          `Excerpt:\n${websiteFields.excerpt || "—"}\n\n` +
+                          `## Internal Links Notes\n\n` +
+                          `${websiteFields.internal_links_notes || "—"}\n\n` +
+                          `## Body Markdown\n\n` +
+                          getMarkdownBlocks(true) + `\n\n` +
+                          `## References Notes\n\n` +
+                          `${websiteFields.references_notes || "—"}`;
+                feedback = "Copied Website Draft Pack";
                 break;
         }
 
@@ -245,6 +318,93 @@ export default function WritingStudioTab({
                         )}
                     </div>
                 </div>
+
+                {activeProject && (
+                    <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Globe className="w-4 h-4 text-amber-600" />
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Website Fields</h4>
+                            </div>
+                            <button 
+                                onClick={handleSaveFields}
+                                disabled={saving}
+                                className="p-1.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-all disabled:opacity-30"
+                                title="Save Website Fields"
+                            >
+                                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                            </button>
+                        </div>
+                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar-small">
+                            <div>
+                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">URL Slug</label>
+                                <input 
+                                    type="text"
+                                    value={websiteFields.slug}
+                                    onChange={(e) => setWebsiteFields({...websiteFields, slug: e.target.value})}
+                                    placeholder="article-slug-here..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Meta Title</label>
+                                <input 
+                                    type="text"
+                                    value={websiteFields.meta_title}
+                                    onChange={(e) => setWebsiteFields({...websiteFields, meta_title: e.target.value})}
+                                    placeholder="SEO Title..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Meta Description</label>
+                                <textarea 
+                                    value={websiteFields.meta_description}
+                                    onChange={(e) => setWebsiteFields({...websiteFields, meta_description: e.target.value})}
+                                    placeholder="SEO Description..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Keywords</label>
+                                <input 
+                                    type="text"
+                                    value={websiteFields.keywords}
+                                    onChange={(e) => setWebsiteFields({...websiteFields, keywords: e.target.value})}
+                                    placeholder="Keywords separated by comma..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Excerpt</label>
+                                <textarea 
+                                    value={websiteFields.excerpt}
+                                    onChange={(e) => setWebsiteFields({...websiteFields, excerpt: e.target.value})}
+                                    placeholder="Brief summary for list view..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Internal Links Notes</label>
+                                <textarea 
+                                    value={websiteFields.internal_links_notes}
+                                    onChange={(e) => setWebsiteFields({...websiteFields, internal_links_notes: e.target.value})}
+                                    placeholder="Links to include..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">References Notes</label>
+                                <textarea 
+                                    value={websiteFields.references_notes}
+                                    onChange={(e) => setWebsiteFields({...websiteFields, references_notes: e.target.value})}
+                                    placeholder="Sources and citations..."
+                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Center Column: Wide Writing Area */}
@@ -320,6 +480,13 @@ export default function WritingStudioTab({
                                             className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
                                         >
                                             <Type className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleCopy('website')}
+                                            title="Copy Website Draft Pack"
+                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                        >
+                                            <Globe className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => handleCopy('outline')}

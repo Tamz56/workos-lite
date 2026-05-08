@@ -78,6 +78,12 @@ export interface WritingProject {
   narrative_status: string | null;
   summary: string | null;
   notes: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  keywords: string | null;
+  excerpt: string | null;
+  internal_links_notes: string | null;
+  references_notes: string | null;
   attached_to: string | null;
   created_at: string;
   updated_at: string;

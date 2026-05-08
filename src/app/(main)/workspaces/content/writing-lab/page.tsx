@@ -34,8 +34,8 @@ export default function WritingLabPage() {
         setLoading(true);
         try {
             const [ssRes, pRes] = await Promise.all([
-                fetch("/api/content/writing-lab/story-sets"),
-                fetch("/api/content/writing-lab/projects")
+                fetch("/api/content/writing-lab/story-sets", { cache: 'no-store' }),
+                fetch("/api/content/writing-lab/projects", { cache: 'no-store' })
             ]);
             
             if (ssRes.ok) setStorySets(await ssRes.json());
@@ -154,6 +154,7 @@ export default function WritingLabPage() {
                         projects={projects} 
                         onCreateProject={() => handleOpenCreateProject()}
                         onSelectProject={setSelectedProjectId}
+                        onRefresh={fetchData}
                     />
                 )}
             </div>
