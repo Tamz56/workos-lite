@@ -113,7 +113,7 @@ export default function WritingStudioTab({
                         <select 
                             value={projectId || ""}
                             onChange={(e) => onSelectProject(e.target.value)}
-                            className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm font-bold text-neutral-900 appearance-none outline-none focus:ring-2 focus:ring-black/5"
+                            className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm font-bold text-neutral-900 appearance-none outline-none focus:ring-2 focus:ring-black/5 transition-all"
                         >
                             <option value="">Select Project...</option>
                             {projects.map(p => (
@@ -158,7 +158,7 @@ export default function WritingStudioTab({
                     </div>
                 </div>
 
-                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm flex-1">
+                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm flex-1 min-h-[200px]">
                     <div className="flex items-center gap-2 mb-4">
                         <Layout className="w-4 h-4 text-blue-600" />
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Structure</h4>
@@ -168,15 +168,15 @@ export default function WritingStudioTab({
                             <div className="space-y-3">
                                 <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
                                     <div className="text-[10px] font-black text-neutral-400 uppercase tracking-tight mb-1">Summary</div>
-                                    <p className="text-xs text-neutral-600 leading-relaxed">{activeProject.summary || "No summary provided."}</p>
+                                    <p className="text-xs text-neutral-600 leading-relaxed line-clamp-4 hover:line-clamp-none transition-all cursor-help">{activeProject.summary || "No summary provided."}</p>
                                 </div>
                                 
                                 {blocks.length > 0 && (
                                     <div className="mt-4">
-                                        <div className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">Blocks Layout</div>
+                                        <div className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">Blocks Outline</div>
                                         <div className="space-y-1">
                                             {blocks.map((b, i) => (
-                                                <div key={b.id} className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 py-1.5 px-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                                                <div key={b.id} className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 py-1.5 px-3 bg-neutral-50 rounded-lg border border-neutral-100 hover:border-neutral-200 transition-colors">
                                                     <span className="text-neutral-300 w-3">{i + 1}</span>
                                                     <span className="truncate">{b.label}</span>
                                                 </div>
@@ -194,22 +194,40 @@ export default function WritingStudioTab({
                 </div>
             </div>
 
-            {/* Center Column: Writing Area */}
-            <div className="col-span-6 flex flex-col gap-6">
+            {/* Center Column: Wide Writing Area */}
+            <div className="col-span-9 flex flex-col gap-6">
                 {activeProject ? (
                     <div className="bg-white border border-neutral-200 rounded-[40px] shadow-sm flex-1 flex flex-col overflow-hidden">
                         {/* Writing Header */}
                         <div className="px-10 py-8 border-b border-neutral-100 flex items-center justify-between bg-white sticky top-0 z-10">
                             <div>
                                 <h2 className="text-2xl font-black text-neutral-900 leading-none">{activeProject.title}</h2>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">{activeProject.id}</span>
-                                    <span className="w-1 h-1 bg-neutral-200 rounded-full" />
-                                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">{activeProject.status}</span>
+                                <div className="flex items-center gap-3 mt-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">{activeProject.id}</span>
+                                        <span className="w-1 h-1 bg-neutral-200 rounded-full" />
+                                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">{activeProject.status}</span>
+                                    </div>
+                                    <span className="w-px h-3 bg-neutral-100" />
+                                    {/* Compact Placeholder Toolbar */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 rounded-md">
+                                            <Zap className="w-2.5 h-2.5 text-amber-500" />
+                                            <span className="text-[8px] font-black text-amber-700 uppercase">AI Disabled</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-neutral-50 rounded-md">
+                                            <Settings className="w-2.5 h-2.5 text-neutral-400" />
+                                            <span className="text-[8px] font-black text-neutral-500 uppercase">Tone Placeholder</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-neutral-50 rounded-md">
+                                            <Share2 className="w-2.5 h-2.5 text-neutral-400" />
+                                            <span className="text-[8px] font-black text-neutral-500 uppercase">Export Locked</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-4">
                                 {lastSaved && (
                                     <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
                                         <CheckCircle className="w-3 h-3" />
@@ -219,133 +237,103 @@ export default function WritingStudioTab({
                                 <button 
                                     onClick={handleSave}
                                     disabled={saving || blocks.length === 0}
-                                    className="flex items-center gap-2 px-6 py-2.5 bg-black text-white rounded-xl text-xs font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-2 px-8 py-3 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
                                 >
-                                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                     {saving ? "Saving..." : "Save Content"}
                                 </button>
                             </div>
                         </div>
 
                         {/* Blocks Area */}
-                        <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-12 custom-scrollbar bg-neutral-50/30">
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center h-full text-neutral-300">
                                     <RefreshCw className="w-8 h-8 animate-spin mb-4" />
                                     <p className="text-sm font-bold uppercase tracking-widest">Loading Blocks...</p>
                                 </div>
                             ) : blocks.length > 0 ? (
-                                <div className="max-w-3xl mx-auto space-y-12">
+                                <div className="max-w-4xl mx-auto space-y-16">
                                     {blocks.map((block) => (
-                                        <div key={block.id} className="group">
-                                            <div className="flex items-center justify-between mb-3 px-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-black text-neutral-300 uppercase tracking-tight group-hover:text-neutral-400 transition-colors">#{block.sort_order + 1}</span>
-                                                    <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500">{block.label}</label>
+                                        <div key={block.id} className="group relative">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-8 h-8 flex items-center justify-center bg-white border border-neutral-100 rounded-lg text-[10px] font-black text-neutral-300 uppercase tracking-tight group-hover:text-neutral-900 group-hover:border-neutral-200 transition-all shadow-sm">
+                                                        {block.sort_order + 1}
+                                                    </span>
+                                                    <div>
+                                                        <label className="text-[11px] font-black uppercase tracking-[0.15em] text-neutral-400 group-focus-within:text-neutral-900 transition-colors">
+                                                            {block.label}
+                                                        </label>
+                                                        {block.placeholder && (
+                                                            <p className="text-[8px] font-bold text-neutral-300 uppercase tracking-wider mt-0.5">
+                                                                {block.placeholder.length > 40 ? block.placeholder.substring(0, 40) + '...' : block.placeholder}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <textarea 
-                                                value={block.content_md}
-                                                onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                                                placeholder={block.placeholder || "Start writing here..."}
-                                                className="w-full min-h-[120px] bg-transparent text-lg text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none resize-none border-l-2 border-transparent focus:border-neutral-100 pl-4 transition-all"
-                                                style={{ height: 'auto', minHeight: '120px' }}
-                                                onInput={(e) => {
-                                                    const target = e.target as HTMLTextAreaElement;
-                                                    target.style.height = 'auto';
-                                                    target.style.height = target.scrollHeight + 'px';
-                                                }}
-                                            />
+                                            <div className="relative">
+                                                <textarea 
+                                                    value={block.content_md}
+                                                    onChange={(e) => updateBlockContent(block.id, e.target.value)}
+                                                    placeholder={block.placeholder || "Start writing here..."}
+                                                    className="w-full bg-white border border-neutral-100 rounded-2xl p-6 text-lg text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none resize-none focus:ring-4 focus:ring-black/5 focus:border-neutral-200 transition-all shadow-sm group-hover:shadow-md"
+                                                    style={{ height: 'auto', minHeight: '160px' }}
+                                                    onInput={(e) => {
+                                                        const target = e.target as HTMLTextAreaElement;
+                                                        target.style.height = 'auto';
+                                                        target.style.height = target.scrollHeight + 'px';
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
                                     ))}
                                     
-                                    <div className="pt-20 pb-10 text-center">
-                                        <div className="w-10 h-1 bg-neutral-100 mx-auto rounded-full mb-6" />
-                                        <p className="text-[10px] font-black text-neutral-300 uppercase tracking-[0.2em]">End of Document</p>
+                                    <div className="pt-24 pb-12 text-center">
+                                        <div className="w-12 h-1 bg-neutral-200 mx-auto rounded-full mb-8" />
+                                        <p className="text-[10px] font-black text-neutral-300 uppercase tracking-[0.3em]">End of Narrative Structure</p>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center">
-                                    <div className="w-20 h-20 bg-neutral-50 rounded-full flex items-center justify-center mb-6">
-                                        <Layout className="w-8 h-8 text-neutral-200" />
+                                <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
+                                    <div className="w-24 h-24 bg-white border border-neutral-100 rounded-[32px] flex items-center justify-center mb-8 shadow-sm">
+                                        <Layout className="w-10 h-10 text-neutral-200" />
                                     </div>
-                                    <h3 className="text-xl font-black text-neutral-900 mb-2">No blocks initialized</h3>
-                                    <p className="text-sm text-neutral-400 max-w-xs mx-auto mb-8 leading-relaxed">
+                                    <h3 className="text-2xl font-black text-neutral-900 mb-3">No blocks initialized</h3>
+                                    <p className="text-sm text-neutral-400 max-w-sm mx-auto mb-10 leading-relaxed">
                                         This project needs a writing structure. Click below to initialize blocks for 
-                                        <span className="text-black font-bold mx-1 uppercase">{activeProject.writing_mode.replace(/_/g, ' ')}</span>.
+                                        <span className="text-black font-bold mx-2 uppercase border-b-2 border-amber-400">{activeProject.writing_mode.replace(/_/g, ' ')}</span>.
                                     </p>
                                     <button 
                                         onClick={handleInitialize}
-                                        className="px-8 py-3 bg-neutral-900 text-white rounded-2xl text-sm font-black hover:bg-black transition-all shadow-lg flex items-center gap-2"
+                                        className="px-10 py-4 bg-neutral-900 text-white rounded-2xl text-sm font-black hover:bg-black transition-all shadow-xl hover:shadow-black/20 flex items-center gap-3 transform hover:-translate-y-1"
                                     >
-                                        <Zap className="w-4 h-4 text-amber-400" />
-                                        Initialize Blocks
+                                        <Zap className="w-5 h-5 text-amber-400" />
+                                        Initialize Narrative Blocks
                                     </button>
                                 </div>
                             )}
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-white border border-neutral-200 rounded-[40px] p-10 shadow-sm flex-1 flex flex-col items-center justify-center text-center">
-                        <div className="w-20 h-20 bg-neutral-50 rounded-full flex items-center justify-center mb-6">
-                            <PenTool className="w-8 h-8 text-neutral-300" />
+                    <div className="bg-white border border-neutral-200 rounded-[40px] p-16 shadow-sm flex-1 flex flex-col items-center justify-center text-center">
+                        <div className="w-28 h-28 bg-neutral-50 rounded-[40px] flex items-center justify-center mb-8">
+                            <PenTool className="w-12 h-12 text-neutral-300" />
                         </div>
-                        <h2 className="text-2xl font-black text-neutral-900 mb-2">Writing Studio</h2>
-                        <p className="text-sm text-neutral-400 max-w-xs mx-auto leading-relaxed">
-                            This is where your story comes to life. Select a project to start writing.
+                        <h2 className="text-3xl font-black text-neutral-900 mb-3">Writing Studio</h2>
+                        <p className="text-base text-neutral-400 max-w-sm mx-auto leading-relaxed">
+                            Every great story starts with a single word. Select a project to begin your journey.
                         </p>
                         <button 
                             onClick={onCreateProject}
-                            className="mt-8 px-8 py-3 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 flex items-center gap-2"
+                            className="mt-10 px-10 py-4 bg-black text-white rounded-[24px] text-sm font-black hover:bg-neutral-800 transition-all shadow-xl shadow-black/10 flex items-center gap-3 transform hover:-translate-y-1"
                         >
-                            <Plus className="w-4 h-4" />
-                            Start New Project
+                            <Plus className="w-5 h-5" />
+                            Create Your First Project
                         </button>
                     </div>
                 )}
-            </div>
-
-            {/* Right Column: Intelligence & Settings */}
-            <div className="col-span-3 flex flex-col gap-6 overflow-y-auto pl-2 custom-scrollbar pb-10">
-                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Zap className="w-4 h-4 text-amber-500" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Arbor Intelligence</h4>
-                    </div>
-                    <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100/50">
-                        <p className="text-xs text-amber-700 font-medium leading-relaxed">
-                            AI Writing Generation is currently disabled. Focus on your human-led narrative structure.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Settings className="w-4 h-4 text-neutral-400" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Settings</h4>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-neutral-500 uppercase">Voice & Tone</span>
-                            <span className="text-[10px] font-bold text-neutral-300 uppercase italic">Coming Soon</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-neutral-500 uppercase">Guardrails</span>
-                            <span className="text-[10px] font-bold text-neutral-300 uppercase italic">Coming Soon</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Share2 className="w-4 h-4 text-neutral-400" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Export</h4>
-                    </div>
-                    <button disabled className="w-full py-2.5 bg-neutral-100 text-neutral-400 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed flex items-center justify-center gap-2">
-                        <AlertCircle className="w-3 h-3" />
-                        Export Disabled
-                    </button>
-                </div>
             </div>
         </div>
     );
