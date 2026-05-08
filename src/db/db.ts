@@ -821,7 +821,11 @@ function ensureGreenFinenessModel() {
         { name: 'body_markdown', type: 'TEXT' },
         { name: 'read_more_markdown', type: 'TEXT' },
         { name: 'faq_markdown', type: 'TEXT' },
-        { name: 'references_markdown', type: 'TEXT' }
+        { name: 'references_markdown', type: 'TEXT' },
+        { name: 'group_post_markdown', type: 'TEXT' },
+        { name: 'page_post_markdown', type: 'TEXT' },
+        { name: 'personal_post_markdown', type: 'TEXT' },
+        { name: 'social_extras_markdown', type: 'TEXT' }
     ];
 
     for (const col of additiveCols) {
@@ -877,10 +881,98 @@ export function seedGreenFinenessSeason1() {
     tx();
 }
 
+function ensureArborWritingLab() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS gf_story_sets (
+          id           TEXT PRIMARY KEY,
+          title        TEXT NOT NULL,
+          description  TEXT NULL,
+          status       TEXT NOT NULL DEFAULT 'active',
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS gf_episodes (
+          id            TEXT PRIMARY KEY,
+          story_set_id  TEXT NOT NULL,
+          title         TEXT NOT NULL,
+          role          TEXT NOT NULL CHECK (role IN ('core_episode', 'supporting_article', 'bridge_article', 'practical_guide', 'journal_note', 'social_only_piece')),
+          status        TEXT NOT NULL DEFAULT 'planned',
+          created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS gf_writing_projects (
+          id                TEXT PRIMARY KEY,
+          title             TEXT NOT NULL,
+          story_set_id      TEXT NULL,
+          episode_id        TEXT NULL,
+          writing_mode      TEXT NOT NULL CHECK (writing_mode IN ('knowledge_article', 'knowledge_journey_article', 'documentary_chapter', 'writers_journal', 'social_story_copy')),
+          status            TEXT NOT NULL DEFAULT 'draft',
+          narrative_status  TEXT NULL,
+          attached_to       TEXT NULL,
+          created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE SET NULL,
+          FOREIGN KEY(episode_id) REFERENCES gf_episodes(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS gf_writing_blocks (
+          id          TEXT PRIMARY KEY,
+          project_id  TEXT NOT NULL,
+          type        TEXT NOT NULL DEFAULT 'text',
+          content     TEXT NOT NULL DEFAULT '',
+          sort_order  INTEGER NOT NULL DEFAULT 0,
+          created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(project_id) REFERENCES gf_writing_projects(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS gf_article_relationships (
+          id                TEXT PRIMARY KEY,
+          source_id         TEXT NOT NULL,
+          target_id         TEXT NOT NULL,
+          relationship_type TEXT NOT NULL CHECK (relationship_type IN ('bridge_from', 'bridge_to', 'related', 'prerequisite', 'next_step', 'supports', 'expands', 'same_story_set')),
+          created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(source_id) REFERENCES gf_episodes(id) ON DELETE CASCADE,
+          FOREIGN KEY(target_id) REFERENCES gf_episodes(id) ON DELETE CASCADE
+        );
+    `);
+}
+
+export function seedArborWritingLab() {
+    const storySets = [
+        { id: "STORY-SET-01", title: "ชีวิตของพืชหนึ่งต้น", description: "The core journey of a single plant from seed to seed." },
+        { id: "STORY-SET-02", title: "โลกใต้พื้นดิน", description: "Exploring the hidden complexity beneath the soil surface." },
+        { id: "STORY-SET-03", title: "ธาตุอาหารพืช", description: "Understanding essential nutrients and their roles in plant life." },
+        { id: "STORY-SET-04", title: "จุลินทรีย์และไรโซสเฟียร์", description: "The intricate relationship between microbes and plant roots." },
+        { id: "STORY-SET-05", title: "การดูแลพืชอย่างเข้าใจ", description: "Practical guide to plant care based on scientific understanding." }
+    ];
+
+    const stmt = db.prepare(`
+        INSERT INTO gf_story_sets (id, title, description, status)
+        VALUES (?, ?, ?, 'active')
+        ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            description = excluded.description,
+            updated_at = datetime('now')
+    `);
+
+    const tx = db.transaction(() => {
+        for (const ss of storySets) {
+            stmt.run(ss.id, ss.title, ss.description);
+        }
+    });
+    tx();
+}
+
 ensureNotes();
 ensureAppMeta();
 cleanupLegacyAvaDemoDataOnce();
 ensureGreenFinenessModel();
+ensureArborWritingLab();
+
 if (!shouldSkipSeed) {
     ensureSeedProjects();
 }
