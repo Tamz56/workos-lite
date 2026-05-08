@@ -13,7 +13,9 @@ import {
     ClockIcon,
     QueueListIcon,
     ChevronLeftIcon,
-    ChevronRightIcon
+    ChevronRightIcon,
+    DocumentTextIcon,
+    PencilSquareIcon
 } from "@heroicons/react/24/outline";
 
 const STORAGE_KEY = "workos.sidebar.collapsed";
@@ -142,6 +144,20 @@ export function Sidebar() {
                     label="GF Content Hub"
                     icon={<BriefcaseIcon className="w-5 h-5" />}
                     active={pathname.startsWith("/workspaces/content/gf-hub")}
+                    isCollapsed={isCollapsed}
+                />
+                <NavItem
+                    href="/workspaces/content/article-studio"
+                    label="Article Studio"
+                    icon={<DocumentTextIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/workspaces/content/article-studio")}
+                    isCollapsed={isCollapsed}
+                />
+                <NavItem
+                    href="/workspaces/content/writing-lab"
+                    label="Writing Lab"
+                    icon={<PencilSquareIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/workspaces/content/writing-lab")}
                     isCollapsed={isCollapsed}
                 />
             </nav>
