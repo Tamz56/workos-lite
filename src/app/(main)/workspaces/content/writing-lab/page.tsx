@@ -147,7 +147,7 @@ export default function WritingLabPage() {
                         onCreateProject={handleOpenCreateProject}
                     />
                 )}
-                {activeTab === "content-library" && <ContentLibraryTab projects={projects} loading={loading} onSelectProject={handleSelectProject} />}
+                {activeTab === "content-library" && <ContentLibraryTab projects={projects} loading={loading} onSelectProject={handleSelectProject} onRefresh={fetchData} />}
                 {activeTab === "writing-studio" && (
                     <WritingStudioTab 
                         projectId={selectedProjectId} 

@@ -55,3 +55,17 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: Request,
+  props: { params: Promise<{ id: string }> }
+) {
+  const { id } = await props.params;
+  try {
+    // Delete projects (cascade will handle blocks because of FK ON DELETE CASCADE)
+    db.prepare("DELETE FROM gf_writing_projects WHERE id = ?").run(id);
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
