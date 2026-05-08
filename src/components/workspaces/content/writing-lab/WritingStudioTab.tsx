@@ -37,6 +37,8 @@ export default function WritingStudioTab({
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+    const [copied, setCopied] = useState(false);
 
     const fetchBlocks = useCallback(async () => {
         if (!projectId) return;
@@ -97,6 +99,17 @@ export default function WritingStudioTab({
 
     const updateBlockContent = (id: string, content_md: string) => {
         setBlocks(prev => prev.map(b => b.id === id ? { ...b, content_md } : b));
+    };
+
+    const assembledMarkdown = blocks
+        .filter(b => b.content_md?.trim() !== "")
+        .map(b => `## ${b.label}\n\n${b.content_md}`)
+        .join("\n\n");
+
+    const handleCopyMarkdown = () => {
+        navigator.clipboard.writeText(assembledMarkdown);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     };
 
     return (
@@ -201,7 +214,24 @@ export default function WritingStudioTab({
                         {/* Writing Header */}
                         <div className="px-10 py-8 border-b border-neutral-100 flex items-center justify-between bg-white sticky top-0 z-10">
                             <div>
-                                <h2 className="text-2xl font-black text-neutral-900 leading-none">{activeProject.title}</h2>
+                                <div className="flex items-center gap-4 mb-1">
+                                    <h2 className="text-2xl font-black text-neutral-900 leading-none">{activeProject.title}</h2>
+                                    {/* View Mode Toggle */}
+                                    <div className="flex items-center bg-neutral-100 p-1 rounded-xl">
+                                        <button 
+                                            onClick={() => setViewMode('edit')}
+                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'edit' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button 
+                                            onClick={() => setViewMode('preview')}
+                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'preview' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                        >
+                                            Preview
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="flex items-center gap-3 mt-2">
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">{activeProject.id}</span>
@@ -228,29 +258,66 @@ export default function WritingStudioTab({
                             </div>
 
                             <div className="flex items-center gap-4">
-                                {lastSaved && (
+                                {viewMode === 'preview' && blocks.length > 0 && (
+                                    <button 
+                                        onClick={handleCopyMarkdown}
+                                        className={`flex items-center gap-2 px-6 py-3 border border-neutral-200 rounded-2xl text-xs font-black transition-all transform active:scale-95 ${copied ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white hover:bg-neutral-50 text-neutral-600'}`}
+                                    >
+                                        {copied ? <CheckCircle className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                                        {copied ? "Copied Markdown" : "Copy Markdown"}
+                                    </button>
+                                )}
+                                
+                                {lastSaved && viewMode === 'edit' && (
                                     <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
                                         <CheckCircle className="w-3 h-3" />
                                         Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                 )}
-                                <button 
-                                    onClick={handleSave}
-                                    disabled={saving || blocks.length === 0}
-                                    className="flex items-center gap-2 px-8 py-3 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
-                                >
-                                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                    {saving ? "Saving..." : "Save Content"}
-                                </button>
+                                
+                                {viewMode === 'edit' && (
+                                    <button 
+                                        onClick={handleSave}
+                                        disabled={saving || blocks.length === 0}
+                                        className="flex items-center gap-2 px-8 py-3 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
+                                    >
+                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                        {saving ? "Saving..." : "Save Content"}
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        {/* Blocks Area */}
+                        {/* Blocks Area / Preview Area */}
                         <div className="flex-1 overflow-y-auto p-12 custom-scrollbar bg-neutral-50/30">
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center h-full text-neutral-300">
                                     <RefreshCw className="w-8 h-8 animate-spin mb-4" />
                                     <p className="text-sm font-bold uppercase tracking-widest">Loading Blocks...</p>
+                                </div>
+                            ) : viewMode === 'preview' ? (
+                                <div className="max-w-4xl mx-auto py-8">
+                                    {blocks.length > 0 ? (
+                                        <div className="bg-white border border-neutral-100 rounded-3xl p-12 shadow-sm min-h-[500px]">
+                                            <div className="max-w-none">
+                                                {blocks.map((block) => (
+                                                    <div key={block.id} className="mb-12 last:mb-0">
+                                                        <h2 className="text-xl font-black text-neutral-900 border-b border-neutral-100 pb-3 mb-6 uppercase tracking-tight">
+                                                            {block.label}
+                                                        </h2>
+                                                        <div className="text-lg text-neutral-800 leading-relaxed whitespace-pre-wrap">
+                                                            {block.content_md || <span className="text-neutral-200 italic font-medium">No content for this section</span>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-20 bg-white border border-neutral-100 rounded-3xl shadow-sm">
+                                            <AlertCircle className="w-12 h-12 text-neutral-200 mx-auto mb-4" />
+                                            <p className="text-sm font-bold text-neutral-400 uppercase">No content to preview</p>
+                                        </div>
+                                    )}
                                 </div>
                             ) : blocks.length > 0 ? (
                                 <div className="max-w-4xl mx-auto space-y-16">
