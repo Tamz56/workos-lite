@@ -85,9 +85,11 @@ export interface WritingProject {
 
 export interface WritingBlock {
   id: string;
-  project_id: string;
-  type: string;
-  content: string;
+  writing_project_id: string;
+  block_type: string;
+  label: string | null;
+  placeholder: string | null;
+  content_md: string;
   sort_order: number;
   created_at: string;
   updated_at: string;

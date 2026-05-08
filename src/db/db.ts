@@ -932,14 +932,16 @@ function ensureArborWritingLab() {
         );
 
         CREATE TABLE IF NOT EXISTS gf_writing_blocks (
-          id          TEXT PRIMARY KEY,
-          project_id  TEXT NOT NULL,
-          type        TEXT NOT NULL DEFAULT 'text',
-          content     TEXT NOT NULL DEFAULT '',
-          sort_order  INTEGER NOT NULL DEFAULT 0,
-          created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-          updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY(project_id) REFERENCES gf_writing_projects(id) ON DELETE CASCADE
+          id                  TEXT PRIMARY KEY,
+          writing_project_id  TEXT NOT NULL,
+          block_type          TEXT NOT NULL DEFAULT 'text',
+          label               TEXT NULL,
+          placeholder         TEXT NULL,
+          content_md          TEXT NOT NULL DEFAULT '',
+          sort_order          INTEGER NOT NULL DEFAULT 0,
+          created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(writing_project_id) REFERENCES gf_writing_projects(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS gf_article_relationships (
@@ -1001,6 +1003,33 @@ function ensureArborWritingLab() {
             } catch (e: any) {
                 if (!e.message?.includes("duplicate column name")) {
                     console.error(`Migration error on project ${col.name}:`, e);
+                    throw e;
+                }
+            }
+        }
+    }
+
+    const blockCols = db.prepare("PRAGMA table_info(gf_writing_blocks)").all() as any[];
+    const blockColNames = blockCols.map(c => c.name);
+
+    const additiveBlockCols = [
+        { name: 'writing_project_id', type: 'TEXT' },
+        { name: 'block_type', type: 'TEXT' },
+        { name: 'label', type: 'TEXT' },
+        { name: 'placeholder', type: 'TEXT' },
+        { name: 'content_md', type: 'TEXT' }
+    ];
+
+    for (const col of additiveBlockCols) {
+        if (!blockColNames.includes(col.name)) {
+            try {
+                // If it's a critical NOT NULL column like writing_project_id, we might need a default or allow null for migration
+                // But since this is a new table in this branch, it's safer to just ADD it.
+                const sql = `ALTER TABLE gf_writing_blocks ADD COLUMN ${col.name} ${col.type}`;
+                db.exec(sql);
+            } catch (e: any) {
+                if (!e.message?.includes("duplicate column name")) {
+                    console.error(`Migration error on block ${col.name}:`, e);
                     throw e;
                 }
             }
