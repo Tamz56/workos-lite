@@ -893,14 +893,21 @@ function ensureArborWritingLab() {
         );
 
         CREATE TABLE IF NOT EXISTS gf_episodes (
-          id            TEXT PRIMARY KEY,
-          story_set_id  TEXT NOT NULL,
-          title         TEXT NOT NULL,
-          role          TEXT NOT NULL CHECK (role IN ('core_episode', 'supporting_article', 'bridge_article', 'practical_guide', 'journal_note', 'social_only_piece')),
-          status        TEXT NOT NULL DEFAULT 'planned',
-          created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-          updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE CASCADE
+          id                      TEXT PRIMARY KEY,
+          story_set_id            TEXT NOT NULL,
+          title                   TEXT NOT NULL,
+          slug                    TEXT NULL,
+          description             TEXT NULL,
+          role                    TEXT NOT NULL CHECK (role IN ('core_episode', 'supporting_article', 'bridge_article', 'practical_guide', 'journal_note', 'social_only_piece')),
+          journey_stage           TEXT NULL,
+          attached_to_episode_id  TEXT NULL,
+          sort_order              INTEGER NOT NULL DEFAULT 0,
+          narrative_status        TEXT NOT NULL DEFAULT 'unmapped',
+          status                  TEXT NOT NULL DEFAULT 'planned',
+          created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE CASCADE,
+          FOREIGN KEY(attached_to_episode_id) REFERENCES gf_episodes(id) ON DELETE SET NULL
         );
 
         CREATE TABLE IF NOT EXISTS gf_writing_projects (
@@ -939,6 +946,35 @@ function ensureArborWritingLab() {
           FOREIGN KEY(target_id) REFERENCES gf_episodes(id) ON DELETE CASCADE
         );
     `);
+
+    // Idempotent column additions for existing tables
+    const episodeCols = db.prepare("PRAGMA table_info(gf_episodes)").all() as any[];
+    const episodeColNames = episodeCols.map(c => c.name);
+
+    const additiveCols = [
+        { name: 'slug', type: 'TEXT' },
+        { name: 'description', type: 'TEXT' },
+        { name: 'journey_stage', type: 'TEXT' },
+        { name: 'attached_to_episode_id', type: 'TEXT' },
+        { name: 'sort_order', type: 'INTEGER', default: '0' },
+        { name: 'narrative_status', type: 'TEXT', default: "'unmapped'" }
+    ];
+
+    for (const col of additiveCols) {
+        if (!episodeColNames.includes(col.name)) {
+            try {
+                let sql = `ALTER TABLE gf_episodes ADD COLUMN ${col.name} ${col.type}`;
+                if (col.default) sql += ` DEFAULT ${col.default}`;
+                db.exec(sql);
+            } catch (e: any) {
+                // Ignore if column already exists (handles race conditions during build)
+                if (!e.message?.includes("duplicate column name")) {
+                    console.error(`Migration error on ${col.name}:`, e);
+                    throw e;
+                }
+            }
+        }
+    }
 }
 
 export function seedArborWritingLab() {

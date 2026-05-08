@@ -119,7 +119,7 @@ export default function WritingLabPage() {
 
             {/* Tab Content */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {activeTab === "story-map" && <StoryMapTab storySets={storySets} loading={loading} />}
+                {activeTab === "story-map" && <StoryMapTab storySets={storySets} loading={loading} onRefresh={fetchData} />}
                 {activeTab === "content-library" && <ContentLibraryTab projects={projects} loading={loading} />}
                 {activeTab === "writing-studio" && <WritingStudioTab />}
             </div>

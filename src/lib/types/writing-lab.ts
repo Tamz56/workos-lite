@@ -23,6 +23,21 @@ export type RelationshipType =
   | "expands" 
   | "same_story_set";
 
+export type NarrativeStatus = 
+  | "unmapped" 
+  | "mapped" 
+  | "needs_review" 
+  | "published";
+
+export type EpisodeStatus = 
+  | "idea" 
+  | "planned" 
+  | "drafting" 
+  | "ready_for_article_studio" 
+  | "website_draft" 
+  | "published" 
+  | "archived";
+
 export interface StorySet {
   id: string;
   title: string;
@@ -37,8 +52,14 @@ export interface Episode {
   id: string;
   story_set_id: string;
   title: string;
+  slug: string | null;
+  description: string | null;
   role: EpisodeRole;
-  status: string;
+  journey_stage: string | null;
+  attached_to_episode_id: string | null;
+  sort_order: number;
+  narrative_status: NarrativeStatus;
+  status: EpisodeStatus;
   created_at: string;
   updated_at: string;
 }

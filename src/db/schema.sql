@@ -378,14 +378,21 @@ CREATE TABLE IF NOT EXISTS gf_story_sets (
 );
 
 CREATE TABLE IF NOT EXISTS gf_episodes (
-  id            TEXT PRIMARY KEY,
-  story_set_id  TEXT NOT NULL,
-  title         TEXT NOT NULL,
-  role          TEXT NOT NULL CHECK (role IN ('core_episode', 'supporting_article', 'bridge_article', 'practical_guide', 'journal_note', 'social_only_piece')),
-  status        TEXT NOT NULL DEFAULT 'planned',
-  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE CASCADE
+  id                      TEXT PRIMARY KEY,
+  story_set_id            TEXT NOT NULL,
+  title                   TEXT NOT NULL,
+  slug                    TEXT NULL,
+  description             TEXT NULL,
+  role                    TEXT NOT NULL CHECK (role IN ('core_episode', 'supporting_article', 'bridge_article', 'practical_guide', 'journal_note', 'social_only_piece')),
+  journey_stage           TEXT NULL,
+  attached_to_episode_id  TEXT NULL,
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  narrative_status        TEXT NOT NULL DEFAULT 'unmapped',
+  status                  TEXT NOT NULL DEFAULT 'planned',
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE CASCADE,
+  FOREIGN KEY(attached_to_episode_id) REFERENCES gf_episodes(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS gf_writing_projects (
