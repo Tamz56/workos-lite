@@ -8,14 +8,59 @@ import {
     Share2, 
     Layout,
     Type,
-    Zap
+    Zap,
+    ChevronDown,
+    Plus
 } from "lucide-react";
+import { WritingProject } from "@/lib/types/writing-lab";
 
-export default function WritingStudioTab() {
+interface WritingStudioTabProps {
+    projectId: string | null;
+    projects: WritingProject[];
+    onCreateProject: () => void;
+    onSelectProject: (id: string) => void;
+}
+
+export default function WritingStudioTab({ 
+    projectId, 
+    projects, 
+    onCreateProject,
+    onSelectProject 
+}: WritingStudioTabProps) {
+    const activeProject = projects.find(p => p.id === projectId);
+
     return (
         <div className="grid grid-cols-12 gap-8 h-[calc(100vh-320px)] min-h-[600px]">
             {/* Left Column: Context & Structure */}
-            <div className="col-span-3 flex flex-col gap-6 overflow-y-auto pr-2">
+            <div className="col-span-3 flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar">
+                {/* Project Selector */}
+                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <PenTool className="w-4 h-4 text-neutral-400" />
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Active Project</h4>
+                    </div>
+                    <div className="relative group">
+                        <select 
+                            value={projectId || ""}
+                            onChange={(e) => onSelectProject(e.target.value)}
+                            className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm font-bold text-neutral-900 appearance-none outline-none focus:ring-2 focus:ring-black/5"
+                        >
+                            <option value="">Select Project...</option>
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id}>{p.title}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-neutral-900 transition-colors" />
+                    </div>
+                    <button 
+                        onClick={onCreateProject}
+                        className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 border border-dashed border-neutral-200 rounded-xl text-[10px] font-black text-neutral-400 uppercase tracking-widest hover:bg-neutral-50 hover:text-black transition-all"
+                    >
+                        <Plus className="w-3 h-3" />
+                        New Project
+                    </button>
+                </div>
+
                 <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                         <Target className="w-4 h-4 text-emerald-600" />
@@ -23,12 +68,22 @@ export default function WritingStudioTab() {
                     </div>
                     <div className="space-y-4">
                         <div>
-                            <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Story Set</label>
-                            <div className="mt-1 text-sm font-bold text-neutral-900">—</div>
+                            <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Writing Mode</label>
+                            <div className="mt-1 text-sm font-bold text-neutral-900 uppercase">
+                                {activeProject?.writing_mode?.replace(/_/g, ' ') || "—"}
+                            </div>
                         </div>
                         <div>
                             <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Episode Role</label>
-                            <div className="mt-1 text-sm font-bold text-neutral-900">—</div>
+                            <div className="mt-1 text-sm font-bold text-neutral-900 uppercase">
+                                {activeProject?.episode_role?.replace(/_/g, ' ') || "—"}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Journey Stage</label>
+                            <div className="mt-1 text-sm font-bold text-neutral-900 uppercase">
+                                {activeProject?.journey_stage || "—"}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -39,32 +94,71 @@ export default function WritingStudioTab() {
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Structure</h4>
                     </div>
                     <div className="space-y-2">
-                        <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] font-bold text-neutral-400 text-center border-dashed">
-                            No structure defined
-                        </div>
+                        {activeProject ? (
+                            <div className="space-y-3">
+                                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
+                                    <div className="text-[10px] font-black text-neutral-400 uppercase tracking-tight mb-1">Summary</div>
+                                    <p className="text-xs text-neutral-600 leading-relaxed">{activeProject.summary || "No summary provided."}</p>
+                                </div>
+                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-center">
+                                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Phase 2.3 Preview</p>
+                                    <p className="text-[9px] text-blue-500 font-bold uppercase tracking-tight">Writing blocks editor coming next</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] font-bold text-neutral-400 text-center border-dashed">
+                                Select a project to view structure
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
             {/* Center Column: Writing Area */}
             <div className="col-span-6 flex flex-col gap-6">
-                <div className="bg-white border border-neutral-200 rounded-[40px] p-10 shadow-sm flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="w-20 h-20 bg-neutral-50 rounded-full flex items-center justify-center mb-6">
-                        <PenTool className="w-8 h-8 text-neutral-300" />
+                {activeProject ? (
+                    <div className="bg-white border border-neutral-200 rounded-[40px] p-10 shadow-sm flex-1 flex flex-col">
+                        <div className="mb-10">
+                            <h2 className="text-3xl font-black text-neutral-900 mb-2">{activeProject.title}</h2>
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">{activeProject.id}</span>
+                                <span className="w-1 h-1 bg-neutral-200 rounded-full" />
+                                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{activeProject.status}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40">
+                            <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mb-6">
+                                <PenTool className="w-6 h-6 text-neutral-300" />
+                            </div>
+                            <h3 className="text-lg font-black text-neutral-900 mb-2">Block Editor Placeholder</h3>
+                            <p className="text-xs text-neutral-400 max-w-xs mx-auto leading-relaxed">
+                                The active writing blocks editor will be implemented in Phase 2.3.
+                            </p>
+                        </div>
                     </div>
-                    <h2 className="text-2xl font-black text-neutral-900 mb-2">Writing Studio</h2>
-                    <p className="text-sm text-neutral-400 max-w-xs mx-auto leading-relaxed">
-                        This is where your story comes to life. Select a project to start writing.
-                    </p>
-                    <button disabled className="mt-8 px-8 py-3 bg-neutral-300 text-white rounded-2xl text-sm font-black cursor-not-allowed transition-all shadow-sm flex items-center gap-2">
-                        <Type className="w-4 h-4" />
-                        Start New Project — Phase 2
-                    </button>
-                </div>
+                ) : (
+                    <div className="bg-white border border-neutral-200 rounded-[40px] p-10 shadow-sm flex-1 flex flex-col items-center justify-center text-center">
+                        <div className="w-20 h-20 bg-neutral-50 rounded-full flex items-center justify-center mb-6">
+                            <PenTool className="w-8 h-8 text-neutral-300" />
+                        </div>
+                        <h2 className="text-2xl font-black text-neutral-900 mb-2">Writing Studio</h2>
+                        <p className="text-sm text-neutral-400 max-w-xs mx-auto leading-relaxed">
+                            This is where your story comes to life. Select a project to start writing.
+                        </p>
+                        <button 
+                            onClick={onCreateProject}
+                            className="mt-8 px-8 py-3 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Start New Project
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Right Column: Intelligence & Settings */}
-            <div className="col-span-3 flex flex-col gap-6 overflow-y-auto pl-2">
+            <div className="col-span-3 flex flex-col gap-6 overflow-y-auto pl-2 custom-scrollbar">
                 <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                         <Zap className="w-4 h-4 text-amber-500" />
@@ -72,7 +166,7 @@ export default function WritingStudioTab() {
                     </div>
                     <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100/50">
                         <p className="text-xs text-amber-700 font-medium leading-relaxed">
-                            AI Writing Generation is currently disabled for Phase 1. 
+                            AI Writing Generation is currently disabled for Phase 2.2. 
                         </p>
                     </div>
                 </div>
@@ -85,11 +179,11 @@ export default function WritingStudioTab() {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-neutral-500 uppercase">Voice & Tone</span>
-                            <span className="text-[10px] font-bold text-neutral-300 uppercase">Placeholder</span>
+                            <span className="text-[10px] font-bold text-neutral-300 uppercase italic">Coming Soon</span>
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-neutral-500 uppercase">Guardrails</span>
-                            <span className="text-[10px] font-bold text-neutral-300 uppercase">Placeholder</span>
+                            <span className="text-[10px] font-bold text-neutral-300 uppercase italic">Coming Soon</span>
                         </div>
                     </div>
                 </div>

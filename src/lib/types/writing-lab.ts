@@ -66,12 +66,18 @@ export interface Episode {
 
 export interface WritingProject {
   id: string;
+  topic_id: string | null;
   title: string;
+  slug: string | null;
   story_set_id: string | null;
   episode_id: string | null;
   writing_mode: WritingMode;
+  episode_role: string | null;
+  journey_stage: string | null;
   status: string;
   narrative_status: string | null;
+  summary: string | null;
+  notes: string | null;
   attached_to: string | null;
   created_at: string;
   updated_at: string;

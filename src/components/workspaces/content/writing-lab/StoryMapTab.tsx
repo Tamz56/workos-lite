@@ -8,9 +8,10 @@ interface StoryMapTabProps {
     storySets: any[];
     loading: boolean;
     onRefresh: () => void;
+    onCreateProject: (initialData: any) => void;
 }
 
-export default function StoryMapTab({ storySets, loading, onRefresh }: StoryMapTabProps) {
+export default function StoryMapTab({ storySets, loading, onRefresh, onCreateProject }: StoryMapTabProps) {
     const [selectedStorySet, setSelectedStorySet] = useState<{ id: string; title: string; episodes: any[] } | null>(null);
 
     if (loading) {
@@ -75,8 +76,21 @@ export default function StoryMapTab({ storySets, loading, onRefresh }: StoryMapT
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-2 opacity-0 group-hover/ep:opacity-100 transition-opacity">
-                                                    <span className="text-[9px] font-bold text-neutral-300 uppercase">{ep.status}</span>
-                                                    <ChevronRight className="w-3 h-3 text-neutral-300" />
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onCreateProject({ 
+                                                                story_set_id: set.id, 
+                                                                episode_id: ep.id,
+                                                                title: ep.title,
+                                                                episode_role: ep.role,
+                                                                journey_stage: ep.journey_stage
+                                                            });
+                                                        }}
+                                                        className="px-2 py-1 bg-black text-white text-[9px] font-black uppercase rounded-lg hover:bg-neutral-800 transition-colors"
+                                                    >
+                                                        Start Project
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -100,7 +114,7 @@ export default function StoryMapTab({ storySets, loading, onRefresh }: StoryMapT
                                 <div className="w-6 h-6 rounded-full bg-neutral-100 flex items-center justify-center text-[8px] font-bold text-neutral-400">
                                     <FileText className="w-3 h-3" />
                                 </div>
-                                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">0 Projects</span>
+                                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">{set.episodes?.length || 0} Project Nodes</span>
                             </div>
                             <button className="text-[10px] font-black text-neutral-900 uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
                                 View Map <ChevronRight className="w-3 h-3" />

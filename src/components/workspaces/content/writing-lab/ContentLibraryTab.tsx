@@ -20,9 +20,10 @@ const ROLE_COLORS: Record<string, string> = {
 interface ContentLibraryTabProps {
     projects: any[];
     loading: boolean;
+    onSelectProject?: (id: string) => void;
 }
 
-export default function ContentLibraryTab({ projects, loading }: ContentLibraryTabProps) {
+export default function ContentLibraryTab({ projects, loading, onSelectProject }: ContentLibraryTabProps) {
     if (loading) {
         return <div className="py-20 text-center text-neutral-400">Loading Library...</div>;
     }
@@ -50,10 +51,10 @@ export default function ContentLibraryTab({ projects, loading }: ContentLibraryT
                     <thead>
                         <tr className="bg-neutral-50 border-b border-neutral-100">
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Title</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Story Set</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Topic ID</th>
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Episode Role</th>
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Writing Mode</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Attached To</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Journey Stage</th>
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Status</th>
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Narrative Status</th>
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Updated At</th>
@@ -63,13 +64,17 @@ export default function ContentLibraryTab({ projects, loading }: ContentLibraryT
                         {projects.map(project => {
                             const roleColor = ROLE_COLORS[project.episode_role] || "bg-neutral-100 text-neutral-500 border-neutral-200";
                             return (
-                            <tr key={project.id} className="hover:bg-neutral-50/50 transition-colors group">
+                            <tr 
+                                key={project.id} 
+                                onClick={() => onSelectProject?.(project.id)}
+                                className="hover:bg-neutral-50 transition-colors group cursor-pointer"
+                            >
                                 <td className="px-5 py-4">
-                                    <div className="font-bold text-neutral-900 truncate max-w-[200px]">{project.title}</div>
+                                    <div className="font-bold text-neutral-900 truncate max-w-[200px] group-hover:text-black">{project.title}</div>
                                     <div className="text-[10px] text-neutral-400 mt-0.5 font-mono">{project.id}</div>
                                 </td>
                                 <td className="px-5 py-4">
-                                    <div className="text-xs font-medium text-neutral-600">{project.story_set_title || "—"}</div>
+                                    <div className="text-xs font-mono text-neutral-600">{project.topic_id || "—"}</div>
                                 </td>
                                 <td className="px-5 py-4">
                                     {project.episode_role ? (
@@ -86,15 +91,11 @@ export default function ContentLibraryTab({ projects, loading }: ContentLibraryT
                                     </span>
                                 </td>
                                 <td className="px-5 py-4">
-                                    {project.attached_to ? (
-                                        <span className="text-[10px] font-mono text-neutral-600">{project.attached_to}</span>
-                                    ) : (
-                                        <span className="text-[10px] text-neutral-300">—</span>
-                                    )}
+                                    <div className="text-xs font-medium text-neutral-600 uppercase">{project.journey_stage || "—"}</div>
                                 </td>
                                 <td className="px-5 py-4">
                                     <div className="flex items-center gap-1.5">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'done' ? 'bg-emerald-500' : project.status === 'in_progress' ? 'bg-blue-500' : 'bg-amber-400'}`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'published' ? 'bg-emerald-500' : project.status === 'draft' ? 'bg-amber-400' : 'bg-blue-500'}`} />
                                         <span className="text-[10px] font-bold text-neutral-500 uppercase">{project.status}</span>
                                     </div>
                                 </td>
@@ -121,7 +122,7 @@ export default function ContentLibraryTab({ projects, loading }: ContentLibraryT
                     <div className="py-20 text-center">
                         <Library className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
                         <p className="text-neutral-500 font-bold">No writing projects yet.</p>
-                        <p className="text-xs text-neutral-400 mt-2">Create a new project to get started — coming in Phase 2.</p>
+                        <p className="text-xs text-neutral-400 mt-2">Start a new project from the Header or Writing Studio.</p>
                     </div>
                 )}
             </div>

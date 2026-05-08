@@ -14,6 +14,7 @@ import { Toast } from "@/components/ui/Toast";
 import StoryMapTab from "@/components/workspaces/content/writing-lab/StoryMapTab";
 import ContentLibraryTab from "@/components/workspaces/content/writing-lab/ContentLibraryTab";
 import WritingStudioTab from "@/components/workspaces/content/writing-lab/WritingStudioTab";
+import CreateProjectModal from "@/components/workspaces/content/writing-lab/CreateProjectModal";
 
 type TabKey = "story-map" | "content-library" | "writing-studio";
 
@@ -21,6 +22,9 @@ export default function WritingLabPage() {
     const [activeTab, setActiveTab] = useState<TabKey>("story-map");
     const [loading, setLoading] = useState(true);
     const [seeding, setSeeding] = useState(false);
+    const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+    const [projectInitialData, setProjectInitialData] = useState<any>(null);
+    const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ isVisible: boolean; message: string }>({ isVisible: false, message: "" });
     
     const [storySets, setStorySets] = useState<any[]>([]);
@@ -62,13 +66,29 @@ export default function WritingLabPage() {
         }
     };
 
+    const handleOpenCreateProject = (initialData?: any) => {
+        setProjectInitialData(initialData || null);
+        setIsCreateProjectOpen(true);
+    };
+
+    const handleProjectCreated = () => {
+        setToast({ isVisible: true, message: "🚀 Project created successfully!" });
+        setProjectInitialData(null);
+        fetchData();
+    };
+
+    const handleSelectProject = (id: string) => {
+        setSelectedProjectId(id);
+        setActiveTab("writing-studio");
+    };
+
     return (
         <div className="min-h-screen bg-[#FDFDFD] p-8">
             <header className="mb-10 flex items-center justify-between">
                 <div>
                     <div className="flex items-center gap-3">
                         <h1 className="text-3xl font-black tracking-tight text-neutral-900">Arbor Writing Lab</h1>
-                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-100">Phase 1</span>
+                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-100">Phase 2.2</span>
                     </div>
                     <p className="text-sm font-medium text-neutral-500 mt-1">Story Map → Writing Studio → Content Library</p>
                 </div>
@@ -83,8 +103,8 @@ export default function WritingLabPage() {
                         {seeding ? 'Seeding...' : 'Seed Data'}
                     </button>
                     <button 
-                        onClick={() => setToast({ isVisible: true, message: "🚧 Create Project — coming in Phase 2" })}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-neutral-300 text-white rounded-xl text-sm font-black cursor-not-allowed transition-all shadow-sm"
+                        onClick={() => handleOpenCreateProject()}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-black text-white rounded-xl text-sm font-black hover:bg-neutral-800 transition-all shadow-sm"
                     >
                         <Plus className="w-4 h-4" />
                         New Project
@@ -119,10 +139,32 @@ export default function WritingLabPage() {
 
             {/* Tab Content */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {activeTab === "story-map" && <StoryMapTab storySets={storySets} loading={loading} onRefresh={fetchData} />}
-                {activeTab === "content-library" && <ContentLibraryTab projects={projects} loading={loading} />}
-                {activeTab === "writing-studio" && <WritingStudioTab />}
+                {activeTab === "story-map" && (
+                    <StoryMapTab 
+                        storySets={storySets} 
+                        loading={loading} 
+                        onRefresh={fetchData} 
+                        onCreateProject={handleOpenCreateProject}
+                    />
+                )}
+                {activeTab === "content-library" && <ContentLibraryTab projects={projects} loading={loading} onSelectProject={handleSelectProject} />}
+                {activeTab === "writing-studio" && (
+                    <WritingStudioTab 
+                        projectId={selectedProjectId} 
+                        projects={projects} 
+                        onCreateProject={() => handleOpenCreateProject()}
+                        onSelectProject={setSelectedProjectId}
+                    />
+                )}
             </div>
+
+            <CreateProjectModal 
+                isOpen={isCreateProjectOpen}
+                onClose={() => setIsCreateProjectOpen(false)}
+                storySets={storySets}
+                onSuccess={handleProjectCreated}
+                initialData={projectInitialData}
+            />
 
             <Toast 
                 isVisible={toast.isVisible} 

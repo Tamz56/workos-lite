@@ -397,12 +397,18 @@ CREATE TABLE IF NOT EXISTS gf_episodes (
 
 CREATE TABLE IF NOT EXISTS gf_writing_projects (
   id                TEXT PRIMARY KEY,
+  topic_id          TEXT NULL,
   title             TEXT NOT NULL,
+  slug              TEXT NULL,
   story_set_id      TEXT NULL,
   episode_id        TEXT NULL,
   writing_mode      TEXT NOT NULL CHECK (writing_mode IN ('knowledge_article', 'knowledge_journey_article', 'documentary_chapter', 'writers_journal', 'social_story_copy')),
+  episode_role      TEXT NULL,
+  journey_stage     TEXT NULL,
   status            TEXT NOT NULL DEFAULT 'draft',
   narrative_status  TEXT NULL,
+  summary           TEXT NULL,
+  notes             TEXT NULL,
   attached_to       TEXT NULL, -- Topic ID or Task ID
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at        TEXT NOT NULL DEFAULT (datetime('now')),

@@ -912,12 +912,18 @@ function ensureArborWritingLab() {
 
         CREATE TABLE IF NOT EXISTS gf_writing_projects (
           id                TEXT PRIMARY KEY,
+          topic_id          TEXT NULL,
           title             TEXT NOT NULL,
+          slug              TEXT NULL,
           story_set_id      TEXT NULL,
           episode_id        TEXT NULL,
           writing_mode      TEXT NOT NULL CHECK (writing_mode IN ('knowledge_article', 'knowledge_journey_article', 'documentary_chapter', 'writers_journal', 'social_story_copy')),
+          episode_role      TEXT NULL,
+          journey_stage     TEXT NULL,
           status            TEXT NOT NULL DEFAULT 'draft',
           narrative_status  TEXT NULL,
+          summary           TEXT NULL,
+          notes             TEXT NULL,
           attached_to       TEXT NULL,
           created_at        TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
@@ -967,9 +973,34 @@ function ensureArborWritingLab() {
                 if (col.default) sql += ` DEFAULT ${col.default}`;
                 db.exec(sql);
             } catch (e: any) {
-                // Ignore if column already exists (handles race conditions during build)
                 if (!e.message?.includes("duplicate column name")) {
                     console.error(`Migration error on ${col.name}:`, e);
+                    throw e;
+                }
+            }
+        }
+    }
+
+    const projectCols = db.prepare("PRAGMA table_info(gf_writing_projects)").all() as any[];
+    const projectColNames = projectCols.map(c => c.name);
+
+    const additiveProjectCols = [
+        { name: 'topic_id', type: 'TEXT' },
+        { name: 'slug', type: 'TEXT' },
+        { name: 'episode_role', type: 'TEXT' },
+        { name: 'journey_stage', type: 'TEXT' },
+        { name: 'summary', type: 'TEXT' },
+        { name: 'notes', type: 'TEXT' }
+    ];
+
+    for (const col of additiveProjectCols) {
+        if (!projectColNames.includes(col.name)) {
+            try {
+                const sql = `ALTER TABLE gf_writing_projects ADD COLUMN ${col.name} ${col.type}`;
+                db.exec(sql);
+            } catch (e: any) {
+                if (!e.message?.includes("duplicate column name")) {
+                    console.error(`Migration error on project ${col.name}:`, e);
                     throw e;
                 }
             }
