@@ -917,7 +917,7 @@ function ensureArborWritingLab() {
           slug              TEXT NULL,
           story_set_id      TEXT NULL,
           episode_id        TEXT NULL,
-          writing_mode      TEXT NOT NULL CHECK (writing_mode IN ('knowledge_article', 'knowledge_journey_article', 'documentary_chapter', 'writers_journal', 'social_story_copy')),
+          writing_mode      TEXT NOT NULL CHECK (writing_mode IN ('knowledge_article', 'knowledge_journey_article', 'documentary_chapter', 'writers_journal', 'social_story_copy', 'journey_chapter')),
           episode_role      TEXT NULL,
           journey_stage     TEXT NULL,
           status            TEXT NOT NULL DEFAULT 'draft',

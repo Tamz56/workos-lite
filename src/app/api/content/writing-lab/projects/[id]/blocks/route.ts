@@ -96,6 +96,21 @@ export async function POST(
         { label: "Personal Profile Post", placeholder: "Tailored for personal connection..." },
         { label: "Short Caption", placeholder: "For Instagram/TikTok style..." },
         { label: "Hashtags", placeholder: "#topic #insight..." }
+      ],
+      journey_chapter: [
+        { label: "Chapter Metadata", placeholder: "Define where this chapter belongs in the Journey, what its focus lens is, what systems can be mentioned, what should be reserved for other chapters, and which Story Sets it connects to." },
+        { label: "Chapter Title / Working Title", placeholder: "Use a clear Thai title that fits Green Fineness documentary knowledge style. Avoid overclaiming and avoid fantasy-like titles." },
+        { label: "Hero Opening", placeholder: "Open with a documentary-style natural scene, then connect quickly to the knowledge point. The opening should create visual context but must not become fictional or overly poetic." },
+        { label: "Core Knowledge", placeholder: "Explain the main scientific concept in readable Thai. Use calm academic language. Keep the explanation accurate, structured, and accessible." },
+        { label: "Knowledge Box", placeholder: "Add a concise box or bullet explanation for the key concept. This can include: key idea summary, important terms, common misunderstanding, system checklist, what readers should remember." },
+        { label: "System Connection", placeholder: "Connect this chapter to the larger plant-life system, such as soil, roots, microbes, nutrients, water, air, organic matter, photosynthesis, transport, flowers, fruits, seeds, or nutrient cycling." },
+        { label: "Visual Notes", placeholder: "Note where 2–4 images should appear inside the chapter. Include purpose of each image: hero image, system detail image, process image, bridge image." },
+        { label: "Practical Meaning", placeholder: "Explain what growers, learners, or general readers should understand from this chapter. Keep it practical but not simplistic. Do not turn it into a rigid how-to manual unless the chapter requires it." },
+        { label: "Boundary / Claim Guardrail", placeholder: "Clarify what this chapter does not overclaim, what should not be simplified too much, and what will be covered in another chapter. Use cautious phrasing when discussing soil, microbes, fertilizers, nutrients, disease, productivity, or environmental claims." },
+        { label: "Bridge to Next Chapter", placeholder: "Lead readers naturally to the next chapter. The bridge should feel like a continuation of the journey, not a hard CTA." },
+        { label: "Read More Links", placeholder: "Add 3–5 internal links or related Library articles. Suggested structure: Journey Hub link, main Library article for this chapter, supporting Library article 1, supporting Library article 2, next chapter link." },
+        { label: "Image Briefs", placeholder: "Add image briefs for: 1. Hero image, 2. System detail image, 3. Practical/context image, 4. Bridge image, optional." },
+        { label: "References Notes", placeholder: "Add notes for sources and further reading. This does not need to be a full reference list inside the writing mode, but should remind the writer where references are needed." }
       ]
     };
 

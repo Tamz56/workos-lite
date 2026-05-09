@@ -11,7 +11,8 @@ export type WritingMode =
   | "knowledge_journey_article" 
   | "documentary_chapter" 
   | "writers_journal" 
-  | "social_story_copy";
+  | "social_story_copy"
+  | "journey_chapter";
 
 export type RelationshipType = 
   | "bridge_from" 

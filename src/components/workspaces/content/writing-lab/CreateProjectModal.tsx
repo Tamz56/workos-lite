@@ -17,6 +17,7 @@ const MODES: { value: WritingMode; label: string }[] = [
     { value: "documentary_chapter", label: "Documentary Chapter" },
     { value: "writers_journal", label: "Writer's Journal" },
     { value: "social_story_copy", label: "Social Story Copy" },
+    { value: "journey_chapter", label: "Journey Chapter" },
 ];
 
 export default function CreateProjectModal({ 
