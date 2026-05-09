@@ -14,7 +14,9 @@ export async function PATCH(
       "meta_title", "meta_description", "keywords", "excerpt",
       "internal_links_notes", "references_notes",
       "group_post_markdown", "page_post_markdown", "personal_post_markdown",
-      "social_caption", "hashtags"
+      "social_caption", "hashtags",
+      "tone_profile", "web_voice_guideline", "group_voice_guideline", 
+      "page_voice_guideline", "personal_voice_guideline", "claim_guardrail_note"
     ];
 
     const updates: string[] = [];

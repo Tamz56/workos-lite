@@ -925,6 +925,12 @@ function ensureArborWritingLab() {
           summary           TEXT NULL,
           notes             TEXT NULL,
           attached_to       TEXT NULL,
+          tone_profile      TEXT NULL,
+          web_voice_guideline TEXT NULL,
+          group_voice_guideline TEXT NULL,
+          page_voice_guideline TEXT NULL,
+          personal_voice_guideline TEXT NULL,
+          claim_guardrail_note TEXT NULL,
           created_at        TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
           FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE SET NULL,
@@ -1003,7 +1009,13 @@ function ensureArborWritingLab() {
         { name: 'page_post_markdown', type: 'TEXT' },
         { name: 'personal_post_markdown', type: 'TEXT' },
         { name: 'social_caption', type: 'TEXT' },
-        { name: 'hashtags', type: 'TEXT' }
+        { name: 'hashtags', type: 'TEXT' },
+        { name: 'tone_profile', type: 'TEXT' },
+        { name: 'web_voice_guideline', type: 'TEXT' },
+        { name: 'group_voice_guideline', type: 'TEXT' },
+        { name: 'page_voice_guideline', type: 'TEXT' },
+        { name: 'personal_voice_guideline', type: 'TEXT' },
+        { name: 'claim_guardrail_note', type: 'TEXT' }
     ];
 
     for (const col of additiveProjectCols) {

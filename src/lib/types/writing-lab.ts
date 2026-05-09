@@ -90,6 +90,12 @@ export interface WritingProject {
   personal_post_markdown: string | null;
   social_caption: string | null;
   hashtags: string | null;
+  tone_profile: string | null;
+  web_voice_guideline: string | null;
+  group_voice_guideline: string | null;
+  page_voice_guideline: string | null;
+  personal_voice_guideline: string | null;
+  claim_guardrail_note: string | null;
   attached_to: string | null;
   created_at: string;
   updated_at: string;

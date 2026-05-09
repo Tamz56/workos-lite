@@ -24,8 +24,11 @@ import {
     MessageCircle,
     User,
     Users,
-    Flag
+    Flag,
+    Sparkles,
+    Wand2
 } from "lucide-react";
+import ToneModal from "./ToneModal";
 import { WritingProject, WritingBlock } from "@/lib/types/writing-lab";
 
 interface WritingStudioTabProps {
@@ -50,6 +53,7 @@ export default function WritingStudioTab({
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [activeSubTab, setActiveSubTab] = useState<'chapter' | 'social' | 'preview'>('chapter');
     const [copyStatus, setCopyStatus] = useState<string | null>(null);
+    const [isToneModalOpen, setIsToneModalOpen] = useState(false);
     const [websiteFields, setWebsiteFields] = useState({
         slug: "",
         meta_title: "",
@@ -280,6 +284,14 @@ export default function WritingStudioTab({
                           `Episode: ${activeProject.episode_id || "—"}\n` +
                           `Status: ${activeProject.status}\n\n` +
                           `---\n\n` +
+                          `## Tone / Voice Guideline\n\n` +
+                          `Tone Profile: ${activeProject.tone_profile || "Tone not set"}\n` +
+                          `Web Voice: ${activeProject.web_voice_guideline || "—"}\n` +
+                          `Group Voice: ${activeProject.group_voice_guideline || "—"}\n` +
+                          `Page Voice: ${activeProject.page_voice_guideline || "—"}\n` +
+                          `Personal Voice: ${activeProject.personal_voice_guideline || "—"}\n` +
+                          `Claim Guardrail: ${activeProject.claim_guardrail_note || "—"}\n\n` +
+                          `---\n\n` +
                           `## Website Fields\n\n` +
                           `Meta Title: ${websiteFields.meta_title || "—"}\n` +
                           `Meta Description: ${websiteFields.meta_description || "—"}\n` +
@@ -311,7 +323,12 @@ export default function WritingStudioTab({
                           `## Body Markdown\n\n` +
                           getMarkdownBlocks(true) + `\n\n` +
                           `## References Notes\n\n` +
-                          `${websiteFields.references_notes || "—"}`;
+                          `${websiteFields.references_notes || "—"}\n\n` +
+                          `---\n\n` +
+                          `## Tone Guideline\n\n` +
+                          `Tone Profile: ${activeProject.tone_profile || "—"}\n` +
+                          `Web Voice: ${activeProject.web_voice_guideline || "—"}\n` +
+                          `Claim Guardrail: ${activeProject.claim_guardrail_note || "—"}`;
                 feedback = "Copied Website Draft Pack";
                 break;
             case 'studio':
@@ -372,11 +389,14 @@ ${refBlock ? (websiteFields.references_notes ? "\n\n" : "") + refBlock : ""}
 ${(!websiteFields.references_notes && !refBlock) ? "—" : ""}
 
 ## Internal Links Notes
-
 ${websiteFields.internal_links_notes || "—"}
 
-## Source Notes
+## Tone Guideline
+Tone Profile: ${activeProject.tone_profile || "—"}
+Web Voice Guideline: ${activeProject.web_voice_guideline || "—"}
+Claim Guardrail: ${activeProject.claim_guardrail_note || "—"}
 
+## Source Notes
 Generated from Arbor Writing Lab.
 Project ID: ${activeProject.id}
 Writing Mode: ${activeProject.writing_mode}
@@ -668,10 +688,15 @@ Episode Role: ${activeProject.episode_role || "—"}
                                             <Zap className="w-2.5 h-2.5 text-amber-500" />
                                             <span className="text-[8px] font-black text-amber-700 uppercase">AI Disabled</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-neutral-50 rounded-md">
-                                            <Settings className="w-2.5 h-2.5 text-neutral-400" />
-                                            <span className="text-[8px] font-black text-neutral-500 uppercase">Tone Placeholder</span>
-                                        </div>
+                                        <button 
+                                            onClick={() => setIsToneModalOpen(true)}
+                                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-all ${activeProject.tone_profile ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-neutral-100 text-neutral-400 hover:bg-neutral-200'}`}
+                                        >
+                                            <Sparkles className={`w-2.5 h-2.5 ${activeProject.tone_profile ? 'text-blue-500' : 'text-neutral-400'}`} />
+                                            <span className="text-[8px] font-black uppercase">
+                                                {activeProject.tone_profile || "Tone not set"}
+                                            </span>
+                                        </button>
                                         <div className="flex items-center gap-1.5 px-2 py-0.5 bg-neutral-50 rounded-md">
                                             <Share2 className="w-2.5 h-2.5 text-neutral-400" />
                                             <span className="text-[8px] font-black text-neutral-500 uppercase">Export Locked</span>
@@ -1089,6 +1114,23 @@ Episode Role: ${activeProject.episode_role || "—"}
                     </div>
                 )}
             </div>
+
+            {activeProject && (
+                <ToneModal 
+                    isOpen={isToneModalOpen}
+                    onClose={() => setIsToneModalOpen(false)}
+                    projectId={activeProject.id}
+                    initialData={{
+                        tone_profile: activeProject.tone_profile,
+                        web_voice_guideline: activeProject.web_voice_guideline,
+                        group_voice_guideline: activeProject.group_voice_guideline,
+                        page_voice_guideline: activeProject.page_voice_guideline,
+                        personal_voice_guideline: activeProject.personal_voice_guideline,
+                        claim_guardrail_note: activeProject.claim_guardrail_note
+                    }}
+                    onSuccess={onRefresh}
+                />
+            )}
         </div>
     );
 }
