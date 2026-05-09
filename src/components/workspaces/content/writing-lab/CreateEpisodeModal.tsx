@@ -96,51 +96,51 @@ export default function CreateEpisodeModal({
             <form onSubmit={handleSubmit} className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Title</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Title</label>
                         <input 
                             required
                             type="text" 
                             value={formData.title}
                             onChange={e => setFormData({ ...formData, title: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none placeholder:text-theme-muted"
                             placeholder="Episode title..."
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Slug</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 dark:text-slate-500 mb-1.5 block">Slug</label>
                         <input 
                             type="text" 
                             value={formData.slug}
                             onChange={e => setFormData({ ...formData, slug: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none placeholder:text-neutral-300 dark:placeholder:text-slate-700"
                             placeholder="episode-slug..."
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Role</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Role</label>
                         <select 
                             value={formData.role}
                             onChange={e => setFormData({ ...formData, role: e.target.value as EpisodeRole })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none"
                         >
                             {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                         </select>
                     </div>
                     <div className="col-span-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Description</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 dark:text-slate-500 mb-1.5 block">Description</label>
                         <textarea 
                             value={formData.description}
                             onChange={e => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none min-h-[80px]"
+                            className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none min-h-[80px] placeholder:text-neutral-300 dark:placeholder:text-slate-700"
                             placeholder="Short description..."
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Status</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Status</label>
                         <select 
                             value={formData.status}
                             onChange={e => setFormData({ ...formData, status: e.target.value as EpisodeStatus })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none"
                         >
                             {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
@@ -150,7 +150,7 @@ export default function CreateEpisodeModal({
                         <select 
                             value={formData.narrative_status}
                             onChange={e => setFormData({ ...formData, narrative_status: e.target.value as NarrativeStatus })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none"
                         >
                             {NARRATIVE_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
@@ -161,7 +161,7 @@ export default function CreateEpisodeModal({
                             <select 
                                 value={formData.attached_to_episode_id}
                                 onChange={e => setFormData({ ...formData, attached_to_episode_id: e.target.value })}
-                                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                                className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none"
                             >
                                 <option value="">None</option>
                                 {coreEpisodes.map(ep => <option key={ep.id} value={ep.id}>{ep.title}</option>)}
@@ -169,29 +169,29 @@ export default function CreateEpisodeModal({
                         </div>
                     )}
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Journey Stage</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 dark:text-slate-500 mb-1.5 block">Journey Stage</label>
                         <input 
                             type="text" 
                             value={formData.journey_stage}
                             onChange={e => setFormData({ ...formData, journey_stage: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none placeholder:text-neutral-300 dark:placeholder:text-slate-700"
                             placeholder="e.g. Awareness"
                         />
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-100">
+                <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-100 dark:border-slate-800">
                     <button 
                         type="button" 
                         onClick={onClose}
-                        className="px-6 py-2.5 text-sm font-bold text-neutral-500 hover:text-neutral-900 transition-colors"
+                        className="px-6 py-2.5 text-sm font-bold text-neutral-500 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-slate-100 transition-colors"
                     >
                         Cancel
                     </button>
                     <button 
                         type="submit" 
                         disabled={loading}
-                        className="px-8 py-2.5 bg-black text-white rounded-xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-50"
+                        className="px-8 py-2.5 bg-black dark:bg-slate-800 text-white dark:text-theme-primary border border-transparent dark:border-slate-700 rounded-xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-lg shadow-black/10 disabled:opacity-50"
                     >
                         {loading ? "Creating..." : "Create Episode"}
                     </button>

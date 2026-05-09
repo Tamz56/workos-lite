@@ -83,28 +83,28 @@ export default function WritingLabPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#FDFDFD] p-8">
+        <div className="min-h-screen bg-theme-app p-8 transition-theme duration-500">
             <header className="mb-10 flex items-center justify-between">
                 <div>
                     <div className="flex items-center gap-3">
-                        <h1 className="text-3xl font-black tracking-tight text-neutral-900">Arbor Writing Lab</h1>
-                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-100">Phase 2.2</span>
+                        <h1 className="text-3xl font-black tracking-tight text-theme-primary">Arbor Writing Lab</h1>
+                        <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-800/50">Phase 2.2</span>
                     </div>
-                    <p className="text-sm font-medium text-neutral-500 mt-1">Story Map → Writing Studio → Content Library</p>
+                    <p className="text-sm font-medium text-theme-secondary mt-1">Story Map → Writing Studio → Content Library</p>
                 </div>
                 
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={handleSeed}
                         disabled={seeding}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-bold text-neutral-600 hover:bg-neutral-50 transition-all shadow-sm disabled:opacity-50"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700/60 rounded-xl text-sm font-bold text-neutral-600 dark:text-theme-secondary hover:bg-neutral-50 dark:hover:bg-slate-700 transition-all shadow-sm disabled:opacity-50"
                     >
                         <RefreshCcw className={`w-4 h-4 ${seeding ? 'animate-spin' : ''}`} />
                         {seeding ? 'Seeding...' : 'Seed Data'}
                     </button>
                     <button 
                         onClick={() => handleOpenCreateProject()}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-black text-white rounded-xl text-sm font-black hover:bg-neutral-800 transition-all shadow-sm"
+                        className="flex items-center gap-2 px-6 py-2.5 bg-black dark:bg-slate-800 border border-transparent dark:border-slate-700 text-white dark:text-theme-primary rounded-xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-sm"
                     >
                         <Plus className="w-4 h-4" />
                         New Project
@@ -113,24 +113,24 @@ export default function WritingLabPage() {
             </header>
 
             {/* Tabs */}
-            <div className="flex items-center gap-1 bg-neutral-200/50 p-1.5 rounded-2xl w-fit mb-8">
+            <div className="flex items-center gap-1 bg-neutral-200/50 dark:bg-theme-panel/60 p-1.5 rounded-2xl w-fit mb-8 border border-transparent dark:border-theme-border/40">
                 <button 
                     onClick={() => setActiveTab("story-map")}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "story-map" ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"}`}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "story-map" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
                 >
                     <Map className="w-4 h-4" />
                     Story Map
                 </button>
                 <button 
                     onClick={() => setActiveTab("content-library")}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "content-library" ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"}`}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "content-library" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
                 >
                     <Library className="w-4 h-4" />
                     Content Library
                 </button>
                 <button 
                     onClick={() => setActiveTab("writing-studio")}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "writing-studio" ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"}`}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "writing-studio" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
                 >
                     <PenTool className="w-4 h-4" />
                     Writing Studio

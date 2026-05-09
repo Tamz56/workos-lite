@@ -76,87 +76,87 @@ export default function ToneModal({
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Tone / Voice Guideline">
             <form onSubmit={handleSubmit} className="space-y-6 py-4">
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3">
-                    <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl p-4 flex gap-3">
+                    <Info className="w-4 h-4 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-800 dark:text-amber-200/80 leading-relaxed">
                         Define the writing DNA for this project. These guidelines help maintain consistency across all chapters and social posts.
                     </p>
                 </div>
 
                 <div className="space-y-4">
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Tone Profile Name</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Tone Profile Name</label>
                         <input 
                             type="text" 
                             value={formData.tone_profile}
                             onChange={e => setFormData({ ...formData, tone_profile: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm font-bold text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none placeholder:text-theme-muted"
                             placeholder="e.g. GF-WRITING-DNA / คุณตั้ม Voice"
                         />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Web Journey Voice</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Web Journey Voice</label>
                             <textarea 
                                 value={formData.web_voice_guideline}
                                 onChange={e => setFormData({ ...formData, web_voice_guideline: e.target.value })}
-                                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-black/5 outline-none h-24 resize-none"
+                                className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-xs text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none h-24 resize-none placeholder:text-theme-muted"
                                 placeholder="Guideline for long-form articles..."
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Facebook Group Voice</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Facebook Group Voice</label>
                             <textarea 
                                 value={formData.group_voice_guideline}
                                 onChange={e => setFormData({ ...formData, group_voice_guideline: e.target.value })}
-                                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-black/5 outline-none h-24 resize-none"
+                                className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-xs text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none h-24 resize-none placeholder:text-theme-muted"
                                 placeholder="Guideline for community posts..."
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Editorial Page Voice</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Editorial Page Voice</label>
                             <textarea 
                                 value={formData.page_voice_guideline}
                                 onChange={e => setFormData({ ...formData, page_voice_guideline: e.target.value })}
-                                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-black/5 outline-none h-24 resize-none"
+                                className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-xs text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none h-24 resize-none placeholder:text-theme-muted"
                                 placeholder="Guideline for broad reach posts..."
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Founder Reflection Voice</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Founder Reflection Voice</label>
                             <textarea 
                                 value={formData.personal_voice_guideline}
                                 onChange={e => setFormData({ ...formData, personal_voice_guideline: e.target.value })}
-                                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-black/5 outline-none h-24 resize-none"
+                                className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-xs text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none h-24 resize-none placeholder:text-theme-muted"
                                 placeholder="Guideline for personal connection..."
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Claim Guardrail / Caution</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Claim Guardrail / Caution</label>
                         <textarea 
                             value={formData.claim_guardrail_note}
                             onChange={e => setFormData({ ...formData, claim_guardrail_note: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-black/5 outline-none h-20 resize-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-xs text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none h-20 resize-none placeholder:text-theme-muted"
                             placeholder="What to avoid claiming or how to handle sensitive scientific topics..."
                         />
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-100">
+                <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-100 dark:border-slate-800">
                     <button 
                         type="button" 
                         onClick={onClose}
-                        className="px-6 py-2.5 text-sm font-bold text-neutral-500 hover:text-neutral-900 transition-colors"
+                        className="px-6 py-2.5 text-sm font-bold text-neutral-500 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-slate-100 transition-colors"
                     >
                         Cancel
                     </button>
                     <button 
                         type="submit" 
                         disabled={loading}
-                        className="px-8 py-2.5 bg-black text-white rounded-xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-50 flex items-center gap-2"
+                        className="px-8 py-2.5 bg-black dark:bg-slate-800 text-white dark:text-theme-primary border border-transparent dark:border-slate-700 rounded-xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-lg shadow-black/10 disabled:opacity-50 flex items-center gap-2"
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         {loading ? "Saving..." : "Save Guideline"}

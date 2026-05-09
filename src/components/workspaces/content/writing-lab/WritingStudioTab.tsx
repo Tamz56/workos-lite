@@ -414,56 +414,56 @@ Episode Role: ${activeProject.episode_role || "—"}
     return (
         <div className="grid grid-cols-12 gap-8 h-[calc(100vh-280px)] min-h-[600px]">
             {/* Left Column: Context & Structure */}
-            <div className="col-span-3 flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar pb-10">
+            <div className="col-span-3 flex flex-col gap-6 overflow-y-auto pr-2 scrollbar-theme pb-10">
                 {/* Project Selector */}
-                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
-                        <PenTool className="w-4 h-4 text-neutral-400" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Active Project</h4>
+                        <PenTool className="w-4 h-4 text-theme-muted" />
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Active Project</h4>
                     </div>
                     <div className="relative group">
                         <select 
                             value={projectId || ""}
                             onChange={(e) => onSelectProject(e.target.value)}
-                            className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm font-bold text-neutral-900 appearance-none outline-none focus:ring-2 focus:ring-black/5 transition-all"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-3 text-sm font-bold text-theme-primary appearance-none outline-none focus:ring-2 focus:ring-theme-accent/10 transition-all"
                         >
                             <option value="">Select Project...</option>
                             {projects.map(p => (
                                 <option key={p.id} value={p.id}>{p.title}</option>
                             ))}
                         </select>
-                        <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-neutral-900 transition-colors" />
+                        <ChevronDown className="w-4 h-4 text-theme-muted absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-theme-primary transition-colors" />
                     </div>
                     <button 
                         onClick={onCreateProject}
-                        className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 border border-dashed border-neutral-200 rounded-xl text-[10px] font-black text-neutral-400 uppercase tracking-widest hover:bg-neutral-50 hover:text-black transition-all"
+                        className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 border border-dashed border-theme-border rounded-xl text-[10px] font-black text-theme-muted uppercase tracking-widest hover:bg-theme-hover hover:text-theme-primary transition-all"
                     >
                         <Plus className="w-3 h-3" />
                         New Project
                     </button>
                 </div>
 
-                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
-                        <Target className="w-4 h-4 text-emerald-600" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Context</h4>
+                        <Target className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Context</h4>
                     </div>
                     <div className="space-y-4">
                         <div>
-                            <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Writing Mode</label>
-                            <div className="mt-1 text-sm font-bold text-neutral-900 uppercase">
+                            <label className="text-[9px] font-bold text-theme-muted uppercase tracking-tight">Writing Mode</label>
+                            <div className="mt-1 text-sm font-bold text-theme-primary uppercase">
                                 {activeProject?.writing_mode?.replace(/_/g, ' ') || "—"}
                             </div>
                         </div>
                         <div>
-                            <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Episode Role</label>
-                            <div className="mt-1 text-sm font-bold text-neutral-900 uppercase">
+                            <label className="text-[9px] font-bold text-theme-muted uppercase tracking-tight">Episode Role</label>
+                            <div className="mt-1 text-sm font-bold text-theme-primary uppercase">
                                 {activeProject?.episode_role?.replace(/_/g, ' ') || "—"}
                             </div>
                         </div>
                         <div>
-                            <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Journey Stage</label>
-                            <div className="mt-1 text-sm font-bold text-neutral-900 uppercase">
+                            <label className="text-[9px] font-bold text-theme-muted uppercase tracking-tight">Journey Stage</label>
+                            <div className="mt-1 text-sm font-bold text-theme-primary uppercase">
                                 {activeProject?.journey_stage || "—"}
                             </div>
                         </div>
@@ -473,22 +473,22 @@ Episode Role: ${activeProject.episode_role || "—"}
 
                 {activeProject && (
                     <>
-                        <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                        <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                                <Globe className="w-4 h-4 text-amber-600" />
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Website Fields</h4>
+                                <Globe className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Website Fields</h4>
                             </div>
-                            <button 
-                                onClick={handleSaveFields}
-                                disabled={saving}
-                                className="p-1.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-all disabled:opacity-30"
-                                title="Save Website Fields"
-                            >
+                             <button 
+                                 onClick={handleSaveFields}
+                                 disabled={saving}
+                                 className="p-1.5 bg-black dark:bg-slate-800 text-white dark:text-theme-primary border border-transparent dark:border-slate-700 rounded-lg hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all disabled:opacity-30"
+                                 title="Save Website Fields"
+                             >
                                 {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                             </button>
                         </div>
-                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar-small">
+                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-theme">
                             <div>
                                 <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">URL Slug</label>
                                 <input 
@@ -496,7 +496,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     value={websiteFields.slug}
                                     onChange={(e) => setWebsiteFields({...websiteFields, slug: e.target.value})}
                                     placeholder="article-slug-here..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5"
+                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10"
                                 />
                             </div>
                             <div>
@@ -506,7 +506,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     value={websiteFields.meta_title}
                                     onChange={(e) => setWebsiteFields({...websiteFields, meta_title: e.target.value})}
                                     placeholder="SEO Title..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5"
+                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10"
                                 />
                             </div>
                             <div>
@@ -515,7 +515,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     value={websiteFields.meta_description}
                                     onChange={(e) => setWebsiteFields({...websiteFields, meta_description: e.target.value})}
                                     placeholder="SEO Description..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10 h-20 resize-none"
                                 />
                             </div>
                             <div>
@@ -525,7 +525,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     value={websiteFields.keywords}
                                     onChange={(e) => setWebsiteFields({...websiteFields, keywords: e.target.value})}
                                     placeholder="Keywords separated by comma..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5"
+                                    className="w-full mt-1 bg-neutral-50 dark:bg-slate-950/40 border border-neutral-100 dark:border-slate-800 rounded-lg px-3 py-2 text-xs font-bold text-neutral-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-emerald-500/10"
                                 />
                             </div>
                             <div>
@@ -534,7 +534,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     value={websiteFields.excerpt}
                                     onChange={(e) => setWebsiteFields({...websiteFields, excerpt: e.target.value})}
                                     placeholder="Brief summary for list view..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10 h-20 resize-none"
                                 />
                             </div>
                             <div>
@@ -543,7 +543,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     value={websiteFields.internal_links_notes}
                                     onChange={(e) => setWebsiteFields({...websiteFields, internal_links_notes: e.target.value})}
                                     placeholder="Links to include..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10 h-20 resize-none"
                                 />
                             </div>
                             <div>
@@ -552,21 +552,21 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     value={websiteFields.references_notes}
                                     onChange={(e) => setWebsiteFields({...websiteFields, references_notes: e.target.value})}
                                     placeholder="Sources and citations..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
+                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10 h-20 resize-none"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm">
+                    <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                                <Share2 className="w-4 h-4 text-blue-600" />
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Social Drafts</h4>
+                                <Share2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Social Drafts</h4>
                             </div>
                             <button 
                                 onClick={() => setActiveSubTab('social')}
-                                className="p-1.5 bg-neutral-50 text-neutral-400 rounded-lg hover:bg-neutral-100 hover:text-black transition-all"
+                                className="p-1.5 bg-theme-panel text-theme-muted rounded-lg hover:bg-theme-hover hover:text-theme-primary transition-all"
                                 title="Go to Social Workspace"
                             >
                                 <PenTool className="w-3 h-3" />
@@ -594,14 +594,14 @@ Episode Role: ${activeProject.episode_role || "—"}
                         </div>
                     </div>
 
-                    <div className={`bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm transition-all duration-300 ${isStructureCollapsed ? 'flex-none' : 'flex-1 min-h-[200px]'}`}>
+                    <div className={`bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm transition-all duration-300 ${isStructureCollapsed ? 'flex-none' : 'flex-1 min-h-[200px]'}`}>
                         <button 
                             onClick={() => setIsStructureCollapsed(!isStructureCollapsed)}
                             className="w-full flex items-center justify-between mb-2 group"
                         >
                             <div className="flex items-center gap-2">
-                                <Layout className="w-4 h-4 text-blue-600" />
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 group-hover:text-black transition-colors">Structure</h4>
+                                <Layout className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 dark:text-slate-500 group-hover:text-black dark:group-hover:text-white transition-colors">Structure</h4>
                             </div>
                             <ChevronDown className={`w-3 h-3 text-neutral-300 transition-transform duration-300 ${isStructureCollapsed ? '-rotate-90' : 'rotate-0'}`} />
                         </button>
@@ -610,18 +610,18 @@ Episode Role: ${activeProject.episode_role || "—"}
                             <div className="space-y-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                 {activeProject ? (
                                     <div className="space-y-3">
-                                        <div className="p-2.5 bg-neutral-50 rounded-xl border border-neutral-100">
-                                            <div className="text-[9px] font-black text-neutral-400 uppercase tracking-tight mb-1">Summary</div>
-                                            <p className="text-[10px] text-neutral-500 leading-relaxed line-clamp-2 hover:line-clamp-none transition-all cursor-help">{activeProject.summary || "—"}</p>
+                                        <div className="p-2.5 bg-neutral-50 dark:bg-slate-900/50 rounded-xl border border-neutral-100 dark:border-slate-800">
+                                            <div className="text-[9px] font-black text-neutral-400 dark:text-slate-500 uppercase tracking-tight mb-1">Summary</div>
+                                            <p className="text-[10px] text-neutral-500 dark:text-slate-400 leading-relaxed line-clamp-2 hover:line-clamp-none transition-all cursor-help">{activeProject.summary || "—"}</p>
                                         </div>
                                         
                                         {blocks.length > 0 && (
                                             <div className="mt-2">
                                                 <div className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-2 px-1">Blocks Outline</div>
-                                                <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar-small">
+                                                <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1 scrollbar-theme">
                                                     {blocks.map((b, i) => (
-                                                        <div key={b.id} className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 py-1.5 px-3 bg-neutral-50 rounded-lg border border-neutral-100 hover:border-neutral-200 transition-colors">
-                                                            <span className="text-neutral-300 w-3">{i + 1}</span>
+                                                        <div key={b.id} className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 dark:text-slate-400 py-1.5 px-3 bg-neutral-50 dark:bg-slate-900/50 rounded-lg border border-neutral-100 dark:border-slate-800 hover:border-neutral-200 dark:hover:border-slate-700 transition-colors">
+                                                            <span className="text-neutral-300 dark:text-slate-700 w-3">{i + 1}</span>
                                                             <span className="truncate">{b.label}</span>
                                                         </div>
                                                     ))}
@@ -630,7 +630,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[10px] font-bold text-neutral-400 text-center border-dashed italic">
+                                    <div className="p-3 bg-neutral-50 dark:bg-slate-900/50 rounded-xl border border-neutral-100 dark:border-slate-800 text-[10px] font-bold text-neutral-400 dark:text-slate-600 text-center border-dashed italic">
                                         Select project to view structure
                                     </div>
                                 )}
@@ -644,31 +644,31 @@ Episode Role: ${activeProject.episode_role || "—"}
             {/* Center Column: Wide Writing Area */}
             <div className="col-span-9 flex flex-col gap-6">
                 {activeProject ? (
-                    <div className="bg-white border border-neutral-200 rounded-[40px] shadow-sm flex-1 flex flex-col overflow-hidden">
+                    <div className="bg-theme-card border border-theme-border rounded-[40px] shadow-sm flex-1 flex flex-col overflow-hidden">
                         {/* Writing Header */}
-                        <div className="px-10 py-8 border-b border-neutral-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                        <div className="px-10 py-8 border-b border-theme-border/50 flex items-center justify-between bg-theme-card sticky top-0 z-10">
                             <div>
                                 <div className="flex items-center gap-4 mb-1">
-                                    <h2 className="text-2xl font-black text-neutral-900 leading-none">{activeProject.title}</h2>
+                                    <h2 className="text-2xl font-black text-neutral-900 dark:text-slate-100 leading-none">{activeProject.title}</h2>
                                     {/* Sub-Tab Switcher */}
-                                    <div className="flex items-center bg-neutral-100 p-1 rounded-2xl">
+                                    <div className="flex items-center bg-neutral-100 dark:bg-slate-900/50 p-1 rounded-2xl">
                                         <button 
                                             onClick={() => setActiveSubTab('chapter')}
-                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'chapter' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'chapter' ? 'bg-white dark:bg-slate-800 text-black dark:text-theme-primary shadow-sm border border-transparent dark:border-slate-700' : 'text-neutral-400 dark:text-slate-500 hover:text-neutral-600 dark:hover:text-slate-300'}`}
                                         >
                                             <PenTool className="w-3 h-3" />
                                             Chapter Draft
                                         </button>
                                         <button 
                                             onClick={() => setActiveSubTab('social')}
-                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'social' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'social' ? 'bg-white dark:bg-slate-800 text-black dark:text-theme-primary shadow-sm border border-transparent dark:border-slate-700' : 'text-neutral-400 dark:text-slate-500 hover:text-neutral-600 dark:hover:text-slate-300'}`}
                                         >
                                             <Share2 className="w-3 h-3" />
                                             Social Drafts
                                         </button>
                                         <button 
                                             onClick={() => setActiveSubTab('preview')}
-                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'preview' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'preview' ? 'bg-white dark:bg-slate-800 text-black dark:text-theme-primary shadow-sm border border-transparent dark:border-slate-700' : 'text-neutral-400 dark:text-slate-500 hover:text-neutral-600 dark:hover:text-slate-300'}`}
                                         >
                                             <Globe className="w-3 h-3" />
                                             Preview / Export
@@ -677,29 +677,29 @@ Episode Role: ${activeProject.episode_role || "—"}
                                 </div>
                                 <div className="flex items-center gap-3 mt-2">
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">{activeProject.id}</span>
-                                        <span className="w-1 h-1 bg-neutral-200 rounded-full" />
-                                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">{activeProject.status}</span>
+                                        <span className="text-[9px] font-black text-neutral-400 dark:text-slate-500 uppercase tracking-widest">{activeProject.id}</span>
+                                        <span className="w-1 h-1 bg-neutral-200 dark:bg-slate-800 rounded-full" />
+                                        <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{activeProject.status}</span>
                                     </div>
-                                    <span className="w-px h-3 bg-neutral-100" />
+                                    <span className="w-px h-3 bg-neutral-100 dark:bg-slate-800" />
                                     {/* Compact Placeholder Toolbar */}
                                     <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 rounded-md">
-                                            <Zap className="w-2.5 h-2.5 text-amber-500" />
-                                            <span className="text-[8px] font-black text-amber-700 uppercase">AI Disabled</span>
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 dark:bg-amber-950/30 rounded-md">
+                                            <Zap className="w-2.5 h-2.5 text-amber-500 dark:text-amber-400" />
+                                            <span className="text-[8px] font-black text-amber-700 dark:text-amber-500 uppercase">AI Disabled</span>
                                         </div>
                                         <button 
                                             onClick={() => setIsToneModalOpen(true)}
-                                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-all ${activeProject.tone_profile ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-neutral-100 text-neutral-400 hover:bg-neutral-200'}`}
+                                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-all ${activeProject.tone_profile ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50' : 'bg-neutral-100 dark:bg-slate-900 text-neutral-400 dark:text-slate-500 hover:bg-neutral-200 dark:hover:bg-slate-800'}`}
                                         >
                                             <Sparkles className={`w-2.5 h-2.5 ${activeProject.tone_profile ? 'text-blue-500' : 'text-neutral-400'}`} />
                                             <span className="text-[8px] font-black uppercase">
                                                 {activeProject.tone_profile || "Tone not set"}
                                             </span>
                                         </button>
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-neutral-50 rounded-md">
-                                            <Share2 className="w-2.5 h-2.5 text-neutral-400" />
-                                            <span className="text-[8px] font-black text-neutral-500 uppercase">Export Locked</span>
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-theme-input rounded-md border border-theme-border/50">
+                                            <Share2 className="w-2.5 h-2.5 text-theme-muted" />
+                                            <span className="text-[8px] font-black text-theme-secondary uppercase">Export Locked</span>
                                         </div>
                                     </div>
                                 </div>
@@ -707,46 +707,46 @@ Episode Role: ${activeProject.episode_role || "—"}
 
                             <div className="flex items-center gap-4">
                                 {activeSubTab === 'preview' && blocks.length > 0 && (
-                                    <div className="flex items-center gap-2 bg-neutral-100 p-1.5 rounded-2xl">
+                                    <div className="flex items-center gap-2 bg-theme-panel/60 p-1.5 rounded-2xl border border-theme-border/40">
                                         <button 
                                             onClick={() => handleCopy('markdown')}
                                             title="Copy As Markdown"
-                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
                                         >
                                             <Share2 className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => handleCopy('workos')}
                                             title="Copy WorkOS Note"
-                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
                                         >
                                             <FileText className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => handleCopy('draft')}
                                             title="Copy Article Draft"
-                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
                                         >
                                             <Type className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => handleCopy('website')}
                                             title="Copy Website Draft Pack"
-                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
                                         >
                                             <Globe className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => handleCopy('studio')}
                                             title="Copy Article Studio Pack"
-                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
                                         >
                                             <Box className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => handleCopy('outline')}
                                             title="Copy Outline"
-                                            className="p-2 hover:bg-white rounded-xl text-neutral-500 hover:text-black transition-all"
+                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
                                         >
                                             <List className="w-4 h-4" />
                                         </button>
@@ -771,7 +771,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     <button 
                                         onClick={handleSave}
                                         disabled={saving || blocks.length === 0}
-                                        className="flex items-center gap-2 px-8 py-3 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
+                                        className="flex items-center gap-2 px-8 py-3 bg-black dark:bg-slate-800 border border-transparent dark:border-slate-700 text-white dark:text-theme-primary rounded-2xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
                                     >
                                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                         {saving ? "Saving..." : "Save Content"}
@@ -782,7 +782,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     <button 
                                         onClick={handleSaveSocialFields}
                                         disabled={saving}
-                                        className="flex items-center gap-2 px-8 py-3 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
+                                        className="flex items-center gap-2 px-8 py-3 bg-black dark:bg-slate-800 border border-transparent dark:border-slate-700 text-white dark:text-theme-primary rounded-2xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
                                     >
                                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                         {saving ? "Saving Drafts..." : "Save Social Drafts"}
@@ -792,7 +792,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                         </div>
 
                         {/* Workspace Area */}
-                        <div className="flex-1 overflow-y-auto p-12 custom-scrollbar bg-neutral-50/30">
+                        <div className="flex-1 overflow-y-auto p-12 scrollbar-theme bg-theme-app/40 dark:bg-theme-app/60">
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center h-full text-neutral-300">
                                     <RefreshCw className="w-8 h-8 animate-spin mb-4" />
@@ -801,124 +801,124 @@ Episode Role: ${activeProject.episode_role || "—"}
                             ) : activeSubTab === 'preview' ? (
                                 <div className="max-w-4xl mx-auto py-8">
                                     {blocks.length > 0 ? (
-                                        <div className="bg-white border border-neutral-100 rounded-3xl p-12 shadow-sm min-h-[500px]">
+                                        <div className="bg-theme-card border border-theme-border rounded-3xl p-12 shadow-sm min-h-[500px]">
                                             <div className="max-w-none">
                                                 {blocks.map((block) => (
                                                     <div key={block.id} className="mb-12 last:mb-0">
-                                                        <h2 className="text-xl font-black text-neutral-900 border-b border-neutral-100 pb-3 mb-6 uppercase tracking-tight">
+                                                        <h2 className="text-xl font-black text-theme-primary border-b border-theme-border/50 pb-3 mb-6 uppercase tracking-tight">
                                                             {block.label}
                                                         </h2>
-                                                        <div className="text-lg text-neutral-800 leading-relaxed whitespace-pre-wrap">
-                                                            {block.content_md || <span className="text-neutral-200 italic font-medium">No content for this section</span>}
+                                                        <div className="text-lg text-theme-secondary leading-relaxed whitespace-pre-wrap">
+                                                            {block.content_md || <span className="text-theme-muted italic font-medium">No content for this section</span>}
                                                         </div>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="text-center py-20 bg-white border border-neutral-100 rounded-3xl shadow-sm">
-                                            <AlertCircle className="w-12 h-12 text-neutral-200 mx-auto mb-4" />
-                                            <p className="text-sm font-bold text-neutral-400 uppercase">No content to preview</p>
+                                        <div className="text-center py-20 bg-theme-card border border-theme-border rounded-3xl shadow-sm">
+                                            <AlertCircle className="w-12 h-12 text-theme-muted mx-auto mb-4" />
+                                            <p className="text-sm font-bold text-theme-muted uppercase">No content to preview</p>
                                         </div>
                                     )}
                                     
                                     {/* Social Preview Section */}
                                     <div className="mt-12 space-y-8">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-px bg-neutral-200 flex-1" />
-                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-300">Social Draft Preview</h3>
-                                            <div className="h-px bg-neutral-200 flex-1" />
+                                            <div className="h-px bg-neutral-200 dark:bg-slate-800 flex-1" />
+                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-300 dark:text-slate-600">Social Draft Preview</h3>
+                                            <div className="h-px bg-neutral-200 dark:bg-slate-800 flex-1" />
                                         </div>
                                         
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             {/* FB Group */}
-                                            <div className="bg-white border border-neutral-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="bg-theme-card border border-theme-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
                                                 <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center gap-2 text-blue-600">
+                                                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                                                         <Users className="w-4 h-4" />
                                                         <span className="text-[10px] font-black uppercase tracking-widest">FB Group Post</span>
                                                     </div>
-                                                    <button onClick={() => handleCopySocial('group')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all">
+                                                    <button onClick={() => handleCopySocial('group')} className="p-1.5 hover:bg-neutral-50 dark:hover:bg-slate-800 rounded-lg text-neutral-400 dark:text-slate-500 hover:text-black dark:hover:text-white transition-all">
                                                         <Share2 className="w-3 h-3" />
                                                     </button>
                                                 </div>
-                                                <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
-                                                    {socialFields.group_post_markdown || <span className="text-neutral-200 italic">No group draft...</span>}
+                                                <div className="text-sm text-neutral-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                                                    {socialFields.group_post_markdown || <span className="text-neutral-200 dark:text-slate-800 italic">No group draft...</span>}
                                                 </div>
                                                 {socialFields.hashtags && (
-                                                    <div className="mt-4 pt-4 border-t border-neutral-50 text-[10px] font-bold text-blue-500">
+                                                    <div className="mt-4 pt-4 border-t border-neutral-50 dark:border-slate-800 text-[10px] font-bold text-blue-500">
                                                         {socialFields.hashtags}
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* FB Page */}
-                                            <div className="bg-white border border-neutral-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="bg-theme-card border border-theme-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
                                                 <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center gap-2 text-emerald-600">
+                                                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
                                                         <Flag className="w-4 h-4" />
                                                         <span className="text-[10px] font-black uppercase tracking-widest">FB Page Post</span>
                                                     </div>
-                                                    <button onClick={() => handleCopySocial('page')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all">
+                                                    <button onClick={() => handleCopySocial('page')} className="p-1.5 hover:bg-neutral-50 dark:hover:bg-slate-800 rounded-lg text-neutral-400 dark:text-slate-500 hover:text-black dark:hover:text-white transition-all">
                                                         <Share2 className="w-3 h-3" />
                                                     </button>
                                                 </div>
-                                                <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
-                                                    {socialFields.page_post_markdown || <span className="text-neutral-200 italic">No page draft...</span>}
+                                                <div className="text-sm text-neutral-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                                                    {socialFields.page_post_markdown || <span className="text-neutral-200 dark:text-slate-800 italic">No page draft...</span>}
                                                 </div>
                                                 {socialFields.hashtags && (
-                                                    <div className="mt-4 pt-4 border-t border-neutral-50 text-[10px] font-bold text-blue-500">
+                                                    <div className="mt-4 pt-4 border-t border-neutral-50 dark:border-slate-800 text-[10px] font-bold text-blue-500">
                                                         {socialFields.hashtags}
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Personal Profile */}
-                                            <div className="bg-white border border-neutral-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="bg-theme-card border border-theme-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
                                                 <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center gap-2 text-neutral-900">
+                                                    <div className="flex items-center gap-2 text-neutral-900 dark:text-slate-100">
                                                         <User className="w-4 h-4" />
                                                         <span className="text-[10px] font-black uppercase tracking-widest">Personal Post</span>
                                                     </div>
-                                                    <button onClick={() => handleCopySocial('personal')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all">
+                                                    <button onClick={() => handleCopySocial('personal')} className="p-1.5 hover:bg-neutral-50 dark:hover:bg-slate-800 rounded-lg text-neutral-400 dark:text-slate-500 hover:text-black dark:hover:text-white transition-all">
                                                         <Share2 className="w-3 h-3" />
                                                     </button>
                                                 </div>
-                                                <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
-                                                    {socialFields.personal_post_markdown || <span className="text-neutral-200 italic">No personal draft...</span>}
+                                                <div className="text-sm text-neutral-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                                                    {socialFields.personal_post_markdown || <span className="text-neutral-200 dark:text-slate-800 italic">No personal draft...</span>}
                                                 </div>
                                                 {socialFields.hashtags && (
-                                                    <div className="mt-4 pt-4 border-t border-neutral-50 text-[10px] font-bold text-blue-500">
+                                                    <div className="mt-4 pt-4 border-t border-neutral-50 dark:border-slate-800 text-[10px] font-bold text-blue-500">
                                                         {socialFields.hashtags}
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Caption & Hashtags */}
-                                            <div className="bg-white border border-neutral-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="bg-theme-card border border-theme-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
                                                 <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center gap-2 text-amber-600">
+                                                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                                                         <MessageCircle className="w-4 h-4" />
                                                         <span className="text-[10px] font-black uppercase tracking-widest">Short Caption</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <button onClick={() => handleCopySocial('caption')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all" title="Copy Caption">
+                                                        <button onClick={() => handleCopySocial('caption')} className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all" title="Copy Caption">
                                                             <Share2 className="w-3 h-3" />
                                                         </button>
-                                                        <button onClick={() => handleCopySocial('hashtags')} className="p-1.5 hover:bg-neutral-50 rounded-lg text-neutral-400 hover:text-black transition-all" title="Copy Hashtags">
+                                                        <button onClick={() => handleCopySocial('hashtags')} className="p-1.5 hover:bg-neutral-50 dark:hover:bg-slate-800 rounded-lg text-neutral-400 dark:text-slate-500 hover:text-black dark:hover:text-white transition-all" title="Copy Hashtags">
                                                             <Hash className="w-3 h-3" />
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed mb-4">
-                                                    {socialFields.social_caption || <span className="text-neutral-200 italic">No short caption...</span>}
+                                                <div className="text-sm text-theme-secondary whitespace-pre-wrap leading-relaxed mb-4">
+                                                    {socialFields.social_caption || <span className="text-theme-muted italic">No short caption...</span>}
                                                 </div>
-                                                <div className="text-[10px] font-bold text-neutral-400 border-t border-neutral-50 pt-4">
+                                                <div className="text-[10px] font-bold text-neutral-400 dark:text-slate-600 border-t border-neutral-50 dark:border-slate-800 pt-4">
                                                     <div className="flex items-center gap-1 mb-1 opacity-50">
                                                         <Hash className="w-2 h-2" />
                                                         <span>HASHTAGS</span>
                                                     </div>
-                                                    <div className="text-blue-500 leading-relaxed">
+                                                    <div className="text-blue-500 dark:text-blue-400 leading-relaxed">
                                                         {socialFields.hashtags || "—"}
                                                     </div>
                                                 </div>
@@ -928,7 +928,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                         <div className="flex justify-center">
                                             <button 
                                                 onClick={() => handleCopySocial('all')}
-                                                className="flex items-center gap-2 px-6 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                                className="flex items-center gap-2 px-6 py-3 bg-theme-panel hover:bg-theme-hover text-theme-secondary hover:text-theme-primary rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
                                             >
                                                 <Share2 className="w-3 h-3" />
                                                 Copy All Social Drafts
@@ -941,58 +941,58 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     {/* FB Group Editor */}
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
-                                                <Users className="w-5 h-5 text-blue-600" />
+                                            <div className="w-10 h-10 bg-blue-50 dark:bg-blue-950/30 rounded-2xl flex items-center justify-center">
+                                                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                             </div>
                                             <div>
-                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Facebook Group Post</h3>
-                                                <p className="text-[10px] font-bold text-neutral-400 uppercase">Educational Long-form (800–1,200 words)</p>
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-theme-primary">Facebook Group Post</h3>
+                                                <p className="text-[10px] font-bold text-neutral-400 dark:text-slate-500 uppercase">Educational Long-form (800–1,200 words)</p>
                                             </div>
                                         </div>
-                                        <textarea 
-                                            value={socialFields.group_post_markdown}
-                                            onChange={(e) => setSocialFields({...socialFields, group_post_markdown: e.target.value})}
-                                            placeholder={`[HOOK] — Grab attention with a scientific curiosity or common plant problem...\n\n[EDUCATIONAL BODY] — Deep dive into the mechanism of plant life...\n\n[BULLET POINTS] — Key takeaways or system checklists...\n\n[CAUTION / NUANCE] — Scientific guardrails and what to avoid...\n\n[READ MORE] — Link to full article or Hub...\n\n[QUESTION PROMPT] — Engaging question for the community...`}
-                                            className="w-full bg-white border border-neutral-100 rounded-[32px] p-8 text-lg text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none min-h-[600px] shadow-sm focus:ring-4 focus:ring-blue-500/5 focus:border-blue-200 transition-all"
-                                        />
+                                            <textarea 
+                                                value={socialFields.group_post_markdown}
+                                                onChange={(e) => setSocialFields({...socialFields, group_post_markdown: e.target.value})}
+                                                placeholder={`[HOOK] — Grab attention with a scientific curiosity or common plant problem...\n\n[EDUCATIONAL BODY] — Deep dive into the mechanism of plant life...\n\n[BULLET POINTS] — Key takeaways or system checklists...\n\n[CAUTION / NUANCE] — Scientific guardrails and what to avoid...\n\n[READ MORE] — Link to full article or Hub...\n\n[QUESTION PROMPT] — Engaging question for the community...`}
+                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[600px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all"
+                                            />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         {/* FB Page Editor */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                                                    <Flag className="w-5 h-5 text-emerald-600" />
+                                                <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl flex items-center justify-center">
+                                                    <Flag className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Facebook Page Post</h3>
-                                                    <p className="text-[10px] font-bold text-neutral-400 uppercase">Editorial Summary (300–600 words)</p>
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900 dark:text-slate-100">Facebook Page Post</h3>
+                                                    <p className="text-[10px] font-bold text-neutral-400 dark:text-slate-500 uppercase">Editorial Summary (300–600 words)</p>
                                                 </div>
                                             </div>
                                             <textarea 
                                                 value={socialFields.page_post_markdown}
                                                 onChange={(e) => setSocialFields({...socialFields, page_post_markdown: e.target.value})}
                                                 placeholder={`[EDITORIAL SUMMARY] — Concise insight for broad reach...\n\n[BRAND TONE] — Calm, professional, and knowledge-first...\n\n[READ MORE] — Link to Journey Hub...\n\n[HASHTAGS] — Strategic tags...`}
-                                                className="w-full bg-white border border-neutral-100 rounded-[32px] p-8 text-base text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-200 transition-all"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-base text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all"
                                             />
                                         </div>
 
                                         {/* Personal Post Editor */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-neutral-100 rounded-2xl flex items-center justify-center">
-                                                    <User className="w-5 h-5 text-neutral-900" />
+                                                <div className="w-10 h-10 bg-neutral-100 dark:bg-slate-900 rounded-2xl flex items-center justify-center">
+                                                    <User className="w-5 h-5 text-neutral-900 dark:text-slate-100" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Personal Post</h3>
-                                                    <p className="text-[10px] font-bold text-neutral-400 uppercase">Reflection (150–350 words)</p>
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900 dark:text-slate-100">Personal Post</h3>
+                                                    <p className="text-[10px] font-bold text-neutral-400 dark:text-slate-500 uppercase">Reflection (150–350 words)</p>
                                                 </div>
                                             </div>
                                             <textarea 
                                                 value={socialFields.personal_post_markdown}
                                                 onChange={(e) => setSocialFields({...socialFields, personal_post_markdown: e.target.value})}
                                                 placeholder={`[FOUNDER REFLECTION] — Personal take on this chapter's discovery...\n\n[BEHIND-THE-SCENES] — Observation from the field or research process...\n\n[LEARNING NOTE] — Quick takeaway for fellow learners...\n\n[SOFT CTA] — Invite to follow the journey...`}
-                                                className="w-full bg-white border border-neutral-100 rounded-[32px] p-8 text-base text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-black/5 focus:border-neutral-200 transition-all"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-base text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all scrollbar-theme"
                                             />
                                         </div>
                                     </div>
@@ -1001,32 +1001,32 @@ Episode Role: ${activeProject.episode_role || "—"}
                                         {/* Short Caption */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center">
-                                                    <MessageCircle className="w-5 h-5 text-amber-600" />
+                                                <div className="w-10 h-10 bg-amber-50 dark:bg-amber-950/30 rounded-2xl flex items-center justify-center">
+                                                    <MessageCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                                                 </div>
-                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Short Caption</h3>
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900 dark:text-slate-100">Short Caption</h3>
                                             </div>
                                             <textarea 
                                                 value={socialFields.social_caption}
                                                 onChange={(e) => setSocialFields({...socialFields, social_caption: e.target.value})}
                                                 placeholder="Short teaser for IG/TikTok/Stories..."
-                                                className="w-full bg-white border border-neutral-100 rounded-[24px] p-6 text-sm text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-amber-500/5 focus:border-amber-200 transition-all"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[24px] p-6 text-sm text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all"
                                             />
                                         </div>
 
                                         {/* Hashtags */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
-                                                    <Hash className="w-5 h-5 text-blue-600" />
+                                                <div className="w-10 h-10 bg-blue-50 dark:bg-blue-950/30 rounded-2xl flex items-center justify-center">
+                                                    <Hash className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                                 </div>
-                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Hashtags</h3>
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900 dark:text-slate-100">Hashtags</h3>
                                             </div>
                                             <textarea 
                                                 value={socialFields.hashtags}
                                                 onChange={(e) => setSocialFields({...socialFields, hashtags: e.target.value})}
                                                 placeholder="#topic #insight #plantlife #greenfineness..."
-                                                className="w-full bg-white border border-neutral-100 rounded-[24px] p-6 text-sm text-neutral-800 font-mono leading-relaxed placeholder:text-neutral-200 outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-blue-500/5 focus:border-blue-200 transition-all"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[24px] p-6 text-sm text-theme-primary font-mono leading-relaxed placeholder:text-theme-muted outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all"
                                             />
                                         </div>
                                     </div>
@@ -1037,15 +1037,15 @@ Episode Role: ${activeProject.episode_role || "—"}
                                         <div key={block.id} className="group relative">
                                             <div className="flex items-center justify-between mb-4">
                                                 <div className="flex items-center gap-3">
-                                                    <span className="w-8 h-8 flex items-center justify-center bg-white border border-neutral-100 rounded-lg text-[10px] font-black text-neutral-300 uppercase tracking-tight group-hover:text-neutral-900 group-hover:border-neutral-200 transition-all shadow-sm">
+                                                    <span className="w-8 h-8 flex items-center justify-center bg-theme-panel border border-theme-border rounded-lg text-[10px] font-black text-theme-muted uppercase tracking-tight group-hover:text-theme-primary transition-all shadow-sm">
                                                         {block.sort_order + 1}
                                                     </span>
                                                     <div>
-                                                        <label className="text-[11px] font-black uppercase tracking-[0.15em] text-neutral-400 group-focus-within:text-neutral-900 transition-colors">
+                                                        <label className="text-[11px] font-black uppercase tracking-[0.15em] text-neutral-400 dark:text-slate-500 group-focus-within:text-neutral-900 dark:group-focus-within:text-slate-100 transition-colors">
                                                             {block.label}
                                                         </label>
                                                         {block.placeholder && (
-                                                            <p className="text-[8px] font-bold text-neutral-300 uppercase tracking-wider mt-0.5">
+                                                            <p className="text-[8px] font-bold text-neutral-300 dark:text-slate-700 uppercase tracking-wider mt-0.5">
                                                                 {block.placeholder.length > 40 ? block.placeholder.substring(0, 40) + '...' : block.placeholder}
                                                             </p>
                                                         )}
@@ -1053,11 +1053,11 @@ Episode Role: ${activeProject.episode_role || "—"}
                                                 </div>
                                             </div>
                                             <div className="relative">
-                                                <textarea 
-                                                    value={block.content_md}
-                                                    onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                                                    placeholder={block.placeholder || "Start writing here..."}
-                                                    className="w-full bg-white border border-neutral-100 rounded-2xl p-6 text-lg text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none resize-none focus:ring-4 focus:ring-black/5 focus:border-neutral-200 transition-all shadow-sm group-hover:shadow-md"
+                                                    <textarea 
+                                                        value={block.content_md}
+                                                        onChange={(e) => updateBlockContent(block.id, e.target.value)}
+                                                        placeholder={block.placeholder || "Start writing here..."}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-2xl p-6 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none resize-none focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all shadow-sm group-hover:shadow-md scrollbar-theme"
                                                     style={{ height: 'auto', minHeight: '160px' }}
                                                     onInput={(e) => {
                                                         const target = e.target as HTMLTextAreaElement;
@@ -1070,23 +1070,23 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     ))}
                                     
                                     <div className="pt-24 pb-12 text-center">
-                                        <div className="w-12 h-1 bg-neutral-200 mx-auto rounded-full mb-8" />
-                                        <p className="text-[10px] font-black text-neutral-300 uppercase tracking-[0.3em]">End of Narrative Structure</p>
+                                        <div className="w-12 h-1 bg-neutral-200 dark:bg-slate-800 mx-auto rounded-full mb-8" />
+                                        <p className="text-[10px] font-black text-neutral-300 dark:text-slate-700 uppercase tracking-[0.3em]">End of Narrative Structure</p>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
-                                    <div className="w-24 h-24 bg-white border border-neutral-100 rounded-[32px] flex items-center justify-center mb-8 shadow-sm">
-                                        <Layout className="w-10 h-10 text-neutral-200" />
+                                    <div className="w-24 h-24 bg-theme-panel border border-theme-border rounded-[32px] flex items-center justify-center mb-8 shadow-sm">
+                                        <Layout className="w-10 h-10 text-neutral-200 dark:text-slate-800" />
                                     </div>
-                                    <h3 className="text-2xl font-black text-neutral-900 mb-3">No blocks initialized</h3>
-                                    <p className="text-sm text-neutral-400 max-w-sm mx-auto mb-10 leading-relaxed">
+                                    <h3 className="text-2xl font-black text-neutral-900 dark:text-slate-100 mb-3">No blocks initialized</h3>
+                                    <p className="text-sm text-neutral-400 dark:text-slate-500 max-w-sm mx-auto mb-10 leading-relaxed">
                                         This project needs a writing structure. Click below to initialize blocks for 
-                                        <span className="text-black font-bold mx-2 uppercase border-b-2 border-amber-400">{activeProject.writing_mode.replace(/_/g, ' ')}</span>.
+                                        <span className="text-black dark:text-white font-bold mx-2 uppercase border-b-2 border-amber-400">{activeProject.writing_mode.replace(/_/g, ' ')}</span>.
                                     </p>
                                     <button 
                                         onClick={handleInitialize}
-                                        className="px-10 py-4 bg-neutral-900 text-white rounded-2xl text-sm font-black hover:bg-black transition-all shadow-xl hover:shadow-black/20 flex items-center gap-3 transform hover:-translate-y-1"
+                                        className="px-10 py-4 bg-black dark:bg-slate-800 text-white dark:text-theme-primary rounded-2xl text-sm font-black border border-transparent dark:border-slate-700 hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-xl hover:shadow-black/20 flex items-center gap-3 transform hover:-translate-y-1"
                                     >
                                         <Zap className="w-5 h-5 text-amber-400" />
                                         Initialize Narrative Blocks
@@ -1096,17 +1096,17 @@ Episode Role: ${activeProject.episode_role || "—"}
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-white border border-neutral-200 rounded-[40px] p-16 shadow-sm flex-1 flex flex-col items-center justify-center text-center">
-                        <div className="w-28 h-28 bg-neutral-50 rounded-[40px] flex items-center justify-center mb-8">
-                            <PenTool className="w-12 h-12 text-neutral-300" />
+                    <div className="bg-theme-card border border-theme-border rounded-[40px] p-16 shadow-sm flex-1 flex flex-col items-center justify-center text-center">
+                        <div className="w-28 h-28 bg-theme-panel rounded-[40px] flex items-center justify-center mb-8">
+                            <PenTool className="w-12 h-12 text-theme-muted" />
                         </div>
-                        <h2 className="text-3xl font-black text-neutral-900 mb-3">Writing Studio</h2>
-                        <p className="text-base text-neutral-400 max-w-sm mx-auto leading-relaxed">
+                        <h2 className="text-3xl font-black text-theme-primary mb-3">Writing Studio</h2>
+                        <p className="text-base text-theme-secondary max-w-sm mx-auto leading-relaxed">
                             Every great story starts with a single word. Select a project to begin your journey.
                         </p>
                         <button 
                             onClick={onCreateProject}
-                            className="mt-10 px-10 py-4 bg-black text-white rounded-[24px] text-sm font-black hover:bg-neutral-800 transition-all shadow-xl shadow-black/10 flex items-center gap-3 transform hover:-translate-y-1"
+                            className="mt-10 px-10 py-4 bg-black dark:bg-slate-800 text-white dark:text-theme-primary rounded-[24px] text-sm font-black border border-transparent dark:border-slate-700 hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-xl shadow-black/10 flex items-center gap-3 transform hover:-translate-y-1"
                         >
                             <Plus className="w-5 h-5" />
                             Create Your First Project

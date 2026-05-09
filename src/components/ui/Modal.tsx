@@ -126,7 +126,7 @@ export function Modal(props: ModalProps) {
                 </div>
                 
                 {/* Scrollable Body - Compact */}
-                <div className={`flex-1 overflow-y-auto custom-scrollbar px-8 pb-8 ${contentClassName}`}>
+                <div className={`flex-1 overflow-y-auto scrollbar-theme px-8 pb-8 ${contentClassName}`}>
                     {children}
                 </div>
             </div>

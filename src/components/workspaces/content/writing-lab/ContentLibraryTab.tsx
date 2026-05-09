@@ -14,12 +14,12 @@ import {
 } from "lucide-react";
 
 const ROLE_COLORS: Record<string, string> = {
-    core_episode: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    supporting_article: "bg-blue-50 text-blue-600 border-blue-100",
-    bridge_article: "bg-purple-50 text-purple-600 border-purple-100",
-    practical_guide: "bg-amber-50 text-amber-600 border-amber-100",
-    journal_note: "bg-rose-50 text-rose-600 border-rose-100",
-    social_only_piece: "bg-indigo-50 text-indigo-600 border-indigo-100",
+    core_episode: "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+    supporting_article: "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
+    bridge_article: "bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20",
+    practical_guide: "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20",
+    journal_note: "bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20",
+    social_only_piece: "bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20",
 };
 
 interface ContentLibraryTabProps {
@@ -68,64 +68,64 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
     const filteredProjects = projects.filter(p => showArchived ? true : p.status !== 'archived');
 
     if (loading) {
-        return <div className="py-20 text-center text-neutral-400">Loading Library...</div>;
+        return <div className="py-20 text-center text-theme-muted">Loading Library...</div>;
     }
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-4 bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center gap-4 bg-theme-card border border-theme-border rounded-2xl p-4 shadow-sm">
                 <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
                     <input 
                         type="text" 
                         placeholder="Search writing projects..."
-                        className="w-full bg-neutral-50 border-none rounded-xl pl-11 pr-4 py-2 text-sm focus:ring-2 focus:ring-black/5 transition-all outline-none"
+                        className="w-full bg-theme-input border border-theme-border rounded-xl pl-11 pr-4 py-2 text-sm text-theme-primary placeholder:text-theme-muted focus:ring-2 focus:ring-theme-accent/5 transition-all outline-none"
                     />
                 </div>
                 <button 
                     onClick={() => setShowArchived(!showArchived)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showArchived ? 'bg-black text-white' : 'bg-neutral-50 text-neutral-600 hover:bg-neutral-100'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${showArchived ? 'bg-black dark:bg-slate-800 text-white dark:text-theme-primary border-transparent dark:border-slate-700' : 'bg-theme-panel border-transparent text-theme-secondary hover:bg-theme-hover'}`}
                 >
                     {showArchived ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                     {showArchived ? 'Showing Archived' : 'Show Archived'}
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-neutral-50 rounded-xl text-xs font-bold text-neutral-600 hover:bg-neutral-100 transition-all">
+                <button className="flex items-center gap-2 px-4 py-2 bg-theme-panel rounded-xl text-xs font-bold text-theme-secondary hover:bg-theme-hover transition-all">
                     <Filter className="w-3.5 h-3.5" />
                     Filter
                 </button>
             </div>
 
-            <div className="bg-white border border-neutral-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-theme-card border border-theme-border rounded-3xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
-                        <tr className="bg-neutral-50 border-b border-neutral-100">
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Title</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Topic ID</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Episode Role</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Writing Mode</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Journey Stage</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Status</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Narrative Status</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400">Updated At</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-neutral-400 text-right">Actions</th>
+                        <tr className="bg-theme-panel/50 border-b border-theme-border">
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Title</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Topic ID</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Episode Role</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Writing Mode</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Journey Stage</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Status</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Narrative Status</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Updated At</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody className="divide-y divide-theme-border/50">
                         {filteredProjects.map(project => {
-                            const roleColor = ROLE_COLORS[project.episode_role] || "bg-neutral-100 text-neutral-500 border-neutral-200";
+                            const roleColor = ROLE_COLORS[project.episode_role] || "bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-theme-panel dark:text-theme-muted dark:border-theme-border";
                             return (
                             <tr 
                                 key={project.id} 
                                 onClick={() => onSelectProject?.(project.id)}
-                                className="hover:bg-neutral-50 transition-colors group cursor-pointer"
+                                className="hover:bg-theme-hover transition-colors group cursor-pointer"
                             >
                                 <td className="px-5 py-4">
-                                    <div className="font-bold text-neutral-900 truncate max-w-[200px] group-hover:text-black">{project.title}</div>
-                                    <div className="text-[10px] text-neutral-400 mt-0.5 font-mono">{project.id}</div>
+                                    <div className="font-bold text-theme-primary truncate max-w-[200px] group-hover:text-black dark:group-hover:text-white transition-colors">{project.title}</div>
+                                    <div className="text-[10px] text-theme-muted mt-0.5 font-mono">{project.id}</div>
                                 </td>
                                 <td className="px-5 py-4">
-                                    <div className="text-xs font-mono text-neutral-600">{project.topic_id || "—"}</div>
+                                    <div className="text-xs font-mono text-theme-secondary">{project.topic_id || "—"}</div>
                                 </td>
                                 <td className="px-5 py-4">
                                     {project.episode_role ? (
@@ -133,32 +133,32 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
                                             {project.episode_role.replace(/_/g, ' ')}
                                         </span>
                                     ) : (
-                                        <span className="text-[10px] text-neutral-300">—</span>
+                                        <span className="text-[10px] text-theme-muted/40">—</span>
                                     )}
                                 </td>
                                 <td className="px-5 py-4">
-                                    <span className="text-[9px] font-black uppercase tracking-tight px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200">
+                                    <span className="text-[9px] font-black uppercase tracking-tight px-2 py-0.5 rounded-full bg-theme-panel text-theme-muted border border-theme-border">
                                         {project.writing_mode?.replace(/_/g, ' ')}
                                     </span>
                                 </td>
                                 <td className="px-5 py-4">
-                                    <div className="text-xs font-medium text-neutral-600 uppercase">{project.journey_stage || "—"}</div>
+                                    <div className="text-xs font-medium text-theme-secondary uppercase">{project.journey_stage || "—"}</div>
                                 </td>
                                 <td className="px-5 py-4">
                                     <div className="flex items-center gap-1.5">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'published' ? 'bg-emerald-500' : project.status === 'draft' ? 'bg-amber-400' : project.status === 'archived' ? 'bg-neutral-300' : 'bg-blue-500'}`} />
-                                        <span className="text-[10px] font-bold text-neutral-500 uppercase">{project.status}</span>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'published' ? 'bg-emerald-500' : project.status === 'draft' ? 'bg-amber-400' : project.status === 'archived' ? 'bg-theme-muted/50' : 'bg-blue-500'}`} />
+                                        <span className="text-[10px] font-bold text-theme-muted uppercase">{project.status}</span>
                                     </div>
                                 </td>
                                 <td className="px-5 py-4">
                                     {project.narrative_status ? (
-                                        <span className="text-[10px] font-bold text-neutral-500 uppercase">{project.narrative_status.replace(/_/g, ' ')}</span>
+                                        <span className="text-[10px] font-bold text-theme-muted uppercase">{project.narrative_status.replace(/_/g, ' ')}</span>
                                     ) : (
-                                        <span className="text-[10px] text-neutral-300">—</span>
+                                        <span className="text-[10px] text-theme-muted/40">—</span>
                                     )}
                                 </td>
                                 <td className="px-5 py-4">
-                                    <div className="flex items-center gap-1.5 text-neutral-400">
+                                    <div className="flex items-center gap-1.5 text-theme-muted">
                                         <Clock className="w-3 h-3" />
                                         <span className="text-[10px] font-medium">{new Date(project.updated_at).toLocaleDateString()}</span>
                                     </div>
@@ -169,23 +169,23 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
                                             e.stopPropagation();
                                             setActiveMenu(activeMenu === project.id ? null : project.id);
                                         }}
-                                        className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-400 hover:text-black transition-all"
+                                        className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
                                     >
                                         <MoreVertical className="w-4 h-4" />
                                     </button>
 
                                     {activeMenu === project.id && (
-                                        <div className="absolute right-14 top-4 z-20 bg-white border border-neutral-200 rounded-xl shadow-xl p-1.5 min-w-[140px] animate-in fade-in zoom-in-95 duration-200">
+                                        <div className="absolute right-14 top-4 z-20 bg-theme-card border border-theme-border rounded-xl shadow-xl p-1.5 min-w-[140px] animate-in fade-in zoom-in-95 duration-200">
                                             <button 
                                                 onClick={(e) => handleArchive(e, project.id, project.status)}
-                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-neutral-600 hover:bg-neutral-50 hover:text-black rounded-lg transition-all"
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover hover:text-theme-primary rounded-lg transition-all"
                                             >
                                                 <Archive className="w-3.5 h-3.5" />
                                                 {project.status === 'archived' ? 'Restore' : 'Archive'}
                                             </button>
                                             <button 
                                                 onClick={(e) => handleDelete(e, project.id)}
-                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                                 Delete
@@ -201,9 +201,9 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
                 </div>
                 {filteredProjects.length === 0 && (
                     <div className="py-20 text-center">
-                        <Library className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-                        <p className="text-neutral-500 font-bold">{showArchived ? "Library is empty." : "No active projects."}</p>
-                        <p className="text-xs text-neutral-400 mt-2">
+                        <Library className="w-12 h-12 text-theme-muted mx-auto mb-4" />
+                        <p className="text-theme-secondary font-bold">{showArchived ? "Library is empty." : "No active projects."}</p>
+                        <p className="text-xs text-theme-muted mt-2">
                             {showArchived ? "Try creating a new project." : "Check Show Archived to see hidden projects."}
                         </p>
                     </div>

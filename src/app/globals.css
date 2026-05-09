@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   --background: #ffffff;
@@ -39,14 +40,14 @@
   --background: #08090a;
   --foreground: #F8FAFC;
 
-  /* Theme Tokens - Dark (Refined Premium Slate) */
+  /* Theme Tokens - Dark (Arbor Studio Charcoal) */
   --theme-sidebar-bg: #06080a;
   --theme-topbar-bg: #0B0E14;
-  --theme-app-bg: #0B0E14;
+  --theme-app-bg: #0f141b;
   --theme-panel-bg: #10141d;
-  --theme-card-bg: #121721;
+  --theme-card-bg: #141b24;
   --theme-card-elevated: #1A202C;
-  --theme-border: #222d3d;
+  --theme-border: #1e293b;
   --theme-border-subtle: #19212e;
   --theme-text-primary: #F8FAFC;
   --theme-text-secondary: #CBD5E1;
@@ -55,7 +56,7 @@
   --theme-hover: #1e2633;
   --theme-nav-hover: #1e2633;
   --theme-nav-active: #2d3748;
-  --theme-input-bg: #06080a;
+  --theme-input-bg: #101722;
   --theme-input-border: #222d3d;
   --theme-overlay: #1A202C;
   --theme-accent: #3B82F6;
@@ -328,7 +329,7 @@ body {
   border-radius: 10px;
 }
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: var(--theme-text-muted);
+  background-color: var(--theme-text-subtle);
 }
 
 .scrollbar-hide-until-hover::-webkit-scrollbar {
@@ -343,7 +344,34 @@ body {
   border-radius: 10px;
 }
 .scrollbar-hide-until-hover:hover::-webkit-scrollbar-thumb {
-  background-color: var(--theme-text-muted);
+  background-color: var(--theme-text-subtle);
+}
+
+/* Theme-aware Scrollbar Utility */
+.scrollbar-theme::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-theme::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-theme::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.scrollbar-theme:hover::-webkit-scrollbar-thumb {
+  background-color: #475569;
+}
+[data-theme="dark"] .scrollbar-theme::-webkit-scrollbar-track {
+  background: #0f141b;
+}
+[data-theme="dark"] .scrollbar-theme::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+[data-theme="dark"] .scrollbar-theme:hover::-webkit-scrollbar-thumb {
+  background-color: #64748b;
 }
 
 /* Typography Theme Overrides */

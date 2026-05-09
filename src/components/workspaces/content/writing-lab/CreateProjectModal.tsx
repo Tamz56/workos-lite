@@ -105,32 +105,32 @@ export default function CreateProjectModal({
             <form onSubmit={handleSubmit} className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Project Title</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Project Title</label>
                         <input 
                             required
                             type="text" 
                             value={formData.title}
                             onChange={e => setFormData({ ...formData, title: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none placeholder:text-theme-muted"
                             placeholder="Enter project title..."
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Topic ID</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 dark:text-slate-500 mb-1.5 block">Topic ID</label>
                         <input 
                             type="text" 
                             value={formData.topic_id}
                             onChange={e => setFormData({ ...formData, topic_id: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none placeholder:text-neutral-300 dark:placeholder:text-slate-700"
                             placeholder="e.g. T-101"
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Writing Mode</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Writing Mode</label>
                         <select 
                             value={formData.writing_mode}
                             onChange={e => setFormData({ ...formData, writing_mode: e.target.value as WritingMode })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none"
                         >
                             {MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                         </select>
@@ -141,18 +141,18 @@ export default function CreateProjectModal({
                         <select 
                             value={formData.story_set_id}
                             onChange={e => setFormData({ ...formData, story_set_id: e.target.value, episode_id: "" })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none"
                         >
                             <option value="">Select Story Set...</option>
                             {storySets.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Episode</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Episode</label>
                         <select 
                             value={formData.episode_id}
                             onChange={e => setFormData({ ...formData, episode_id: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none"
                             disabled={!formData.story_set_id}
                         >
                             <option value="">Select Episode...</option>
@@ -163,49 +163,49 @@ export default function CreateProjectModal({
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Slug</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 dark:text-slate-500 mb-1.5 block">Slug</label>
                         <input 
                             type="text" 
                             value={formData.slug}
                             onChange={e => setFormData({ ...formData, slug: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none font-mono"
+                            className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none font-mono placeholder:text-neutral-300 dark:placeholder:text-slate-700"
                             placeholder="e.g. soil-microbes"
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Notes</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Notes</label>
                         <input 
                             type="text" 
                             value={formData.notes}
                             onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none placeholder:text-theme-muted"
                             placeholder="Internal notes..."
                         />
                     </div>
 
                     <div className="col-span-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Summary / Goal</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-neutral-400 dark:text-slate-500 mb-1.5 block">Summary / Goal</label>
                         <textarea 
                             value={formData.summary}
                             onChange={e => setFormData({ ...formData, summary: e.target.value })}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none min-h-[80px]"
+                            className="w-full bg-neutral-50 dark:bg-slate-950/40 border border-neutral-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-neutral-900 dark:text-slate-100 focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 outline-none min-h-[80px] placeholder:text-neutral-300 dark:placeholder:text-slate-700"
                             placeholder="What is this project about?"
                         />
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-100">
+                <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-100 dark:border-slate-800">
                     <button 
                         type="button" 
                         onClick={onClose}
-                        className="px-6 py-2.5 text-sm font-bold text-neutral-500 hover:text-neutral-900 transition-colors"
+                        className="px-6 py-2.5 text-sm font-bold text-neutral-500 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-slate-100 transition-colors"
                     >
                         Cancel
                     </button>
                     <button 
                         type="submit" 
                         disabled={loading}
-                        className="px-8 py-2.5 bg-black text-white rounded-xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-50"
+                        className="px-8 py-2.5 bg-black dark:bg-slate-800 text-white dark:text-theme-primary border border-transparent dark:border-slate-700 rounded-xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-lg shadow-black/10 disabled:opacity-50"
                     >
                         {loading ? "Creating..." : "Create Project"}
                     </button>
