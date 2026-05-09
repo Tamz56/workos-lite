@@ -48,7 +48,7 @@ export default function WritingStudioTab({
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
-    const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+    const [activeSubTab, setActiveSubTab] = useState<'chapter' | 'social' | 'preview'>('chapter');
     const [copyStatus, setCopyStatus] = useState<string | null>(null);
     const [websiteFields, setWebsiteFields] = useState({
         slug: "",
@@ -90,12 +90,12 @@ export default function WritingStudioTab({
     }, [activeProject]);
 
     useEffect(() => {
-        if (viewMode === 'preview') {
+        if (activeSubTab === 'preview') {
             setIsStructureCollapsed(true);
         } else {
             setIsStructureCollapsed(false);
         }
-    }, [viewMode]);
+    }, [activeSubTab]);
 
     const handleSaveFields = async () => {
         if (!projectId) return;
@@ -545,74 +545,31 @@ Episode Role: ${activeProject.episode_role || "—"}
                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Social Drafts</h4>
                             </div>
                             <button 
-                                onClick={handleSaveSocialFields}
-                                disabled={saving}
-                                className="p-1.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-all disabled:opacity-30"
-                                title="Save Social Drafts"
+                                onClick={() => setActiveSubTab('social')}
+                                className="p-1.5 bg-neutral-50 text-neutral-400 rounded-lg hover:bg-neutral-100 hover:text-black transition-all"
+                                title="Go to Social Workspace"
                             >
-                                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                <PenTool className="w-3 h-3" />
                             </button>
                         </div>
-                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar-small">
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <Users className="w-3 h-3 text-neutral-400" />
-                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Facebook Group Post</label>
-                                </div>
-                                <textarea 
-                                    value={socialFields.group_post_markdown}
-                                    onChange={(e) => setSocialFields({...socialFields, group_post_markdown: e.target.value})}
-                                    placeholder="Group tailored draft..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-24 resize-none"
-                                />
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Group</span>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${socialFields.group_post_markdown?.length > 100 ? 'bg-emerald-50 text-emerald-600' : socialFields.group_post_markdown?.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-neutral-50 text-neutral-400'}`}>
+                                    {socialFields.group_post_markdown?.length > 100 ? 'Ready' : socialFields.group_post_markdown?.length > 0 ? 'Draft' : 'Empty'}
+                                </span>
                             </div>
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <Flag className="w-3 h-3 text-neutral-400" />
-                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Facebook Page Post</label>
-                                </div>
-                                <textarea 
-                                    value={socialFields.page_post_markdown}
-                                    onChange={(e) => setSocialFields({...socialFields, page_post_markdown: e.target.value})}
-                                    placeholder="Page tailored draft..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-24 resize-none"
-                                />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Page</span>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${socialFields.page_post_markdown?.length > 50 ? 'bg-emerald-50 text-emerald-600' : socialFields.page_post_markdown?.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-neutral-50 text-neutral-400'}`}>
+                                    {socialFields.page_post_markdown?.length > 50 ? 'Ready' : socialFields.page_post_markdown?.length > 0 ? 'Draft' : 'Empty'}
+                                </span>
                             </div>
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <User className="w-3 h-3 text-neutral-400" />
-                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Personal Profile Post</label>
-                                </div>
-                                <textarea 
-                                    value={socialFields.personal_post_markdown}
-                                    onChange={(e) => setSocialFields({...socialFields, personal_post_markdown: e.target.value})}
-                                    placeholder="Personal tailored draft..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-24 resize-none"
-                                />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <MessageCircle className="w-3 h-3 text-neutral-400" />
-                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Short Caption</label>
-                                </div>
-                                <textarea 
-                                    value={socialFields.social_caption}
-                                    onChange={(e) => setSocialFields({...socialFields, social_caption: e.target.value})}
-                                    placeholder="Short caption for IG/TikTok..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-20 resize-none"
-                                />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <Hash className="w-3 h-3 text-neutral-400" />
-                                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Hashtags</label>
-                                </div>
-                                <textarea 
-                                    value={socialFields.hashtags}
-                                    onChange={(e) => setSocialFields({...socialFields, hashtags: e.target.value})}
-                                    placeholder="#topic #insight..."
-                                    className="w-full mt-1 bg-neutral-50 border border-neutral-100 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black/5 h-16 resize-none"
-                                />
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Personal</span>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${socialFields.personal_post_markdown?.length > 30 ? 'bg-emerald-50 text-emerald-600' : socialFields.personal_post_markdown?.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-neutral-50 text-neutral-400'}`}>
+                                    {socialFields.personal_post_markdown?.length > 30 ? 'Ready' : socialFields.personal_post_markdown?.length > 0 ? 'Draft' : 'Empty'}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -673,19 +630,28 @@ Episode Role: ${activeProject.episode_role || "—"}
                             <div>
                                 <div className="flex items-center gap-4 mb-1">
                                     <h2 className="text-2xl font-black text-neutral-900 leading-none">{activeProject.title}</h2>
-                                    {/* View Mode Toggle */}
-                                    <div className="flex items-center bg-neutral-100 p-1 rounded-xl">
+                                    {/* Sub-Tab Switcher */}
+                                    <div className="flex items-center bg-neutral-100 p-1 rounded-2xl">
                                         <button 
-                                            onClick={() => setViewMode('edit')}
-                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'edit' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                            onClick={() => setActiveSubTab('chapter')}
+                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'chapter' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
                                         >
-                                            Edit
+                                            <PenTool className="w-3 h-3" />
+                                            Chapter Draft
                                         </button>
                                         <button 
-                                            onClick={() => setViewMode('preview')}
-                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'preview' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                            onClick={() => setActiveSubTab('social')}
+                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'social' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
                                         >
-                                            Preview
+                                            <Share2 className="w-3 h-3" />
+                                            Social Drafts
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveSubTab('preview')}
+                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'preview' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                        >
+                                            <Globe className="w-3 h-3" />
+                                            Preview / Export
                                         </button>
                                     </div>
                                 </div>
@@ -715,7 +681,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                             </div>
 
                             <div className="flex items-center gap-4">
-                                {viewMode === 'preview' && blocks.length > 0 && (
+                                {activeSubTab === 'preview' && blocks.length > 0 && (
                                     <div className="flex items-center gap-2 bg-neutral-100 p-1.5 rounded-2xl">
                                         <button 
                                             onClick={() => handleCopy('markdown')}
@@ -769,14 +735,14 @@ Episode Role: ${activeProject.episode_role || "—"}
                                     </span>
                                 )}
                                 
-                                {lastSaved && viewMode === 'edit' && !copyStatus && (
+                                {lastSaved && activeSubTab !== 'preview' && !copyStatus && (
                                     <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
                                         <CheckCircle className="w-3 h-3" />
                                         Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                 )}
                                 
-                                {viewMode === 'edit' && (
+                                {activeSubTab === 'chapter' && (
                                     <button 
                                         onClick={handleSave}
                                         disabled={saving || blocks.length === 0}
@@ -786,17 +752,28 @@ Episode Role: ${activeProject.episode_role || "—"}
                                         {saving ? "Saving..." : "Save Content"}
                                     </button>
                                 )}
+
+                                {activeSubTab === 'social' && (
+                                    <button 
+                                        onClick={handleSaveSocialFields}
+                                        disabled={saving}
+                                        className="flex items-center gap-2 px-8 py-3 bg-black text-white rounded-2xl text-sm font-black hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
+                                    >
+                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                        {saving ? "Saving Drafts..." : "Save Social Drafts"}
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        {/* Blocks Area / Preview Area */}
+                        {/* Workspace Area */}
                         <div className="flex-1 overflow-y-auto p-12 custom-scrollbar bg-neutral-50/30">
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center h-full text-neutral-300">
                                     <RefreshCw className="w-8 h-8 animate-spin mb-4" />
-                                    <p className="text-sm font-bold uppercase tracking-widest">Loading Blocks...</p>
+                                    <p className="text-sm font-bold uppercase tracking-widest">Loading Workspace...</p>
                                 </div>
-                            ) : viewMode === 'preview' ? (
+                            ) : activeSubTab === 'preview' ? (
                                 <div className="max-w-4xl mx-auto py-8">
                                     {blocks.length > 0 ? (
                                         <div className="bg-white border border-neutral-100 rounded-3xl p-12 shadow-sm min-h-[500px]">
@@ -934,7 +911,102 @@ Episode Role: ${activeProject.episode_role || "—"}
                                         </div>
                                     </div>
                                 </div>
-                            ) : blocks.length > 0 ? (
+                            ) : activeSubTab === 'social' ? (
+                                <div className="max-w-4xl mx-auto space-y-12 pb-20">
+                                    {/* FB Group Editor */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
+                                                <Users className="w-5 h-5 text-blue-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Facebook Group Post</h3>
+                                                <p className="text-[10px] font-bold text-neutral-400 uppercase">Educational Long-form (800–1,200 words)</p>
+                                            </div>
+                                        </div>
+                                        <textarea 
+                                            value={socialFields.group_post_markdown}
+                                            onChange={(e) => setSocialFields({...socialFields, group_post_markdown: e.target.value})}
+                                            placeholder={`[HOOK] — Grab attention with a scientific curiosity or common plant problem...\n\n[EDUCATIONAL BODY] — Deep dive into the mechanism of plant life...\n\n[BULLET POINTS] — Key takeaways or system checklists...\n\n[CAUTION / NUANCE] — Scientific guardrails and what to avoid...\n\n[READ MORE] — Link to full article or Hub...\n\n[QUESTION PROMPT] — Engaging question for the community...`}
+                                            className="w-full bg-white border border-neutral-100 rounded-[32px] p-8 text-lg text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none min-h-[600px] shadow-sm focus:ring-4 focus:ring-blue-500/5 focus:border-blue-200 transition-all"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {/* FB Page Editor */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center">
+                                                    <Flag className="w-5 h-5 text-emerald-600" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Facebook Page Post</h3>
+                                                    <p className="text-[10px] font-bold text-neutral-400 uppercase">Editorial Summary (300–600 words)</p>
+                                                </div>
+                                            </div>
+                                            <textarea 
+                                                value={socialFields.page_post_markdown}
+                                                onChange={(e) => setSocialFields({...socialFields, page_post_markdown: e.target.value})}
+                                                placeholder={`[EDITORIAL SUMMARY] — Concise insight for broad reach...\n\n[BRAND TONE] — Calm, professional, and knowledge-first...\n\n[READ MORE] — Link to Journey Hub...\n\n[HASHTAGS] — Strategic tags...`}
+                                                className="w-full bg-white border border-neutral-100 rounded-[32px] p-8 text-base text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-200 transition-all"
+                                            />
+                                        </div>
+
+                                        {/* Personal Post Editor */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-neutral-100 rounded-2xl flex items-center justify-center">
+                                                    <User className="w-5 h-5 text-neutral-900" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Personal Post</h3>
+                                                    <p className="text-[10px] font-bold text-neutral-400 uppercase">Reflection (150–350 words)</p>
+                                                </div>
+                                            </div>
+                                            <textarea 
+                                                value={socialFields.personal_post_markdown}
+                                                onChange={(e) => setSocialFields({...socialFields, personal_post_markdown: e.target.value})}
+                                                placeholder={`[FOUNDER REFLECTION] — Personal take on this chapter's discovery...\n\n[BEHIND-THE-SCENES] — Observation from the field or research process...\n\n[LEARNING NOTE] — Quick takeaway for fellow learners...\n\n[SOFT CTA] — Invite to follow the journey...`}
+                                                className="w-full bg-white border border-neutral-100 rounded-[32px] p-8 text-base text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-black/5 focus:border-neutral-200 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {/* Short Caption */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center">
+                                                    <MessageCircle className="w-5 h-5 text-amber-600" />
+                                                </div>
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Short Caption</h3>
+                                            </div>
+                                            <textarea 
+                                                value={socialFields.social_caption}
+                                                onChange={(e) => setSocialFields({...socialFields, social_caption: e.target.value})}
+                                                placeholder="Short teaser for IG/TikTok/Stories..."
+                                                className="w-full bg-white border border-neutral-100 rounded-[24px] p-6 text-sm text-neutral-800 leading-relaxed placeholder:text-neutral-200 outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-amber-500/5 focus:border-amber-200 transition-all"
+                                            />
+                                        </div>
+
+                                        {/* Hashtags */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
+                                                    <Hash className="w-5 h-5 text-blue-600" />
+                                                </div>
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900">Hashtags</h3>
+                                            </div>
+                                            <textarea 
+                                                value={socialFields.hashtags}
+                                                onChange={(e) => setSocialFields({...socialFields, hashtags: e.target.value})}
+                                                placeholder="#topic #insight #plantlife #greenfineness..."
+                                                className="w-full bg-white border border-neutral-100 rounded-[24px] p-6 text-sm text-neutral-800 font-mono leading-relaxed placeholder:text-neutral-200 outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-blue-500/5 focus:border-blue-200 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : activeSubTab === 'chapter' && blocks.length > 0 ? (
                                 <div className="max-w-4xl mx-auto space-y-16">
                                     {blocks.map((block) => (
                                         <div key={block.id} className="group relative">
