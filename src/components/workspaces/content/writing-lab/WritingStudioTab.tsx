@@ -749,7 +749,7 @@ Episode Role: ${activeProject.episode_role || "—"}
             {/* Center Column: Wide Writing Area */}
             <div className="col-span-9 flex flex-col gap-6">
                 {activeProject ? (
-                    <div className="bg-theme-card border border-theme-border rounded-[40px] shadow-sm flex-1 flex flex-col overflow-hidden">
+                    <div className="bg-theme-card border border-theme-border rounded-[40px] shadow-sm flex-1 flex flex-col">
                         {/* Writing Header */}
                         <div className="px-10 py-8 border-b border-theme-border/50 flex items-center justify-between bg-theme-card sticky top-0 z-10">
                             <div>
@@ -897,7 +897,8 @@ Episode Role: ${activeProject.episode_role || "—"}
                         </div>
 
                         {/* Workspace Area */}
-                        <div className="flex-1 overflow-y-auto p-12 scrollbar-theme bg-theme-app/40 dark:bg-theme-app/60">
+                        <div className="flex-1 overflow-y-auto scrollbar-theme bg-theme-app/40 dark:bg-theme-app/60">
+                            <div className="p-12">
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center h-full text-neutral-300">
                                     <RefreshCw className="w-8 h-8 animate-spin mb-4" />
@@ -1058,7 +1059,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                                 value={socialFields.group_post_markdown}
                                                 onChange={(e) => setSocialFields({...socialFields, group_post_markdown: e.target.value})}
                                                 placeholder={`[HOOK] — Grab attention with a scientific curiosity or common plant problem...\n\n[EDUCATIONAL BODY] — Deep dive into the mechanism of plant life...\n\n[BULLET POINTS] — Key takeaways or system checklists...\n\n[CAUTION / NUANCE] — Scientific guardrails and what to avoid...\n\n[READ MORE] — Link to full article or Hub...\n\n[QUESTION PROMPT] — Engaging question for the community...`}
-                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[600px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[600px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20"
                                             />
                                     </div>
 
@@ -1078,7 +1079,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                                 value={socialFields.page_post_markdown}
                                                 onChange={(e) => setSocialFields({...socialFields, page_post_markdown: e.target.value})}
                                                 placeholder={`[EDITORIAL SUMMARY] — Concise insight for broad reach...\n\n[BRAND TONE] — Calm, professional, and knowledge-first...\n\n[READ MORE] — Link to Journey Hub...\n\n[HASHTAGS] — Strategic tags...`}
-                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-base text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-base text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20"
                                             />
                                         </div>
 
@@ -1097,7 +1098,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                                 value={socialFields.personal_post_markdown}
                                                 onChange={(e) => setSocialFields({...socialFields, personal_post_markdown: e.target.value})}
                                                 placeholder={`[FOUNDER REFLECTION] — Personal take on this chapter's discovery...\n\n[BEHIND-THE-SCENES] — Observation from the field or research process...\n\n[LEARNING NOTE] — Quick takeaway for fellow learners...\n\n[SOFT CTA] — Invite to follow the journey...`}
-                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-base text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all scrollbar-theme"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-base text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 scrollbar-theme"
                                             />
                                         </div>
                                     </div>
@@ -1115,7 +1116,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                                 value={socialFields.social_caption}
                                                 onChange={(e) => setSocialFields({...socialFields, social_caption: e.target.value})}
                                                 placeholder="Short teaser for IG/TikTok/Stories..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-[24px] p-6 text-sm text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[24px] p-6 text-sm text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20"
                                             />
                                         </div>
 
@@ -1131,7 +1132,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                                 value={socialFields.hashtags}
                                                 onChange={(e) => setSocialFields({...socialFields, hashtags: e.target.value})}
                                                 placeholder="#topic #insight #plantlife #greenfineness..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-[24px] p-6 text-sm text-theme-primary font-mono leading-relaxed placeholder:text-theme-muted outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all"
+                                                className="w-full bg-theme-input border border-theme-border rounded-[24px] p-6 text-sm text-theme-primary font-mono leading-relaxed placeholder:text-theme-muted outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20"
                                             />
                                         </div>
                                     </div>
@@ -1225,7 +1226,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                                                     onBlur={() => setTimeout(() => setFocusedBlockId(prev => prev === block.id ? null : prev), 200)}
                                                     onPaste={(e) => handlePaste(e, block.id)}
                                                     placeholder={block.placeholder || "Start writing here..."}
-                                                    className="w-full bg-theme-input border border-theme-border rounded-2xl p-6 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none resize-none focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all shadow-sm group-hover:shadow-md scrollbar-theme"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-2xl p-6 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none resize-none focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 shadow-sm group-hover:shadow-md scrollbar-theme"
                                                     style={{ height: 'auto', minHeight: '160px' }}
                                                     onInput={(e) => {
                                                         const target = e.target as HTMLTextAreaElement;
@@ -1263,6 +1264,7 @@ Episode Role: ${activeProject.episode_role || "—"}
                             )}
                         </div>
                     </div>
+                </div>
                 ) : (
                     <div className="bg-theme-card border border-theme-border rounded-[40px] p-16 shadow-sm flex-1 flex flex-col items-center justify-center text-center">
                         <div className="w-28 h-28 bg-theme-panel rounded-[40px] flex items-center justify-center mb-8">
