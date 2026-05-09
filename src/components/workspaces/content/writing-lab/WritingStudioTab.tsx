@@ -26,7 +26,12 @@ import {
     Users,
     Flag,
     Sparkles,
-    Wand2
+    Wand2,
+    Bold,
+    Italic,
+    ListOrdered,
+    Quote,
+    Minus
 } from "lucide-react";
 import ToneModal from "./ToneModal";
 import { WritingProject, WritingBlock } from "@/lib/types/writing-lab";
@@ -71,6 +76,106 @@ export default function WritingStudioTab({
         hashtags: ""
     });
     const [isStructureCollapsed, setIsStructureCollapsed] = useState(false);
+    const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
+
+    const applyMarkdown = (
+        blockId: string,
+        type: 'bold' | 'italic' | 'bullet' | 'number' | 'quote' | 'divider'
+    ) => {
+        const textarea = document.getElementById(`textarea-${blockId}`) as HTMLTextAreaElement;
+        if (!textarea) return;
+
+        textarea.focus();
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const selection = text.substring(start, end);
+
+        let replacement = "";
+
+        switch (type) {
+            case 'bold':
+                replacement = `**${selection || "text"}**`;
+                break;
+            case 'italic':
+                replacement = `*${selection || "text"}*`;
+                break;
+            case 'bullet':
+                replacement = selection ? selection.split('\n').map(l => l.startsWith('- ') ? l : `- ${l}`).join('\n') : `- `;
+                break;
+            case 'number':
+                replacement = selection ? selection.split('\n').map((l, i) => l.match(/^\d+\./) ? l : `${i + 1}. ${l}`).join('\n') : `1. `;
+                break;
+            case 'quote':
+                replacement = selection ? selection.split('\n').map(l => l.startsWith('> ') ? l : `> ${l}`).join('\n') : `> `;
+                break;
+            case 'divider':
+                replacement = selection ? `\n---\n${selection}` : `\n---\n`;
+                break;
+        }
+
+        // Use execCommand to preserve undo history
+        try {
+            const success = document.execCommand('insertText', false, replacement);
+            if (!success) {
+                // Fallback for older browsers or environments
+                const before = text.substring(0, start);
+                const after = text.substring(end);
+                updateBlockContent(blockId, before + replacement + after);
+            }
+        } catch (e) {
+            const before = text.substring(0, start);
+            const after = text.substring(end);
+            updateBlockContent(blockId, before + replacement + after);
+        }
+        
+        // Restore selection if text was selected
+        if (selection) {
+            setTimeout(() => {
+                textarea.setSelectionRange(start, start + replacement.length);
+            }, 0);
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>, blockId: string) => {
+        const pastedText = e.clipboardData.getData('text');
+        if (!pastedText) return;
+
+        // Convert common bullet characters to Markdown bullets
+        // • (\u2022), ◦ (\u25e6), – (\u2013), — (\u2014)
+        const sanitizedText = pastedText
+            .replace(/^[\s]*[•◦–—][\s]+/gm, '- ')
+            .replace(/[\r\n][\s]*[•◦–—][\s]+/g, '\n- ');
+
+        if (sanitizedText !== pastedText) {
+            e.preventDefault();
+            const textarea = e.currentTarget;
+            
+            // Use execCommand to preserve undo history
+            try {
+                const success = document.execCommand('insertText', false, sanitizedText);
+                if (!success) {
+                    // Fallback
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = textarea.value;
+                    const newVal = text.substring(0, start) + sanitizedText + text.substring(end);
+                    updateBlockContent(blockId, newVal);
+                    
+                    setTimeout(() => {
+                        const newPos = start + sanitizedText.length;
+                        textarea.setSelectionRange(newPos, newPos);
+                    }, 0);
+                }
+            } catch (err) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const text = textarea.value;
+                const newVal = text.substring(0, start) + sanitizedText + text.substring(end);
+                updateBlockContent(blockId, newVal);
+            }
+        }
+    };
 
     useEffect(() => {
         if (activeProject) {
@@ -1053,11 +1158,74 @@ Episode Role: ${activeProject.episode_role || "—"}
                                                 </div>
                                             </div>
                                             <div className="relative">
-                                                    <textarea 
-                                                        value={block.content_md}
-                                                        onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                                                        placeholder={block.placeholder || "Start writing here..."}
-                                                        className="w-full bg-theme-input border border-theme-border rounded-2xl p-6 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none resize-none focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all shadow-sm group-hover:shadow-md scrollbar-theme"
+                                                {focusedBlockId === block.id && (
+                                                    <div className="absolute -top-12 left-0 right-0 flex items-center gap-1 bg-theme-card border border-theme-border rounded-xl p-1.5 shadow-xl z-20 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                                        <button 
+                                                            type="button"
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={() => applyMarkdown(block.id, 'bold')}
+                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
+                                                            title="Bold (**text**)"
+                                                        >
+                                                            <Bold className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={() => applyMarkdown(block.id, 'italic')}
+                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
+                                                            title="Italic (*text*)"
+                                                        >
+                                                            <Italic className="w-4 h-4" />
+                                                        </button>
+                                                        <div className="w-px h-4 bg-theme-border mx-1" />
+                                                        <button 
+                                                            type="button"
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={() => applyMarkdown(block.id, 'bullet')}
+                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
+                                                            title="Bullet List (- item)"
+                                                        >
+                                                            <List className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={() => applyMarkdown(block.id, 'number')}
+                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
+                                                            title="Numbered List (1. item)"
+                                                        >
+                                                            <ListOrdered className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={() => applyMarkdown(block.id, 'quote')}
+                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
+                                                            title="Quote (> text)"
+                                                        >
+                                                            <Quote className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={() => applyMarkdown(block.id, 'divider')}
+                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
+                                                            title="Divider (---)"
+                                                        >
+                                                            <Minus className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                <textarea 
+                                                    id={`textarea-${block.id}`}
+                                                    value={block.content_md}
+                                                    onChange={(e) => updateBlockContent(block.id, e.target.value)}
+                                                    onFocus={() => setFocusedBlockId(block.id)}
+                                                    onBlur={() => setTimeout(() => setFocusedBlockId(prev => prev === block.id ? null : prev), 200)}
+                                                    onPaste={(e) => handlePaste(e, block.id)}
+                                                    placeholder={block.placeholder || "Start writing here..."}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-2xl p-6 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none resize-none focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 transition-all shadow-sm group-hover:shadow-md scrollbar-theme"
                                                     style={{ height: 'auto', minHeight: '160px' }}
                                                     onInput={(e) => {
                                                         const target = e.target as HTMLTextAreaElement;
