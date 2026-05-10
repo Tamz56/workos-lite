@@ -60,6 +60,7 @@ interface ReviewResult {
     draft_id: string;
     review_mode: string;
     review_status: string;
+    reviewed_content_type: ContentType | null;
     summary: string | null;
     issues_json: string | null; // JSON string of ReviewIssue[]
     patches_json: string | null; // JSON string of ReviewPatch[]
@@ -711,8 +712,25 @@ export default function WritingDeskLiteClient() {
                     ) : (
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
                             {/* Summary */}
-                            <section>
-                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted mb-2">Summary</h3>
+                            <section className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Summary</h3>
+                                    {review.reviewed_content_type && (
+                                        <div className="text-[8px] font-bold px-1.5 py-0.5 bg-theme-input rounded text-theme-secondary border border-theme-border/50">
+                                            Reviewed as: {review.reviewed_content_type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {activeDraft?.content_type !== review.reviewed_content_type && (
+                                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2.5">
+                                        <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+                                        <div className="text-[10px] font-bold text-amber-800 leading-tight">
+                                            Review outdated — content type changed. Please run Arbor Review again.
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="text-xs font-bold text-theme-primary leading-relaxed bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
                                     {review.summary}
                                 </div>

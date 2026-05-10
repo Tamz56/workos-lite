@@ -1104,15 +1104,16 @@ function ensureWritingDeskTables() {
         );
 
         CREATE TABLE IF NOT EXISTS arbor_review_results (
-            id              TEXT PRIMARY KEY,
-            draft_id        TEXT NOT NULL,
-            review_mode     TEXT NOT NULL,
-            review_status   TEXT NOT NULL,
-            summary         TEXT NULL,
-            issues_json     TEXT NULL,
-            patches_json    TEXT NULL,
-            next_step       TEXT NULL,
-            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            id                      TEXT PRIMARY KEY,
+            draft_id                TEXT NOT NULL,
+            review_mode             TEXT NOT NULL,
+            review_status           TEXT NOT NULL,
+            reviewed_content_type   TEXT NULL,
+            summary                 TEXT NULL,
+            issues_json             TEXT NULL,
+            patches_json            TEXT NULL,
+            next_step               TEXT NULL,
+            created_at              TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY(draft_id) REFERENCES writing_desk_drafts(id) ON DELETE CASCADE
         );
 

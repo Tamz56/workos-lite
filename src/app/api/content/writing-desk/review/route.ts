@@ -44,38 +44,73 @@ export async function POST(req: NextRequest) {
 
         const { draft_id, review_mode } = parsed.data;
         
-        // Fetch draft to verify existence
+        // Fetch draft to verify existence and get latest state
         const draft = getDb().prepare("SELECT * FROM writing_desk_drafts WHERE id = ?").get(draft_id) as any;
         if (!draft) return NextResponse.json({ error: "Draft not found" }, { status: 404 });
 
-        // Mock Review Logic
+        const contentType = draft.content_type;
         const id = nanoid();
         const now = new Date().toISOString();
         
-        const mockIssues = [
-            { id: 1, type: 'clarity', message: 'ประโยคแรกอาจจะยาวไปนิดนึง ลองแบ่งเป็นสองประโยคดูครับ', severity: 'low' },
-            { id: 2, type: 'tone', message: 'ใช้คำที่เป็นทางการเกินไปสำหรับ group_post ลองปรับให้เป็นกันเองมากขึ้น', severity: 'medium' },
-            { id: 3, type: 'grammar', message: 'พบคำสะกดผิด: "กะเสด" -> "เกษตร"', severity: 'high' }
-        ];
+        let mockIssues: any[] = [];
+        let mockPatches: any[] = [];
+        let summary = "";
+        let next_step = "";
 
-        const mockPatches = [
-            { id: 1, original: 'การทำกะเสดอินทรีย์เป็นเรื่องดี', replacement: 'การทำเกษตรอินทรีย์เป็นเรื่องที่ดีต่อโลก' },
-            { id: 2, original: 'เราควรทำสิ่งนี้ร่วมกันเพื่ออนาคตที่ยั่งยืนของทุกคนในโลกใบนี้', replacement: 'มาร่วมสร้างอนาคตที่ยั่งยืนไปด้วยกันนะครับ' }
-        ];
-
-        const summary = "โดยรวมถือว่าทำได้ดีครับ เนื้อหาครอบคลุม แต่ควรปรับปรุงเรื่องความกระชับและโทนเสียงให้เข้ากับกลุ่มเป้าหมายมากขึ้น";
-        const next_step = "ปรับโทนเสียงให้เป็นกันเอง (Conversational Tone)";
+        if (contentType === 'group_post') {
+            mockIssues = [
+                { id: 1, type: 'tone', message: 'ความเป็นกันเองทำได้ดี แต่ลองเพิ่มจังหวะชวนคุยหรือตั้งคำถามกับลูกเพจเพิ่มขึ้นอีกนิดครับ', severity: 'low' },
+                { id: 2, type: 'structure', message: 'ไม่แข็งเป็นวิชาการจนเกินไป เหมาะกับ Group Post แล้วครับ', severity: 'low' }
+            ];
+            mockPatches = [
+                { id: 1, original: 'นี่คือแนวทางที่ควรทำ', replacement: 'ลองเอาวิธีนี้ไปใช้กันดูนะครับ ได้ผลยังไงมาเล่าให้ฟังด้วยนะ' }
+            ];
+            summary = "เหมาะสำหรับโพสต์ในกลุ่มครับ มีความเป็นกันเองสูงและย่อยข้อมูลให้อ่านง่าย";
+            next_step = "เพิ่ม Call to Action (CTA) ให้สมาชิกมาคอมเมนต์แลกเปลี่ยน";
+        } else if (contentType === 'page_post') {
+            mockIssues = [
+                { id: 1, type: 'hook', message: 'Hook ใน 2 ประโยคแรกยังไม่แรงพอ ลองดึงเอาผลลัพธ์ที่น่าทึ่งที่สุดขึ้นมาไว้บนสุดครับ', severity: 'medium' },
+                { id: 2, type: 'brevity', message: 'บางช่วงยังยาวไปนิดนึงสำหรับ Facebook Page ลองตัดประโยคขยายความที่ไม่จำเป็นออก', severity: 'low' }
+            ];
+            mockPatches = [
+                { id: 1, original: 'เรามีการสอนเรื่องการทำเกษตรอินทรีย์ที่มีคุณภาพ', replacement: 'เกษตรอินทรีย์ทำง่าย แถมขายได้ราคา! มาดูวิธีกัน...' }
+            ];
+            summary = "โครงสร้าง Page Post ดีแล้ว แต่ต้องเน้นเรื่อง Hook และความกระชับมากขึ้น";
+            next_step = "ปรับปรุง Hook 3 บรรทัดแรกให้น่าสนใจ";
+        } else if (contentType === 'personal_post') {
+            mockIssues = [
+                { id: 1, type: 'voice', message: 'ยังติดโทนแบรนด์อยู่นิดหน่อย ลองเปลี่ยนมาเล่าในมุมมอง "คุณตั้ม" ให้มากขึ้น', severity: 'medium' },
+                { id: 2, type: 'authenticity', message: 'ลองแชร์ประสบการณ์ส่วนตัวหรือความผิดพลาดที่เจอจริง จะทำให้โพสต์ดูจริงใจมากขึ้น', severity: 'low' }
+            ];
+            summary = "น้ำเสียงยังดูเป็นทางการไปนิดครับ ลองเล่าแบบพี่น้องคุยกัน";
+            next_step = "ปรับโทนให้เป็นเสียงส่วนตัวคุณตั้ม (Personal Voice)";
+        } else if (contentType === 'web_article_section' || contentType === 'body_markdown') {
+            mockIssues = [
+                { id: 1, type: 'structure', message: 'Heading (H2/H3) ยังไม่ชัดเจน ลองแบ่งส่วนเนื้อหาให้เป็นระบบมากขึ้น', severity: 'medium' },
+                { id: 2, type: 'safety', message: 'มีการอ้างอิงถึงสรรพคุณทางการแพทย์ ควรตรวจสอบความถูกต้องตามหลักวิชาการอีกครั้ง (Claim Safety)', severity: 'high' }
+            ];
+            mockPatches = [
+                { id: 1, original: 'รักษาได้ทุกโรค', replacement: 'มีส่วนช่วยในการบำรุงสุขภาพตามงานวิจัยเบื้องต้น' }
+            ];
+            summary = "บทความมีความลึก แต่ต้องการการจัดระเบียบโครงสร้างและตรวจสอบเรื่องคำเคลมสุขภาพ";
+            next_step = "จัดโครงสร้าง Heading และตรวจสอบความปลอดภัยของข้อมูล (Claim Safety)";
+        } else {
+            mockIssues = [{ id: 1, type: 'general', message: 'รีวิวในฐานะเนื้อหาทั่วไป กรุณาตรวจสอบความถูกต้องของข้อมูล', severity: 'low' }];
+            summary = "รีวิวตามมาตรฐานทั่วไปครับ";
+            next_step = "ตรวจสอบความเรียบร้อยก่อนนำไปใช้งาน";
+        }
 
         getDb().prepare(`
             INSERT INTO arbor_review_results (
-                id, draft_id, review_mode, review_status, summary,
+                id, draft_id, review_mode, review_status, reviewed_content_type, summary,
                 issues_json, patches_json, next_step, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             id,
             draft_id,
             review_mode,
             'completed',
+            contentType,
             summary,
             JSON.stringify(mockIssues),
             JSON.stringify(mockPatches),
