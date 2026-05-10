@@ -16,6 +16,13 @@ export default function Topbar() {
         if (pathname.startsWith("/projects")) return "Projects";
         if (pathname.startsWith("/timeline")) return "Timeline";
         if (pathname.startsWith("/sprints")) return "Sprints";
+        
+        // Specific Content Routes
+        if (pathname.startsWith("/workspaces/content/writing-desk-lite")) return "Writing Desk Lite";
+        if (pathname.startsWith("/workspaces/content/gf-hub")) return "GF Content Hub";
+        if (pathname.startsWith("/workspaces/content/article-studio")) return "Article Studio";
+        if (pathname.startsWith("/workspaces/content/writing-lab")) return "Writing Lab";
+        
         if (pathname.startsWith("/workspaces")) return "Areas";
         if (pathname.startsWith("/settings")) return "Settings";
         return "WorkOS";

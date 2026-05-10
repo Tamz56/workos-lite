@@ -129,7 +129,7 @@ export function Sidebar() {
                     href="/workspaces"
                     label="Areas"
                     icon={<ChartBarIcon className="w-5 h-5" />}
-                    active={pathname.startsWith("/workspaces")}
+                    active={pathname === "/workspaces" || (pathname.startsWith("/workspaces") && !pathname.includes("/workspaces/content/"))}
                     isCollapsed={isCollapsed}
                 />
                 <NavItem
