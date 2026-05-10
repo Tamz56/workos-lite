@@ -84,12 +84,12 @@ export async function POST(req: NextRequest) {
             structured.toneNotes = ["Sincere", "Authentic", "Personal"];
             structured.recommendedNextEdit = "ปรับโทนให้เป็นเสียงส่วนตัวคุณตั้ม (Personal Voice) และเล่าเรื่องแบบ Storytelling";
         } else if (contentType === 'web_article_section' || contentType === 'body_markdown') {
-            structured.editorialSummary = "บทความมีความลึก แต่ต้องการการจัดระเบียบโครงสร้างและตรวจสอบเรื่องคำเคลมสุขภาพ";
+            structured.editorialSummary = "บทความมีความลึก แต่ต้องการการจัดระเบียบโครงสร้างและตรวจสอบเรื่องคำเคลมทางวิชาการ/เกษตร";
             structured.contentStrength = ["ข้อมูลแน่นและลึก", "มีประโยชน์ต่อผู้อ่านที่ต้องการความรู้"];
             structured.revisionPoints = ["Heading (H2/H3) ยังไม่ชัดเจน", "จัดลำดับการอธิบายให้เป็นระบบมากขึ้น"];
-            structured.claimSafetyNotes = ["มีการอ้างอิงถึงสรรพคุณทางการแพทย์ ควรตรวจสอบความถูกต้องตามหลักวิชาการ (Claim Safety)", "ตรวจสอบแหล่งอ้างอิงของข้อมูล"];
+            structured.claimSafetyNotes = ["มีการอ้างอิงถึงสรรพคุณเฉพาะทาง ควรตรวจสอบความถูกต้องตามหลักวิชาการ/เกษตร (Claim Safety)", "ตรวจสอบแหล่งอ้างอิงของข้อมูล"];
             structured.toneNotes = ["Educational", "Authoritative", "Safe"];
-            structured.recommendedNextEdit = "จัดโครงสร้าง Heading ใหม่ และตรวจสอบความถูกต้องของข้อมูลทางการแพทย์";
+            structured.recommendedNextEdit = "จัดโครงสร้าง Heading ใหม่ และตรวจสอบความถูกต้องของข้อมูลทางวิชาการ (Claim Safety)";
         } else {
             structured.editorialSummary = "รีวิวตามมาตรฐานทั่วไปครับ";
             structured.contentStrength = ["เนื้อหาครบถ้วน"];

@@ -280,22 +280,28 @@ export default function WritingDeskLiteClient() {
         }
     };
 
-    // Export Logic
-    const handleExportMarkdown = () => {
-        if (!activeDraft) return;
+    const formatDraftToMarkdown = (draft: Draft, reviewResult: ReviewResult | null) => {
+        let markdown = `# Writing Desk Export\n\n`;
         
-        let markdown = `# ${activeDraft.topic_title}\n\n`;
-        markdown += `**Topic ID:** ${activeDraft.topic_id || 'N/A'}\n`;
-        markdown += `**Content Type:** ${activeDraft.content_type}\n`;
-        markdown += `**Stage:** ${activeDraft.draft_stage}\n\n`;
-        markdown += `## Body\n\n${activeDraft.body}\n\n`;
+        markdown += `## Metadata\n\n`;
+        markdown += `- Topic ID: ${draft.topic_id || 'N/A'}\n`;
+        markdown += `- Topic Title: ${draft.topic_title}\n`;
+        markdown += `- Content Type: ${draft.content_type}\n`;
+        markdown += `- Draft Stage: ${draft.draft_stage}\n`;
+        markdown += `- Writing Mode: ${draft.writing_mode}\n`;
+        markdown += `- Source Step: ${draft.source_step || 'N/A'}\n`;
+        if (reviewResult) {
+            markdown += `- Reviewed as: ${reviewResult.reviewed_content_type || 'N/A'}\n`;
+        }
+        markdown += `\n---\n\n`;
+
+        markdown += `## Draft Content\n\n${draft.body}\n\n`;
         
-        if (review) {
-            markdown += `## Arbor Review\n\n`;
-            markdown += `Reviewed as: ${review.reviewed_content_type || activeDraft.content_type}\n\n`;
+        if (reviewResult) {
+            markdown += `---\n\n## Arbor Review\n\n`;
             
-            if (review.structured_json) {
-                const s = JSON.parse(review.structured_json) as ArborReviewPayload;
+            if (reviewResult.structured_json) {
+                const s = JSON.parse(reviewResult.structured_json) as ArborReviewPayload;
                 markdown += `### Summary\n${s.editorialSummary}\n\n`;
                 markdown += `### Keep\n${s.contentStrength.map(i => `- ${i}`).join('\n')}\n\n`;
                 markdown += `### Fix\n${s.revisionPoints.map(i => `- ${i}`).join('\n')}\n\n`;
@@ -303,10 +309,19 @@ export default function WritingDeskLiteClient() {
                 markdown += `### Tone\n${s.toneNotes.join(', ')}\n\n`;
                 markdown += `### Next Action\n${s.recommendedNextEdit}\n\n`;
             } else {
-                markdown += `### Summary\n${review.summary}\n\n`;
-                markdown += `### Next Step\n${review.next_step}\n\n`;
+                markdown += `### Summary\n${reviewResult.summary}\n\n`;
+                markdown += `### Next Action\n${reviewResult.next_step}\n\n`;
             }
         }
+        
+        return markdown;
+    };
+
+    // Export Logic
+    const handleExportMarkdown = () => {
+        if (!activeDraft) return;
+        
+        const markdown = formatDraftToMarkdown(activeDraft, review);
 
         const blob = new Blob([markdown], { type: "text/markdown" });
         const url = URL.createObjectURL(blob);
@@ -357,8 +372,14 @@ export default function WritingDeskLiteClient() {
             const taskRes = await fetch(`/api/tasks/${activeDraft.linked_task_id}`);
             const task = await taskRes.json();
             
-            const marker = "\n\n## Writing Desk Export\n";
-            const newNotes = (task.notes || "") + marker + activeDraft.body;
+            const timestamp = new Date().toLocaleString('en-GB', { 
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hour12: false 
+            }).replace(',', '');
+            
+            const markdown = formatDraftToMarkdown(activeDraft, review);
+            const header = `\n\n## Writing Desk Export — ${timestamp}\n\n`;
+            const newNotes = (task.notes || "") + header + markdown;
 
             await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
                 method: "PATCH",
@@ -369,7 +390,9 @@ export default function WritingDeskLiteClient() {
             setMessage({ type: 'success', text: "Appended to task notes!" });
             setTimeout(() => setMessage(null), 3000);
         } catch (err) {
-            setMessage({ type: 'error', text: "Failed to append to task" });
+            console.error("Failed to append to task", err);
+            setMessage({ type: 'error', text: "Failed to append to task notes" });
+            setTimeout(() => setMessage(null), 3000);
         } finally {
             setIsSaving(false);
         }
