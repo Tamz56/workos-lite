@@ -160,6 +160,13 @@ export function Sidebar() {
                     active={pathname.startsWith("/workspaces/content/writing-lab")}
                     isCollapsed={isCollapsed}
                 />
+                <NavItem
+                    href="/workspaces/content/writing-desk-lite"
+                    label="Writing Desk Lite"
+                    icon={<DocumentTextIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/workspaces/content/writing-desk-lite")}
+                    isCollapsed={isCollapsed}
+                />
             </nav>
 
             {/* Footer */}

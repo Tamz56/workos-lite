@@ -1086,11 +1086,55 @@ export function seedArborWritingLab() {
     tx();
 }
 
+function ensureWritingDeskTables() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS writing_desk_drafts (
+            id              TEXT PRIMARY KEY,
+            topic_id        TEXT NULL,
+            topic_title     TEXT NOT NULL,
+            content_type    TEXT NOT NULL CHECK (content_type IN ('group_post', 'page_post', 'personal_post', 'web_article_section', 'website_fields', 'body_markdown', 'reference_note', 'schema_jsonld', 'visual_brief')),
+            draft_stage     TEXT NOT NULL DEFAULT 'working' CHECK (draft_stage IN ('working', 'reviewed', 'ready_to_export', 'exported', 'archived')),
+            writing_mode    TEXT NOT NULL DEFAULT 'draft' CHECK (writing_mode IN ('draft', 'rewrite', 'polish', 'review', 'voice_extract', 'claim_check')),
+            source_step     TEXT NULL CHECK (source_step IN ('research_raw', 'research_direction', 'brief', 'script_caption', 'assets_canva', 'outline_web_article', 'website_publish_pack', 'publish')),
+            body            TEXT NOT NULL DEFAULT '',
+            notes           TEXT NULL,
+            linked_task_id  TEXT NULL,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS arbor_review_results (
+            id              TEXT PRIMARY KEY,
+            draft_id        TEXT NOT NULL,
+            review_mode     TEXT NOT NULL,
+            review_status   TEXT NOT NULL,
+            summary         TEXT NULL,
+            issues_json     TEXT NULL,
+            patches_json    TEXT NULL,
+            next_step       TEXT NULL,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY(draft_id) REFERENCES writing_desk_drafts(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_writing_desk_topic_id ON writing_desk_drafts(topic_id);
+        CREATE INDEX IF NOT EXISTS idx_writing_desk_linked_task ON writing_desk_drafts(linked_task_id);
+        CREATE INDEX IF NOT EXISTS idx_arbor_review_draft_id ON arbor_review_results(draft_id);
+    `);
+
+    // Add source_step if it doesn't exist (in case of re-run on older version)
+    const columns = db.prepare("PRAGMA table_info(writing_desk_drafts)").all() as any[];
+    const colNames = columns.map(c => c.name);
+    if (!colNames.includes('source_step')) {
+        db.exec("ALTER TABLE writing_desk_drafts ADD COLUMN source_step TEXT NULL");
+    }
+}
+
 ensureNotes();
 ensureAppMeta();
 cleanupLegacyAvaDemoDataOnce();
 ensureGreenFinenessModel();
 ensureArborWritingLab();
+ensureWritingDeskTables();
 
 if (!shouldSkipSeed) {
     ensureSeedProjects();
