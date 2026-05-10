@@ -52,69 +52,64 @@ export async function POST(req: NextRequest) {
         const id = nanoid();
         const now = new Date().toISOString();
         
-        let mockIssues: any[] = [];
-        let mockPatches: any[] = [];
-        let summary = "";
-        let next_step = "";
+        const structured: any = {
+            reviewedContentType: contentType,
+            editorialSummary: "",
+            contentStrength: [],
+            revisionPoints: [],
+            claimSafetyNotes: [],
+            toneNotes: [],
+            recommendedNextEdit: ""
+        };
 
         if (contentType === 'group_post') {
-            mockIssues = [
-                { id: 1, type: 'tone', message: 'ความเป็นกันเองทำได้ดี แต่ลองเพิ่มจังหวะชวนคุยหรือตั้งคำถามกับลูกเพจเพิ่มขึ้นอีกนิดครับ', severity: 'low' },
-                { id: 2, type: 'structure', message: 'ไม่แข็งเป็นวิชาการจนเกินไป เหมาะกับ Group Post แล้วครับ', severity: 'low' }
-            ];
-            mockPatches = [
-                { id: 1, original: 'นี่คือแนวทางที่ควรทำ', replacement: 'ลองเอาวิธีนี้ไปใช้กันดูนะครับ ได้ผลยังไงมาเล่าให้ฟังด้วยนะ' }
-            ];
-            summary = "เหมาะสำหรับโพสต์ในกลุ่มครับ มีความเป็นกันเองสูงและย่อยข้อมูลให้อ่านง่าย";
-            next_step = "เพิ่ม Call to Action (CTA) ให้สมาชิกมาคอมเมนต์แลกเปลี่ยน";
+            structured.editorialSummary = "เหมาะสำหรับโพสต์ในกลุ่มครับ มีความเป็นกันเองสูงและย่อยข้อมูลให้อ่านง่าย";
+            structured.contentStrength = ["ความเป็นกันเองทำได้ดี", "ไม่แข็งเป็นวิชาการจนเกินไป", "ย่อยข้อมูลให้เข้าใจง่ายสำหรับคนทั่วไป"];
+            structured.revisionPoints = ["ลองเพิ่มจังหวะชวนคุยหรือตั้งคำถามกับลูกเพจเพิ่มขึ้นอีกนิด", "เพิ่มช่องว่างระหว่างย่อหน้าให้อ่านง่ายขึ้น"];
+            structured.claimSafetyNotes = ["ข้อมูลทั่วไป ปลอดภัยสำหรับการโพสต์"];
+            structured.toneNotes = ["Conversational", "Friendly", "Community-focused"];
+            structured.recommendedNextEdit = "เพิ่ม Call to Action (CTA) ให้สมาชิกมาคอมเมนต์แลกเปลี่ยน";
         } else if (contentType === 'page_post') {
-            mockIssues = [
-                { id: 1, type: 'hook', message: 'Hook ใน 2 ประโยคแรกยังไม่แรงพอ ลองดึงเอาผลลัพธ์ที่น่าทึ่งที่สุดขึ้นมาไว้บนสุดครับ', severity: 'medium' },
-                { id: 2, type: 'brevity', message: 'บางช่วงยังยาวไปนิดนึงสำหรับ Facebook Page ลองตัดประโยคขยายความที่ไม่จำเป็นออก', severity: 'low' }
-            ];
-            mockPatches = [
-                { id: 1, original: 'เรามีการสอนเรื่องการทำเกษตรอินทรีย์ที่มีคุณภาพ', replacement: 'เกษตรอินทรีย์ทำง่าย แถมขายได้ราคา! มาดูวิธีกัน...' }
-            ];
-            summary = "โครงสร้าง Page Post ดีแล้ว แต่ต้องเน้นเรื่อง Hook และความกระชับมากขึ้น";
-            next_step = "ปรับปรุง Hook 3 บรรทัดแรกให้น่าสนใจ";
+            structured.editorialSummary = "โครงสร้าง Page Post ดีแล้ว แต่ต้องเน้นเรื่อง Hook และความกระชับมากขึ้น";
+            structured.contentStrength = ["เนื้อหามีความน่าสนใจ", "Brand Voice ชัดเจน"];
+            structured.revisionPoints = ["Hook ใน 2 ประโยคแรกยังไม่แรงพอ", "ตัดประโยคขยายความที่ไม่จำเป็นออกเพื่อให้กระชับขึ้น"];
+            structured.claimSafetyNotes = ["ตรวจสอบคำโฆษณาเกินจริง (ถ้ามี)"];
+            structured.toneNotes = ["Professional yet accessible", "Impactful", "Brand-aligned"];
+            structured.recommendedNextEdit = "ปรับปรุง Hook 3 บรรทัดแรกให้น่าสนใจและดึงดูดสายตา";
         } else if (contentType === 'personal_post') {
-            mockIssues = [
-                { id: 1, type: 'voice', message: 'ยังติดโทนแบรนด์อยู่นิดหน่อย ลองเปลี่ยนมาเล่าในมุมมอง "คุณตั้ม" ให้มากขึ้น', severity: 'medium' },
-                { id: 2, type: 'authenticity', message: 'ลองแชร์ประสบการณ์ส่วนตัวหรือความผิดพลาดที่เจอจริง จะทำให้โพสต์ดูจริงใจมากขึ้น', severity: 'low' }
-            ];
-            summary = "น้ำเสียงยังดูเป็นทางการไปนิดครับ ลองเล่าแบบพี่น้องคุยกัน";
-            next_step = "ปรับโทนให้เป็นเสียงส่วนตัวคุณตั้ม (Personal Voice)";
+            structured.editorialSummary = "น้ำเสียงยังดูเป็นทางการไปนิดครับ ลองเล่าแบบพี่น้องคุยกัน";
+            structured.contentStrength = ["หัวข้อเรื่องน่าสนใจ", "มีความเป็นมนุษย์"];
+            structured.revisionPoints = ["ยังติดโทนแบรนด์อยู่บ้าง ลองเปลี่ยนมาเล่าในมุมมองคุณตั้มให้มากขึ้น", "แชร์ประสบการณ์ส่วนตัวหรือความผิดพลาดที่เจอจริง"];
+            structured.claimSafetyNotes = ["ข้อมูลส่วนบุคคล ปลอดภัย"];
+            structured.toneNotes = ["Sincere", "Authentic", "Personal"];
+            structured.recommendedNextEdit = "ปรับโทนให้เป็นเสียงส่วนตัวคุณตั้ม (Personal Voice) และเล่าเรื่องแบบ Storytelling";
         } else if (contentType === 'web_article_section' || contentType === 'body_markdown') {
-            mockIssues = [
-                { id: 1, type: 'structure', message: 'Heading (H2/H3) ยังไม่ชัดเจน ลองแบ่งส่วนเนื้อหาให้เป็นระบบมากขึ้น', severity: 'medium' },
-                { id: 2, type: 'safety', message: 'มีการอ้างอิงถึงสรรพคุณทางการแพทย์ ควรตรวจสอบความถูกต้องตามหลักวิชาการอีกครั้ง (Claim Safety)', severity: 'high' }
-            ];
-            mockPatches = [
-                { id: 1, original: 'รักษาได้ทุกโรค', replacement: 'มีส่วนช่วยในการบำรุงสุขภาพตามงานวิจัยเบื้องต้น' }
-            ];
-            summary = "บทความมีความลึก แต่ต้องการการจัดระเบียบโครงสร้างและตรวจสอบเรื่องคำเคลมสุขภาพ";
-            next_step = "จัดโครงสร้าง Heading และตรวจสอบความปลอดภัยของข้อมูล (Claim Safety)";
+            structured.editorialSummary = "บทความมีความลึก แต่ต้องการการจัดระเบียบโครงสร้างและตรวจสอบเรื่องคำเคลมสุขภาพ";
+            structured.contentStrength = ["ข้อมูลแน่นและลึก", "มีประโยชน์ต่อผู้อ่านที่ต้องการความรู้"];
+            structured.revisionPoints = ["Heading (H2/H3) ยังไม่ชัดเจน", "จัดลำดับการอธิบายให้เป็นระบบมากขึ้น"];
+            structured.claimSafetyNotes = ["มีการอ้างอิงถึงสรรพคุณทางการแพทย์ ควรตรวจสอบความถูกต้องตามหลักวิชาการ (Claim Safety)", "ตรวจสอบแหล่งอ้างอิงของข้อมูล"];
+            structured.toneNotes = ["Educational", "Authoritative", "Safe"];
+            structured.recommendedNextEdit = "จัดโครงสร้าง Heading ใหม่ และตรวจสอบความถูกต้องของข้อมูลทางการแพทย์";
         } else {
-            mockIssues = [{ id: 1, type: 'general', message: 'รีวิวในฐานะเนื้อหาทั่วไป กรุณาตรวจสอบความถูกต้องของข้อมูล', severity: 'low' }];
-            summary = "รีวิวตามมาตรฐานทั่วไปครับ";
-            next_step = "ตรวจสอบความเรียบร้อยก่อนนำไปใช้งาน";
+            structured.editorialSummary = "รีวิวตามมาตรฐานทั่วไปครับ";
+            structured.contentStrength = ["เนื้อหาครบถ้วน"];
+            structured.recommendedNextEdit = "ตรวจสอบความเรียบร้อยก่อนนำไปใช้งาน";
         }
 
         getDb().prepare(`
             INSERT INTO arbor_review_results (
                 id, draft_id, review_mode, review_status, reviewed_content_type, summary,
-                issues_json, patches_json, next_step, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                next_step, structured_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             id,
             draft_id,
             review_mode,
             'completed',
             contentType,
-            summary,
-            JSON.stringify(mockIssues),
-            JSON.stringify(mockPatches),
-            next_step,
+            structured.editorialSummary,
+            structured.recommendedNextEdit,
+            JSON.stringify(structured),
             now
         );
 

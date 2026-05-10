@@ -1113,6 +1113,7 @@ function ensureWritingDeskTables() {
             issues_json             TEXT NULL,
             patches_json            TEXT NULL,
             next_step               TEXT NULL,
+            structured_json         TEXT NULL,
             created_at              TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY(draft_id) REFERENCES writing_desk_drafts(id) ON DELETE CASCADE
         );

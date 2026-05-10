@@ -55,6 +55,16 @@ interface ReviewPatch {
     replacement: string;
 }
 
+interface ArborReviewPayload {
+    reviewedContentType: string;
+    editorialSummary: string;
+    contentStrength: string[];
+    revisionPoints: string[];
+    claimSafetyNotes: string[];
+    toneNotes: string[];
+    recommendedNextEdit: string;
+}
+
 interface ReviewResult {
     id: string;
     draft_id: string;
@@ -65,6 +75,7 @@ interface ReviewResult {
     issues_json: string | null; // JSON string of ReviewIssue[]
     patches_json: string | null; // JSON string of ReviewPatch[]
     next_step: string | null;
+    structured_json: string | null; // JSON string of ArborReviewPayload
 }
 
 // --- Constants ---
@@ -272,7 +283,32 @@ export default function WritingDeskLiteClient() {
     // Export Logic
     const handleExportMarkdown = () => {
         if (!activeDraft) return;
-        const blob = new Blob([activeDraft.body], { type: "text/markdown" });
+        
+        let markdown = `# ${activeDraft.topic_title}\n\n`;
+        markdown += `**Topic ID:** ${activeDraft.topic_id || 'N/A'}\n`;
+        markdown += `**Content Type:** ${activeDraft.content_type}\n`;
+        markdown += `**Stage:** ${activeDraft.draft_stage}\n\n`;
+        markdown += `## Body\n\n${activeDraft.body}\n\n`;
+        
+        if (review) {
+            markdown += `## Arbor Review\n\n`;
+            markdown += `Reviewed as: ${review.reviewed_content_type || activeDraft.content_type}\n\n`;
+            
+            if (review.structured_json) {
+                const s = JSON.parse(review.structured_json) as ArborReviewPayload;
+                markdown += `### Summary\n${s.editorialSummary}\n\n`;
+                markdown += `### Keep\n${s.contentStrength.map(i => `- ${i}`).join('\n')}\n\n`;
+                markdown += `### Fix\n${s.revisionPoints.map(i => `- ${i}`).join('\n')}\n\n`;
+                markdown += `### Risk\n${s.claimSafetyNotes.map(i => `- ${i}`).join('\n')}\n\n`;
+                markdown += `### Tone\n${s.toneNotes.join(', ')}\n\n`;
+                markdown += `### Next Action\n${s.recommendedNextEdit}\n\n`;
+            } else {
+                markdown += `### Summary\n${review.summary}\n\n`;
+                markdown += `### Next Step\n${review.next_step}\n\n`;
+            }
+        }
+
+        const blob = new Blob([markdown], { type: "text/markdown" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -711,73 +747,142 @@ export default function WritingDeskLiteClient() {
                         </div>
                     ) : (
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
-                            {/* Summary */}
-                            <section className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Summary</h3>
-                                    {review.reviewed_content_type && (
-                                        <div className="text-[8px] font-bold px-1.5 py-0.5 bg-theme-input rounded text-theme-secondary border border-theme-border/50">
-                                            Reviewed as: {review.reviewed_content_type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                            {/* Structured Review Sections */}
+                            {review.structured_json ? (() => {
+                                const s = JSON.parse(review.structured_json) as ArborReviewPayload;
+                                return (
+                                    <>
+                                        <section className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Summary</h3>
+                                                <div className="text-[8px] font-bold px-1.5 py-0.5 bg-theme-input rounded text-theme-secondary border border-theme-border/50">
+                                                    Reviewed as: {s.reviewedContentType.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                                                </div>
+                                            </div>
+
+                                            {activeDraft?.content_type !== review.reviewed_content_type && (
+                                                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2.5">
+                                                    <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+                                                    <div className="text-[10px] font-bold text-amber-800 leading-tight">
+                                                        Review outdated — content type changed. Please run Arbor Review again.
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="text-xs font-bold text-theme-primary leading-relaxed bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                                                {s.editorialSummary}
+                                            </div>
+                                        </section>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <section className="space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Keep</h3>
+                                                <div className="space-y-1.5">
+                                                    {s.contentStrength.map((text, idx) => (
+                                                        <div key={idx} className="flex gap-2 p-2 bg-green-50/50 rounded-lg border border-green-100/50">
+                                                            <div className="w-1 h-1 rounded-full bg-green-500 mt-1.5 shrink-0" />
+                                                            <div className="text-[10px] font-bold text-green-800">{text}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </section>
+                                            <section className="space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Fix</h3>
+                                                <div className="space-y-1.5">
+                                                    {s.revisionPoints.map((text, idx) => (
+                                                        <div key={idx} className="flex gap-2 p-2 bg-red-50/50 rounded-lg border border-red-100/50">
+                                                            <div className="w-1 h-1 rounded-full bg-red-500 mt-1.5 shrink-0" />
+                                                            <div className="text-[10px] font-bold text-red-800">{text}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </section>
                                         </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <section className="space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Risk</h3>
+                                                <div className="space-y-1.5">
+                                                    {s.claimSafetyNotes.map((text, idx) => (
+                                                        <div key={idx} className="flex gap-2 p-2 bg-amber-50/50 rounded-lg border border-amber-100/50">
+                                                            <AlertCircle size={10} className="text-amber-600 mt-0.5 shrink-0" />
+                                                            <div className="text-[10px] font-bold text-amber-800">{text}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </section>
+                                            <section className="space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Tone</h3>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {s.toneNotes.map((tone, idx) => (
+                                                        <span key={idx} className="px-2 py-1 bg-theme-input rounded-md text-[9px] font-black text-theme-secondary border border-theme-border/50">
+                                                            {tone}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </section>
+                                        </div>
+
+                                        <section className="pt-4 border-t border-theme-border/50">
+                                            <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted mb-2">Next Action</h3>
+                                            <div className="flex items-center gap-3 p-3 bg-black text-white rounded-xl shadow-lg">
+                                                <ChevronRight size={16} className="text-blue-400 shrink-0" />
+                                                <div className="text-[11px] font-black leading-tight">{s.recommendedNextEdit}</div>
+                                            </div>
+                                        </section>
+                                    </>
+                                );
+                            })() : (
+                                <>
+                                    {/* Legacy Review Format fallback */}
+                                    <section className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Summary</h3>
+                                            {review.reviewed_content_type && (
+                                                <div className="text-[8px] font-bold px-1.5 py-0.5 bg-theme-input rounded text-theme-secondary border border-theme-border/50">
+                                                    Reviewed as: {review.reviewed_content_type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {activeDraft?.content_type !== review.reviewed_content_type && (
+                                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2.5">
+                                                <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+                                                <div className="text-[10px] font-bold text-amber-800 leading-tight">
+                                                    Review outdated — content type changed. Please run Arbor Review again.
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="text-xs font-bold text-theme-primary leading-relaxed bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                                            {review.summary}
+                                        </div>
+                                    </section>
+
+                                    {/* Issues & Patches (Legacy) */}
+                                    {review.issues_json && (
+                                        <section>
+                                            <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted mb-2">Detected Issues</h3>
+                                            <div className="space-y-2">
+                                                {(JSON.parse(review.issues_json) as ReviewIssue[]).map((issue) => (
+                                                    <div key={issue.id} className="p-3 bg-theme-input/50 rounded-xl border border-theme-border flex gap-3 items-start group">
+                                                        <div className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${issue.severity === 'high' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                                                        <div className="text-[11px] font-bold text-theme-secondary">{issue.message}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
                                     )}
-                                </div>
 
-                                {activeDraft?.content_type !== review.reviewed_content_type && (
-                                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2.5">
-                                        <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
-                                        <div className="text-[10px] font-bold text-amber-800 leading-tight">
-                                            Review outdated — content type changed. Please run Arbor Review again.
+                                    <section className="pt-4 border-t border-theme-border/50">
+                                        <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted mb-2">Next Step</h3>
+                                        <div className="flex items-center gap-3 p-3 bg-black text-white rounded-xl shadow-lg">
+                                            <ChevronRight size={16} className="text-blue-400" />
+                                            <div className="text-[11px] font-black">{review.next_step}</div>
                                         </div>
-                                    </div>
-                                )}
-
-                                <div className="text-xs font-bold text-theme-primary leading-relaxed bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
-                                    {review.summary}
-                                </div>
-                            </section>
-
-                            {/* Issues */}
-                            <section>
-                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted mb-2">Detected Issues</h3>
-                                <div className="space-y-2">
-                                {review.issues_json && (JSON.parse(review.issues_json) as ReviewIssue[]).map((issue) => (
-                                        <div key={issue.id} className="p-3 bg-theme-input/50 rounded-xl border border-theme-border flex gap-3 items-start group hover:bg-theme-input transition-colors">
-                                            <div className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${issue.severity === 'high' ? 'bg-red-500' : issue.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'}`} />
-                                            <div className="flex-1">
-                                                <div className="text-[10px] font-black uppercase tracking-tighter text-theme-muted mb-0.5">{issue.type}</div>
-                                                <div className="text-[11px] font-bold text-theme-secondary leading-normal">{issue.message}</div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
-
-                            {/* Suggested Fixes */}
-                            <section>
-                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted mb-2">Suggested Fixes</h3>
-                                <div className="space-y-3">
-                                {review.patches_json && (JSON.parse(review.patches_json) as ReviewPatch[]).map((patch) => (
-                                        <div key={patch.id} className="space-y-2">
-                                            <div className="text-[10px] font-mono p-2 bg-red-50 text-red-700 rounded-lg line-through decoration-red-300 opacity-70 truncate">{patch.original}</div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex-1 text-[11px] font-bold p-2 bg-green-50 text-green-800 rounded-lg border border-green-100">{patch.replacement}</div>
-                                                <button className="p-1.5 hover:bg-green-100 rounded-lg text-green-700 transition-all shrink-0" title="Apply Patch">
-                                                    <CheckCircle2 size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
-
-                            {/* Next Step */}
-                            <section className="pt-4 border-t border-theme-border/50">
-                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted mb-2">Recommended Next Step</h3>
-                                <div className="flex items-center gap-3 p-3 bg-black text-white rounded-xl shadow-lg">
-                                    <ChevronRight size={16} className="text-blue-400" />
-                                    <div className="text-[11px] font-black">{review.next_step}</div>
-                                </div>
-                            </section>
+                                    </section>
+                                </>
+                            )}
                         </div>
                     )}
                 </aside>
