@@ -22,7 +22,7 @@ import { PageShell } from "@/components/layout/PageShell";
 
 // --- Types ---
 
-type ContentType = 'group_post' | 'page_post' | 'personal_post' | 'web_article_section' | 'website_fields' | 'body_markdown' | 'reference_note' | 'schema_jsonld' | 'visual_brief';
+type ContentType = 'group_post' | 'page_post' | 'personal_post' | 'web_article_section' | 'website_fields' | 'body_markdown' | 'reference_note' | 'schema_jsonld' | 'visual_brief' | 'publish_note';
 type DraftStage = 'working' | 'reviewed' | 'ready_to_export' | 'exported' | 'archived';
 type WritingMode = 'draft' | 'rewrite' | 'polish' | 'review' | 'voice_extract' | 'claim_check';
 type SourceStep = 'research_raw' | 'research_direction' | 'brief' | 'script_caption' | 'assets_canva' | 'outline_web_article' | 'website_publish_pack' | 'publish';
@@ -80,10 +80,34 @@ interface ReviewResult {
 
 // --- Constants ---
 
-const CONTENT_TYPES: ContentType[] = ['group_post', 'page_post', 'personal_post', 'web_article_section', 'website_fields', 'body_markdown', 'reference_note', 'schema_jsonld', 'visual_brief'];
+const CONTENT_TYPES: ContentType[] = ['group_post', 'page_post', 'personal_post', 'web_article_section', 'website_fields', 'body_markdown', 'reference_note', 'schema_jsonld', 'visual_brief', 'publish_note'];
 const DRAFT_STAGES: DraftStage[] = ['working', 'reviewed', 'ready_to_export', 'exported', 'archived'];
 const WRITING_MODES: WritingMode[] = ['draft', 'rewrite', 'polish', 'review', 'voice_extract', 'claim_check'];
 const SOURCE_STEPS: SourceStep[] = ['research_raw', 'research_direction', 'brief', 'script_caption', 'assets_canva', 'outline_web_article', 'website_publish_pack', 'publish'];
+
+const CONTENT_TYPE_TO_ROLE: Record<string, string> = {
+    group_post: 'Script & Caption — Group Post',
+    page_post: 'Script & Caption — Page Post',
+    personal_post: 'Script & Caption — Personal Post',
+    web_article_section: 'Outline web article',
+    body_markdown: 'Outline web article',
+    visual_brief: 'Visual Package',
+    website_fields: 'Website Publish Pack',
+    schema_jsonld: 'SEO & Schema',
+    reference_note: 'SEO & Schema',
+    publish_note: 'Review / Publish'
+};
+
+const normalizeTopicId = (topicId: string) => {
+    let id = topicId.trim().toUpperCase().replace(/[\[\]]/g, '');
+    if (id.startsWith('CONTENT-') && !id.startsWith('GF-')) {
+        id = `GF-${id}`;
+    }
+    if (/^\d+$/.test(id)) {
+        id = `GF-CONTENT-${id}`;
+    }
+    return id;
+};
 
 // --- Helper Components ---
 
@@ -347,7 +371,30 @@ export default function WritingDeskLiteClient() {
             // Search tasks with this topic_id
             const res = await fetch(`/api/tasks?q=${activeDraft.topic_id}`);
             const data = await res.json();
-            setSuggestedTasks(data);
+            
+            // Sort tasks by relevance to content_type
+            const sorted = [...data].sort((a: any, b: any) => {
+                const getScore = (task: any) => {
+                    const title = task.title.toLowerCase();
+                    const ct = activeDraft.content_type;
+                    
+                    if (ct === 'group_post' && (title.includes('group post'))) return 100;
+                    if (ct === 'page_post' && (title.includes('page post'))) return 100;
+                    if (ct === 'personal_post' && (title.includes('personal post'))) return 100;
+                    if ((ct === 'web_article_section' || ct === 'body_markdown') && title.includes('outline web article')) return 100;
+                    if (ct === 'visual_brief' && title.includes('visual package')) return 100;
+                    if (['website_fields', 'schema_jsonld', 'reference_note'].includes(ct) && (title.includes('website publish pack') || title.includes('seo & schema'))) return 100;
+                    if (ct === 'publish_note' && (title.includes('review') || title.includes('publish'))) return 100;
+                    
+                    // Fallback for Script & Caption
+                    if (['group_post', 'page_post', 'personal_post'].includes(ct) && title.includes('script & caption')) return 50;
+                    
+                    return 0;
+                };
+                return getScore(b) - getScore(a);
+            });
+
+            setSuggestedTasks(sorted);
             setIsTaskSearchOpen(true);
         } catch (err) {
             console.error("Failed to search tasks", err);
@@ -362,6 +409,71 @@ export default function WritingDeskLiteClient() {
         setIsTaskSearchOpen(false);
         setMessage({ type: 'success', text: `Linked to task ${taskId}` });
         setTimeout(() => setMessage(null), 2000);
+    };
+
+    const getRecommendedTaskTitle = (topicId: string, topicTitle: string, contentType: ContentType) => {
+        const role = CONTENT_TYPE_TO_ROLE[contentType] || 'Working Doc';
+        const id = normalizeTopicId(topicId);
+        return `[${id}] ${role} — ${topicTitle}`;
+    };
+
+    const handleCreateAndLinkTask = async () => {
+        if (!activeDraft || !activeDraft.topic_id) return;
+        
+        const normalizedId = normalizeTopicId(activeDraft.topic_id);
+        const recommendedTitle = getRecommendedTaskTitle(normalizedId, activeDraft.topic_title, activeDraft.content_type);
+        const targetRole = CONTENT_TYPE_TO_ROLE[activeDraft.content_type];
+        
+        // Duplicate guard: check if it already exists in suggestedTasks by checking exact ID and role
+        const exactId = `[${normalizedId}]`.toLowerCase();
+        const exactRole = targetRole.toLowerCase();
+
+        const existing = suggestedTasks.find((t: any) => {
+            const title = t.title.toLowerCase();
+            return title.includes(exactId) && title.includes(exactRole);
+        });
+        
+        if (existing) {
+            handleLinkTask(existing.id);
+            return;
+        }
+
+        setIsLinking(true);
+        try {
+            // Find context from existing tasks to inherit workspace/list/sprint
+            const contextTask = suggestedTasks[0];
+            const payload = {
+                title: recommendedTitle,
+                workspace: contextTask?.workspace || 'content',
+                status: 'planned',
+                review_status: 'draft',
+                list_id: contextTask?.list_id || null,
+                sprint_id: contextTask?.sprint_id || null,
+                topic_id: normalizedId,
+                topic_title: activeDraft.topic_title,
+                notes: `Created via Writing Desk Lite for ${activeDraft.content_type}`
+            };
+
+            const res = await fetch("/api/tasks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            
+            if (data.task) {
+                handleLinkTask(data.task.id);
+                setMessage({ type: 'success', text: `Created and linked: ${recommendedTitle}` });
+            } else {
+                throw new Error("Failed to create task");
+            }
+        } catch (err) {
+            console.error("Failed to create task", err);
+            setMessage({ type: 'error', text: "Failed to create task" });
+        } finally {
+            setIsLinking(false);
+            setTimeout(() => setMessage(null), 3000);
+        }
     };
 
     const handleAppendToTask = async () => {
@@ -384,7 +496,11 @@ export default function WritingDeskLiteClient() {
             await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ notes: newNotes })
+                body: JSON.stringify({ 
+                    notes: newNotes,
+                    status: 'in_progress',
+                    review_status: 'in_review'
+                })
             });
 
             setMessage({ type: 'success', text: "Appended to task notes!" });
@@ -727,20 +843,96 @@ export default function WritingDeskLiteClient() {
                                 {suggestedTasks.length === 0 ? (
                                     <div className="p-8 text-center text-xs text-theme-muted font-bold italic">No tasks found for this topic ID.</div>
                                 ) : (
-                                    <div className="space-y-2">
-                                        {suggestedTasks.map((t: any) => (
-                                            <button 
-                                                key={t.id}
-                                                onClick={() => handleLinkTask(t.id)}
-                                                className="w-full text-left p-4 rounded-2xl border border-theme-border hover:border-blue-300 hover:bg-blue-50 transition-all group"
-                                            >
-                                                <div className="text-xs font-black text-theme-primary group-hover:text-blue-700 mb-1">{t.title}</div>
-                                                <div className="flex items-center gap-3">
-                                                    <Badge color="slate">{t.status}</Badge>
-                                                    <span className="text-[10px] font-mono text-theme-muted">ID: {t.id}</span>
-                                                </div>
-                                            </button>
-                                        ))}
+                                    <div className="space-y-6">
+                                        {(() => {
+                                            const normalizedId = activeDraft?.topic_id ? normalizeTopicId(activeDraft.topic_id) : '';
+                                            const targetRole = activeDraft ? CONTENT_TYPE_TO_ROLE[activeDraft.content_type] : '';
+                                            const recommendedTitle = activeDraft ? getRecommendedTaskTitle(normalizedId, activeDraft.topic_title, activeDraft.content_type) : '';
+                                            
+                                            // Exact match ID and Role for Recommended
+                                            const recommendedTasks = suggestedTasks.filter((t: any) => {
+                                                const title = t.title.toLowerCase();
+                                                return normalizedId && targetRole && 
+                                                       title.includes(`[${normalizedId}]`.toLowerCase()) && 
+                                                       title.includes(targetRole.toLowerCase());
+                                            });
+                                            const otherTasks = suggestedTasks.filter((t: any) => !recommendedTasks.find(rt => rt.id === t.id));
+                                            
+                                            return (
+                                                <>
+                                                    {/* Recommended Section */}
+                                                    {recommendedTasks.length > 0 && (
+                                                        <section className="space-y-2">
+                                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-600 px-2">Recommended Task</h4>
+                                                            <div className="space-y-2">
+                                                                {recommendedTasks.map((t: any) => (
+                                                                    <button 
+                                                                        key={t.id}
+                                                                        onClick={() => handleLinkTask(t.id)}
+                                                                        className="w-full text-left p-4 rounded-2xl border border-blue-400 bg-blue-50/50 hover:bg-blue-50 transition-all group"
+                                                                    >
+                                                                        <div className="flex items-center justify-between mb-1">
+                                                                            <div className="text-xs font-black text-blue-700 group-hover:text-blue-800">{t.title}</div>
+                                                                            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 bg-blue-600 text-white rounded-full">Recommended</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <Badge color={t.status === 'done' ? 'green' : 'slate'}>{t.status}</Badge>
+                                                                            <span className="text-[10px] font-mono text-theme-muted">ID: {t.id}</span>
+                                                                        </div>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </section>
+                                                    )}
+
+                                                    {/* Create Section */}
+                                                    {recommendedTasks.length === 0 && (
+                                                        <section className="space-y-3 p-5 bg-amber-50/50 border border-amber-200 rounded-2xl">
+                                                            <div>
+                                                                <div className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-1">Arbor Suggestion</div>
+                                                                <p className="text-[11px] font-bold text-amber-800 leading-normal">
+                                                                    ไม่พบ Task เฉพาะสำหรับ {activeDraft?.content_type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}<br/>
+                                                                    ควรแยก Task เป็น <span className="font-black">“{recommendedTitle.split('] ')[1]}”</span> เพื่อให้เก็บข้อมูลแยกกันอย่างเป็นระเบียบ
+                                                                </p>
+                                                            </div>
+                                                            <button 
+                                                                onClick={handleCreateAndLinkTask}
+                                                                disabled={isLinking}
+                                                                className="w-full py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
+                                                            >
+                                                                {isLinking ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                                                                Create & Link Task
+                                                            </button>
+                                                            <div className="text-[9px] font-bold text-amber-600 text-center italic">
+                                                                ชื่อ Task: {recommendedTitle}
+                                                            </div>
+                                                        </section>
+                                                    )}
+
+                                                    {/* Other Tasks Section */}
+                                                    {otherTasks.length > 0 && (
+                                                        <section className="space-y-2">
+                                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted px-2">Other Related Tasks</h4>
+                                                            <div className="space-y-2">
+                                                                {otherTasks.map((t: any) => (
+                                                                    <button 
+                                                                        key={t.id}
+                                                                        onClick={() => handleLinkTask(t.id)}
+                                                                        className="w-full text-left p-4 rounded-2xl border border-theme-border hover:border-blue-300 hover:bg-blue-50/30 transition-all group"
+                                                                    >
+                                                                        <div className="text-xs font-black text-theme-primary group-hover:text-blue-700 mb-1">{t.title}</div>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <Badge color={t.status === 'done' ? 'green' : 'slate'}>{t.status}</Badge>
+                                                                            <span className="text-[10px] font-mono text-theme-muted">ID: {t.id}</span>
+                                                                        </div>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </section>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 )}
                             </div>
