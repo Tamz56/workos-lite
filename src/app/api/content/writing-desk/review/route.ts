@@ -26,11 +26,37 @@ function hasStrongHook(text: string): boolean {
     return hasQuestionOrObservation && hasTopicKeywords && lengthIsDecent;
 }
 
-function hasCTA(text: string): boolean {
+function hasCTA(text: string, contentType?: string): boolean {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     if (lines.length === 0) return false;
-    const lastLines = lines.slice(-3).join(' ');
-    return lastLines.includes('?') || lastLines.includes('คอมเมนต์') || lastLines.includes('คิดว่า') || lastLines.includes('แชร์') || lastLines.includes('ฝาก');
+    
+    // Inspect only the tail (last 10 non-empty lines)
+    const tailLines = lines.slice(-10).join(' ');
+    
+    if (contentType === 'page_post') {
+        const hasUrl = tailLines.includes('greenfineness.com/library/');
+        const hasArticleBridge = tailLines.includes('อ่านบทความเต็ม') || tailLines.includes('ในบทความเต็ม');
+        
+        // Specific closing insight patterns (avoid generic single words)
+        const hasSpecificInsight = 
+            (tailLines.includes('การเข้าใจ') && tailLines.includes('จึงไม่ใช่แค่')) ||
+            tailLines.includes('ควรมองร่วมกับ') ||
+            tailLines.includes('จึงไม่ใช่เรื่องของ') ||
+            tailLines.includes('แต่เป็นเรื่องของ') ||
+            tailLines.includes('ก่อนจะกลายเป็น');
+        
+        return hasUrl || hasArticleBridge || hasSpecificInsight;
+    }
+    
+    // Default / Group Post logic (tail-based)
+    return tailLines.includes('?') || 
+           tailLines.includes('คอมเมนต์') || 
+           tailLines.includes('คิดว่า') || 
+           tailLines.includes('แชร์') || 
+           tailLines.includes('ฝาก') ||
+           tailLines.includes('เคยเจอ') ||
+           tailLines.includes('ลองเล่า') ||
+           tailLines.includes('แบ่งปัน');
 }
 // --- HEURISTICS END ---
 
@@ -89,7 +115,8 @@ export async function POST(req: NextRequest) {
             revisionPoints: [],
             claimSafetyNotes: [],
             toneNotes: [],
-            recommendedNextEdit: ""
+            recommendedNextEdit: "",
+            suggestedRevision: ""
         };
 
         const isPlaceholder = hasPlaceholder(contentText);
@@ -98,7 +125,7 @@ export async function POST(req: NextRequest) {
             structured.editorialSummary = "เหมาะสำหรับโพสต์ในกลุ่มครับ มีความเป็นกันเองสูงและย่อยข้อมูลให้อ่านง่าย";
             structured.contentStrength = ["ความเป็นกันเองทำได้ดี", "ไม่แข็งเป็นวิชาการจนเกินไป", "ย่อยข้อมูลให้เข้าใจง่ายสำหรับคนทั่วไป"];
             structured.revisionPoints = ["ลองเพิ่มจังหวะชวนคุยหรือตั้งคำถามกับลูกเพจเพิ่มขึ้นอีกนิด", "เพิ่มช่องว่างระหว่างย่อหน้าให้อ่านง่ายขึ้น"];
-            if (!hasCTA(contentText)) {
+            if (!hasCTA(contentText, contentType)) {
                 structured.revisionPoints.push("เพิ่ม Call to Action (CTA) หรือคำถามปิดท้ายชวนคุย");
             }
             structured.claimSafetyNotes = ["ข้อมูลทั่วไป ปลอดภัยสำหรับการโพสต์"];
@@ -109,8 +136,11 @@ export async function POST(req: NextRequest) {
             if (strongHook && !isPlaceholder) {
                 structured.editorialSummary = "โครงสร้าง Page Post ดีครับ Hook เปิดประเด็นได้ชัดขึ้น";
                 structured.contentStrength = ["Hook เปิดประเด็นได้ชัดขึ้น", "เนื้อหามีความน่าสนใจ", "Brand Voice ชัดเจน"];
-                structured.revisionPoints = ["ลดความซ้ำในย่อหน้าถัดไป", "เพิ่ม CTA ถ้ายังไม่มี"];
-                structured.recommendedNextEdit = "ปรับปรุงเนื้อหาส่วนกลางและเพิ่ม Call to Action (CTA)";
+                structured.revisionPoints = ["ลดความซ้ำในย่อหน้าถัดไป"];
+                if (!hasCTA(contentText, contentType)) {
+                    structured.revisionPoints.push("เพิ่ม CTA ถ้ายังไม่มี");
+                }
+                structured.recommendedNextEdit = "ปรับปรุงเนื้อหาส่วนกลางและตรวจสอบความเรียบร้อย";
             } else {
                 structured.editorialSummary = "โครงสร้าง Page Post ดีแล้ว แต่ต้องเน้นเรื่อง Hook และความกระชับมากขึ้น";
                 structured.contentStrength = ["เนื้อหามีความน่าสนใจ", "Brand Voice ชัดเจน"];
@@ -143,6 +173,23 @@ export async function POST(req: NextRequest) {
             structured.editorialSummary = `🚨 พบข้อความทดสอบหรือ Placeholder ในเนื้อหา\n${structured.editorialSummary}`;
             structured.revisionPoints.unshift("ลบข้อความทดสอบ (TODO, Lorem, xxx, หรือวงเล็บต่างๆ) ก่อนนำไปใช้งานจริง");
             structured.recommendedNextEdit = "ลบข้อความทดสอบและ Placeholder ออกก่อน";
+            structured.suggestedRevision = "กรุณาลบข้อความทดสอบหรือ Placeholder (เช่น [ใส่ลิงก์], TODO, xxx, HOOK TEST) ออกจากเนื้อหาก่อนนำไปใช้งานจริง เพื่อให้ข้อมูลมีความถูกต้องและเป็นมืออาชีพครับ";
+        } else {
+            // This is a lightweight heuristic suggestion layer. 
+            // Full editorial review should be handled by a future AI review integration.
+            if (contentType === 'page_post') {
+                const strongHook = hasStrongHook(contentText);
+                const hasCta = hasCTA(contentText, contentType);
+                if (!strongHook) {
+                    structured.suggestedRevision = "ทำไมพืชถึงดูดซึมไนโตรเจนได้ไม่เต็มที่? วันนี้เรามาทำความเข้าใจกลไกการทำงานของดิน เพื่อการเติบโตที่ยั่งยืนของผลผลิตกันครับ";
+                } else if (!hasCta) {
+                    structured.suggestedRevision = "การเข้าใจไนโตรเจนจึงไม่ใช่แค่การดูว่าพืชได้รับธาตุอาหารพอไหม แต่ควรมองร่วมกับรูปของไนโตรเจน สภาพดิน ความชื้น อินทรียวัตถุ และช่วงการเติบโตของพืชด้วย";
+                }
+            } else if (contentType === 'group_post') {
+                if (!hasCTA(contentText, contentType)) {
+                    structured.suggestedRevision = "ในพื้นที่ของแต่ละคน เคยเจอกรณีที่พืชตอบสนองต่อไนโตรเจนไม่เหมือนกันไหมครับ? ถ้าเล่าได้ ลองบอกบริบทของดิน น้ำ พืชที่ปลูก และช่วงการเติบโตประกอบด้วย จะช่วยให้เห็นภาพของระบบมากขึ้นครับ";
+                }
+            }
         }
 
         getDb().prepare(`

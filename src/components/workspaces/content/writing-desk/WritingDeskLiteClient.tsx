@@ -63,6 +63,7 @@ interface ArborReviewPayload {
     claimSafetyNotes: string[];
     toneNotes: string[];
     recommendedNextEdit: string;
+    suggestedRevision?: string;
 }
 
 interface ReviewResult {
@@ -285,22 +286,23 @@ export default function WritingDeskLiteClient() {
         }
     };
 
-    // Run Arbor Review (Mock)
+    // Run Arbor Review
     const handleRunReview = async () => {
         if (!activeDraft) return;
         setIsReviewing(true);
         try {
-            if (saveStatus === 'unsaved') {
-                await handleSave();
-            }
-
+            // Force-save full current draft state before running review
+            // This ensures all metadata (content_type, topic_id, etc.) are in sync with the API
+            await handleSave();
+ 
             const res = await fetch("/api/content/writing-desk/review", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ draft_id: activeDraft.id })
             });
             const result = await res.json();
-
+ 
+            // Immediately replace local review state with the returned result
             setReview(result);
         } catch (err) {
             console.error("Failed to run review", err);
@@ -1042,6 +1044,27 @@ export default function WritingDeskLiteClient() {
                                                 </div>
                                             </section>
                                         </div>
+
+                                        {s.suggestedRevision && (
+                                            <section className="pt-4 border-t border-theme-border/50 space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Suggested Revision</h3>
+                                                <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 space-y-3">
+                                                    <p className="text-xs font-bold text-amber-900 leading-relaxed italic">
+                                                        “{s.suggestedRevision}”
+                                                    </p>
+                                                    <button 
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(s.suggestedRevision!);
+                                                            setMessage({ type: 'success', text: "Suggestion copied!" });
+                                                            setTimeout(() => setMessage(null), 2000);
+                                                        }}
+                                                        className="w-full py-2 bg-white border border-amber-200 text-amber-700 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-100 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                                    >
+                                                        <Copy size={12} /> Copy Suggestion
+                                                    </button>
+                                                </div>
+                                            </section>
+                                        )}
 
                                         <section className="pt-4 border-t border-theme-border/50">
                                             <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted mb-2">Next Action</h3>
