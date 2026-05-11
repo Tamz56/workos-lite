@@ -290,12 +290,17 @@ export default function WritingDeskLiteClient() {
         if (!activeDraft) return;
         setIsReviewing(true);
         try {
+            if (saveStatus === 'unsaved') {
+                await handleSave();
+            }
+
             const res = await fetch("/api/content/writing-desk/review", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ draft_id: activeDraft.id })
             });
             const result = await res.json();
+
             setReview(result);
         } catch (err) {
             console.error("Failed to run review", err);

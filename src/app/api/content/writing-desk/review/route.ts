@@ -6,6 +6,34 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { toErrorMessage } from "@/lib/error";
 
+// --- HEURISTICS START ---
+function hasPlaceholder(text: string): boolean {
+    const placeholders = ["HOOK TEST", "TEST 123", "TODO", "placeholder", "Lorem", "[ใส่ลิงก์บทความ]", "[ใส่", "xxx"];
+    const lower = text.toLowerCase();
+    return placeholders.some(p => lower.includes(p.toLowerCase()));
+}
+
+function getFirstLines(text: string, count: number): string {
+    return text.split('\n').map(l => l.trim()).filter(l => l.length > 0).slice(0, count).join(' ');
+}
+
+function hasStrongHook(text: string): boolean {
+    const opening = getFirstLines(text, 3);
+    const hasQuestionOrObservation = opening.includes('?') || opening.includes('ทำไม') || opening.includes('อย่างไร') || opening.includes('รู้หรือไม่') || opening.includes('สังเกต');
+    const topicKeywords = ['ไนโตรเจน', 'พืช', 'ปุ๋ย', 'ผลผลิต', 'ดิน', 'น้ำ', 'ใบ', 'ต้น', 'ราก', 'โรค', 'แมลง'];
+    const hasTopicKeywords = topicKeywords.some(k => opening.includes(k));
+    const lengthIsDecent = opening.length > 20;
+    return hasQuestionOrObservation && hasTopicKeywords && lengthIsDecent;
+}
+
+function hasCTA(text: string): boolean {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return false;
+    const lastLines = lines.slice(-3).join(' ');
+    return lastLines.includes('?') || lastLines.includes('คอมเมนต์') || lastLines.includes('คิดว่า') || lastLines.includes('แชร์') || lastLines.includes('ฝาก');
+}
+// --- HEURISTICS END ---
+
 const ReviewRequestSchema = z.object({
     draft_id: z.string(),
     review_mode: z.string().default('standard'),
@@ -49,6 +77,8 @@ export async function POST(req: NextRequest) {
         if (!draft) return NextResponse.json({ error: "Draft not found" }, { status: 404 });
 
         const contentType = draft.content_type;
+        const contentText = draft.body || "";
+        
         const id = nanoid();
         const now = new Date().toISOString();
         
@@ -62,20 +92,33 @@ export async function POST(req: NextRequest) {
             recommendedNextEdit: ""
         };
 
+        const isPlaceholder = hasPlaceholder(contentText);
+
         if (contentType === 'group_post') {
             structured.editorialSummary = "เหมาะสำหรับโพสต์ในกลุ่มครับ มีความเป็นกันเองสูงและย่อยข้อมูลให้อ่านง่าย";
             structured.contentStrength = ["ความเป็นกันเองทำได้ดี", "ไม่แข็งเป็นวิชาการจนเกินไป", "ย่อยข้อมูลให้เข้าใจง่ายสำหรับคนทั่วไป"];
             structured.revisionPoints = ["ลองเพิ่มจังหวะชวนคุยหรือตั้งคำถามกับลูกเพจเพิ่มขึ้นอีกนิด", "เพิ่มช่องว่างระหว่างย่อหน้าให้อ่านง่ายขึ้น"];
+            if (!hasCTA(contentText)) {
+                structured.revisionPoints.push("เพิ่ม Call to Action (CTA) หรือคำถามปิดท้ายชวนคุย");
+            }
             structured.claimSafetyNotes = ["ข้อมูลทั่วไป ปลอดภัยสำหรับการโพสต์"];
             structured.toneNotes = ["Conversational", "Friendly", "Community-focused"];
             structured.recommendedNextEdit = "เพิ่ม Call to Action (CTA) ให้สมาชิกมาคอมเมนต์แลกเปลี่ยน";
         } else if (contentType === 'page_post') {
-            structured.editorialSummary = "โครงสร้าง Page Post ดีแล้ว แต่ต้องเน้นเรื่อง Hook และความกระชับมากขึ้น";
-            structured.contentStrength = ["เนื้อหามีความน่าสนใจ", "Brand Voice ชัดเจน"];
-            structured.revisionPoints = ["Hook ใน 2 ประโยคแรกยังไม่แรงพอ", "ตัดประโยคขยายความที่ไม่จำเป็นออกเพื่อให้กระชับขึ้น"];
+            const strongHook = hasStrongHook(contentText);
+            if (strongHook && !isPlaceholder) {
+                structured.editorialSummary = "โครงสร้าง Page Post ดีครับ Hook เปิดประเด็นได้ชัดขึ้น";
+                structured.contentStrength = ["Hook เปิดประเด็นได้ชัดขึ้น", "เนื้อหามีความน่าสนใจ", "Brand Voice ชัดเจน"];
+                structured.revisionPoints = ["ลดความซ้ำในย่อหน้าถัดไป", "เพิ่ม CTA ถ้ายังไม่มี"];
+                structured.recommendedNextEdit = "ปรับปรุงเนื้อหาส่วนกลางและเพิ่ม Call to Action (CTA)";
+            } else {
+                structured.editorialSummary = "โครงสร้าง Page Post ดีแล้ว แต่ต้องเน้นเรื่อง Hook และความกระชับมากขึ้น";
+                structured.contentStrength = ["เนื้อหามีความน่าสนใจ", "Brand Voice ชัดเจน"];
+                structured.revisionPoints = ["Hook ใน 2 ประโยคแรกยังไม่แรงพอ", "ตัดประโยคขยายความที่ไม่จำเป็นออกเพื่อให้กระชับขึ้น"];
+                structured.recommendedNextEdit = "ปรับปรุง Hook 3 บรรทัดแรกให้น่าสนใจและดึงดูดสายตา";
+            }
             structured.claimSafetyNotes = ["ตรวจสอบคำโฆษณาเกินจริง (ถ้ามี)"];
             structured.toneNotes = ["Professional yet accessible", "Impactful", "Brand-aligned"];
-            structured.recommendedNextEdit = "ปรับปรุง Hook 3 บรรทัดแรกให้น่าสนใจและดึงดูดสายตา";
         } else if (contentType === 'personal_post') {
             structured.editorialSummary = "น้ำเสียงยังดูเป็นทางการไปนิดครับ ลองเล่าแบบพี่น้องคุยกัน";
             structured.contentStrength = ["หัวข้อเรื่องน่าสนใจ", "มีความเป็นมนุษย์"];
@@ -94,6 +137,12 @@ export async function POST(req: NextRequest) {
             structured.editorialSummary = "รีวิวตามมาตรฐานทั่วไปครับ";
             structured.contentStrength = ["เนื้อหาครบถ้วน"];
             structured.recommendedNextEdit = "ตรวจสอบความเรียบร้อยก่อนนำไปใช้งาน";
+        }
+
+        if (isPlaceholder) {
+            structured.editorialSummary = `🚨 พบข้อความทดสอบหรือ Placeholder ในเนื้อหา\n${structured.editorialSummary}`;
+            structured.revisionPoints.unshift("ลบข้อความทดสอบ (TODO, Lorem, xxx, หรือวงเล็บต่างๆ) ก่อนนำไปใช้งานจริง");
+            structured.recommendedNextEdit = "ลบข้อความทดสอบและ Placeholder ออกก่อน";
         }
 
         getDb().prepare(`
