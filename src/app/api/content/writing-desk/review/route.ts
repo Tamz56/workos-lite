@@ -49,14 +49,17 @@ function hasCTA(text: string, contentType?: string): boolean {
     }
     
     // Default / Group Post logic (tail-based)
-    return tailLines.includes('?') || 
-           tailLines.includes('คอมเมนต์') || 
-           tailLines.includes('คิดว่า') || 
-           tailLines.includes('แชร์') || 
-           tailLines.includes('ฝาก') ||
-           tailLines.includes('เคยเจอ') ||
-           tailLines.includes('ลองเล่า') ||
-           tailLines.includes('แบ่งปัน');
+    // Avoid false positives by requiring common community keywords or a question mark near the very end
+    const communityKeywords = ['คอมเมนต์', 'คิดว่า', 'เคยเจอ', 'ลองเล่า', 'แบ่งปัน'];
+    const hasCommunityKeyword = communityKeywords.some(k => tailLines.includes(k));
+    
+    // Restrict question mark checks to the very last 3 lines to avoid matching H3 headings in the middle of the tail
+    const veryTailLines = lines.slice(-3).join(' ');
+    const hasQuestion = veryTailLines.includes('?') || veryTailLines.includes('ครับไหม') || veryTailLines.includes('ไหมครับ') || veryTailLines.includes('มั้ยครับ');
+    
+    const hasBridge = tailLines.includes('อ่านบทความเต็ม') || tailLines.includes('ในบทความเต็ม');
+    
+    return hasQuestion || hasCommunityKeyword || hasBridge;
 }
 // --- HEURISTICS END ---
 
@@ -122,15 +125,22 @@ export async function POST(req: NextRequest) {
         const isPlaceholder = hasPlaceholder(contentText);
 
         if (contentType === 'group_post') {
+            const hasCta = hasCTA(contentText, contentType);
             structured.editorialSummary = "เหมาะสำหรับโพสต์ในกลุ่มครับ มีความเป็นกันเองสูงและย่อยข้อมูลให้อ่านง่าย";
             structured.contentStrength = ["ความเป็นกันเองทำได้ดี", "ไม่แข็งเป็นวิชาการจนเกินไป", "ย่อยข้อมูลให้เข้าใจง่ายสำหรับคนทั่วไป"];
-            structured.revisionPoints = ["ลองเพิ่มจังหวะชวนคุยหรือตั้งคำถามกับลูกเพจเพิ่มขึ้นอีกนิด", "เพิ่มช่องว่างระหว่างย่อหน้าให้อ่านง่ายขึ้น"];
-            if (!hasCTA(contentText, contentType)) {
+            
+            structured.revisionPoints = ["เพิ่มช่องว่างระหว่างย่อหน้าให้อ่านง่ายขึ้น"];
+            
+            if (!hasCta) {
+                structured.revisionPoints.unshift("ลองเพิ่มจังหวะชวนคุยหรือตั้งคำถามกับลูกเพจเพิ่มขึ้นอีกนิด");
                 structured.revisionPoints.push("เพิ่ม Call to Action (CTA) หรือคำถามปิดท้ายชวนคุย");
+                structured.recommendedNextEdit = "เพิ่ม Call to Action (CTA) ให้สมาชิกมาคอมเมนต์แลกเปลี่ยน";
+            } else {
+                structured.recommendedNextEdit = "ตรวจความกระชับของย่อหน้า และเตรียมส่งต่อไปยัง WorkOS Task";
             }
+            
             structured.claimSafetyNotes = ["ข้อมูลทั่วไป ปลอดภัยสำหรับการโพสต์"];
             structured.toneNotes = ["Conversational", "Friendly", "Community-focused"];
-            structured.recommendedNextEdit = "เพิ่ม Call to Action (CTA) ให้สมาชิกมาคอมเมนต์แลกเปลี่ยน";
         } else if (contentType === 'page_post') {
             const strongHook = hasStrongHook(contentText);
             if (strongHook && !isPlaceholder) {
@@ -186,11 +196,21 @@ export async function POST(req: NextRequest) {
                     structured.suggestedRevision = "การเข้าใจไนโตรเจนจึงไม่ใช่แค่การดูว่าพืชได้รับธาตุอาหารพอไหม แต่ควรมองร่วมกับรูปของไนโตรเจน สภาพดิน ความชื้น อินทรียวัตถุ และช่วงการเติบโตของพืชด้วย";
                 }
             } else if (contentType === 'group_post') {
-                if (!hasCTA(contentText, contentType)) {
-                    structured.suggestedRevision = "ในพื้นที่ของแต่ละคน เคยเจอกรณีที่พืชตอบสนองต่อไนโตรเจนไม่เหมือนกันไหมครับ? ถ้าเล่าได้ ลองบอกบริบทของดิน น้ำ พืชที่ปลูก และช่วงการเติบโตประกอบด้วย จะช่วยให้เห็นภาพของระบบมากขึ้นครับ";
+                const hasCta = hasCTA(contentText, contentType);
+                if (!hasCta) {
+                    structured.suggestedRevision = "ถ้าเคยสังเกตว่าพืชตอบสนองต่อไนโตรเจนไม่เหมือนกันในแต่ละแปลง ลองเล่าบริบทของดิน น้ำ อินทรียวัตถุ และช่วงการเติบโตของพืชประกอบกันได้ครับ จะช่วยให้เห็นภาพของระบบดินมากขึ้น";
                 }
             }
         }
+
+        console.log("[review:return]", {
+            draftId: draft_id,
+            content_type: contentType,
+            hasCta: hasCTA(contentText, contentType),
+            suggestedRevision: structured.suggestedRevision,
+            revisionPoints: structured.revisionPoints,
+            dbPath: process.env.WORKOS_DB_PATH || "default"
+        });
 
         getDb().prepare(`
             INSERT INTO arbor_review_results (
