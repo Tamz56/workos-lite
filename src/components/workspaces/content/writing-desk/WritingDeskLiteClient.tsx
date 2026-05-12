@@ -19,8 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
-
-// --- Types ---
+import CreateGfArticleModal from "./CreateGfArticleModal";
 
 type ContentType = 'group_post' | 'page_post' | 'personal_post' | 'web_article_section' | 'website_fields' | 'body_markdown' | 'reference_note' | 'schema_jsonld' | 'visual_brief' | 'publish_note';
 type DraftStage = 'working' | 'reviewed' | 'ready_to_export' | 'exported' | 'archived';
@@ -87,16 +86,16 @@ const WRITING_MODES: WritingMode[] = ['draft', 'rewrite', 'polish', 'review', 'v
 const SOURCE_STEPS: SourceStep[] = ['research_raw', 'research_direction', 'brief', 'script_caption', 'assets_canva', 'outline_web_article', 'website_publish_pack', 'publish'];
 
 const CONTENT_TYPE_TO_ROLE: Record<string, string> = {
-    group_post: 'Script & Caption — Group Post',
-    page_post: 'Script & Caption — Page Post',
-    personal_post: 'Script & Caption — Personal Post',
+    group_post: 'Script & Caption',
+    page_post: 'Script & Caption',
+    personal_post: 'Script & Caption',
     web_article_section: 'Outline web article',
     body_markdown: 'Outline web article',
-    visual_brief: 'Visual Package',
-    website_fields: 'Website Publish Pack',
+    visual_brief: 'Assets / Canva',
+    website_fields: 'SEO & Schema',
     schema_jsonld: 'SEO & Schema',
     reference_note: 'SEO & Schema',
-    publish_note: 'Review / Publish'
+    publish_note: 'Publish'
 };
 
 const normalizeTopicId = (topicId: string) => {
@@ -144,6 +143,7 @@ export default function WritingDeskLiteClient() {
 
     const [suggestedTasks, setSuggestedTasks] = useState<any[]>([]);
     const [isTaskSearchOpen, setIsTaskSearchOpen] = useState(false);
+    const [isCreateGfModalOpen, setIsCreateGfModalOpen] = useState(false);
 
     // Fetch Drafts
     const fetchDrafts = useCallback(async () => {
@@ -491,14 +491,20 @@ export default function WritingDeskLiteClient() {
             const taskRes = await fetch(`/api/tasks/${activeDraft.linked_task_id}`);
             const task = await taskRes.json();
             
-            const timestamp = new Date().toLocaleString('en-GB', { 
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', hour12: false 
-            }).replace(',', '');
+            const stepLabel = CONTENT_TYPE_TO_ROLE[activeDraft.content_type] || "Working Doc";
+            let appendBlock = "";
             
+            if (stepLabel === 'Script & Caption') {
+                appendBlock = `\n\n---\n\n## Arbor Output — Step 5 Script & Caption — Draft\n\n` +
+                `### Group Post\n\n### Page Post\n\n### Personal Post\n\n` +
+                `### Website Bridge Copy\n\n### Short Caption\n\n### Hook Options\n\n` +
+                `### Closing Line Options\n\n### Reference Note\n\n### Hashtags\n\n`;
+            } else {
+                appendBlock = `\n\n---\n\n## Arbor Output — ${stepLabel} — Draft\n\n`;
+            }
+
             const markdown = formatDraftToMarkdown(activeDraft, review);
-            const header = `\n\n## Writing Desk Export — ${timestamp}\n\n`;
-            const newNotes = (task.notes || "") + header + markdown;
+            const newNotes = (task.notes || "") + appendBlock + markdown;
 
             await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
                 method: "PATCH",
@@ -554,6 +560,12 @@ export default function WritingDeskLiteClient() {
                             {message.text}
                         </div>
                     )}
+                    <button
+                        onClick={() => setIsCreateGfModalOpen(true)}
+                        className="bg-black/5 dark:bg-white/5 text-theme-primary px-4 py-2 rounded-xl text-sm font-black flex items-center gap-2 hover:bg-black/10 dark:hover:bg-white/10 transition-all active:scale-95 border border-theme-border"
+                    >
+                        <Sparkles size={16} /> New GF Article
+                    </button>
                     <button 
                         onClick={handleNewDraft}
                         className="bg-black text-white px-4 py-2 rounded-xl text-sm font-black flex items-center gap-2 hover:bg-neutral-800 transition-all active:scale-95"
@@ -1130,6 +1142,15 @@ export default function WritingDeskLiteClient() {
                     )}
                 </aside>
             </div>
+            <CreateGfArticleModal
+                isOpen={isCreateGfModalOpen}
+                onClose={() => setIsCreateGfModalOpen(false)}
+                onSuccess={(count) => {
+                    setMessage({ type: 'success', text: `Successfully created ${count} tasks for the GF Article.` });
+                    setTimeout(() => setMessage(null), 3000);
+                }}
+            />
+
         </PageShell>
     );
 }

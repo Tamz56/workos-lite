@@ -240,6 +240,13 @@ export async function GET(req: NextRequest) {
             bind.q = `%${q}%`;
         }
 
+        const topic_id = url.searchParams.get("topic_id");
+        if (topic_id) {
+            where.push("(notes LIKE @topic_id_pattern OR title LIKE @topic_id_title_pattern)");
+            bind.topic_id_pattern = `%topic_id: ${topic_id}%`;
+            bind.topic_id_title_pattern = `%${topic_id}%`;
+        }
+
         const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
         // Deterministic Ordering for Pagination
