@@ -170,19 +170,18 @@ export async function POST(req: NextRequest) {
             // --- Heuristic analysis for body_markdown ---
             const lines = contentText.split('\n');
             const h2Lines = lines.filter((l: string) => l.trim().startsWith('## '));
-            const h3Lines = lines.filter((l: string) => l.trim().startsWith('### '));
             const hasHeadings = h2Lines.length > 0;
             const opening = getFirstLines(contentText, 4);
 
             // Check for weak opening
-            const weakOpeningPatterns = ['ในบทความนี้', 'บทความนี้จะ', 'เราจะมาพูดถึง', 'วันนี้เราจะ', 'ในเนื้อหานี้'];
+            const weakOpeningPatterns = ['ในบทความนี้', 'บทความนี้จะ', 'เราจะมาพูดถึง', 'วันนี้เราจะ', 'ในเนื้อหาสี้'];
             const hasWeakOpening = weakOpeningPatterns.some(p => opening.includes(p));
 
             // Check for risky/absolute claims
-            const riskyPhrases = ['100%', 'ทุกกรณี', 'ทุกกรณี', 'รักษาได้', 'รักษาโรค', 'แน่นอน 100', 'ป้องกันได้ 100', 'ไม่มีผลข้างเคียง', 'เพิ่มผลผลิตได้ถึง', 'ลดโรคได้ถึง'];
+            const riskyPhrases = ['100%', 'ทุกกรณี', 'รักษาได้', 'รักษาโรค', 'แน่นอน 100', 'ป้องกันได้ 100', 'ไม่มีผลข้างเคียง', 'เพิ่มผลผลิตได้ถึง', 'ลดโรคได้ถึง'];
             const foundRiskyClaims = riskyPhrases.filter(p => contentText.includes(p));
 
-            // Check for voice/tone violations (Khun Tum / Green Fineness guardrails)
+            // Check for voice/tone violations
             const FORBIDDEN_PHRASES = [
                 'พูดง่ายๆ คือ', 'มันคือ', 'มันทำให้', 'มันไม่ได้', 'ไม่ได้แปลว่า',
                 'ให้เราเห็นว่า', 'นั่นคือ', 'มองให้ลึกลงไป', 'ง่ายๆ คือ',
@@ -190,38 +189,47 @@ export async function POST(req: NextRequest) {
             ];
             const flaggedPhrases = FORBIDDEN_PHRASES.filter(p => contentText.includes(p));
 
-            structured.editorialSummary = "บทความมีความลึก แต่ต้องการการจัดระเบียบโครงสร้างและตรวจสอบเรื่องคำเคลมทางวิชาการ/เกษตร";
+            structured.editorialSummary = hasHeadings && !hasWeakOpening && flaggedPhrases.length === 0
+                ? "บทความมีโครงสร้างดีและน้ำเสียงชัดเจน พร้อมสำหรับการตรวจสอบเนื้อหาเชิงลึก"
+                : "บทความมีความลึก แต่ยังมีประเด็นที่ต้องปรับก่อน Review ขั้นถัดไป";
+
             structured.contentStrength = [
                 "ข้อมูลแน่นและลึก",
                 "มีประโยชน์ต่อผู้อ่านที่ต้องการความรู้",
-                ...(hasHeadings ? ["มีโครงสร้าง Heading พื้นฐานแล้ว"] : []),
+                ...(hasHeadings && h2Lines.length >= 2 ? ["โครงสร้าง H2/H3 ครบถ้วนแล้ว"] : []),
+                ...(!hasWeakOpening ? ["ประโยคเปิดชัดเจน ไม่กว้างเกินไป"] : []),
+                ...(flaggedPhrases.length === 0 ? ["น้ำเสียงตรงกับ Green Fineness Voice"] : []),
             ];
-            structured.revisionPoints = [
-                ...(!hasHeadings ? ["ยังไม่มี H2/H3 Heading — ควรเพิ่มโครงสร้างบทความให้ชัดขึ้น"] : []),
+
+            const actualIssues: string[] = [
+                ...(!hasHeadings ? ["ยังไม่มี H2/H3 Heading — ควรเพิ่มโครงสร้างบทความ"] : []),
                 ...(hasWeakOpening ? ["ประโยคเปิดยังกว้างเกินไป ควรเริ่มด้วย Hook หรือประโยคชี้จุดประสงค์"] : []),
                 ...(flaggedPhrases.length > 0 ? [`พบภาษาที่ไม่ตรงกับ Green Fineness Voice: ${flaggedPhrases.slice(0, 3).join(', ')}`] : []),
-                "จัดลำดับการอธิบายให้เป็นระบบมากขึ้น",
+                ...(foundRiskyClaims.length > 0 ? [`พบคำที่มีความเสี่ยงสูง: "${foundRiskyClaims.join('", "')}"`] : []),
             ];
-            structured.claimSafetyNotes = [
-                "มีการอ้างอิงถึงสรรพคุณเฉพาะทาง ควรตรวจสอบความถูกต้องตามหลักวิชาการ/เกษตร (Claim Safety)",
-                "ตรวจสอบแหล่งอ้างอิงของข้อมูล",
-                ...(foundRiskyClaims.length > 0 ? [`พบคำที่มีความเสี่ยงสูง: "${foundRiskyClaims.join('", "')}" — ควรปรับให้อ่อนลง`] : []),
-            ];
+            structured.revisionPoints = actualIssues.length > 0 ? actualIssues : ["ไม่พบปัญหาหลักในรอบนี้"];
+
+            structured.claimSafetyNotes = foundRiskyClaims.length > 0
+                ? [`⚠️ พบคำที่มีความเสี่ยง: "${foundRiskyClaims.join('", "')}" — ควรปรับให้อ่อนลง`, "ตรวจสอบแหล่งอ้างอิงของข้อมูล"]
+                : ["💡 Reminder: ตรวจสอบแหล่งอ้างอิงของข้อมูลเชิงวิชาการก่อน Publish"];
+
             structured.toneNotes = ["Educational", "Authoritative", "Safe"];
-            structured.recommendedNextEdit = "จัดโครงสร้าง Heading ใหม่ และตรวจสอบความถูกต้องของข้อมูลทางวิชาการ (Claim Safety)";
 
-            // --- Actionable Suggestion Fields ---
-
-            // 1. Suggested Heading Structure
-            if (!hasHeadings || h2Lines.length < 2) {
-                structured.suggestedHeadings = `## [ชื่อหัวข้อหลัก — แนะนำให้บอก "ทำไม" หรือ "อะไร"]\n\n### [หัวข้อย่อย 1 — สาเหตุหรือกลไก]\n\n### [หัวข้อย่อย 2 — ผลที่ตามมา]\n\n## [บทสรุปหรือ Takeaway]\n\n### [ข้อควรระวัง / แนวทางปฏิบัติ]`;
+            if (actualIssues.length === 0) {
+                structured.recommendedNextEdit = "✅ ไม่พบปัญหาหลัก — พร้อมสำหรับ Manual Review และ Replace Task Notes ได้เลย";
+            } else if (!hasHeadings) {
+                structured.recommendedNextEdit = "เพิ่ม H2/H3 Heading ก่อน แล้ว Review ใหม่อีกครั้ง";
+            } else if (flaggedPhrases.length > 0) {
+                structured.recommendedNextEdit = `แทนที่ภาษา Casual (${flaggedPhrases.slice(0, 2).join(', ')}) แล้ว Review ใหม่`;
             } else {
-                // Suggest refactored version of existing headings
-                const existingH2 = h2Lines.slice(0, 3).map((l: string) => l.trim()).join('\n');
-                structured.suggestedHeadings = `${existingH2}\n\n### [ตรวจสอบว่าแต่ละ H3 ใต้ H2 มีประโยคสรุปก่อนปิดหัวข้อ]\n\n## [เพิ่ม Takeaway หรือ Key Insight ปิดท้ายบทความ]`;
+                structured.recommendedNextEdit = "ตรวจสอบแหล่งอ้างอิงและความถูกต้องของข้อมูลทางวิชาการ";
             }
 
-            // 2. Suggested Rewrite for weak opening
+            if (!hasHeadings || h2Lines.length < 2) {
+                structured.suggestedHeadings = `## [ชื่อหัวข้อหลัก — แนะนำให้บอก "ทำไม" หรือ "อะไร"]\n\n### [หัวข้อย่อย 1 — สาเหตุหรือกลไก]\n\n### [หัวข้อย่อย 2 — ผลที่ตามมา]\n\n## [บทสรุปหรือ Takeaway]\n\n### [ข้อควรระวัง / แนวทางปฏิบัติ]`;
+            }
+
+            // Suggested Rewrite — only when actual issue detected
             if (hasWeakOpening) {
                 const firstContentLine = lines.find((l: string) => l.trim().length > 20 && !l.trim().startsWith('#'));
                 const preview = firstContentLine ? firstContentLine.trim().slice(0, 60) : 'เนื้อหาส่วนเปิด';
