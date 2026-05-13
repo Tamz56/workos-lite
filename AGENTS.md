@@ -190,3 +190,9 @@ Protect these flows:
 - article title parsing
 - UTM generation
 - Publish Queue flow
+
+
+No evidence = not done.
+
+ห้าม claim ว่า commit / push / migrate / deploy / verify / สร้าง field / แก้ production แล้ว
+ถ้าไม่มีหลักฐานจาก command output, git log, git status, schema check, deploy log หรือ production check

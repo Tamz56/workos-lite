@@ -41,3 +41,35 @@ Recommended Next Step:
 - Do not claim tests passed if they were not run.
 - Do not omit risks.
 - Do not say “done” unless verification is complete or limitations are clearly stated.
+
+## Verification & Evidence Discipline
+
+Never claim an external state change without evidence.
+
+External state changes include:
+- database schema changes
+- migrations
+- commits
+- pushes
+- deployments
+- production updates
+- environment variable changes
+- file uploads
+
+Required rule:
+
+No evidence = not done.
+
+If you claim that something was completed, include direct evidence:
+- command output
+- git log
+- git status
+- migration file path
+- SQL/schema inspection
+- deploy log
+- production URL check
+
+If you cannot verify it, say:
+"Not verified."
+
+Do not blame the user, server, or environment until you have shown evidence from the local repo, build logs, git status, and relevant runtime logs.
