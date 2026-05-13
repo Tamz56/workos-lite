@@ -96,6 +96,19 @@ const SOURCE_STEP_LABELS: Record<SourceStep, string> = {
     publish: 'Publish'
 };
 
+// Keywords to match existing GF workflow tasks by source_step
+// Handles task naming conventions e.g. "Research Raw — NotebookLM"
+const SOURCE_STEP_MATCH_KEYWORDS: Record<SourceStep, string[]> = {
+    research_raw:        ['research raw'],
+    research_direction:  ['research direction', 'arbor questions'],
+    brief:               ['brief'],
+    outline_web_article: ['outline web article', 'outline'],
+    script_caption:      ['script & caption', 'script and caption', 'script caption'],
+    assets_canva:        ['assets / canva', 'assets/canva', 'assets canva', 'visual package', 'visual brief'],
+    website_publish_pack:['seo & schema', 'seo and schema', 'website publish pack'],
+    publish:             ['publish']
+};
+
 const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
     research_raw: 'Research Raw',
     research_direction: 'Research Direction',
@@ -424,27 +437,31 @@ export default function WritingDeskLiteClient() {
         if (!activeDraft?.topic_id) return;
         setIsLinking(true);
         try {
-            // Search tasks with this topic_id
             const res = await fetch(`/api/tasks?q=${activeDraft.topic_id}`);
             const data = await res.json();
-            
-            // Sort tasks by relevance to content_type
+
             const sorted = [...data].sort((a: any, b: any) => {
                 const getScore = (task: any) => {
                     const title = task.title.toLowerCase();
+                    const step = activeDraft.source_step as SourceStep | null;
+
+                    // Priority 1: match by source_step keywords (highest confidence)
+                    if (step && SOURCE_STEP_MATCH_KEYWORDS[step]) {
+                        const matched = SOURCE_STEP_MATCH_KEYWORDS[step].some(kw => title.includes(kw));
+                        if (matched) return 200;
+                    }
+
+                    // Priority 2: fallback content_type matching (legacy)
                     const ct = activeDraft.content_type;
-                    
-                    if (ct === 'group_post' && (title.includes('group post'))) return 100;
-                    if (ct === 'page_post' && (title.includes('page post'))) return 100;
-                    if (ct === 'personal_post' && (title.includes('personal post'))) return 100;
+                    if (ct === 'group_post' && title.includes('group post')) return 100;
+                    if (ct === 'page_post' && title.includes('page post')) return 100;
+                    if (ct === 'personal_post' && title.includes('personal post')) return 100;
                     if ((ct === 'web_article_section' || ct === 'body_markdown') && title.includes('outline web article')) return 100;
                     if (ct === 'visual_brief' && title.includes('visual package')) return 100;
                     if (['website_fields', 'schema_jsonld', 'reference_note'].includes(ct) && (title.includes('website publish pack') || title.includes('seo & schema'))) return 100;
                     if (ct === 'publish_note' && (title.includes('review') || title.includes('publish'))) return 100;
-                    
-                    // Fallback for Script & Caption
                     if (['group_post', 'page_post', 'personal_post'].includes(ct) && title.includes('script & caption')) return 50;
-                    
+
                     return 0;
                 };
                 return getScore(b) - getScore(a);
@@ -918,15 +935,23 @@ export default function WritingDeskLiteClient() {
                                     <div className="space-y-6">
                                         {(() => {
                                             const normalizedId = activeDraft?.topic_id ? normalizeTopicId(activeDraft.topic_id) : '';
+                                            const step = activeDraft?.source_step as SourceStep | null;
                                             const targetRole = activeDraft ? CONTENT_TYPE_TO_ROLE[activeDraft.content_type] : '';
                                             const recommendedTitle = activeDraft ? getRecommendedTaskTitle(normalizedId, activeDraft.topic_title, activeDraft.content_type) : '';
-                                            
-                                            // Exact match ID and Role for Recommended
+
+                                            // Match by source_step keywords first (primary), then fallback to content_type role
                                             const recommendedTasks = suggestedTasks.filter((t: any) => {
                                                 const title = t.title.toLowerCase();
-                                                return normalizedId && targetRole && 
-                                                       title.includes(`[${normalizedId}]`.toLowerCase()) && 
-                                                       title.includes(targetRole.toLowerCase());
+                                                const hasId = normalizedId && title.includes(`[${normalizedId}]`.toLowerCase());
+                                                if (!hasId) return false;
+
+                                                // Source step match (higher confidence)
+                                                if (step && SOURCE_STEP_MATCH_KEYWORDS[step]) {
+                                                    if (SOURCE_STEP_MATCH_KEYWORDS[step].some(kw => title.includes(kw))) return true;
+                                                }
+
+                                                // Fallback: content_type role match
+                                                return targetRole && title.includes(targetRole.toLowerCase());
                                             });
                                             const otherTasks = suggestedTasks.filter((t: any) => !recommendedTasks.find(rt => rt.id === t.id));
                                             
