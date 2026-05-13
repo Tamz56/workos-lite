@@ -104,6 +104,41 @@ For any database, API, or persistence change:
 Never change schema as part of a UI refinement task.
 
 ---
+---
+
+## Anti-Bloat Discipline
+
+Follow `docs/agent-rules/anti-bloat.md`.
+
+Do not add speculative features, unused endpoints, unused environment variables, unused components, unnecessary abstractions, broad refactors, or large generated documentation.
+
+Build only for the current validated workflow unless the user explicitly approves future-facing architecture.
+
+Every new file, dependency, API route, environment variable, or architecture layer must have a clear current purpose.
+
+If the task appears to require broad changes, stop and propose phases first.
+
+Required rule:
+
+No speculative architecture without approval.
+
+Prefer:
+- small focused diffs
+- existing patterns
+- fewer files
+- fewer abstractions
+- current workflow support
+- verified behavior
+
+Avoid:
+- future-proofing without a real use case
+- large rewrites
+- unused code
+- unused docs
+- unused endpoints
+- unnecessary dependencies
+
+----
 
 ## Testing Requirements
 
@@ -196,3 +231,14 @@ No evidence = not done.
 
 ห้าม claim ว่า commit / push / migrate / deploy / verify / สร้าง field / แก้ production แล้ว
 ถ้าไม่มีหลักฐานจาก command output, git log, git status, schema check, deploy log หรือ production check
+
+Follow AGENTS.md.
+
+Apply:
+- No Evidence = Not Done
+- Anti-Bloat Discipline
+
+Do not add speculative features, unused endpoints, unused environment variables, unnecessary abstractions, or large generated docs.
+
+Keep the diff small and focused.
+If the task appears to require a broad refactor, stop and propose phases first.
