@@ -55,12 +55,13 @@ function enrichTask(row: any) {
         if (titleMatch) topicTitle = titleMatch[1].trim();
     }
 
-    // RC65: Title-based fallback for topic_id (legacy support)
+    // RC65: Title-based fallback for topic_id (legacy + GF-STORY-XX support)
     if (!topicId && row.title) {
-        const titleMatch = row.title.match(/TOPIC-(\d+)/i);
-        if (titleMatch) topicId = titleMatch[0].toUpperCase();
-        
-        const gfMatch = row.title.match(/GF-CONTENT-(\d+)/i);
+        const topicMatch = row.title.match(/TOPIC-\d+/i);
+        if (topicMatch) topicId = topicMatch[0].toUpperCase();
+
+        // Match any GF-<WORD>-<NUMBER> format: GF-CONTENT-012, GF-STORY-01, etc.
+        const gfMatch = row.title.match(/GF-[A-Z]+-\d+/i);
         if (gfMatch) topicId = gfMatch[0].toUpperCase();
     }
 

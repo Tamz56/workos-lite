@@ -109,9 +109,10 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
     const groups: Record<string, Task[]> = {};
     const groupMeta: Record<string, any> = {};
 
-    // Helper: Code extraction (GF-CONTENT-### or TOPIC-###)
+    // Helper: Code extraction (GF-CONTENT-###, GF-STORY-###, TOPIC-###, or any GF-*)
     const extractCode = (t: Task) => {
-        const gfPattern = /GF-CONTENT-\d+/g;
+        // Match any GF-<WORD>-<NUMBER> format (GF-CONTENT-001, GF-STORY-01, etc.)
+        const gfPattern = /GF-[A-Z]+-\d+/g;
         const topicPattern = /TOPIC-\d+/g;
 
         // 1. Check explicit topic_id field - canonical grouping key for Content.

@@ -554,12 +554,55 @@ export default function WritingDeskLiteClient() {
         setIsSaving(true);
         try {
             // Fetch existing task
+            // NOTE: GET /api/tasks/[id] returns { task: {...} } — unwrap correctly
             const taskRes = await fetch(`/api/tasks/${activeDraft.linked_task_id}`);
-            const task = await taskRes.json();
-            
-            const stepLabel = CONTENT_TYPE_TO_ROLE[activeDraft.content_type] || "Working Doc";
+            const taskJson = await taskRes.json();
+            const existingNotes: string = taskJson?.task?.notes || taskJson?.notes || "";
+
+            let finalExistingNotes = existingNotes;
+            if (!existingNotes.trim().startsWith("---")) {
+                const taskTitle = taskJson?.task?.title || taskJson?.title || "";
+                
+                let fallbackTopicId = "";
+                const gfMatch = taskTitle.match(/GF-[A-Z]+-\d+/i);
+                if (gfMatch) fallbackTopicId = gfMatch[0].toUpperCase();
+                else {
+                    const topicMatch = taskTitle.match(/TOPIC-\d+/i);
+                    if (topicMatch) fallbackTopicId = topicMatch[0].toUpperCase();
+                }
+
+                const topicId = activeDraft.topic_id || fallbackTopicId;
+                const topicTitle = activeDraft.topic_title || taskTitle;
+                const stepRole = activeDraft.source_step || CONTENT_TYPE_TO_ROLE[activeDraft.content_type] || activeDraft.content_type;
+                
+                const generatedFrontmatter = `---
+topic_id: ${topicId}
+topic_title: ${topicTitle}
+step_role: ${stepRole}
+content_pillar: 
+content_type: ${activeDraft.content_type}
+content_layer: 
+article_format: 
+narrative_style: 
+narrative_status: 
+journey_set: 
+journey_stage: 
+bridge_from: 
+bridge_to: 
+status: research
+priority: medium
+---
+
+`;
+                finalExistingNotes = generatedFrontmatter + existingNotes;
+            }
+
+            // Derive the step label for the append header
+            const stepLabel = activeDraft.source_step
+                ? SOURCE_STEP_LABELS[activeDraft.source_step]
+                : (CONTENT_TYPE_TO_ROLE[activeDraft.content_type] || "Working Doc");
+
             let appendBlock = "";
-            
             if (stepLabel === 'Script & Caption') {
                 appendBlock = `\n\n---\n\n## Arbor Output — Step 5 Script & Caption — Draft\n\n` +
                 `### Group Post\n\n### Page Post\n\n### Personal Post\n\n` +
@@ -570,7 +613,7 @@ export default function WritingDeskLiteClient() {
             }
 
             const markdown = formatDraftToMarkdown(activeDraft, review);
-            const newNotes = (task.notes || "") + appendBlock + markdown;
+            const newNotes = finalExistingNotes + (finalExistingNotes && !finalExistingNotes.endsWith('\n\n') ? '\n\n' : '') + appendBlock.trimStart() + markdown;
 
             await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
                 method: "PATCH",
