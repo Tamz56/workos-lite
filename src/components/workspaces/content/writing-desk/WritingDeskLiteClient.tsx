@@ -15,7 +15,8 @@ import {
     CheckCircle2,
     AlertCircle,
     ChevronRight,
-    Loader2
+    Loader2,
+    RefreshCw
 } from "lucide-react";
 import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
@@ -636,6 +637,155 @@ priority: medium
         }
     };
 
+    const handleReplaceTaskNotes = async () => {
+        if (!activeDraft || !activeDraft.linked_task_id) return;
+        
+        const confirmed = window.confirm("Are you sure you want to replace the linked task's notes? This will overwrite the current content in the task with a clean version of this draft.");
+        if (!confirmed) return;
+
+        setIsSaving(true);
+        try {
+            // Fetch existing task to preserve/merge metadata
+            const taskRes = await fetch(`/api/tasks/${activeDraft.linked_task_id}`);
+            const taskJson = await taskRes.json();
+            const existingNotes: string = taskJson?.task?.notes || taskJson?.notes || "";
+            const taskTitle = taskJson?.task?.title || taskJson?.title || "";
+
+            // 1. Parse existing frontmatter from task
+            const existingMeta: Record<string, string> = {};
+            if (existingNotes.trim().startsWith("---")) {
+                const endIdx = existingNotes.indexOf("---", 3);
+                if (endIdx !== -1) {
+                    const frontmatter = existingNotes.substring(3, endIdx);
+                    frontmatter.split('\n').forEach(line => {
+                        const match = line.match(/^([a-z_]+):\s*(.*)$/);
+                        if (match) existingMeta[match[1]] = match[2].trim();
+                    });
+                }
+            }
+
+            // 2. Parse metadata from draft body (priority)
+            const bodyMeta: Record<string, string> = {};
+            const bodyLines = activeDraft.body.split('\n').slice(0, 50); // Look at first 50 lines
+            bodyLines.forEach(line => {
+                const match = line.match(/^([a-z_]+):\s*(.*)$/);
+                if (match) {
+                    const key = match[1];
+                    const val = match[2].trim();
+                    if (['topic_id', 'topic_title', 'journey_set', 'journey_stage', 'content_layer', 'article_format', 'narrative_style', 'bridge_from', 'bridge_to', 'status', 'content_pillar'].includes(key)) {
+                        bodyMeta[key] = val;
+                    }
+                }
+            });
+
+            // 3. Determine normalized values with priority: Body > Draft Object > Existing Meta > Fallbacks
+            let fallbackTopicId = "";
+            const gfMatch = taskTitle.match(/GF-[A-Z]+-\d+/i);
+            if (gfMatch) fallbackTopicId = gfMatch[0].toUpperCase();
+            else {
+                const topicMatch = taskTitle.match(/TOPIC-\d+/i);
+                if (topicMatch) fallbackTopicId = topicMatch[0].toUpperCase();
+            }
+
+            const topicId = bodyMeta.topic_id || activeDraft.topic_id || existingMeta.topic_id || fallbackTopicId;
+            let topicTitle = bodyMeta.topic_title || activeDraft.topic_title || existingMeta.topic_title || taskTitle;
+            
+            // Clean up topic title if it's the shortened version
+            if (topicId === 'GF-STORY-01' && topicTitle.includes('เมล็ด — Brief')) {
+                topicTitle = 'GF-STORY-01 — เมล็ด: จุดเริ่มต้นของชีวิตพืช';
+            }
+
+            const stepRole = activeDraft.source_step || existingMeta.step_role || CONTENT_TYPE_TO_ROLE[activeDraft.content_type] || activeDraft.content_type;
+            
+            // 4. Determine Step-specific Status
+            let taskStatus = bodyMeta.status || existingMeta.status || 'research';
+            if (activeDraft.source_step === 'brief') {
+                taskStatus = 'brief_updated_ready_for_review';
+            } else if (activeDraft.source_step === 'publish') {
+                taskStatus = 'ready_to_publish';
+            }
+
+            // 5. Narrative & Bridge Fallbacks for GF-STORY-01
+            let narrativeStyle = bodyMeta.narrative_style || existingMeta.narrative_style || '';
+            if (!narrativeStyle && activeDraft.body.toLowerCase().includes('documentary')) {
+                narrativeStyle = 'documentary';
+            }
+
+            let bridgeFrom = bodyMeta.bridge_from || existingMeta.bridge_from || '';
+            if (!bridgeFrom && topicId === 'GF-STORY-01') {
+                bridgeFrom = 'จุดเริ่มต้นของซีรีส์';
+            }
+
+            let bridgeTo = bodyMeta.bridge_to || existingMeta.bridge_to || '';
+            if (!bridgeTo && topicId === 'GF-STORY-01') {
+                bridgeTo = 'GF-STORY-02 — เมล็ดงอก: เมื่อเงื่อนไขเหมาะสม ชีวิตจึงเริ่มต้น';
+            }
+
+            // 6. Construct Clean Normalized Frontmatter
+            const finalFrontmatter = `---
+topic_id: ${topicId}
+topic_title: ${topicTitle}
+step_role: ${stepRole}
+content_pillar: ${bodyMeta.content_pillar || existingMeta.content_pillar || 'Nature & Plant Life'}
+content_type: ${activeDraft.content_type}
+content_layer: ${bodyMeta.content_layer || existingMeta.content_layer || 'knowledge'}
+article_format: ${bodyMeta.article_format || existingMeta.article_format || 'knowledge_journey'}
+narrative_style: ${narrativeStyle}
+narrative_status: ${existingMeta.narrative_status || 'mapped'}
+journey_set: ${bodyMeta.journey_set || existingMeta.journey_set || 'ชีวิตของพืชหนึ่งต้น'}
+journey_stage: ${bodyMeta.journey_stage || existingMeta.journey_stage || '01 — เมล็ด'}
+bridge_from: ${bridgeFrom}
+bridge_to: ${bridgeTo}
+status: ${taskStatus}
+priority: ${existingMeta.priority || 'medium'}
+---`;
+
+            // 7. Construct Clean Body (No export wrapper)
+            let cleanBody = activeDraft.body;
+            
+            // If body contains its own frontmatter, we might want to strip it to avoid double frontmatter
+            // But usually the body starts with the title or content.
+            if (cleanBody.trim().startsWith("---")) {
+                const secondDashes = cleanBody.indexOf("---", 3);
+                if (secondDashes !== -1) {
+                    cleanBody = cleanBody.substring(secondDashes + 3).trim();
+                }
+            }
+
+            if (review) {
+                cleanBody += `\n\n---\n\n## Arbor Review\n\n`;
+                if (review.structured_json) {
+                    const s = JSON.parse(review.structured_json) as ArborReviewPayload;
+                    cleanBody += `### Summary\n${s.editorialSummary}\n\n`;
+                    cleanBody += `### Next Action\n${s.recommendedNextEdit}\n\n`;
+                } else {
+                    cleanBody += `### Summary\n${review.summary}\n\n`;
+                }
+            }
+
+            const newNotes = finalFrontmatter + "\n\n" + cleanBody;
+
+            await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    notes: newNotes,
+                    status: 'in_progress', // WorkOS task status
+                    review_status: 'in_review'
+                })
+            });
+
+            setMessage({ type: 'success', text: "Task notes replaced and normalized!" });
+            setTimeout(() => setMessage(null), 3000);
+        } catch (err) {
+            console.error("Failed to replace task notes", err);
+            setMessage({ type: 'error', text: "Failed to replace task notes" });
+            setTimeout(() => setMessage(null), 3000);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <PageShell className="max-w-[1920px] mx-auto px-6 overflow-hidden flex flex-col h-[calc(100vh-64px)]">
             {/* Header */}
@@ -943,15 +1093,23 @@ priority: medium
                                         <LinkIcon size={14} /> {activeDraft.linked_task_id ? 'Linked' : 'Link to Task'}
                                     </button>
                                     {activeDraft.linked_task_id && (
-                                        <div className="flex flex-col items-end gap-1">
-                                            <button 
-                                                onClick={handleAppendToTask}
-                                                className="px-4 py-2 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all hover:bg-green-700 shadow-sm"
-                                            >
-                                                <Plus size={14} /> Append to Linked Task Notes
-                                            </button>
-                                            <span className="text-[8px] font-bold text-green-600 uppercase tracking-tighter mr-1">
-                                                Append-only: จะไม่เขียนทับ notes เดิม
+                                        <div className="flex flex-col items-end gap-2 mt-2">
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={handleAppendToTask}
+                                                    className="px-4 py-2 bg-theme-border/50 text-theme-primary hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all hover:bg-theme-muted shadow-sm"
+                                                >
+                                                    <Plus size={14} /> Append
+                                                </button>
+                                                <button 
+                                                    onClick={handleReplaceTaskNotes}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all hover:bg-blue-700 shadow-sm"
+                                                >
+                                                    <RefreshCw size={14} /> Replace Task Notes
+                                                </button>
+                                            </div>
+                                            <span className="text-[8px] font-bold text-theme-muted uppercase tracking-tighter mr-1 max-w-[250px] text-right">
+                                                Workflow tasks (Brief, Outline, etc.) use <span className="text-blue-500">Replace</span>. Log outputs use <span className="text-theme-secondary">Append</span>.
                                             </span>
                                         </div>
                                     )}
