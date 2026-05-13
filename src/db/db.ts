@@ -1092,10 +1092,10 @@ function ensureWritingDeskTables() {
             id              TEXT PRIMARY KEY,
             topic_id        TEXT NULL,
             topic_title     TEXT NOT NULL,
-            content_type    TEXT NOT NULL CHECK (content_type IN ('group_post', 'page_post', 'personal_post', 'web_article_section', 'website_fields', 'body_markdown', 'reference_note', 'schema_jsonld', 'visual_brief')),
+            content_type    TEXT NOT NULL,
             draft_stage     TEXT NOT NULL DEFAULT 'working' CHECK (draft_stage IN ('working', 'reviewed', 'ready_to_export', 'exported', 'archived')),
             writing_mode    TEXT NOT NULL DEFAULT 'draft' CHECK (writing_mode IN ('draft', 'rewrite', 'polish', 'review', 'voice_extract', 'claim_check')),
-            source_step     TEXT NULL CHECK (source_step IN ('research_raw', 'research_direction', 'brief', 'script_caption', 'assets_canva', 'outline_web_article', 'website_publish_pack', 'publish')),
+            source_step     TEXT NULL,
             body            TEXT NOT NULL DEFAULT '',
             notes           TEXT NULL,
             linked_task_id  TEXT NULL,
@@ -1128,6 +1128,40 @@ function ensureWritingDeskTables() {
     const colNames = columns.map(c => c.name);
     if (!colNames.includes('source_step')) {
         db.exec("ALTER TABLE writing_desk_drafts ADD COLUMN source_step TEXT NULL");
+    }
+
+    // Migration: remove CHECK constraint on content_type and source_step only.
+    // draft_stage and writing_mode retain their CHECK constraints.
+    // Only runs when the old constraint still exists (idempotent).
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='writing_desk_drafts'").get() as { sql: string } | undefined;
+    if (tableInfo && tableInfo.sql.includes("CHECK (content_type IN")) {
+        console.log("🛠 Migrating writing_desk_drafts: removing CHECK on content_type/source_step, retaining CHECK on draft_stage/writing_mode...");
+        const migrateTx = db.transaction(() => {
+            db.exec(`
+                CREATE TABLE writing_desk_drafts_new (
+                    id              TEXT PRIMARY KEY,
+                    topic_id        TEXT NULL,
+                    topic_title     TEXT NOT NULL,
+                    content_type    TEXT NOT NULL,
+                    draft_stage     TEXT NOT NULL DEFAULT 'working' CHECK (draft_stage IN ('working', 'reviewed', 'ready_to_export', 'exported', 'archived')),
+                    writing_mode    TEXT NOT NULL DEFAULT 'draft' CHECK (writing_mode IN ('draft', 'rewrite', 'polish', 'review', 'voice_extract', 'claim_check')),
+                    source_step     TEXT NULL,
+                    body            TEXT NOT NULL DEFAULT '',
+                    notes           TEXT NULL,
+                    linked_task_id  TEXT NULL,
+                    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                INSERT INTO writing_desk_drafts_new SELECT * FROM writing_desk_drafts;
+                DROP TABLE writing_desk_drafts;
+                ALTER TABLE writing_desk_drafts_new RENAME TO writing_desk_drafts;
+
+                CREATE INDEX IF NOT EXISTS idx_writing_desk_topic_id ON writing_desk_drafts(topic_id);
+                CREATE INDEX IF NOT EXISTS idx_writing_desk_linked_task ON writing_desk_drafts(linked_task_id);
+            `);
+        });
+        migrateTx();
     }
 }
 
