@@ -140,6 +140,29 @@ Avoid:
 
 ----
 
+## Token Efficiency Discipline
+
+Follow `docs/agent-rules/token-efficiency.md`.
+
+Use context efficiently. Keep task briefs focused, split broad work into phases, avoid long generic explanations, and keep final handoffs compact.
+
+Do not save tokens by skipping required verification, evidence, QA, or safety checks.
+
+If the task is broad, stop and propose phases first.
+
+If the same issue fails twice, stop and summarize the blocker instead of continuing blindly.
+
+Prefer reusable instruction files over repeated prompting:
+
+- `AGENTS.md`
+- `docs/agent-rules/`
+- `docs/prompts/`
+- `docs/ai/`
+
+Required rule:
+
+Use fewer tokens by doing the right work in the right scope, not by skipping discipline.
+
 ## Testing Requirements
 
 After implementation, run:
@@ -242,3 +265,4 @@ Do not add speculative features, unused endpoints, unused environment variables,
 
 Keep the diff small and focused.
 If the task appears to require a broad refactor, stop and propose phases first.
+
