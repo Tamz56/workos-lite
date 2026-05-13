@@ -64,6 +64,13 @@ interface ArborReviewPayload {
     toneNotes: string[];
     recommendedNextEdit: string;
     suggestedRevision?: string;
+    
+    // Actionable Suggestions
+    suggestedHeadings?: string;
+    suggestedRewrite?: string;
+    claimSafetySuggestions?: string[];
+    voiceToneSuggestions?: string[];
+    nextEditChecklist?: string[];
 }
 
 interface ReviewResult {
@@ -1349,10 +1356,117 @@ priority: ${existingMeta.priority || 'medium'}
                                                             setMessage({ type: 'success', text: "Suggestion copied!" });
                                                             setTimeout(() => setMessage(null), 2000);
                                                         }}
-                                                        className="w-full py-2 bg-white border border-amber-200 text-amber-700 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-100 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                                        className="w-full py-2 bg-white border border-amber-200 text-amber-700 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-theme-100 transition-all flex items-center justify-center gap-2 shadow-sm"
                                                     >
                                                         <Copy size={12} /> Copy Suggestion
                                                     </button>
+                                                </div>
+                                            </section>
+                                        )}
+
+                                        {/* NEW: Actionable Suggestion Sections */}
+                                        {s.suggestedHeadings && (
+                                            <section className="pt-4 border-t border-theme-border/50 space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Suggested Heading Structure</h3>
+                                                <div className="bg-theme-input/30 border border-theme-border/50 rounded-2xl p-4 space-y-3">
+                                                    <pre className="text-[11px] font-mono text-theme-secondary whitespace-pre-wrap leading-relaxed">
+                                                        {s.suggestedHeadings}
+                                                    </pre>
+                                                    <button 
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(s.suggestedHeadings!);
+                                                            setMessage({ type: 'success', text: "Headings copied!" });
+                                                            setTimeout(() => setMessage(null), 2000);
+                                                        }}
+                                                        className="w-full py-2 bg-theme-input border border-theme-border text-theme-secondary text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-theme-hover transition-all flex items-center justify-center gap-2 shadow-sm"
+                                                    >
+                                                        <Copy size={12} /> Copy Markdown
+                                                    </button>
+                                                </div>
+                                            </section>
+                                        )}
+
+                                        {s.suggestedRewrite && (
+                                            <section className="pt-4 border-t border-theme-border/50 space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Suggested Rewrite</h3>
+                                                <div className="bg-blue-50/30 border border-blue-100 rounded-2xl p-4 space-y-3">
+                                                    <div className="text-xs font-bold text-theme-primary leading-relaxed whitespace-pre-wrap">
+                                                        {s.suggestedRewrite}
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(s.suggestedRewrite!);
+                                                            setMessage({ type: 'success', text: "Rewrite copied!" });
+                                                            setTimeout(() => setMessage(null), 2000);
+                                                        }}
+                                                        className="w-full py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                                    >
+                                                        <Copy size={12} /> Copy Markdown
+                                                    </button>
+                                                </div>
+                                            </section>
+                                        )}
+
+                                        {(s.claimSafetySuggestions && s.claimSafetySuggestions.length > 0) && (
+                                            <section className="pt-4 border-t border-theme-border/50 space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Claim Safety Suggestions</h3>
+                                                <div className="space-y-2">
+                                                    {s.claimSafetySuggestions.map((text, idx) => (
+                                                        <div key={idx} className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
+                                                            <div className="text-[10px] font-bold text-amber-900 leading-tight">{text}</div>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(text);
+                                                                    setMessage({ type: 'success', text: "Copied!" });
+                                                                    setTimeout(() => setMessage(null), 2000);
+                                                                }}
+                                                                className="text-[9px] font-black uppercase tracking-tighter text-amber-700 hover:underline flex items-center gap-1"
+                                                            >
+                                                                <Copy size={10} /> Copy Wording
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </section>
+                                        )}
+
+                                        {(s.voiceToneSuggestions && s.voiceToneSuggestions.length > 0) && (
+                                            <section className="pt-4 border-t border-theme-border/50 space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Voice & Tone Suggestions</h3>
+                                                <div className="space-y-2">
+                                                    {s.voiceToneSuggestions.map((text, idx) => (
+                                                        <div key={idx} className="p-3 bg-purple-50/50 border border-purple-100 rounded-xl flex items-start justify-between gap-3">
+                                                            <div className="text-[10px] font-bold text-purple-900 leading-tight">{text}</div>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(text);
+                                                                    setMessage({ type: 'success', text: "Copied!" });
+                                                                    setTimeout(() => setMessage(null), 2000);
+                                                                }}
+                                                                className="shrink-0 p-1.5 hover:bg-purple-100 rounded-lg text-purple-700"
+                                                            >
+                                                                <Copy size={12} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </section>
+                                        )}
+
+                                        {(s.nextEditChecklist && s.nextEditChecklist.length > 0) && (
+                                            <section className="pt-4 border-t border-theme-border/50 space-y-2">
+                                                <h3 className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Next Edit Checklist</h3>
+                                                <div className="bg-theme-card border border-theme-border/50 rounded-2xl p-4 space-y-3">
+                                                    <div className="space-y-2">
+                                                        {s.nextEditChecklist.map((item, idx) => (
+                                                            <div key={idx} className="flex gap-2.5 items-start">
+                                                                <div className="w-4 h-4 rounded-md border border-theme-border flex items-center justify-center shrink-0 mt-0.5">
+                                                                    <div className="w-2 h-2 rounded-sm bg-theme-border/50" />
+                                                                </div>
+                                                                <div className="text-[11px] font-bold text-theme-primary leading-tight">{item}</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </section>
                                         )}

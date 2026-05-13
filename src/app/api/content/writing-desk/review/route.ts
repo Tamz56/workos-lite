@@ -167,12 +167,111 @@ export async function POST(req: NextRequest) {
             structured.toneNotes = ["Sincere", "Authentic", "Personal"];
             structured.recommendedNextEdit = "ปรับโทนให้เป็นเสียงส่วนตัวคุณตั้ม (Personal Voice) และเล่าเรื่องแบบ Storytelling";
         } else if (contentType === 'web_article_section' || contentType === 'body_markdown') {
+            // --- Heuristic analysis for body_markdown ---
+            const lines = contentText.split('\n');
+            const h2Lines = lines.filter((l: string) => l.trim().startsWith('## '));
+            const h3Lines = lines.filter((l: string) => l.trim().startsWith('### '));
+            const hasHeadings = h2Lines.length > 0;
+            const opening = getFirstLines(contentText, 4);
+
+            // Check for weak opening
+            const weakOpeningPatterns = ['ในบทความนี้', 'บทความนี้จะ', 'เราจะมาพูดถึง', 'วันนี้เราจะ', 'ในเนื้อหานี้'];
+            const hasWeakOpening = weakOpeningPatterns.some(p => opening.includes(p));
+
+            // Check for risky/absolute claims
+            const riskyPhrases = ['100%', 'ทุกกรณี', 'ทุกกรณี', 'รักษาได้', 'รักษาโรค', 'แน่นอน 100', 'ป้องกันได้ 100', 'ไม่มีผลข้างเคียง', 'เพิ่มผลผลิตได้ถึง', 'ลดโรคได้ถึง'];
+            const foundRiskyClaims = riskyPhrases.filter(p => contentText.includes(p));
+
+            // Check for voice/tone violations (Khun Tum / Green Fineness guardrails)
+            const FORBIDDEN_PHRASES = [
+                'พูดง่ายๆ คือ', 'มันคือ', 'มันทำให้', 'มันไม่ได้', 'ไม่ได้แปลว่า',
+                'ให้เราเห็นว่า', 'นั่นคือ', 'มองให้ลึกลงไป', 'ง่ายๆ คือ',
+                'จะเห็นว่า', 'พูดถึง', 'นั่นก็คือ',
+            ];
+            const flaggedPhrases = FORBIDDEN_PHRASES.filter(p => contentText.includes(p));
+
             structured.editorialSummary = "บทความมีความลึก แต่ต้องการการจัดระเบียบโครงสร้างและตรวจสอบเรื่องคำเคลมทางวิชาการ/เกษตร";
-            structured.contentStrength = ["ข้อมูลแน่นและลึก", "มีประโยชน์ต่อผู้อ่านที่ต้องการความรู้"];
-            structured.revisionPoints = ["Heading (H2/H3) ยังไม่ชัดเจน", "จัดลำดับการอธิบายให้เป็นระบบมากขึ้น"];
-            structured.claimSafetyNotes = ["มีการอ้างอิงถึงสรรพคุณเฉพาะทาง ควรตรวจสอบความถูกต้องตามหลักวิชาการ/เกษตร (Claim Safety)", "ตรวจสอบแหล่งอ้างอิงของข้อมูล"];
+            structured.contentStrength = [
+                "ข้อมูลแน่นและลึก",
+                "มีประโยชน์ต่อผู้อ่านที่ต้องการความรู้",
+                ...(hasHeadings ? ["มีโครงสร้าง Heading พื้นฐานแล้ว"] : []),
+            ];
+            structured.revisionPoints = [
+                ...(!hasHeadings ? ["ยังไม่มี H2/H3 Heading — ควรเพิ่มโครงสร้างบทความให้ชัดขึ้น"] : []),
+                ...(hasWeakOpening ? ["ประโยคเปิดยังกว้างเกินไป ควรเริ่มด้วย Hook หรือประโยคชี้จุดประสงค์"] : []),
+                ...(flaggedPhrases.length > 0 ? [`พบภาษาที่ไม่ตรงกับ Green Fineness Voice: ${flaggedPhrases.slice(0, 3).join(', ')}`] : []),
+                "จัดลำดับการอธิบายให้เป็นระบบมากขึ้น",
+            ];
+            structured.claimSafetyNotes = [
+                "มีการอ้างอิงถึงสรรพคุณเฉพาะทาง ควรตรวจสอบความถูกต้องตามหลักวิชาการ/เกษตร (Claim Safety)",
+                "ตรวจสอบแหล่งอ้างอิงของข้อมูล",
+                ...(foundRiskyClaims.length > 0 ? [`พบคำที่มีความเสี่ยงสูง: "${foundRiskyClaims.join('", "')}" — ควรปรับให้อ่อนลง`] : []),
+            ];
             structured.toneNotes = ["Educational", "Authoritative", "Safe"];
             structured.recommendedNextEdit = "จัดโครงสร้าง Heading ใหม่ และตรวจสอบความถูกต้องของข้อมูลทางวิชาการ (Claim Safety)";
+
+            // --- Actionable Suggestion Fields ---
+
+            // 1. Suggested Heading Structure
+            if (!hasHeadings || h2Lines.length < 2) {
+                structured.suggestedHeadings = `## [ชื่อหัวข้อหลัก — แนะนำให้บอก "ทำไม" หรือ "อะไร"]\n\n### [หัวข้อย่อย 1 — สาเหตุหรือกลไก]\n\n### [หัวข้อย่อย 2 — ผลที่ตามมา]\n\n## [บทสรุปหรือ Takeaway]\n\n### [ข้อควรระวัง / แนวทางปฏิบัติ]`;
+            } else {
+                // Suggest refactored version of existing headings
+                const existingH2 = h2Lines.slice(0, 3).map((l: string) => l.trim()).join('\n');
+                structured.suggestedHeadings = `${existingH2}\n\n### [ตรวจสอบว่าแต่ละ H3 ใต้ H2 มีประโยคสรุปก่อนปิดหัวข้อ]\n\n## [เพิ่ม Takeaway หรือ Key Insight ปิดท้ายบทความ]`;
+            }
+
+            // 2. Suggested Rewrite for weak opening
+            if (hasWeakOpening) {
+                const firstContentLine = lines.find((l: string) => l.trim().length > 20 && !l.trim().startsWith('#'));
+                const preview = firstContentLine ? firstContentLine.trim().slice(0, 60) : 'เนื้อหาส่วนเปิด';
+                structured.suggestedRewrite = `🔁 ประโยคเปิดที่แนะนำ:\n\n"${preview}..." → ลองเริ่มด้วยคำถามที่สร้างความอยากรู้ เช่น:\n\n"ทำไม [ปรากฏการณ์สำคัญ] ถึงเกิดขึ้น? และมันส่งผลต่อ [หัวข้อ] อย่างไร?"`;
+            } else if (flaggedPhrases.length > 0) {
+                structured.suggestedRewrite = `🔁 ตรวจสอบประโยคที่ใช้ภาษาแบบ Casual เกินไปในบทความ:\n\nเช่น "${flaggedPhrases[0]}" → ลองเปลี่ยนเป็นภาษาที่แม่นยำและเป็น Documentary Voice มากขึ้น`;
+            }
+
+            // 3. Claim Safety Suggestions
+            if (foundRiskyClaims.length > 0) {
+                structured.claimSafetySuggestions = foundRiskyClaims.map(claim => {
+                    const safer: Record<string, string> = {
+                        '100%': `แทน "100%" ด้วย "ในสภาวะที่เหมาะสม" หรือ "ส่วนใหญ่"`,
+                        'รักษาได้': `แทน "รักษาได้" ด้วย "ช่วยลดความรุนแรงของ..." หรือ "ช่วยสนับสนุนการฟื้นตัว"`,
+                        'ป้องกันได้ 100': `แทน "ป้องกันได้ 100" ด้วย "ลดความเสี่ยงได้อย่างมีนัยสำคัญ"`,
+                    };
+                    return safer[claim] || `แทน "${claim}" ด้วยภาษาที่อ่อนลงและมีเงื่อนไขมากขึ้น`;
+                });
+            } else if (structured.claimSafetyNotes.length > 0) {
+                structured.claimSafetySuggestions = [
+                    `ตรวจสอบว่ามีประโยคที่ระบุตัวเลขผลผลิตหรืออัตราความสำเร็จโดยไม่มีแหล่งอ้างอิงหรือไม่`,
+                    `ภาษาที่ปลอดภัยกว่า: ใช้ "มีแนวโน้ม", "ในสภาวะที่เหมาะสม", "ขึ้นอยู่กับ..." แทนการระบุผลแน่นอน`,
+                ];
+            }
+
+            // 4. Voice & Tone Suggestions
+            if (flaggedPhrases.length > 0) {
+                structured.voiceToneSuggestions = flaggedPhrases.map(phrase => {
+                    const fixes: Record<string, string> = {
+                        'พูดง่ายๆ คือ': `"พูดง่ายๆ คือ" → ลบออก แล้วพูดตรงๆ เลย`,
+                        'มันคือ': `"มันคือ" → แทนด้วยชื่อสิ่งนั้นโดยตรง`,
+                        'มันทำให้': `"มันทำให้" → แทนด้วยประธานที่ชัดเจน เช่น "ไนโตรเจนทำให้..."`,
+                        'นั่นคือ': `"นั่นคือ" → ลบออก แล้วอธิบายต่อเนื่องทันที`,
+                        'ไม่ได้แปลว่า': `"ไม่ได้แปลว่า" → ปรับเป็น "แต่ไม่หมายความว่า..."`,
+                        'ให้เราเห็นว่า': `"ให้เราเห็นว่า" → แทนด้วย "ผลคือ..." หรือ "ทำให้เห็นว่า..."`,
+                        'มองให้ลึกลงไป': `"มองให้ลึกลงไป" → แทนด้วยประโยคที่บอกว่าลึกอย่างไร`,
+                    };
+                    return fixes[phrase] || `"${phrase}" → ปรับให้เป็นภาษาที่แม่นยำและเป็น Documentary Voice มากขึ้น`;
+                });
+            }
+
+            // 5. Next Edit Checklist
+            structured.nextEditChecklist = [
+                ...(!hasHeadings ? ["เพิ่ม H2 และ H3 Headings ให้ครบก่อน"] : []),
+                ...(hasWeakOpening ? ["ปรับประโยคเปิดให้เป็น Hook ที่ดึงดูดความสนใจ"] : []),
+                ...(flaggedPhrases.length > 0 ? [`แทนที่ภาษา Casual: ${flaggedPhrases.slice(0, 2).join(', ')}`] : []),
+                ...(foundRiskyClaims.length > 0 ? ["ตรวจสอบและปรับ Claim ที่มีความเสี่ยงทางวิชาการ"] : []),
+                "ตรวจสอบแหล่งอ้างอิงข้อมูลสำคัญ",
+                "ตรวจความสม่ำเสมอของ Narrative Style ตลอดบทความ",
+            ].slice(0, 5); // Max 5 items
         } else {
             structured.editorialSummary = "รีวิวตามมาตรฐานทั่วไปครับ";
             structured.contentStrength = ["เนื้อหาครบถ้วน"];
