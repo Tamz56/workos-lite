@@ -3,6 +3,7 @@ export interface GfArticleInput {
     topic_title: string;
     target_group_id: string;
     target_group_type: 'list' | 'sprint';
+    workflow_order?: number;
     content_pillar: string;
     content_layer: string;
     article_format: string;
@@ -12,17 +13,25 @@ export interface GfArticleInput {
     bridge_to: string;
 }
 
+export type GfWorkflowPreset = 'lean_v2' | 'legacy_v1';
+
 interface TaskDefinition {
     step_role: string;
     title_suffix: string;
     template: (input: GfArticleInput) => string;
 }
 
-function buildMetadataFrontmatter(input: GfArticleInput, stepRole: string): string {
+function buildMetadataFrontmatter(input: GfArticleInput, stepRole: string, preset: GfWorkflowPreset): string {
+    const workflowVersion = preset === 'lean_v2' ? 'lean_v2' : 'legacy_v1';
+    const taskSet = preset === 'lean_v2' ? 'green_fineness_lean_4_tasks' : 'green_fineness_legacy_8_tasks';
+
     return `---
 topic_id: ${input.topic_id}
 topic_title: ${input.topic_title}
 step_role: ${stepRole}
+workflow_version: ${workflowVersion}
+task_set: ${taskSet}
+workflow_order: ${input.workflow_order || 0}
 content_pillar: ${input.content_pillar}
 content_type: web_article
 content_layer: ${input.content_layer}
@@ -36,7 +45,396 @@ priority: medium
 `;
 }
 
-const TASKS: TaskDefinition[] = [
+const LEAN_V2_TASKS: TaskDefinition[] = [
+    {
+        step_role: "research_prompt",
+        title_suffix: "NotebookLM Research Prompt",
+        template: (input) => `# NotebookLM Research Prompt
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+## Research Goal
+[สิ่งที่ต้องการให้ NotebookLM สรุปหรือดึงข้อมูลออกมา]
+
+## Prompt for NotebookLM
+[วาง Prompt ที่ใช้จริง]
+
+## Required Output from NotebookLM
+- Key facts
+- Useful claims
+- Claims to be careful with
+- Terms / concepts to keep
+- Suggested sources / references
+- Notes for Arbor
+
+## Notes After Research
+[สรุปสั้นๆ หลังได้ Output จาก NotebookLM]`
+    },
+    {
+        step_role: "direction_plan",
+        title_suffix: "Direction & Content Plan",
+        template: (input) => `# Direction & Content Plan
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+---
+
+## Knowledge Article Direction
+
+### Working Title
+[ชื่อบทความให้ความรู้]
+
+### Core Message
+[ข้อความหลัก]
+
+### Key Scientific Concepts
+- 
+- 
+- 
+
+### Main Sections
+1. 
+2. 
+3. 
+4. 
+
+### Claim Guardrails
+- 
+- 
+- 
+
+### Image Needs
+- Cover:
+- Body Images:
+- Scientific Figures:
+
+### References Needed
+- 
+- 
+- 
+
+---
+
+## Narrative Article Direction
+
+### Working Title
+[ชื่อบทความ Narrative / Documentary]
+
+### Documentary Angle
+[มุมมองการเล่าเรื่อง]
+
+### Journey Stage
+[Stage ของ Plant Journey / Nature Series]
+
+### Scene Sequence
+1. 
+2. 
+3. 
+4. 
+
+### Related Knowledge Article
+[ชื่อบทความที่เกี่ยวข้องหรือ URL]
+
+### Image Needs
+- Hero:
+- Sequence Images:
+- Social Images:
+
+---
+
+## Decision
+- Knowledge Article:
+- Narrative Article:
+- Do First:
+- Park for Later:`
+    },
+    {
+        step_role: "article_pack",
+        title_suffix: "Final Article Pack",
+        template: (input) => `# Final Article Pack
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+## Status
+Article Ready / Waiting Publish
+
+---
+
+# A) Knowledge Article Upload Pack
+
+## Website Fields
+
+### Title
+[Article title]
+
+### Slug
+[slug]
+
+### Excerpt
+[excerpt]
+
+### Meta Title
+[meta title]
+
+### Meta Description
+[meta description]
+
+### Category
+[category]
+
+### Content Layer
+Knowledge
+
+### Series
+[series name if any]
+
+### Journey Stage
+[journey stage if any]
+
+### Primary Keyword
+[primary keyword]
+
+### Secondary Keywords
+- 
+- 
+- 
+
+### Internal Links
+- 
+- 
+- 
+
+### Status
+Ready for Draft Upload / Waiting Publish
+
+---
+
+## Body Markdown
+
+[Final article body with image URLs already embedded]
+
+Example:
+
+![Alt text](Image URL)
+
+*Caption*
+
+---
+
+## References
+
+1. 
+2. 
+3. 
+
+---
+
+## Schema / JSON-LD
+
+\`\`\`json
+{
+  "@context": "https://schema.org"
+}
+\`\`\`
+
+---
+
+# B) Narrative Article Upload Pack
+
+## Website Fields
+
+### Title
+[Narrative title]
+
+### Slug
+[slug]
+
+### Excerpt
+[excerpt]
+
+### Meta Title
+[meta title]
+
+### Meta Description
+[meta description]
+
+### Category
+Nature Series
+
+### Content Layer
+Narrative
+
+### Series
+[series name]
+
+### Journey Stage
+[journey stage]
+
+### Related Knowledge Article
+[URL or related article title]
+
+### Status
+Ready for Draft Upload / Waiting Publish
+
+---
+
+## Body Markdown
+
+[Final narrative article body with image URLs already embedded]
+
+---
+
+## References / Source Note
+
+[แหล่งที่มาหรือหมายเหตุว่าต่อยอดมาจาก Knowledge Article ไหน]
+
+---
+
+## Schema / JSON-LD
+
+\`\`\`json
+{
+  "@context": "https://schema.org"
+}
+\`\`\``
+    },
+    {
+        step_role: "publish_social_pack",
+        title_suffix: "Publish & Social Pack",
+        template: (input) => `# Publish & Social Pack
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+## Status
+Waiting Publish / Published / Social Ready / Social Published
+
+---
+
+## Published URLs
+
+### Knowledge Article
+[PUBLISHED_URL_KNOWLEDGE]
+
+### Narrative Article
+[PUBLISHED_URL_NARRATIVE]
+
+---
+
+## UTM Templates
+
+### Knowledge Article
+
+Facebook Group:
+[PUBLISHED_URL_KNOWLEDGE]?utm_source=facebook&utm_medium=group&utm_campaign=[campaign_name]&utm_content=group_post
+
+Facebook Page:
+[PUBLISHED_URL_KNOWLEDGE]?utm_source=facebook&utm_medium=page&utm_campaign=[campaign_name]&utm_content=page_post
+
+Personal Profile:
+[PUBLISHED_URL_KNOWLEDGE]?utm_source=facebook&utm_medium=personal&utm_campaign=[campaign_name]&utm_content=personal_post
+
+Line OA:
+[PUBLISHED_URL_KNOWLEDGE]?utm_source=line&utm_medium=oa&utm_campaign=[campaign_name]&utm_content=line_oa
+
+---
+
+### Narrative Article
+
+Facebook Group:
+[PUBLISHED_URL_NARRATIVE]?utm_source=facebook&utm_medium=group&utm_campaign=[campaign_name]&utm_content=group_post
+
+Facebook Page:
+[PUBLISHED_URL_NARRATIVE]?utm_source=facebook&utm_medium=page&utm_campaign=[campaign_name]&utm_content=page_post
+
+Personal Profile:
+[PUBLISHED_URL_NARRATIVE]?utm_source=facebook&utm_medium=personal&utm_campaign=[campaign_name]&utm_content=personal_post
+
+---
+
+## Facebook Group Post
+
+[Final group post]
+
+---
+
+## Facebook Page Post
+
+[Final page post]
+
+---
+
+## Personal Post
+
+[Final personal post]
+
+---
+
+## Short Caption
+
+[Short caption]
+
+---
+
+## Hashtags
+
+[hashtags]
+
+---
+
+## Reference Note for Social
+
+แหล่งความรู้ประกอบโพสต์นี้  
+- 
+- 
+- 
+- สรุปและเรียบเรียงจากฐานข้อมูล NotebookLM และเอกสารต้นทางที่เกี่ยวข้อง
+
+---
+
+## Publish Log
+
+### Website
+- Date:
+- URL:
+- Status:
+
+### Facebook Group
+- Date:
+- Post URL:
+- Status:
+
+### Facebook Page
+- Date:
+- Post URL:
+- Status:
+
+### Personal Profile
+- Date:
+- Post URL:
+- Status:
+
+### Notes
+- `
+    }
+];
+
+const LEGACY_TASKS: TaskDefinition[] = [
     {
         step_role: "research_raw",
         title_suffix: "Research Raw — NotebookLM",
@@ -480,11 +878,15 @@ Waiting final assembly
     }
 ];
 
-export function buildGfArticleTaskSetPayloads(input: GfArticleInput) {
-    return TASKS.map((taskDef, index) => {
+export function buildGfArticleTaskSetPayloads(input: GfArticleInput, preset: GfWorkflowPreset = 'lean_v2') {
+    const taskDefs = preset === 'lean_v2' ? LEAN_V2_TASKS : LEGACY_TASKS;
+    
+    return taskDefs.map((taskDef, index) => {
+        const order = index + 1;
+        const inputWithOrder = { ...input, workflow_order: order };
         const title = `[${input.topic_id}] ${taskDef.title_suffix}`;
-        const frontmatter = buildMetadataFrontmatter(input, taskDef.step_role);
-        const templateContent = taskDef.template(input);
+        const frontmatter = buildMetadataFrontmatter(inputWithOrder, taskDef.step_role, preset);
+        const templateContent = taskDef.template(inputWithOrder);
         const fullNotes = `${frontmatter}\n${templateContent}`;
         
         return {
@@ -497,7 +899,8 @@ export function buildGfArticleTaskSetPayloads(input: GfArticleInput) {
             topic_title: input.topic_title,
             priority: 2, // Medium priority
             notes: fullNotes,
-            sort_order: index + 1
+            sort_order: order
         };
     });
 }
+

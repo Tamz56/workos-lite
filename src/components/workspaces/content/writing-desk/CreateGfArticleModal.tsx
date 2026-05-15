@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { GfArticleInput, buildGfArticleTaskSetPayloads } from "@/lib/content/gfArticleTaskSet";
+import { GfArticleInput, buildGfArticleTaskSetPayloads, GfWorkflowPreset } from "@/lib/content/gfArticleTaskSet";
 
 interface CreateGfArticleModalProps {
     isOpen: boolean;
@@ -20,6 +20,7 @@ export default function CreateGfArticleModal({
     const [groups, setGroups] = useState<GroupOption[]>([]);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+    const [workflowPreset, setWorkflowPreset] = useState<GfWorkflowPreset>('lean_v2');
 
     const [formData, setFormData] = useState<GfArticleInput>({
         topic_id: "",
@@ -38,6 +39,7 @@ export default function CreateGfArticleModal({
     useEffect(() => {
         if (isOpen) {
             setMessage(null);
+            setWorkflowPreset('lean_v2');
             fetchGroups();
         }
     }, [isOpen]);
@@ -89,24 +91,29 @@ export default function CreateGfArticleModal({
         setMessage(null);
 
         try {
-            // 1. Check for duplicates
+            // 1. Check for duplicates (topic_id + task_set)
+            const targetTaskSet = workflowPreset === 'lean_v2' ? 'green_fineness_lean_4_tasks' : 'green_fineness_legacy_8_tasks';
             const queryUrl = `/api/tasks?topic_id=${encodeURIComponent(formData.topic_id)}`;
             const checkRes = await fetch(queryUrl);
             if (checkRes.ok) {
                 const existingTasks = await checkRes.json();
-                if (existingTasks.length > 0) {
-                    setMessage({ type: 'error', text: `Task set for ${formData.topic_id} already exists. No duplicate task was created.` });
+                const hasExistingSet = existingTasks.some((t: any) => t.notes?.includes(`task_set: ${targetTaskSet}`));
+                
+                if (hasExistingSet) {
+                    setMessage({ 
+                        type: 'error', 
+                        text: `Task set (${targetTaskSet}) for ${formData.topic_id} already exists. No duplicate task was created.` 
+                    });
                     setLoading(false);
                     return;
                 }
             }
 
-            // 2. Build payloads and REVERSE the order so Research Raw is created LAST.
-            // This ensures it has the newest updated_at, making it appear FIRST in the UI list.
-            const payloads = buildGfArticleTaskSetPayloads(formData).reverse();
+            // 2. Build payloads. (Deterministic ordering is handled by metadata + selector)
+            const payloads = buildGfArticleTaskSetPayloads(formData, workflowPreset);
             let createdCount = 0;
 
-            // 3. Create sequentially
+            // 3. Create sequentially with a small delay to ensure distinct updated_at timestamps
             for (const payload of payloads) {
                 const res = await fetch("/api/tasks", {
                     method: "POST",
@@ -120,6 +127,8 @@ export default function CreateGfArticleModal({
                     return;
                 }
                 createdCount++;
+                // Small delay to avoid API race conditions
+                await new Promise(resolve => setTimeout(resolve, 20));
             }
 
             // 4. Success
@@ -160,6 +169,18 @@ export default function CreateGfArticleModal({
                 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Workflow Preset</label>
+                        <select
+                            value={workflowPreset}
+                            onChange={e => setWorkflowPreset(e.target.value as GfWorkflowPreset)}
+                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none font-bold"
+                        >
+                            <option value="lean_v2">Green Fineness Lean v2 — 4 Tasks</option>
+                            <option value="legacy_v1">Legacy GF Article — 8 Tasks</option>
+                        </select>
+                    </div>
+
+                    <div className="col-span-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-1.5 block">Target Group</label>
                         {groups.length > 0 ? (
                             <select
@@ -191,7 +212,7 @@ export default function CreateGfArticleModal({
                             value={formData.topic_id}
                             onChange={e => setFormData({ ...formData, topic_id: e.target.value })}
                             className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none font-mono"
-                            placeholder="e.g. GF-CONTENT-012"
+                            placeholder="e.g. GF-STORY-01"
                         />
                     </div>
                     <div>
@@ -306,3 +327,4 @@ export default function CreateGfArticleModal({
         </Modal>
     );
 }
+

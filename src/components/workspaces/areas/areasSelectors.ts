@@ -64,8 +64,22 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
         filtered = filtered.filter(t => state.reviewStatusFilter.includes(t.review_status || "draft"));
     }
 
-    // 5. Sort - unchanged
+    // 5. Sort
     filtered.sort((a, b) => {
+        // Deterministic Workflow Order (Topic-aware)
+        if (a.topic_id && b.topic_id && a.topic_id === b.topic_id) {
+            const extractOrder = (notes: string | null | undefined) => {
+                if (!notes) return null;
+                const match = notes.match(/workflow_order:\s*(\d+)/);
+                return match ? parseInt(match[1], 10) : null;
+            };
+            const aOrder = extractOrder(a.notes);
+            const bOrder = extractOrder(b.notes);
+            if (aOrder !== null && bOrder !== null && aOrder !== bOrder) {
+                return aOrder - bOrder;
+            }
+        }
+
         let res = 0;
         switch (state.sortBy) {
             case "scheduled_date":
