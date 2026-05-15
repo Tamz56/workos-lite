@@ -25,7 +25,7 @@ import CreateGfArticleModal from "./CreateGfArticleModal";
 type ContentType = 'group_post' | 'page_post' | 'personal_post' | 'web_article_section' | 'website_fields' | 'body_markdown' | 'reference_note' | 'schema_jsonld' | 'visual_brief' | 'publish_note' | 'research_raw' | 'research_direction' | 'brief' | 'outline_web_article' | 'script_caption' | 'assets_canva' | 'seo_schema';
 type DraftStage = 'working' | 'reviewed' | 'ready_to_export' | 'exported' | 'archived';
 type WritingMode = 'draft' | 'rewrite' | 'polish' | 'review' | 'voice_extract' | 'claim_check';
-type SourceStep = 'research_raw' | 'research_direction' | 'brief' | 'script_caption' | 'assets_canva' | 'outline_web_article' | 'website_publish_pack' | 'publish';
+type SourceStep = 'research_raw' | 'research_direction' | 'brief' | 'script_caption' | 'assets_canva' | 'outline_web_article' | 'website_publish_pack' | 'publish' | 'research_prompt' | 'direction_plan' | 'article_pack' | 'publish_social_pack';
 
 interface Draft {
     id: string;
@@ -91,9 +91,13 @@ interface ReviewResult {
 const CONTENT_TYPES: ContentType[] = ['research_raw', 'research_direction', 'brief', 'outline_web_article', 'script_caption', 'assets_canva', 'seo_schema', 'publish_note', 'group_post', 'page_post', 'personal_post', 'web_article_section', 'website_fields', 'body_markdown', 'reference_note', 'schema_jsonld', 'visual_brief'];
 const DRAFT_STAGES: DraftStage[] = ['working', 'reviewed', 'ready_to_export', 'exported', 'archived'];
 const WRITING_MODES: WritingMode[] = ['draft', 'rewrite', 'polish', 'review', 'voice_extract', 'claim_check'];
-const SOURCE_STEPS: SourceStep[] = ['research_raw', 'research_direction', 'brief', 'outline_web_article', 'script_caption', 'assets_canva', 'website_publish_pack', 'publish'];
+const SOURCE_STEPS: SourceStep[] = ['research_prompt', 'direction_plan', 'article_pack', 'publish_social_pack', 'research_raw', 'research_direction', 'brief', 'outline_web_article', 'script_caption', 'assets_canva', 'website_publish_pack', 'publish'];
 
 const SOURCE_STEP_LABELS: Record<SourceStep, string> = {
+    research_prompt: 'NotebookLM Research Prompt',
+    direction_plan: 'Direction & Content Plan',
+    article_pack: 'Final Article Pack',
+    publish_social_pack: 'Publish & Social Pack',
     research_raw: 'Research Raw',
     research_direction: 'Research Direction',
     brief: 'Brief',
@@ -107,6 +111,10 @@ const SOURCE_STEP_LABELS: Record<SourceStep, string> = {
 // Keywords to match existing GF workflow tasks by source_step
 // Handles task naming conventions e.g. "Research Raw — NotebookLM"
 const SOURCE_STEP_MATCH_KEYWORDS: Record<SourceStep, string[]> = {
+    research_prompt:     ['notebooklm research prompt', 'research prompt'],
+    direction_plan:      ['direction & content plan', 'direction and content plan', 'direction plan'],
+    article_pack:        ['final article pack', 'article pack'],
+    publish_social_pack: ['publish & social pack', 'publish and social pack', 'publish social pack'],
     research_raw:        ['research raw'],
     research_direction:  ['research direction', 'arbor questions'],
     brief:               ['brief'],
@@ -295,6 +303,7 @@ export default function WritingDeskLiteClient() {
             content_type: "body_markdown",
             draft_stage: "working",
             writing_mode: "draft",
+            source_step: "article_pack",
             body: ""
         };
         try {

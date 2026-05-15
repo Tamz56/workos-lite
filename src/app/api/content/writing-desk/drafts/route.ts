@@ -31,6 +31,10 @@ const DraftSchema = z.object({
     draft_stage: z.enum(['working', 'reviewed', 'ready_to_export', 'exported', 'archived']).default('working'),
     writing_mode: z.enum(['draft', 'rewrite', 'polish', 'review', 'voice_extract', 'claim_check']).default('draft'),
     source_step: z.enum([
+        'research_prompt',
+        'direction_plan',
+        'article_pack',
+        'publish_social_pack',
         'research_raw',
         'research_direction',
         'brief',
