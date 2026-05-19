@@ -43,6 +43,18 @@ export default function AreasTaskList({
     const router = useRouter();
     const virtuosoRef = useRef<VirtuosoHandle>(null);
     
+    // Stabilize onLoadMore to prevent Virtuoso loops from function prop recreation
+    const onLoadMoreRef = useRef(onLoadMore);
+    useEffect(() => {
+        onLoadMoreRef.current = onLoadMore;
+    }, [onLoadMore]);
+
+    const handleEndReached = React.useCallback(() => {
+        if (onLoadMoreRef.current) {
+            onLoadMoreRef.current();
+        }
+    }, []);
+
     // Delegate complex logic to pure selector
     const grouped = useMemo(() => selectGroupedTasks(tasks, state, workspaceId), [tasks, state, workspaceId]);
 
@@ -288,10 +300,11 @@ export default function AreasTaskList({
             </div>
 
             <div className="flex-1 min-h-0 overflow-hidden">
-                <GroupedVirtuoso
-                    ref={virtuosoRef}
-                    groupCounts={groupCounts}
-                    endReached={onLoadMore}
+                {groupCounts.length > 0 ? (
+                    <GroupedVirtuoso
+                        ref={virtuosoRef}
+                        groupCounts={groupCounts}
+                        endReached={handleEndReached}
                     groupContent={(index) => {
                         const group = grouped[index];
                         // RC33: Minimal header for List Mode
@@ -652,6 +665,12 @@ export default function AreasTaskList({
                     style={{ height: "100%", minHeight: "200px" }}
                     className="custom-scrollbar"
                 />
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-neutral-400 py-12">
+                        <LucideIcons.CheckCircle size={32} className="text-neutral-300 mb-2" />
+                        <span className="text-sm font-medium">No tasks in this view</span>
+                    </div>
+                )}
             </div>
         </div>
     );

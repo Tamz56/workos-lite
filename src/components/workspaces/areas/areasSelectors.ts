@@ -125,6 +125,11 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
 
     // Helper: Code extraction (GF-CONTENT-###, GF-STORY-###, TOPIC-###, or any GF-*)
     const extractCode = (t: Task) => {
+        // For travel workspace (Nutrient Planner), do NOT extract GF-APP so they group by list (Phase 3A).
+        if (t.workspace === 'travel' && t.list_id) {
+            return null; // Let it fall back to list_id
+        }
+
         // Match any GF-<WORD>-<NUMBER> format (GF-CONTENT-001, GF-STORY-01, etc.)
         const gfPattern = /GF-[A-Z]+-\d+/g;
         const topicPattern = /TOPIC-\d+/g;
@@ -166,12 +171,13 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
         let key = "Uncategorized";
 
         if (isPackageGroup) {
-            const extractedCode = extractCode(t);
+            const isTravel = t.workspace === 'travel';
+            const extractedCode = isTravel ? null : extractCode(t);
             // Canonical Key resolution: topic_id/code first. list_id is only a legacy fallback.
-            const topicKey = extractedCode || t.topic_id || (isContentWorkspace ? null : t.list_id) || (isContentWorkspace ? "legacy-topic" : null);
+            const topicKey = isTravel ? t.list_id : (extractedCode || t.topic_id || (isContentWorkspace ? null : t.list_id) || (isContentWorkspace ? "legacy-topic" : null));
             
             // Name resolution: if we extracted a code, try to find a nice name from the title
-            const topicName = t.list_name || t.topic_id || (isContentWorkspace ? "Legacy / Needs Topic Mapping" : "Uncategorized");
+            const topicName = isTravel ? (t.list_name || "Phase 3A — Tomato Home Trial") : (t.list_name || t.topic_id || (isContentWorkspace ? "Legacy / Needs Topic Mapping" : "Uncategorized"));
             
             if (topicKey) {
                 key = isContentWorkspace ? `topic:${topicKey}` : `package:${topicKey}`;
@@ -182,7 +188,7 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
                 // 3) Fallback to topicName/list_name/topic_id
                 const notesEpisodeMatch = t.notes ? t.notes.match(/episode_title:\s*([^\n\r]+)/i) : null;
                 const notesEpisodeTitle = notesEpisodeMatch ? notesEpisodeMatch[1].trim() : null;
-                const metadataTitle = t.topic_title || notesEpisodeTitle;
+                const metadataTitle = isTravel ? null : (t.topic_title || notesEpisodeTitle);
                 // NOTE: Do NOT use the right-hand side of `t.title.split(" — ")` (stage/task role) as package title.
                 const canonicalName = metadataTitle || topicName;
 
@@ -234,7 +240,7 @@ export function selectGroupedTasks(tasks: Task[], state: AreasViewState, workspa
                 key = t.status || "inbox";
                 key = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
             } else if (state.groupBy === "list") {
-                key = t.list_name || t.workspace || "Unassigned";
+                key = t.list_name || (t.workspace === 'travel' ? 'nutrient-app' : t.workspace) || "Unassigned";
             } else if (state.groupBy === "sprint") {
                 key = t.sprint_name || "Backlog";
             } else if (state.groupBy === "none") {

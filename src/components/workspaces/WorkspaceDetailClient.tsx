@@ -345,6 +345,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
     const [loadingTasks, setLoadingTasks] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
+    const loadingMoreRef = useRef(false);
     const [offset, setOffset] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [lists, setLists] = useState<any[]>([]);
@@ -405,7 +406,10 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     // Accept explicit offset to avoid closure staleness and dependency loops
     const fetchTasks = useCallback(async (isLoadMore = false, explicitOffset?: number) => {
         const currentOffset = isLoadMore ? (typeof explicitOffset === 'number' ? explicitOffset : 0) : 0;
-        if (isLoadMore) setLoadingMore(true);
+        if (isLoadMore) {
+            setLoadingMore(true);
+            loadingMoreRef.current = true;
+        }
         else setLoadingTasks(true);
 
         try {
@@ -446,7 +450,10 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         } catch (e) {
             console.error("Failed to fetch tasks", e);
         } finally {
-            if (isLoadMore) setLoadingMore(false);
+            if (isLoadMore) {
+                setLoadingMore(false);
+                loadingMoreRef.current = false;
+            }
             else setLoadingTasks(false);
         }
     }, [workspaceId, state.statusFilter, state.workspaceFilter, state.listFilter, state.sprintFilter, state.templateFilter, state.reviewStatusFilter, state.scheduleFilter, state.dateRange.start, state.dateRange.end, state.search]);
@@ -1134,7 +1141,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                                     refresh={() => fetchTasks(false)}
                                     onTasksDelete={handleTasksDelete}
                                     onLoadMore={() => {
-                                        if (hasMore && !loadingMore) fetchTasks(true, offset + LIMIT);
+                                        if (hasMore && !loadingMoreRef.current) fetchTasks(true, offset + LIMIT);
                                     }}
                                 />
                                 <Toast isVisible={toast.isVisible} message={toast.message} action={toast.action} onClose={() => setToast({ ...toast, isVisible: false })} />

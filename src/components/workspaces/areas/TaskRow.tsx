@@ -351,7 +351,7 @@ export default function TaskRow({
                 {/* List / Workspace */}
                 <div className="hidden md:flex items-center gap-1.5 w-32 truncate shrink-0">
                     <Tag className="w-3 h-3 text-neutral-300" />
-                    <span className="truncate">{task.list_name || task.workspace || 'ยังไม่ระบุ'}</span>
+                    <span className="truncate">{task.list_name || (task.workspace === 'travel' ? 'nutrient-app' : task.workspace) || 'ยังไม่ระบุ'}</span>
                 </div>
 
                 {/* Content Template Badge */}

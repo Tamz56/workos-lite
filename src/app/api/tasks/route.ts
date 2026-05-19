@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
         const addInClause = (field: string, values: string[], paramPrefix: string) => {
             if (values.length === 0) return;
             const placeholders = values.map((_, i) => `@${paramPrefix}_${i}`);
-            where.push(`${field} IN (${placeholders.join(", ")})`);
+            where.push(`tasks.${field} IN (${placeholders.join(", ")})`);
             values.forEach((v, i) => {
                 bind[`${paramPrefix}_${i}`] = v;
             });
@@ -128,14 +128,14 @@ export async function GET(req: NextRequest) {
         const cutoffExpr = cutoffOk ? "@cutoff_date" : "date('now','localtime')";
 
         if (filter === "overdue") {
-            where.push("status = 'planned'");
-            where.push("scheduled_date IS NOT NULL");
-            where.push(`scheduled_date < ${cutoffExpr}`);
+            where.push("tasks.status = 'planned'");
+            where.push("tasks.scheduled_date IS NOT NULL");
+            where.push(`tasks.scheduled_date < ${cutoffExpr}`);
         } else if (filter === "upcoming") {
-            where.push("status = 'planned'");
-            where.push("scheduled_date IS NOT NULL");
+            where.push("tasks.status = 'planned'");
+            where.push("tasks.scheduled_date IS NOT NULL");
             const op = inclusive ? ">=" : ">";
-            where.push(`scheduled_date ${op} ${cutoffExpr}`);
+            where.push(`tasks.scheduled_date ${op} ${cutoffExpr}`);
         }
 
         const isSpecialFilter = filter === "overdue" || filter === "upcoming";
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
             if (statuses.length > 0) {
                 addInClause("status", statuses, "st");
             } else if (status && Status.safeParse(status).success) {
-                where.push("status = @status");
+                where.push("tasks.status = @status");
                 bind.status = status;
             }
         }
@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
         if (workspaces.length > 0) {
             addInClause("workspace", workspaces, "ws");
         } else if (workspace && Workspace.safeParse(workspace).success) {
-            where.push("workspace = @workspace");
+            where.push("tasks.workspace = @workspace");
             bind.workspace = workspace;
         }
 
@@ -163,9 +163,9 @@ export async function GET(req: NextRequest) {
             addInClause("list_id", list_ids, "ls");
         } else if (list_id) {
             if (list_id === "unassigned" || list_id === "null") {
-                where.push("list_id IS NULL");
+                where.push("tasks.list_id IS NULL");
             } else {
-                where.push("list_id = @list_id");
+                where.push("tasks.list_id = @list_id");
                 bind.list_id = list_id;
             }
         }
@@ -175,9 +175,9 @@ export async function GET(req: NextRequest) {
             addInClause("sprint_id", sprint_ids, "sp");
         } else if (sprint_id) {
             if (sprint_id === "backlog" || sprint_id === "null") {
-                where.push("sprint_id IS NULL");
+                where.push("tasks.sprint_id IS NULL");
             } else {
-                where.push("sprint_id = @sprint_id");
+                where.push("tasks.sprint_id = @sprint_id");
                 bind.sprint_id = sprint_id;
             }
         }
@@ -189,41 +189,41 @@ export async function GET(req: NextRequest) {
 
         if (parent_id !== null) {
             if (parent_id === "unassigned" || parent_id === "null") {
-                where.push("parent_task_id IS NULL");
+                where.push("tasks.parent_task_id IS NULL");
             } else {
-                where.push("parent_task_id = @parent_id");
+                where.push("tasks.parent_task_id = @parent_id");
                 bind.parent_id = parent_id;
             }
         }
 
         if (scheduled_date) {
             if (scheduled_date === "null") {
-                where.push("scheduled_date IS NULL");
+                where.push("tasks.scheduled_date IS NULL");
             } else if (isDateYYYYMMDD(scheduled_date)) {
-                where.push("scheduled_date = @scheduled_date");
+                where.push("tasks.scheduled_date = @scheduled_date");
                 bind.scheduled_date = scheduled_date;
             }
         }
 
         if (start && isDateYYYYMMDD(start)) {
-            where.push("scheduled_date >= @start");
+            where.push("tasks.scheduled_date >= @start");
             bind.start = start;
         }
         if (end && isDateYYYYMMDD(end)) {
-            where.push("scheduled_date <= @end");
+            where.push("tasks.scheduled_date <= @end");
             bind.end = end;
         }
 
         if (schedule_bucket && Bucket.safeParse(schedule_bucket).success) {
-            where.push("schedule_bucket = @schedule_bucket");
+            where.push("tasks.schedule_bucket = @schedule_bucket");
             bind.schedule_bucket = schedule_bucket;
         }
 
         // RC19: Schedule state filter
         if (schedule_state === "scheduled") {
-            where.push("scheduled_date IS NOT NULL");
+            where.push("tasks.scheduled_date IS NOT NULL");
         } else if (schedule_state === "unscheduled") {
-            where.push("scheduled_date IS NULL");
+            where.push("tasks.scheduled_date IS NULL");
         }
 
         // RC19: Template keys filter (using notes LIKE since metadata is there)
@@ -231,19 +231,19 @@ export async function GET(req: NextRequest) {
             const templateClauses = template_keys.map((key, i) => {
                 const paramName = `tk_${i}`;
                 bind[paramName] = `%template_key: ${key}%`;
-                return `notes LIKE @${paramName}`;
+                return `tasks.notes LIKE @${paramName}`;
             });
             where.push(`(${templateClauses.join(" OR ")})`);
         }
 
         if (q.length > 0) {
-            where.push("(title LIKE @q OR workspace LIKE @q OR id LIKE @q)");
+            where.push("(tasks.title LIKE @q OR tasks.workspace LIKE @q OR tasks.id LIKE @q)");
             bind.q = `%${q}%`;
         }
 
         const topic_id = url.searchParams.get("topic_id");
         if (topic_id) {
-            where.push("(notes LIKE @topic_id_pattern OR title LIKE @topic_id_title_pattern)");
+            where.push("(tasks.notes LIKE @topic_id_pattern OR tasks.title LIKE @topic_id_title_pattern)");
             bind.topic_id_pattern = `%topic_id: ${topic_id}%`;
             bind.topic_id_title_pattern = `%${topic_id}%`;
         }
@@ -253,8 +253,8 @@ export async function GET(req: NextRequest) {
         // Deterministic Ordering for Pagination
         let orderSql = `
           ORDER BY
-            datetime(updated_at) DESC,
-            id ASC
+            datetime(tasks.updated_at) DESC,
+            tasks.id ASC
         `;
 
         const hasAnyStatus = statuses.length > 0 || (status && Status.safeParse(status).success);
@@ -263,33 +263,35 @@ export async function GET(req: NextRequest) {
         if (hasAnyStatus && firstStatus === "done") {
             orderSql = `
               ORDER BY
-                (done_at IS NULL) ASC,
-                datetime(done_at) DESC,
-                datetime(updated_at) DESC,
-                id ASC
+                (tasks.done_at IS NULL) ASC,
+                datetime(tasks.done_at) DESC,
+                datetime(tasks.updated_at) DESC,
+                tasks.id ASC
             `;
         } else if (hasAnyStatus && firstStatus === "planned") {
             orderSql = `
               ORDER BY
-                (scheduled_date IS NULL) ASC,
-                scheduled_date ASC,
-                CASE schedule_bucket
+                (tasks.scheduled_date IS NULL) ASC,
+                tasks.scheduled_date ASC,
+                CASE tasks.schedule_bucket
                   WHEN 'morning' THEN 1
                   WHEN 'afternoon' THEN 2
                   WHEN 'evening' THEN 3
                   ELSE 9
                 END ASC,
-                sort_order ASC,
-                datetime(updated_at) DESC,
-                id ASC
+                tasks.sort_order ASC,
+                datetime(tasks.updated_at) DESC,
+                tasks.id ASC
             `;
         }
 
         const rows = getDb()
             .prepare(
                 `
-        SELECT *
+        SELECT tasks.*, lists.title AS list_name, sprints.name AS sprint_name
         FROM tasks
+        LEFT JOIN lists ON tasks.list_id = lists.id
+        LEFT JOIN sprints ON tasks.sprint_id = sprints.id
         ${whereSql}
         ${orderSql}
         LIMIT @limit OFFSET @offset
