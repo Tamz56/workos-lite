@@ -23,6 +23,7 @@ interface AreasTaskListProps {
     highlightedTaskIds?: string[];
     refresh?: () => void; // RC24
     onTasksDelete?: (ids: string[]) => Promise<void> | void; // RC65
+    onLoadMore?: () => void;
 }
 
 export default function AreasTaskList({ 
@@ -36,7 +37,8 @@ export default function AreasTaskList({
     updateState,
     highlightedTaskIds = [],
     refresh,
-    onTasksDelete
+    onTasksDelete,
+    onLoadMore
 }: AreasTaskListProps) {
     const router = useRouter();
     const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -289,6 +291,7 @@ export default function AreasTaskList({
                 <GroupedVirtuoso
                     ref={virtuosoRef}
                     groupCounts={groupCounts}
+                    endReached={onLoadMore}
                     groupContent={(index) => {
                         const group = grouped[index];
                         // RC33: Minimal header for List Mode
@@ -554,6 +557,7 @@ export default function AreasTaskList({
                                         isMultiSelected={state.selectedTaskIds.includes(task.id)}
                                         onMultiSelect={(checked) => handleSelectTask(task.id, checked)}
                                         onDelete={() => onTasksDelete?.([task.id])}
+                                        isCompactMode={state.isCompactMode}
                                     />
                                 </div>
                             </div>
@@ -642,7 +646,7 @@ export default function AreasTaskList({
                                 </div>
                             );
                         },
-                        Footer: () => <div className="h-32" /> // Extra space for better scrolling experience
+                        Footer: () => <div className={state.isCompactMode ? "h-8" : "h-32"} /> // Extra space for better scrolling experience
                     }}
 
                     style={{ height: "100%", minHeight: "200px" }}

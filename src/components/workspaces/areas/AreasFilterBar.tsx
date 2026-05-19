@@ -82,6 +82,14 @@ interface AreasFilterBarProps {
 }
 
 export default function AreasFilterBar({ workspaceId, tasks, lists, sprints, state, updateState }: AreasFilterBarProps) {
+    const [isFilterExpanded, setIsFilterExpanded] = useState(!state.isCompactMode);
+
+    useEffect(() => {
+        if (state.isCompactMode) {
+            setIsFilterExpanded(false);
+        }
+    }, [state.isCompactMode]);
+
     const toggleStatus = (status: string) => {
         const current = state.statusFilter;
         if (current.includes(status)) {
@@ -96,15 +104,116 @@ export default function AreasFilterBar({ workspaceId, tasks, lists, sprints, sta
     const uniqueLists = lists.length > 0 ? lists.map(l => l.title) : Array.from(new Set(tasks.map(t => t.list_name || "Unassigned"))).filter(Boolean);
     const uniqueSprints = sprints.length > 0 ? sprints.map(s => s.name) : Array.from(new Set(tasks.map(t => t.sprint_id || "Backlog"))).filter(Boolean);
 
+    const activeFilterCount = state.statusFilter.length + state.workspaceFilter.length + state.listFilter.length + 
+                              state.sprintFilter.length + state.templateFilter.length + state.reviewStatusFilter.length + 
+                              (state.onlyReadyToPublish ? 1 : 0) + (state.scheduleFilter !== 'all' ? 1 : 0) + 
+                              (state.dateRange.start ? 1 : 0);
+
     return (
         <div className="flex flex-col border-b border-neutral-200 bg-white shrink-0">
-            {/* Top Row: Presets (RC20) */}
-            <div className="px-6 py-2 pb-0.5">
-                <ContentPresets state={state} updateState={updateState} />
-            </div>
+            {/* Collapsed / Compact Mode View */}
+            {!isFilterExpanded ? (
+                <div className={`px-6 ${state.isCompactMode ? 'py-1' : 'py-2'} flex items-center justify-between text-sm`}>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => setIsFilterExpanded(true)} 
+                            className="flex items-center gap-2 px-3 py-1 bg-neutral-100 border border-neutral-200 rounded-lg text-xs font-bold text-neutral-600 hover:bg-neutral-200 transition-colors"
+                        >
+                            <Filter size={14} /> Filter
+                        </button>
+                        {activeFilterCount > 0 && (
+                            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                                {activeFilterCount} Active
+                            </span>
+                        )}
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                        {/* Grouping Selector */}
+                        <div className="flex items-center gap-2">
+                            <ListFilter className="w-3.5 h-3.5 text-neutral-400" />
+                            <span className="font-bold text-neutral-500 text-xs uppercase tracking-wider hidden sm:inline">Group By</span>
+                            <select 
+                                className="bg-transparent text-sm font-semibold text-neutral-700 focus:outline-none cursor-pointer"
+                                value={state.groupBy}
+                                onChange={(e) => updateState({ groupBy: e.target.value as GroupMode })}
+                            >
+                                <option value="status">Status</option>
+                                <option value="package">Package</option>
+                                <option value="list">Workspace</option>
+                                <option value="sprint">Sprint</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
 
-            {/* Bottom Row: Manual Filters */}
-            <div className="px-6 py-1.5 flex flex-wrap items-center gap-3 text-sm">
+                        {/* Sort Selector */}
+                        <div className="flex items-center gap-2">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-neutral-400" />
+                            <select 
+                                className="bg-transparent text-sm font-semibold text-neutral-700 focus:outline-none cursor-pointer"
+                                value={state.sortBy}
+                                onChange={(e) => updateState({ sortBy: e.target.value as SortMode })}
+                            >
+                                <option value="scheduled_date">Scheduled Date</option>
+                                <option value="priority">Priority</option>
+                                <option value="updated_at">Recently Updated</option>
+                                <option value="created_at">Date Created</option>
+                                <option value="performance">สถิติสูงสุด (Best)</option>
+                            </select>
+
+                            <button 
+                                onClick={() => updateState({ sortDir: state.sortDir === "asc" ? "desc" : "asc" })}
+                                className="text-xs font-bold text-neutral-400 hover:text-neutral-700 uppercase p-1 rounded hover:bg-neutral-100"
+                                title="Toggle sort direction"
+                            >
+                                {state.sortDir === "asc" ? "↑" : "↓"}
+                            </button>
+                        </div>
+                        
+                        {/* RC32: View Mode Switcher */}
+                        <div className="flex items-center gap-1.5 ml-2 pl-4 border-l border-neutral-200">
+                            <div className="flex bg-neutral-100 p-0.5 rounded-xl border border-neutral-200 shadow-inner">
+                                <button 
+                                    onClick={() => updateState({ viewMode: "package" })}
+                                    className={`p-1 rounded-lg transition-all duration-300 ${state.viewMode === "package" ? "bg-white text-indigo-600 shadow-md scale-105" : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200/50"}`}
+                                >
+                                    <LayoutGrid size={14} strokeWidth={2.5} />
+                                </button>
+                                <button 
+                                    onClick={() => updateState({ viewMode: "list" })}
+                                    className={`p-1 rounded-lg transition-all duration-300 ${state.viewMode === "list" ? "bg-white text-indigo-600 shadow-md scale-105" : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-200/50"}`}
+                                >
+                                    <ListIcon size={14} strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {/* Top Row: Presets (RC20) */}
+                    {(!state.isCompactMode) && (
+                        <div className="px-6 py-2 pb-0.5">
+                            <ContentPresets state={state} updateState={updateState} />
+                        </div>
+                    )}
+
+                    {/* Bottom Row: Manual Filters */}
+                    <div className="px-6 py-1.5 flex flex-wrap items-center gap-3 text-sm">
+                        <div className="flex items-center gap-2 border-r border-neutral-100 pr-4">
+                            <button 
+                                onClick={() => setIsFilterExpanded(false)} 
+                                className="flex items-center justify-center p-1 bg-neutral-100 border border-neutral-200 rounded text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700 transition-colors"
+                                title="Collapse Filters"
+                            >
+                                <Filter size={14} className="fill-current opacity-50" />
+                            </button>
+                            {activeFilterCount > 0 && (
+                                <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                        </div>
                 {/* Status Filter */}
                 <div className="flex items-center gap-2 border-r border-neutral-100 pr-4">
                     <Filter className="w-3 h-3 text-neutral-400" />
@@ -288,7 +397,9 @@ export default function AreasFilterBar({ workspaceId, tasks, lists, sprints, sta
                     </div>
                 </div>
             </div>
-        </div>
+        </>
+    )}
+</div>
 
     );
 }

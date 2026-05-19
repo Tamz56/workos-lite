@@ -9,7 +9,7 @@ const GLOBAL_LAST_WS_KEY = "workos-last-workspace";
 const PERSISTENT_FIELDS = [
     "sortBy", "sortDir", "groupBy", "scheduleFilter", "viewMode", 
     "collapsedTopicIds", "statusFilter", "templateFilter", "reviewStatusFilter",
-    "lastActiveTaskId"
+    "lastActiveTaskId", "isCompactMode"
 ] as const;
 
 export interface AreasViewState {
@@ -41,6 +41,7 @@ export interface AreasViewState {
     lastActiveTaskId: string | null;
     isFlowMode: boolean;
     selectedTaskIds: string[]; // RC65: Bulk Selection
+    isCompactMode: boolean;
 }
 
 export function useAreasState(workspaceId: string, initialState?: Partial<AreasViewState>) {
@@ -70,6 +71,7 @@ export function useAreasState(workspaceId: string, initialState?: Partial<AreasV
         lastActiveTaskId: null,
         isFlowMode: false,
         selectedTaskIds: [],
+        isCompactMode: false,
     };
 
     const validate = (key: string, value: any): boolean => {

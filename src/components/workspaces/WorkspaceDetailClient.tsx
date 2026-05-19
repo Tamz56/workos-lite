@@ -349,7 +349,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const [hasMore, setHasMore] = useState(true);
     const [lists, setLists] = useState<any[]>([]);
     const [sprints, setSprints] = useState<any[]>([]);
-    const LIMIT = 50;
+    const LIMIT = 100;
 
     // Feedback state for RC16
     const [toast, setToast] = useState<{
@@ -902,7 +902,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 onToggleFocusMode={toggleFocusMode}
             />
 
-            <div className={`bg-theme-panel border-b border-neutral-100 flex flex-col md:flex-row items-stretch md:items-center justify-between z-20 shadow-sm transition-all duration-300 ${isFocusMode ? 'py-1 opacity-90' : 'py-2 md:py-3'}`}>
+            <div className={`bg-theme-panel border-b border-neutral-100 flex flex-col md:flex-row items-stretch md:items-center justify-between z-20 shadow-sm transition-all duration-300 ${isFocusMode ? 'py-1 opacity-90' : (state.isCompactMode ? 'py-1 md:py-1.5' : 'py-2 md:py-3')}`}>
                 <div className="flex items-center gap-2 px-6 border-b md:border-b-0 md:border-r border-neutral-100 py-2 md:py-0">
                     <button onClick={() => router.push('/workspaces')} className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-400 hover:text-neutral-600 transition-colors">
                         <LayoutGrid size={18} />
@@ -970,7 +970,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         </div>
                         
                         <div className="flex flex-col min-w-0 flex-1">
-                            {headerTaskResult && (
+                            {headerTaskResult && !state.isCompactMode && (
                                 <div className="flex items-center gap-2 mb-0.5">
                                     <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border shadow-sm ${
                                         headerTaskResult.confidence === 'high' ? 'bg-green-50 text-green-700 border-green-100' :
@@ -1133,6 +1133,9 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                                     highlightedTaskIds={highlightedTaskIds}
                                     refresh={() => fetchTasks(false)}
                                     onTasksDelete={handleTasksDelete}
+                                    onLoadMore={() => {
+                                        if (hasMore && !loadingMore) fetchTasks(true, offset + LIMIT);
+                                    }}
                                 />
                                 <Toast isVisible={toast.isVisible} message={toast.message} action={toast.action} onClose={() => setToast({ ...toast, isVisible: false })} />
                                 <CreateContentPackageModal 
