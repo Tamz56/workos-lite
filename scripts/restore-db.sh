@@ -29,4 +29,6 @@ echo "Restoring database from ${BACKUP_FILE}..."
 cp "${BACKUP_FILE}" "${DB_PATH}"
 
 echo "SUCCESS: Database restored."
-echo "Next: run 'npm run migrate:nutrient' to normalize Nutrient Planner phase lists."
+echo "Next:"
+echo "  - run 'npm run migrate:nutrient' to normalize Nutrient Planner phase lists"
+echo "  - run 'npm run migrate:ba' to normalize BA Learning Lab Sprint lists"
