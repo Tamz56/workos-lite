@@ -53,9 +53,9 @@ export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
         emptyState: { title: "Finance queue is empty", description: "Keep your books clean and budgets updated.", actionLabel: "Record Expense", actionType: "quickAdd" }
     },
     {
-        id: "travel", label: "Travel", type: "admin",
-        iconKey: "Plane", colorKey: "rose",
-        emptyState: { title: "Plan your next journey", description: "No upcoming travel tasks planned.", actionLabel: "Add Itinerary", actionType: "quickAdd" }
+        id: "travel", label: "Green Fineness — Nutrient Planner App", type: "ops",
+        iconKey: "Box", colorKey: "emerald",
+        emptyState: { title: "Plan your App MVP", description: "Product spec, MVP planning, and experiments.", actionLabel: "Add Spec", actionType: "quickAdd" }
     },
     {
         id: "marketing", label: "Business / Marketing", type: "ops",
@@ -68,9 +68,9 @@ export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
         emptyState: { title: "Archive view", description: "Everything is backed up and safe.", actionLabel: "Archive Task", actionType: "quickAdd" }
     },
     {
-        id: "other", label: "Other", type: "other",
-        iconKey: "MoreHorizontal", colorKey: "neutral",
-        emptyState: { title: "Everything Else", description: "A catch-all for miscellaneous tasks.", actionLabel: "Add Task", actionType: "quickAdd" }
+        id: "other", label: "Business Analyst Learning Lab", type: "ops",
+        iconKey: "Activity", colorKey: "indigo",
+        emptyState: { title: "Start Learning", description: "A space for BA Sprint / Business Analyst Learning Lab.", actionLabel: "Add Task", actionType: "quickAdd" }
     },
 ] as const;
 
@@ -124,10 +124,10 @@ export function workspaceLabel(w: Workspace | string): string {
         case "admin": return "Personal Admin";
         case "marketing": return "Business / Marketing";
         case "finance": return "Finance";
-        case "travel": return "Travel";
+        case "travel": return "Green Fineness — Nutrient Planner App";
         case "system": return "System/Archive";
         case "inbox": return "Inbox";
-        case "other": return "Other";
+        case "other": return "Business Analyst Learning Lab";
         default: return typeof w === "string" ? w.toUpperCase() : "UNKNOWN";
     }
 }
