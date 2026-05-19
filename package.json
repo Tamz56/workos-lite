@@ -10,7 +10,8 @@
     "lint": "eslint",
     "smoke:tasks": "node scripts/smoke_tasks.js",
     "smoke:events": "node scripts/smoke_events.js",
-    "smoke:backup": "node scripts/smoke_backup.js"
+    "smoke:backup": "node scripts/smoke_backup.js",
+    "migrate:nutrient": "tsx scripts/migrate-nutrient-planner-lists.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
