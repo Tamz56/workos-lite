@@ -236,19 +236,36 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         recordEvent(workspaceId, 'task_skipped', taskId, { activeMode: mode });
     }, [workspaceId, mode]);
 
-    // RC50: Tracking manual overrides
+    // RC50: Tracking manual overrides — ref-based dedup prevents firing twice on same pair
+    const recordedOverrideRef = useRef<Set<string>>(new Set());
     useEffect(() => {
-        if (state.selectedTaskId && !isSystemSelecting.current) {
-            const recommendedId = lastRecommendedId.current;
-            if (recommendedId && state.selectedTaskId !== recommendedId) {
-                if (!overrides.includes(recommendedId)) {
-                    setOverrides(prev => [...prev, recommendedId]);
-                    recordEvent(workspaceId, 'task_override', recommendedId, { chosenId: state.selectedTaskId });
-                }
-            }
+        // Early guards: only fire when user picks a different task than recommended
+        const recommendedId = lastRecommendedId.current;
+        if (!recommendedId) return;
+        if (!state.selectedTaskId) return;
+        if (state.selectedTaskId === recommendedId) return;
+        if (isSystemSelecting.current) {
+            isSystemSelecting.current = false;
+            return;
         }
         isSystemSelecting.current = false;
-    }, [state.selectedTaskId, overrides, workspaceId, state.isFlowMode]);
+
+        // Functional setState guard — safe even if overrides is stale in closure
+        setOverrides(prev => {
+            if (prev.includes(recommendedId)) return prev;
+            return [...prev, recommendedId];
+        });
+
+        // Dedup recordEvent with a stable key so it fires at most once per override pair
+        const key = `${workspaceId}:${recommendedId}:${state.selectedTaskId}`;
+        if (!recordedOverrideRef.current.has(key)) {
+            recordedOverrideRef.current.add(key);
+            recordEvent(workspaceId, 'task_override', recommendedId, { chosenId: state.selectedTaskId });
+        }
+    // Intentionally omit `overrides` — functional setState handles staleness.
+    // Intentionally omit `state.isFlowMode` — not relevant to override detection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.selectedTaskId, workspaceId]);
 
     const handlePinTask = useCallback((taskId: string) => {
         setPinnedTaskId(taskId);
@@ -1143,6 +1160,8 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                                     onLoadMore={() => {
                                         if (hasMore && !loadingMoreRef.current) fetchTasks(true, offset + LIMIT);
                                     }}
+                                    hasMore={hasMore}
+                                    loadingMore={loadingMore}
                                 />
                                 <Toast isVisible={toast.isVisible} message={toast.message} action={toast.action} onClose={() => setToast({ ...toast, isVisible: false })} />
                                 <CreateContentPackageModal 
