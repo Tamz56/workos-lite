@@ -205,6 +205,12 @@ export default function WritingDeskLiteClient() {
     const [isTaskSearchOpen, setIsTaskSearchOpen] = useState(false);
     const [isCreateGfModalOpen, setIsCreateGfModalOpen] = useState(false);
 
+    // Save Destination Selector states
+    const [saveDestination, setSaveDestination] = useState<'summary' | 'notes' | 'main_doc' | 'section' | 'new_doc'>('notes');
+    const [saveMode, setSaveMode] = useState<'append' | 'replace_section' | 'replace_all'>('append');
+    const [sectionName, setSectionName] = useState<string>('');
+    const [isConfirmReplaceModalOpen, setIsConfirmReplaceModalOpen] = useState(false);
+
     // Fetch Drafts
     const fetchDrafts = useCallback(async () => {
         setIsLoading(true);
@@ -272,6 +278,52 @@ export default function WritingDeskLiteClient() {
 
         return () => clearTimeout(timer);
     }, [activeDraft, saveStatus]);
+
+    // Suggested Destination Logic Effect
+    useEffect(() => {
+        if (!activeDraft) return;
+        
+        let suggestedDest: 'summary' | 'notes' | 'main_doc' | 'section' | 'new_doc' = 'notes';
+        let suggestedMode: 'append' | 'replace_section' | 'replace_all' = 'append';
+        let suggestedSecName = '';
+
+        const sourceStep = activeDraft.source_step;
+        const contentType = activeDraft.content_type;
+
+        if (sourceStep === 'article_pack') {
+            suggestedDest = 'main_doc';
+            suggestedMode = 'append';
+        } else if (contentType === 'body_markdown') {
+            suggestedDest = 'section';
+            suggestedMode = 'append';
+            suggestedSecName = 'Body Markdown';
+        } else if (contentType === 'website_fields') {
+            suggestedDest = 'section';
+            suggestedMode = 'append';
+            suggestedSecName = 'Website Fields';
+        } else if (contentType === 'reference_note') {
+            suggestedDest = 'section';
+            suggestedMode = 'append';
+            suggestedSecName = 'References';
+        } else if (contentType === 'schema_jsonld' || contentType === 'seo_schema') {
+            suggestedDest = 'section';
+            suggestedMode = 'append';
+            suggestedSecName = 'Schema';
+        } else if (sourceStep === 'direction_plan') {
+            suggestedDest = 'notes';
+            suggestedMode = 'append';
+        } else if (sourceStep === 'research_prompt') {
+            suggestedDest = 'notes';
+            suggestedMode = 'append';
+        } else {
+            suggestedDest = 'notes';
+            suggestedMode = 'append';
+        }
+
+        setSaveDestination(suggestedDest);
+        setSaveMode(suggestedMode);
+        setSectionName(suggestedSecName);
+    }, [activeDraft?.id, activeDraft?.content_type, activeDraft?.source_step]);
 
     // Save Draft
     const handleSave = async () => {
@@ -565,21 +617,107 @@ export default function WritingDeskLiteClient() {
             setTimeout(() => setMessage(null), 3000);
         }
     };
+    // Helper to escape regex chars
+    const escapeRegExp = (str: string) => {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
 
-    const handleAppendToTask = async () => {
+    const replaceSectionInMarkdown = (markdown: string, secName: string, newContent: string) => {
+        const escapedSectionName = escapeRegExp(secName.trim());
+        const regex = new RegExp(`(^|\\n)(##\\s+${escapedSectionName}\\b[^\\n]*)([\\s\\S]*?)(?=\\n##|\\n#|$)`, 'i');
+        
+        const match = markdown.match(regex);
+        if (match) {
+            const header = match[2];
+            return markdown.replace(regex, `$1${header}\n\n${newContent}`);
+        } else {
+            const divider = markdown.endsWith('\n') ? '' : '\n';
+            return `${markdown}${divider}\n## ${secName}\n\n${newContent}\n`;
+        }
+    };
+
+    const appendToSectionInMarkdown = (markdown: string, secName: string, appendContent: string) => {
+        const escapedSectionName = escapeRegExp(secName.trim());
+        const regex = new RegExp(`(^|\\n)(##\\s+${escapedSectionName}\\b[^\\n]*)([\\s\\S]*?)(?=\\n##|\\n#|$)`, 'i');
+        
+        const match = markdown.match(regex);
+        if (match) {
+            const header = match[2];
+            const oldContent = match[3].trim();
+            const divider = oldContent ? '\n\n' : '';
+            const updatedSectionContent = `${oldContent}${divider}${appendContent}`;
+            return markdown.replace(regex, `$1${header}\n\n${updatedSectionContent}`);
+        } else {
+            const divider = markdown.endsWith('\n') ? '' : '\n';
+            return `${markdown}${divider}\n## ${secName}\n\n${appendContent}\n`;
+        }
+    };
+
+    const parseNotesFull = (raw: string) => {
+        const lines = (raw || "").split("\n");
+        const descriptionLines: string[] = [];
+        const subtasks: { id: string, text: string, done: boolean }[] = [];
+
+        lines.forEach((line, idx) => {
+            const match = line.match(/^-\s\[([ xX])\]\s(.*)$/);
+            if (match) {
+                subtasks.push({
+                    id: `st-${idx}`,
+                    done: match[1].toLowerCase() === "x",
+                    text: match[2]
+                });
+            } else {
+                descriptionLines.push(line);
+            }
+        });
+
+        return { description: descriptionLines.join("\n").trim(), subtasks };
+    };
+
+    const serializeNotesFull = (description: string, subtasks: { id: string, text: string, done: boolean }[]) => {
+        let out = description.trim();
+        if (subtasks.length > 0) {
+            if (out) out += "\n\n";
+            out += subtasks.map(s => `- [${s.done ? "x" : " "}] ${s.text}`).join("\n");
+        }
+        return out;
+    };
+
+    const handleSaveToDestination = async (overrideConfirm = false) => {
         if (!activeDraft || !activeDraft.linked_task_id) return;
+
+        // Verify safety confirm
+        if (saveMode === 'replace_all' && saveDestination === 'notes' && !overrideConfirm) {
+            setIsConfirmReplaceModalOpen(true);
+            return;
+        }
+
         setIsSaving(true);
         try {
-            // Fetch existing task
-            // NOTE: GET /api/tasks/[id] returns { task: {...} } — unwrap correctly
+            // Fetch task details
             const taskRes = await fetch(`/api/tasks/${activeDraft.linked_task_id}`);
             const taskJson = await taskRes.json();
-            const existingNotes: string = taskJson?.task?.notes || taskJson?.notes || "";
+            const task = taskJson?.task || taskJson;
+            if (!task) throw new Error("Task not found");
 
+            const existingNotes: string = task.notes || "";
+            const taskTitle = task.title || "";
+            const workspace = task.workspace || "content";
+
+            // Prepare Frontmatter
             let finalExistingNotes = existingNotes;
-            if (!existingNotes.trim().startsWith("---")) {
-                const taskTitle = taskJson?.task?.title || taskJson?.title || "";
-                
+            let frontmatter = "";
+            let notesBody = existingNotes;
+
+            if (existingNotes.trim().startsWith("---")) {
+                const endIdx = existingNotes.indexOf("---", 3);
+                if (endIdx !== -1) {
+                    frontmatter = existingNotes.substring(0, endIdx + 3);
+                    notesBody = existingNotes.substring(endIdx + 3);
+                }
+            }
+
+            if (!frontmatter) {
                 let fallbackTopicId = "";
                 const gfMatch = taskTitle.match(/GF-[A-Z]+-\d+/i);
                 if (gfMatch) fallbackTopicId = gfMatch[0].toUpperCase();
@@ -591,8 +729,8 @@ export default function WritingDeskLiteClient() {
                 const topicId = activeDraft.topic_id || fallbackTopicId;
                 const topicTitle = activeDraft.topic_title || taskTitle;
                 const stepRole = activeDraft.source_step || CONTENT_TYPE_TO_ROLE[activeDraft.content_type] || activeDraft.content_type;
-                
-                const generatedFrontmatter = `---
+
+                frontmatter = `---
 topic_id: ${topicId}
 topic_title: ${topicTitle}
 step_role: ${stepRole}
@@ -608,197 +746,179 @@ bridge_from:
 bridge_to: 
 status: research
 priority: medium
----
-
-`;
-                finalExistingNotes = generatedFrontmatter + existingNotes;
+---`;
+                finalExistingNotes = frontmatter + "\n\n" + existingNotes;
             }
 
-            // Derive the step label for the append header
-            const stepLabel = activeDraft.source_step
-                ? SOURCE_STEP_LABELS[activeDraft.source_step]
-                : (CONTENT_TYPE_TO_ROLE[activeDraft.content_type] || "Working Doc");
+            const timestamp = new Date().toLocaleString('th-TH');
+            const appendHeader = `\n\n---\n\n### 📝 Draft Added - ${timestamp}\n\n`;
+            const draftContent = activeDraft.body;
 
-            let appendBlock = "";
-            if (stepLabel === 'Script & Caption') {
-                appendBlock = `\n\n---\n\n## Arbor Output — Step 5 Script & Caption — Draft\n\n` +
-                `### Group Post\n\n### Page Post\n\n### Personal Post\n\n` +
-                `### Website Bridge Copy\n\n### Short Caption\n\n### Hook Options\n\n` +
-                `### Closing Line Options\n\n### Reference Note\n\n### Hashtags\n\n`;
-            } else {
-                appendBlock = `\n\n---\n\n## Arbor Output — ${stepLabel} — Draft\n\n`;
+            // Handle Save Destinations
+            if (saveDestination === 'summary') {
+                // Task Summary / Checkpoint: only touches task description, keeps subtasks
+                const { description, subtasks } = parseNotesFull(existingNotes);
+                let newDescription = "";
+
+                if (saveMode === 'replace_all') {
+                    newDescription = draftContent;
+                } else if (saveMode === 'replace_section') {
+                    if (!sectionName) throw new Error("โปรดระบุชื่อหัวข้อ (Section Name)");
+                    newDescription = replaceSectionInMarkdown(description, sectionName, draftContent);
+                } else { // append
+                    newDescription = description + (description ? '\n\n' : '') + `### Checkpoint - ${timestamp}\n` + draftContent;
+                }
+
+                const updatedNotes = serializeNotesFull(newDescription, subtasks);
+
+                await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        notes: updatedNotes,
+                        status: 'in_progress',
+                        review_status: 'in_review'
+                    })
+                });
+            } 
+            else if (saveDestination === 'notes') {
+                // Task Notes Whole
+                let updatedNotes = "";
+
+                if (saveMode === 'replace_all') {
+                    updatedNotes = frontmatter + "\n\n" + draftContent;
+                } else if (saveMode === 'replace_section') {
+                    if (!sectionName) throw new Error("โปรดระบุชื่อหัวข้อ (Section Name)");
+                    const bodyReplaced = replaceSectionInMarkdown(notesBody, sectionName, draftContent);
+                    updatedNotes = frontmatter + "\n\n" + bodyReplaced;
+                } else { // append
+                    updatedNotes = existingNotes + appendHeader + draftContent;
+                }
+
+                await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        notes: updatedNotes,
+                        status: 'in_progress',
+                        review_status: 'in_review'
+                    })
+                });
             }
+            else if (saveDestination === 'section') {
+                // Specific Section inside Notes
+                if (!sectionName) throw new Error("โปรดระบุชื่อหัวข้อ (Section Name)");
+                let updatedNotes = "";
 
-            const markdown = formatDraftToMarkdown(activeDraft, review);
-            const newNotes = finalExistingNotes + (finalExistingNotes && !finalExistingNotes.endsWith('\n\n') ? '\n\n' : '') + appendBlock.trimStart() + markdown;
+                if (saveMode === 'replace_section' || saveMode === 'replace_all') {
+                    const bodyReplaced = replaceSectionInMarkdown(notesBody, sectionName, draftContent);
+                    updatedNotes = frontmatter + "\n\n" + bodyReplaced;
+                } else { // append
+                    const bodyAppended = appendToSectionInMarkdown(notesBody, sectionName, `*ต่อท้ายเมื่อ ${timestamp}*\n` + draftContent);
+                    updatedNotes = frontmatter + "\n\n" + bodyAppended;
+                }
 
-            await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    notes: newNotes,
-                    status: 'in_progress',
-                    review_status: 'in_review'
-                })
-            });
+                await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        notes: updatedNotes,
+                        status: 'in_progress',
+                        review_status: 'in_review'
+                    })
+                });
+            }
+            else if (saveDestination === 'main_doc') {
+                // Task Main Doc (Primary Document)
+                let targetDocId = task.doc_id;
 
-            setMessage({ type: 'success', text: "Appended to task notes!" });
-            setTimeout(() => setMessage(null), 3000);
-        } catch (err) {
-            console.error("Failed to append to task", err);
-            setMessage({ type: 'error', text: "Failed to append to task notes" });
-            setTimeout(() => setMessage(null), 3000);
-        } finally {
-            setIsSaving(false);
-        }
-    };
+                if (!targetDocId) {
+                    // Create primary doc
+                    const docRes = await fetch("/api/docs", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            title: `${activeDraft.topic_title} — Primary Document`,
+                            content_md: draftContent,
+                            workspace: workspace
+                        })
+                    });
+                    const docJson = await docRes.json();
+                    const newDoc = docJson?.doc;
+                    if (!newDoc?.id) throw new Error("ไม่สามารถสร้าง Primary Document ได้");
 
-    const handleReplaceTaskNotes = async () => {
-        if (!activeDraft || !activeDraft.linked_task_id) return;
-        
-        const confirmed = window.confirm("Are you sure you want to replace the linked task's notes? This will overwrite the current content in the task with a clean version of this draft.");
-        if (!confirmed) return;
+                    targetDocId = newDoc.id;
 
-        setIsSaving(true);
-        try {
-            // Fetch existing task to preserve/merge metadata
-            const taskRes = await fetch(`/api/tasks/${activeDraft.linked_task_id}`);
-            const taskJson = await taskRes.json();
-            const existingNotes: string = taskJson?.task?.notes || taskJson?.notes || "";
-            const taskTitle = taskJson?.task?.title || taskJson?.title || "";
+                    // Link doc to task
+                    await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ doc_id: targetDocId })
+                    });
+                } else {
+                    // Fetch primary doc content
+                    const docRes = await fetch(`/api/docs/${targetDocId}`);
+                    const docJson = await docRes.json();
+                    const doc = docJson?.doc || docJson;
+                    if (!doc) throw new Error("ไม่พบ Primary Document");
 
-            // 1. Parse existing frontmatter from task
-            const existingMeta: Record<string, string> = {};
-            if (existingNotes.trim().startsWith("---")) {
-                const endIdx = existingNotes.indexOf("---", 3);
-                if (endIdx !== -1) {
-                    const frontmatter = existingNotes.substring(3, endIdx);
-                    frontmatter.split('\n').forEach(line => {
-                        const match = line.match(/^([a-z_]+):\s*(.*)$/);
-                        if (match) existingMeta[match[1]] = match[2].trim();
+                    const oldDocContent = doc.content_md || "";
+                    let newDocContent = "";
+
+                    if (saveMode === 'replace_all') {
+                        newDocContent = draftContent;
+                    } else if (saveMode === 'replace_section') {
+                        if (!sectionName) throw new Error("โปรดระบุชื่อหัวข้อ (Section Name)");
+                        newDocContent = replaceSectionInMarkdown(oldDocContent, sectionName, draftContent);
+                    } else { // append
+                        newDocContent = oldDocContent + (oldDocContent ? '\n\n' : '') + `## Append Checkpoint — ${timestamp}\n\n` + draftContent;
+                    }
+
+                    // Save doc
+                    await fetch(`/api/docs/${targetDocId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ content_md: newDocContent })
                     });
                 }
             }
+            else if (saveDestination === 'new_doc') {
+                // New Linked Doc
+                const docRes = await fetch("/api/docs", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        title: `${activeDraft.topic_title} — Document ${timestamp}`,
+                        content_md: draftContent,
+                        workspace: workspace
+                    })
+                });
+                const docJson = await docRes.json();
+                const newDoc = docJson?.doc;
+                if (!newDoc?.id) throw new Error("ไม่สามารถสร้าง Linked Document ใหม่ได้");
 
-            // 2. Parse metadata from draft body (priority)
-            const bodyMeta: Record<string, string> = {};
-            const bodyLines = activeDraft.body.split('\n').slice(0, 50); // Look at first 50 lines
-            bodyLines.forEach(line => {
-                const match = line.match(/^([a-z_]+):\s*(.*)$/);
-                if (match) {
-                    const key = match[1];
-                    const val = match[2].trim();
-                    if (['topic_id', 'topic_title', 'journey_set', 'journey_stage', 'content_layer', 'article_format', 'narrative_style', 'bridge_from', 'bridge_to', 'status', 'content_pillar'].includes(key)) {
-                        bodyMeta[key] = val;
-                    }
-                }
-            });
-
-            // 3. Determine normalized values with priority: Body > Draft Object > Existing Meta > Fallbacks
-            let fallbackTopicId = "";
-            const gfMatch = taskTitle.match(/GF-[A-Z]+-\d+/i);
-            if (gfMatch) fallbackTopicId = gfMatch[0].toUpperCase();
-            else {
-                const topicMatch = taskTitle.match(/TOPIC-\d+/i);
-                if (topicMatch) fallbackTopicId = topicMatch[0].toUpperCase();
+                // Link to Task via Notes append
+                const docLinkMd = `\n\n---\n\n🔗 **Linked Document Created at ${timestamp}**\n- Title: [${newDoc.title}](/docs/${newDoc.id})\n\n`;
+                
+                await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        notes: existingNotes + docLinkMd,
+                        doc_id: task.doc_id ? task.doc_id : newDoc.id
+                    })
+                });
             }
 
-            const topicId = bodyMeta.topic_id || activeDraft.topic_id || existingMeta.topic_id || fallbackTopicId;
-            let topicTitle = bodyMeta.topic_title || activeDraft.topic_title || existingMeta.topic_title || taskTitle;
-            
-            // Clean up topic title if it's the shortened version
-            if (topicId === 'GF-STORY-01' && topicTitle.includes('เมล็ด — Brief')) {
-                topicTitle = 'GF-STORY-01 — เมล็ด: จุดเริ่มต้นของชีวิตพืช';
-            }
-
-            const stepRole = activeDraft.source_step || existingMeta.step_role || CONTENT_TYPE_TO_ROLE[activeDraft.content_type] || activeDraft.content_type;
-            
-            // 4. Determine Step-specific Status
-            let taskStatus = bodyMeta.status || existingMeta.status || 'research';
-            if (activeDraft.source_step === 'brief') {
-                taskStatus = 'brief_updated_ready_for_review';
-            } else if (activeDraft.source_step === 'publish') {
-                taskStatus = 'ready_to_publish';
-            }
-
-            // 5. Narrative & Bridge Fallbacks for GF-STORY-01
-            let narrativeStyle = bodyMeta.narrative_style || existingMeta.narrative_style || '';
-            if (!narrativeStyle && activeDraft.body.toLowerCase().includes('documentary')) {
-                narrativeStyle = 'documentary';
-            }
-
-            let bridgeFrom = bodyMeta.bridge_from || existingMeta.bridge_from || '';
-            if (!bridgeFrom && topicId === 'GF-STORY-01') {
-                bridgeFrom = 'จุดเริ่มต้นของซีรีส์';
-            }
-
-            let bridgeTo = bodyMeta.bridge_to || existingMeta.bridge_to || '';
-            if (!bridgeTo && topicId === 'GF-STORY-01') {
-                bridgeTo = 'GF-STORY-02 — เมล็ดงอก: เมื่อเงื่อนไขเหมาะสม ชีวิตจึงเริ่มต้น';
-            }
-
-            // 6. Construct Clean Normalized Frontmatter
-            const finalFrontmatter = `---
-topic_id: ${topicId}
-topic_title: ${topicTitle}
-step_role: ${stepRole}
-content_pillar: ${bodyMeta.content_pillar || existingMeta.content_pillar || 'Nature & Plant Life'}
-content_type: ${activeDraft.content_type}
-content_layer: ${bodyMeta.content_layer || existingMeta.content_layer || 'knowledge'}
-article_format: ${bodyMeta.article_format || existingMeta.article_format || 'knowledge_journey'}
-narrative_style: ${narrativeStyle}
-narrative_status: ${existingMeta.narrative_status || 'mapped'}
-journey_set: ${bodyMeta.journey_set || existingMeta.journey_set || 'ชีวิตของพืชหนึ่งต้น'}
-journey_stage: ${bodyMeta.journey_stage || existingMeta.journey_stage || '01 — เมล็ด'}
-bridge_from: ${bridgeFrom}
-bridge_to: ${bridgeTo}
-status: ${taskStatus}
-priority: ${existingMeta.priority || 'medium'}
----`;
-
-            // 7. Construct Clean Body (No export wrapper)
-            let cleanBody = activeDraft.body;
-            
-            // If body contains its own frontmatter, we might want to strip it to avoid double frontmatter
-            // But usually the body starts with the title or content.
-            if (cleanBody.trim().startsWith("---")) {
-                const secondDashes = cleanBody.indexOf("---", 3);
-                if (secondDashes !== -1) {
-                    cleanBody = cleanBody.substring(secondDashes + 3).trim();
-                }
-            }
-
-            if (review) {
-                cleanBody += `\n\n---\n\n## Arbor Review\n\n`;
-                if (review.structured_json) {
-                    const s = JSON.parse(review.structured_json) as ArborReviewPayload;
-                    cleanBody += `### Summary\n${s.editorialSummary}\n\n`;
-                    cleanBody += `### Next Action\n${s.recommendedNextEdit}\n\n`;
-                } else {
-                    cleanBody += `### Summary\n${review.summary}\n\n`;
-                }
-            }
-
-            const newNotes = finalFrontmatter + "\n\n" + cleanBody;
-
-            await fetch(`/api/tasks/${activeDraft.linked_task_id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    notes: newNotes,
-                    status: 'in_progress', // WorkOS task status
-                    review_status: 'in_review'
-                })
-            });
-
-            setMessage({ type: 'success', text: "Task notes replaced and normalized!" });
+            setMessage({ type: 'success', text: "บันทึกข้อมูลสำเร็จ!" });
             setTimeout(() => setMessage(null), 3000);
-        } catch (err) {
-            console.error("Failed to replace task notes", err);
-            setMessage({ type: 'error', text: "Failed to replace task notes" });
+        } catch (err: any) {
+            console.error("Failed to save to destination", err);
+            setMessage({ type: 'error', text: err?.message || "บันทึกข้อมูลล้มเหลว" });
             setTimeout(() => setMessage(null), 3000);
         } finally {
             setIsSaving(false);
+            setIsConfirmReplaceModalOpen(false);
         }
     };
 
@@ -1109,24 +1229,118 @@ priority: ${existingMeta.priority || 'medium'}
                                         <LinkIcon size={14} /> {activeDraft.linked_task_id ? 'Linked' : 'Link to Task'}
                                     </button>
                                     {activeDraft.linked_task_id && (
-                                        <div className="flex flex-col items-end gap-2 mt-2">
-                                            <div className="flex items-center gap-2">
-                                                <button 
-                                                    onClick={handleAppendToTask}
-                                                    className="px-4 py-2 bg-theme-border/50 text-theme-primary hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all hover:bg-theme-muted shadow-sm"
+                                        <div className="mt-4 p-4 bg-theme-input/40 dark:bg-zinc-900/40 rounded-2xl border border-theme-border flex flex-col gap-4 w-full text-left">
+                                            <div className="flex flex-wrap items-center justify-between gap-4">
+                                                {/* Destination Selector */}
+                                                <div className="flex flex-col gap-1.5">
+                                                    <span className="text-[9px] font-black uppercase text-theme-muted tracking-wider">Save to (บันทึกไปยัง)</span>
+                                                    <div className="flex flex-wrap gap-1 bg-theme-input p-1 rounded-xl border border-theme-border">
+                                                        {[
+                                                            { id: 'summary', label: 'Summary / Checkpoint' },
+                                                            { id: 'notes', label: 'Task Notes' },
+                                                            { id: 'main_doc', label: 'Task Main Doc' },
+                                                            { id: 'section', label: 'Specific Section' },
+                                                            { id: 'new_doc', label: 'New Linked Doc' }
+                                                        ].map(dest => (
+                                                            <button
+                                                                key={dest.id}
+                                                                type="button"
+                                                                onClick={() => setSaveDestination(dest.id as any)}
+                                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                                                                    saveDestination === dest.id 
+                                                                        ? 'bg-white dark:bg-zinc-800 text-theme-primary shadow-sm border border-theme-border/50 font-black' 
+                                                                        : 'text-theme-secondary hover:text-theme-primary'
+                                                                }`}
+                                                            >
+                                                                {dest.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Save Mode Selector */}
+                                                <div className="flex flex-col gap-1.5">
+                                                    <span className="text-[9px] font-black uppercase text-theme-muted tracking-wider">Save Mode (โหมดเซฟ)</span>
+                                                    <div className="flex flex-wrap gap-1 bg-theme-input p-1 rounded-xl border border-theme-border">
+                                                        {[
+                                                            { id: 'append', label: 'Append (ต่อท้าย)' },
+                                                            { id: 'replace_section', label: 'Replace Section (แทนที่หัวข้อ)' },
+                                                            { id: 'replace_all', label: 'Replace All (เขียนทับทั้งหมด)' }
+                                                        ].map(mode => (
+                                                            <button
+                                                                key={mode.id}
+                                                                type="button"
+                                                                onClick={() => setSaveMode(mode.id as any)}
+                                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                                                                    saveMode === mode.id 
+                                                                        ? 'bg-white dark:bg-zinc-800 text-theme-primary shadow-sm border border-theme-border/50 font-black' 
+                                                                        : 'text-theme-secondary hover:text-theme-primary'
+                                                                }`}
+                                                            >
+                                                                {mode.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Conditional Input for Section Name */}
+                                            {(saveDestination === 'section' || saveMode === 'replace_section') && (
+                                                <div className="flex items-center gap-3 bg-theme-input/60 p-3 rounded-xl border border-theme-border/50 animate-fadeIn">
+                                                    <div className="flex-1">
+                                                        <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Section Name (ชื่อหัวข้อ Markdown ภายใต้ ##)</label>
+                                                        <input
+                                                            value={sectionName}
+                                                            onChange={e => setSectionName(e.target.value)}
+                                                            className="w-full bg-theme-card border border-theme-border rounded-lg px-3 py-1.5 text-xs font-bold mt-1 outline-none focus:border-blue-500 transition-all text-theme-primary"
+                                                            placeholder="เช่น Body Markdown, Website Fields, References, หรือ Schema..."
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Dynamic Action Button & Hint */}
+                                            <div className="flex items-center justify-between gap-4 pt-2 border-t border-theme-border/40">
+                                                <span className="text-[9px] font-medium text-theme-muted italic">
+                                                    {saveDestination === 'main_doc' && '💡 บันทึกเข้าสู่ Primary Document หลักที่เชื่อมโยงกับ Task'}
+                                                    {saveDestination === 'new_doc' && '💡 สร้างเอกสารใหม่และลิงก์ประวัติอ้างอิงไว้ใน Task'}
+                                                    {saveDestination === 'summary' && '💡 บันทึกเข้าไปยัง Task Description ด้านบนสุดโดยเว้นระยะ Checklist ด้านล่าง'}
+                                                    {saveDestination === 'notes' && saveMode === 'replace_all' && '⚠️ คำเตือน: โหมดเขียนทับ Notes ทั้งหมด จะแทนที่คำบรรยายเดิมของ Task'}
+                                                    {saveDestination === 'notes' && saveMode === 'append' && '💡 เพิ่มข้อมูลต่อท้าย Task Notes ทั้งก้อนแบบเรียงลำดับเวลา'}
+                                                    {saveDestination === 'section' && '💡 ค้นหา ## หัวข้อ และแทนที่เฉพาะเนื้อหานั้นๆ'}
+                                                </span>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleSaveToDestination(false)}
+                                                    disabled={isSaving || ((saveDestination === 'section' || saveMode === 'replace_section') && !sectionName.trim())}
+                                                    className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-md active:scale-98 ${
+                                                        isSaving 
+                                                            ? 'bg-theme-border text-theme-muted cursor-not-allowed'
+                                                            : saveMode === 'replace_all' && saveDestination === 'notes'
+                                                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-100 dark:shadow-none'
+                                                                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100 dark:shadow-none'
+                                                    }`}
                                                 >
-                                                    <Plus size={14} /> Append
-                                                </button>
-                                                <button 
-                                                    onClick={handleReplaceTaskNotes}
-                                                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all hover:bg-blue-700 shadow-sm"
-                                                >
-                                                    <RefreshCw size={14} /> Replace Task Notes
+                                                    {isSaving ? (
+                                                        <Loader2 size={14} className="animate-spin" />
+                                                    ) : saveDestination === 'new_doc' ? (
+                                                        <Plus size={14} />
+                                                    ) : saveMode === 'replace_section' ? (
+                                                        <RefreshCw size={14} />
+                                                    ) : saveMode === 'replace_all' ? (
+                                                        <Trash2 size={14} />
+                                                    ) : (
+                                                        <Plus size={14} />
+                                                    )}
+                                                    {isSaving ? 'Saving...' : 
+                                                        saveDestination === 'new_doc' ? 'Create linked doc' :
+                                                        saveMode === 'replace_section' ? 'Replace selected section' :
+                                                        saveMode === 'replace_all' ? 'Replace selected destination' :
+                                                        'Append to selected destination'
+                                                    }
                                                 </button>
                                             </div>
-                                            <span className="text-[8px] font-bold text-theme-muted uppercase tracking-tighter mr-1 max-w-[250px] text-right">
-                                                Workflow tasks (Brief, Outline, etc.) use <span className="text-blue-500">Replace</span>. Log outputs use <span className="text-theme-secondary">Append</span>.
-                                            </span>
                                         </div>
                                     )}
                                 </div>
@@ -1249,6 +1463,42 @@ priority: ${existingMeta.priority || 'medium'}
                                         })()}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Confirm Replace Whole Notes Modal */}
+                {isConfirmReplaceModalOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-6 animate-fadeIn">
+                        <div className="bg-theme-card border border-theme-border rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-6 text-left">
+                            <div className="flex items-center gap-3 text-red-600">
+                                <AlertCircle size={24} />
+                                <h3 className="text-base font-black uppercase tracking-wider">ยืนยันการเขียนทับเนื้อหา</h3>
+                            </div>
+                            
+                            <p className="text-xs font-bold text-theme-secondary leading-relaxed">
+                                คุณแน่ใจหรือไม่ว่าต้องการ <span className="text-red-600 font-black">เขียนทับ (Replace)</span> เนื้อหาทั้งหมดในส่วนปลายทางที่เลือก? 
+                                การดำเนินการนี้จะเขียนทับข้อมูลคำบรรยายเดิมของ Task และไม่สามารถกู้คืนได้ (แต่ Checklist/Subtasks จะไม่ถูกลบหากเลือกปลายทางเป็น Summary / Checkpoint)
+                            </p>
+
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => handleSaveToDestination(true)}
+                                    disabled={isSaving}
+                                    className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-red-100 dark:shadow-none"
+                                >
+                                    {isSaving ? 'กำลังบันทึก...' : 'ใช่, เขียนทับทั้งหมด'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsConfirmReplaceModalOpen(false)}
+                                    disabled={isSaving}
+                                    className="flex-1 py-3 bg-theme-input hover:bg-theme-border text-theme-primary text-xs font-black uppercase tracking-wider rounded-xl transition-all"
+                                >
+                                    ยกเลิก
+                                </button>
                             </div>
                         </div>
                     </div>
