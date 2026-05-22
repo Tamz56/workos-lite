@@ -1101,6 +1101,38 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             )}
 
             <div className={`flex-1 min-h-0 overflow-hidden relative flex flex-col transition-all duration-300 ${isFocusMode ? 'px-1 md:px-2' : 'px-4'}`}>
+                {workspaceId === "other" && !isFocusMode && !state.isFlowMode && (
+                    <div className="mb-6 mt-2 bg-gradient-to-r from-indigo-600/90 via-violet-700/95 to-indigo-900 border border-indigo-400/20 rounded-3xl p-6 text-white shadow-xl shadow-indigo-500/5 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl pointer-events-none" />
+                        
+                        <div className="flex items-center gap-5 relative z-10">
+                            <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/20 text-white shrink-0">
+                                <LucideIcons.GraduationCap size={30} className="text-white" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-wider">
+                                        Prototype v0.1
+                                    </span>
+                                    <span className="text-indigo-200 text-xs font-bold">Business Analyst Lab Special Module</span>
+                                </div>
+                                <h2 className="text-xl font-black tracking-tight text-white mb-0.5">BA Learning Classroom (ห้องเรียนจำลอง BA)</h2>
+                                <p className="text-indigo-100/90 text-xs font-medium max-w-xl">
+                                    เรียนรู้ความแตกต่างระหว่าง Problem vs Requirement, ทบทวนศัพท์เฉพาะทาง BA, ทำกรณีศึกษา Nature Series และส่งแบบฝึกหัดประจำวันของคุณ
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <button 
+                            onClick={() => router.push(`/workspaces/other/classroom`)}
+                            className="px-6 py-3.5 bg-white text-indigo-700 hover:bg-indigo-50 rounded-2xl text-sm font-black transition-all shadow-lg shadow-indigo-900/10 active:scale-95 flex items-center gap-2 shrink-0 z-10 cursor-pointer animate-in fade-in zoom-in-95 duration-300"
+                        >
+                            <span>Open Classroom</span>
+                            <LucideIcons.ArrowRight size={16} />
+                        </button>
+                    </div>
+                )}
                 {smartQueueItems.length > 0 && !isFocusMode && (
                     <SmartQueueStrip items={smartQueueItems} onItemClick={handleQueueItemClick} onItemShown={handleQueueItemShown} onDismiss={() => setIsQueueDismissed(true)} />
                 )}
