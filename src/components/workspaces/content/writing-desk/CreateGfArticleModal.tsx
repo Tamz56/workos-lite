@@ -44,6 +44,28 @@ export default function CreateGfArticleModal({
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        if (workflowPreset === 'dual_v3') {
+            setFormData(prev => ({
+                ...prev,
+                content_layer: 'dual',
+                article_format: 'knowledge_plus_narrative'
+            }));
+        } else if (workflowPreset === 'lean_v2') {
+            setFormData(prev => ({
+                ...prev,
+                content_layer: 'knowledge',
+                article_format: 'knowledge_explainer'
+            }));
+        } else if (workflowPreset === 'legacy_v1') {
+            setFormData(prev => ({
+                ...prev,
+                content_layer: 'knowledge',
+                article_format: 'knowledge_explainer'
+            }));
+        }
+    }, [workflowPreset]);
+
     const fetchGroups = async () => {
         try {
             const [listsRes, sprintsRes] = await Promise.all([
@@ -92,7 +114,11 @@ export default function CreateGfArticleModal({
 
         try {
             // 1. Check for duplicates (topic_id + task_set)
-            const targetTaskSet = workflowPreset === 'lean_v2' ? 'green_fineness_lean_4_tasks' : 'green_fineness_legacy_8_tasks';
+            const targetTaskSet = workflowPreset === 'lean_v2' 
+                ? 'green_fineness_lean_4_tasks' 
+                : workflowPreset === 'dual_v3' 
+                    ? 'green_fineness_dual_5_tasks' 
+                    : 'green_fineness_legacy_8_tasks';
             const queryUrl = `/api/tasks?topic_id=${encodeURIComponent(formData.topic_id)}`;
             const checkRes = await fetch(queryUrl);
             if (checkRes.ok) {
@@ -176,6 +202,7 @@ export default function CreateGfArticleModal({
                             className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-sm text-theme-primary focus:ring-2 focus:ring-theme-accent/5 outline-none font-bold"
                         >
                             <option value="lean_v2">Green Fineness Lean v2 — 4 Tasks</option>
+                            <option value="dual_v3">Green Fineness Dual Article — 5 Tasks</option>
                             <option value="legacy_v1">Legacy GF Article — 8 Tasks</option>
                         </select>
                     </div>

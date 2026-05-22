@@ -13,7 +13,7 @@ export interface GfArticleInput {
     bridge_to: string;
 }
 
-export type GfWorkflowPreset = 'lean_v2' | 'legacy_v1';
+export type GfWorkflowPreset = 'lean_v2' | 'legacy_v1' | 'dual_v3';
 
 interface TaskDefinition {
     step_role: string;
@@ -22,8 +22,8 @@ interface TaskDefinition {
 }
 
 function buildMetadataFrontmatter(input: GfArticleInput, stepRole: string, preset: GfWorkflowPreset): string {
-    const workflowVersion = preset === 'lean_v2' ? 'lean_v2' : 'legacy_v1';
-    const taskSet = preset === 'lean_v2' ? 'green_fineness_lean_4_tasks' : 'green_fineness_legacy_8_tasks';
+    const workflowVersion = preset === 'lean_v2' ? 'lean_v2' : preset === 'dual_v3' ? 'dual_v3' : 'legacy_v1';
+    const taskSet = preset === 'lean_v2' ? 'green_fineness_lean_4_tasks' : preset === 'dual_v3' ? 'green_fineness_dual_5_tasks' : 'green_fineness_legacy_8_tasks';
 
     return `---
 topic_id: ${input.topic_id}
@@ -39,6 +39,8 @@ article_format: ${input.article_format}
 narrative_status: mapped
 journey_set: ${input.journey_set}
 journey_stage: ${input.journey_stage}
+bridge_from: ${input.bridge_from || ''}
+bridge_to: ${input.bridge_to || ''}
 status: research
 priority: medium
 ---
@@ -431,6 +433,374 @@ Personal Profile:
 
 ### Notes
 - `
+    }
+];
+
+const DUAL_V3_TASKS: TaskDefinition[] = [
+    {
+        step_role: "research_prompt",
+        title_suffix: "NotebookLM Research Prompt",
+        template: (input) => `# NotebookLM Research Prompt
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+## Research Goal
+[สิ่งที่ต้องการให้ NotebookLM สรุปหรือดึงข้อมูลออกมา เช่น ข้อมูลเชิงลึกของดิน กลไกพืช หรือสารเคมีวิเคราะห์]
+
+## Prompt for NotebookLM
+[วาง Prompt ที่ใช้จริง]
+
+## Required Output from NotebookLM
+- Key facts
+- Useful claims
+- Claims to be careful with
+- Terms / concepts to keep
+- Suggested sources / references
+- Notes for Arbor
+
+## Research Raw / Summary
+[วางสรุปดิบหรือความรู้ที่ได้จาก NotebookLM เพื่อเก็บเป็นฐานข้อมูลวิจัย]
+
+## Suggested References
+- [รายการเอกสารอ้างอิงหรือลิงก์อ้างอิงที่ NotebookLM เสนอแนะ]`
+    },
+    {
+        step_role: "direction_plan",
+        title_suffix: "Direction & Content Plan",
+        template: (input) => `# Direction & Content Plan
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+---
+
+## Strategy & Connections
+- **Core Message:** [ข้อความหลักที่เชื่อมโยงกันทั้งสองบทความ]
+- **Bridge From:** ${input.bridge_from || ''}
+- **Bridge To:** ${input.bridge_to || ''}
+
+---
+
+## Knowledge Article Direction
+
+### Working Title
+[ชื่อบทความให้ความรู้]
+
+### Core Message
+[ข้อความหลัก]
+
+### Key Scientific Concepts
+- 
+
+### Main Sections
+1. 
+2. 
+3. 
+
+### Claim Guardrails
+- [ข้อควรระวังเชิงวิชาการ / ห้ามกล่าวอ้างสรรพคุณเกินจริง]
+
+### Image Needs
+- Cover:
+- Body Images:
+
+### References Needed
+- 
+
+---
+
+## Narrative Article Direction
+
+### Working Title
+[ชื่อบทความเรื่องเล่า / Narrative]
+
+### Documentary Angle
+[มุมมองการเล่าเรื่องเชิงสารคดี ดึงดูดอารมณ์และประสบการณ์เชิงประจักษ์]
+
+### Scene Sequence
+1. 
+2. 
+3. 
+
+### Image Needs
+- Hero Image:
+- Sequence Images (N01–N04):
+
+---
+
+## Plan Decision
+- Do First:
+- Park for Later:`
+    },
+    {
+        step_role: "knowledge_article",
+        title_suffix: "Knowledge Article",
+        template: (input) => `# Knowledge Article
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+## Status
+Ready for Draft Upload / Waiting Publish
+
+---
+
+## Website Fields
+
+### Title
+[ชื่อบทความความรู้สำหรับแสดงบนหน้าเว็บ]
+
+### Slug
+[slug-english-lowercase]
+
+### Excerpt
+[คำโปรยบทความสั้น ๆ ดึงดูดผู้อ่าน]
+
+### Meta Title
+[Meta Title สำหรับ SEO]
+
+### Meta Description
+[Meta Description สำหรับ SEO]
+
+### Category
+[หมวดหมู่ย่อย]
+
+### Content Layer
+Knowledge
+
+### Primary Keyword
+[primary keyword]
+
+### Secondary Keywords
+- 
+
+### Internal Links
+- 
+
+---
+
+## Body Markdown
+
+[วางเนื้อหาบทความแบบให้ความรู้ที่มีคุณภาพสูง จัดหมวดหมู่ด้วย H2, H3 และ H4 อย่างเหมาะสม]
+
+![Alt text](Image URL / Placeholder)
+*คำอธิบายภาพ*
+
+---
+
+## Images / Image Placeholders
+- [ ] Cover Image: [คำอธิบายหรือลิงก์ภาพหน้าปก]
+- [ ] Body Image 01: [คำอธิบายหรือลิงก์ภาพประกอบเนื้อหา]
+- [ ] Body Image 02: [คำอธิบายหรือลิงก์ภาพโครงสร้างวิชาการ]
+
+---
+
+## References
+1. 
+2. 
+
+---
+
+## Schema / JSON-LD
+
+\`\`\`json
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "[Title]",
+  "description": "[Excerpt]"
+}
+\`\`\``
+    },
+    {
+        step_role: "narrative_article",
+        title_suffix: "Narrative Article",
+        template: (input) => `# Narrative Article
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+## Status
+Ready for Draft Upload / Waiting Publish
+
+---
+
+## Website Fields
+
+### Title
+[ชื่อบทความเรื่องเล่าเชิงประยุกต์ / สารคดี]
+
+### Slug
+[slug-english-lowercase]
+
+### Excerpt
+[คำโปรยบทความสั้น ๆ เล่าเชิงบรรยากาศหรือจุดเปลี่ยนสำคัญ]
+
+### Meta Title
+[Meta Title สำหรับ SEO]
+
+### Meta Description
+[Meta Description สำหรับ SEO]
+
+### Category
+Nature Series
+
+### Content Layer
+Narrative
+
+### Related Knowledge Article
+[ชื่อบทความความรู้ที่เกียวข้อง]
+
+---
+
+## Body Markdown
+
+[วางเนื้อหาบทความแบบเรื่องเล่า (Narrative / Storytelling) ที่เน้นความประทับใจ การสังเกต และการปฏิบัติตามวิถีธรรมชาติ]
+
+---
+
+## Image Placeholders (N01–N04)
+- **N01:** [รายละเอียดและไอเดียรูปภาพซีนที่ 1]
+- **N02:** [รายละเอียดและไอเดียรูปภาพซีนที่ 2]
+- **N03:** [รายละเอียดและไอเดียรูปภาพซีนที่ 3]
+- **N04:** [รายละเอียดและไอเดียรูปภาพซีนที่ 4]
+
+---
+
+## อ่านความรู้ประกอบ
+[คำโปรยชวนผู้อ่านไปอ่านบทความความรู้ฉบับเต็มของตอน เช่น "เพื่อความเข้าใจเชิงลึกเกี่ยวกับกลไกพืชชิ้นนี้ สามารถอ่านต่อได้ในบทความความรู้: [Knowledge Title]"]
+
+---
+
+## Source Note / เรียบเรียงจากฐานความรู้
+[เรียบเรียงและสรุปข้อมูลวิชาการจากบทความหลัก: [Topic ID] เพื่อความกระชับและรักษามาตรฐานวิชาการสูงสุด]
+
+---
+
+## Schema / JSON-LD
+
+\`\`\`json
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "[Title]",
+  "description": "[Excerpt]"
+}
+\`\`\``
+    },
+    {
+        step_role: "publish_social_pack",
+        title_suffix: "Publish & Social Pack",
+        template: (input) => `# Publish & Social Pack
+
+## Topic
+${input.topic_title}
+
+## Topic ID
+${input.topic_id}
+
+## Status
+Waiting Publish / Published / Social Ready
+
+---
+
+## Published URLs
+
+### Knowledge Article
+[PUBLISHED_URL_KNOWLEDGE]
+
+### Narrative Article
+[PUBLISHED_URL_NARRATIVE]
+
+---
+
+## UTM Templates
+
+### Knowledge Article UTMs
+
+- **Facebook Group:**
+  [PUBLISHED_URL_KNOWLEDGE]?utm_source=facebook&utm_medium=group&utm_campaign=${input.topic_id.toLowerCase()}&utm_content=group_post
+
+- **Facebook Page:**
+  [PUBLISHED_URL_KNOWLEDGE]?utm_source=facebook&utm_medium=page&utm_campaign=${input.topic_id.toLowerCase()}&utm_content=page_post
+
+- **Personal Profile:**
+  [PUBLISHED_URL_KNOWLEDGE]?utm_source=facebook&utm_medium=personal&utm_campaign=${input.topic_id.toLowerCase()}&utm_content=personal_post
+
+- **Line OA:**
+  [PUBLISHED_URL_KNOWLEDGE]?utm_source=line&utm_medium=oa&utm_campaign=${input.topic_id.toLowerCase()}&utm_content=line_oa
+
+---
+
+### Narrative Article UTMs
+
+- **Facebook Group:**
+  [PUBLISHED_URL_NARRATIVE]?utm_source=facebook&utm_medium=group&utm_campaign=${input.topic_id.toLowerCase()}&utm_content=group_post
+
+- **Facebook Page:**
+  [PUBLISHED_URL_NARRATIVE]?utm_source=facebook&utm_medium=page&utm_campaign=${input.topic_id.toLowerCase()}&utm_content=page_post
+
+- **Personal Profile:**
+  [PUBLISHED_URL_NARRATIVE]?utm_source=facebook&utm_medium=personal&utm_campaign=${input.topic_id.toLowerCase()}&utm_content=personal_post
+
+---
+
+## Facebook Group Post
+[โพสต์สไตล์แชร์ความรู้ ชวนคุยในกลุ่มคอมมูนิตี้]
+
+---
+
+## Facebook Page Post
+[โพสต์สไตล์วิชาการแบบย่อยง่าย อ่านสบายแต่เปี่ยมด้วยข้อมูลจริง]
+
+---
+
+## Personal Post
+[โพสต์เบื้องหลัง เรื่องเล่าเชิงขบคิดสะท้อนแง่มุมส่วนตัวและแรงบันดาลใจ]
+
+---
+
+## Short Caption
+[แคปชันสั้น ๆ สำหรับใช้แชร์ลิงก์หรือรูปภาพอย่างรวดเร็ว]
+
+---
+
+## Hashtags
+#GreenFineness #ธาตุอาหารพืช #PlantNutrition #ธรรมชาติเชิงประจักษ์
+
+---
+
+## Publish Log
+
+### Knowledge Article Publish Log
+- Date:
+- URL:
+- Status:
+
+### Narrative Article Publish Log
+- Date:
+- URL:
+- Status:
+
+### Social Media Publish Log
+- Facebook Page Post Date:
+- Facebook Group Post Date:
+- Personal Post Date:
+- Status:
+`
     }
 ];
 
@@ -879,7 +1249,7 @@ Waiting final assembly
 ];
 
 export function buildGfArticleTaskSetPayloads(input: GfArticleInput, preset: GfWorkflowPreset = 'lean_v2') {
-    const taskDefs = preset === 'lean_v2' ? LEAN_V2_TASKS : LEGACY_TASKS;
+    const taskDefs = preset === 'lean_v2' ? LEAN_V2_TASKS : preset === 'dual_v3' ? DUAL_V3_TASKS : LEGACY_TASKS;
     
     return taskDefs.map((taskDef, index) => {
         const order = index + 1;
