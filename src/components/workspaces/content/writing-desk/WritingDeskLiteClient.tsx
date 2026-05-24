@@ -22,10 +22,10 @@ import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
 import CreateGfArticleModal from "./CreateGfArticleModal";
 
-type ContentType = 'group_post' | 'page_post' | 'personal_post' | 'web_article_section' | 'website_fields' | 'body_markdown' | 'reference_note' | 'schema_jsonld' | 'visual_brief' | 'publish_note' | 'research_raw' | 'research_direction' | 'brief' | 'outline_web_article' | 'script_caption' | 'assets_canva' | 'seo_schema';
+type ContentType = 'group_post' | 'page_post' | 'personal_post' | 'web_article_section' | 'website_fields' | 'body_markdown' | 'reference_note' | 'schema_jsonld' | 'visual_brief' | 'publish_note' | 'research_raw' | 'research_direction' | 'brief' | 'outline_web_article' | 'script_caption' | 'assets_canva' | 'seo_schema' | 'narrative_article';
 type DraftStage = 'working' | 'reviewed' | 'ready_to_export' | 'exported' | 'archived';
 type WritingMode = 'draft' | 'rewrite' | 'polish' | 'review' | 'voice_extract' | 'claim_check';
-type SourceStep = 'research_raw' | 'research_direction' | 'brief' | 'script_caption' | 'assets_canva' | 'outline_web_article' | 'website_publish_pack' | 'publish' | 'research_prompt' | 'direction_plan' | 'article_pack' | 'publish_social_pack';
+type SourceStep = 'research_raw' | 'research_direction' | 'brief' | 'script_caption' | 'assets_canva' | 'outline_web_article' | 'website_publish_pack' | 'publish' | 'research_prompt' | 'direction_plan' | 'article_pack' | 'publish_social_pack' | 'narrative_article';
 
 interface Draft {
     id: string;
@@ -88,10 +88,10 @@ interface ReviewResult {
 
 // --- Constants ---
 
-const CONTENT_TYPES: ContentType[] = ['research_raw', 'research_direction', 'brief', 'outline_web_article', 'script_caption', 'assets_canva', 'seo_schema', 'publish_note', 'group_post', 'page_post', 'personal_post', 'web_article_section', 'website_fields', 'body_markdown', 'reference_note', 'schema_jsonld', 'visual_brief'];
+const CONTENT_TYPES: ContentType[] = ['research_raw', 'research_direction', 'brief', 'outline_web_article', 'script_caption', 'assets_canva', 'seo_schema', 'publish_note', 'group_post', 'page_post', 'personal_post', 'web_article_section', 'website_fields', 'body_markdown', 'reference_note', 'schema_jsonld', 'visual_brief', 'narrative_article'];
 const DRAFT_STAGES: DraftStage[] = ['working', 'reviewed', 'ready_to_export', 'exported', 'archived'];
 const WRITING_MODES: WritingMode[] = ['draft', 'rewrite', 'polish', 'review', 'voice_extract', 'claim_check'];
-const SOURCE_STEPS: SourceStep[] = ['research_prompt', 'direction_plan', 'article_pack', 'publish_social_pack', 'research_raw', 'research_direction', 'brief', 'outline_web_article', 'script_caption', 'assets_canva', 'website_publish_pack', 'publish'];
+const SOURCE_STEPS: SourceStep[] = ['research_prompt', 'direction_plan', 'article_pack', 'publish_social_pack', 'research_raw', 'research_direction', 'brief', 'outline_web_article', 'script_caption', 'assets_canva', 'website_publish_pack', 'publish', 'narrative_article'];
 
 const SOURCE_STEP_LABELS: Record<SourceStep, string> = {
     research_prompt: 'NotebookLM Research Prompt',
@@ -105,7 +105,8 @@ const SOURCE_STEP_LABELS: Record<SourceStep, string> = {
     script_caption: 'Script & Caption',
     assets_canva: 'Assets / Canva',
     website_publish_pack: 'SEO & Schema',
-    publish: 'Publish'
+    publish: 'Publish',
+    narrative_article: 'Narrative Article'
 };
 
 // Keywords to match existing GF workflow tasks by source_step
@@ -122,7 +123,8 @@ const SOURCE_STEP_MATCH_KEYWORDS: Record<SourceStep, string[]> = {
     script_caption:      ['script & caption', 'script and caption', 'script caption'],
     assets_canva:        ['assets / canva', 'assets/canva', 'assets canva', 'visual package', 'visual brief'],
     website_publish_pack:['seo & schema', 'seo and schema', 'website publish pack'],
-    publish:             ['publish']
+    publish:             ['publish'],
+    narrative_article:   ['narrative article']
 };
 
 const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
@@ -142,7 +144,8 @@ const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
     body_markdown: 'Body Markdown',
     reference_note: 'Reference Note',
     schema_jsonld: 'Schema Jsonld',
-    visual_brief: 'Visual Brief'
+    visual_brief: 'Visual Brief',
+    narrative_article: 'Narrative Article'
 };
 
 const CONTENT_TYPE_TO_ROLE: Record<string, string> = {
@@ -155,7 +158,8 @@ const CONTENT_TYPE_TO_ROLE: Record<string, string> = {
     website_fields: 'SEO & Schema',
     schema_jsonld: 'SEO & Schema',
     reference_note: 'SEO & Schema',
-    publish_note: 'Publish'
+    publish_note: 'Publish',
+    narrative_article: 'Narrative Article'
 };
 
 const normalizeTopicId = (topicId: string) => {
@@ -293,10 +297,10 @@ export default function WritingDeskLiteClient() {
         if (sourceStep === 'article_pack') {
             suggestedDest = 'main_doc';
             suggestedMode = 'append';
-        } else if (contentType === 'body_markdown') {
+        } else if (contentType === 'body_markdown' || contentType === 'narrative_article') {
             suggestedDest = 'section';
             suggestedMode = 'append';
-            suggestedSecName = 'Body Markdown';
+            suggestedSecName = contentType === 'narrative_article' ? 'Narrative Article' : 'Body Markdown';
         } else if (contentType === 'website_fields') {
             suggestedDest = 'section';
             suggestedMode = 'append';
@@ -514,6 +518,15 @@ export default function WritingDeskLiteClient() {
                     const title = task.title.toLowerCase();
                     const step = activeDraft.source_step as SourceStep | null;
 
+                    // Generic Narrative Article match (strongly prefer)
+                    const activeTopicId = activeDraft.topic_id ? normalizeTopicId(activeDraft.topic_id) : '';
+                    const ct = activeDraft.content_type;
+                    if (activeTopicId && (ct === 'narrative_article' || step === 'narrative_article')) {
+                        if (title.includes(activeTopicId.toLowerCase()) && title.includes('narrative article')) {
+                            return 300;
+                        }
+                    }
+
                     // Priority 1: match by source_step keywords (highest confidence)
                     if (step && SOURCE_STEP_MATCH_KEYWORDS[step]) {
                         const matched = SOURCE_STEP_MATCH_KEYWORDS[step].some(kw => title.includes(kw));
@@ -521,11 +534,11 @@ export default function WritingDeskLiteClient() {
                     }
 
                     // Priority 2: fallback content_type matching (legacy)
-                    const ct = activeDraft.content_type;
                     if (ct === 'group_post' && title.includes('group post')) return 100;
                     if (ct === 'page_post' && title.includes('page post')) return 100;
                     if (ct === 'personal_post' && title.includes('personal post')) return 100;
                     if ((ct === 'web_article_section' || ct === 'body_markdown') && title.includes('outline web article')) return 100;
+                    if (ct === 'narrative_article' && title.includes('narrative article')) return 100;
                     if (ct === 'visual_brief' && title.includes('visual package')) return 100;
                     if (['website_fields', 'schema_jsonld', 'reference_note'].includes(ct) && (title.includes('website publish pack') || title.includes('seo & schema'))) return 100;
                     if (ct === 'publish_note' && (title.includes('review') || title.includes('publish'))) return 100;
@@ -1375,6 +1388,11 @@ priority: medium
                                                 const title = t.title.toLowerCase();
                                                 const hasId = normalizedId && title.includes(`[${normalizedId}]`.toLowerCase());
                                                 if (!hasId) return false;
+
+                                                // Generic Narrative Article match (strongly prefer / recommend)
+                                                if (normalizedId && (activeDraft?.content_type === 'narrative_article' || step === 'narrative_article')) {
+                                                    if (title.includes(normalizedId.toLowerCase()) && title.includes('narrative article')) return true;
+                                                }
 
                                                 // Source step match (higher confidence)
                                                 if (step && SOURCE_STEP_MATCH_KEYWORDS[step]) {

@@ -25,7 +25,8 @@ const UpdateDraftSchema = z.object({
         'outline_web_article',
         'script_caption',
         'assets_canva',
-        'seo_schema'
+        'seo_schema',
+        'narrative_article'
     ]).optional(),
     draft_stage: z.enum(['working', 'reviewed', 'ready_to_export', 'exported', 'archived']).optional(),
     writing_mode: z.enum(['draft', 'rewrite', 'polish', 'review', 'voice_extract', 'claim_check']).optional(),
@@ -41,7 +42,8 @@ const UpdateDraftSchema = z.object({
         'script_caption',
         'assets_canva',
         'website_publish_pack',
-        'publish'
+        'publish',
+        'narrative_article'
     ]).optional().nullable(),
     body: z.string().optional(),
     notes: z.string().optional().nullable(),

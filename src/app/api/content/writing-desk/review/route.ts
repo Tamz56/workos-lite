@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
             structured.claimSafetyNotes = ["ข้อมูลส่วนบุคคล ปลอดภัย"];
             structured.toneNotes = ["Sincere", "Authentic", "Personal"];
             structured.recommendedNextEdit = "ปรับโทนให้เป็นเสียงส่วนตัวคุณตั้ม (Personal Voice) และเล่าเรื่องแบบ Storytelling";
-        } else if (contentType === 'web_article_section' || contentType === 'body_markdown') {
+        } else if (contentType === 'web_article_section' || contentType === 'body_markdown' || contentType === 'narrative_article') {
             // --- Heuristic analysis for body_markdown ---
             const lines = contentText.split('\n');
             const h2Lines = lines.filter((l: string) => l.trim().startsWith('## '));
