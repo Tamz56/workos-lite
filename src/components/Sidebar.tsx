@@ -15,7 +15,8 @@ import {
     ChevronLeftIcon,
     ChevronRightIcon,
     DocumentTextIcon,
-    PencilSquareIcon
+    PencilSquareIcon,
+    SparklesIcon
 } from "@heroicons/react/24/outline";
 
 const STORAGE_KEY = "workos.sidebar.collapsed";
@@ -129,7 +130,14 @@ export function Sidebar() {
                     href="/workspaces"
                     label="Areas"
                     icon={<ChartBarIcon className="w-5 h-5" />}
-                    active={pathname === "/workspaces" || (pathname.startsWith("/workspaces") && !pathname.includes("/workspaces/content/"))}
+                    active={pathname === "/workspaces" || (pathname.startsWith("/workspaces") && !pathname.includes("/workspaces/content/")) && !pathname.startsWith("/workspaces/astro-strategy")}
+                    isCollapsed={isCollapsed}
+                />
+                <NavItem
+                    href="/workspaces/astro-strategy"
+                    label="Astro Strategy Lab"
+                    icon={<SparklesIcon className="w-5 h-5" />}
+                    active={pathname.startsWith("/workspaces/astro-strategy")}
                     isCollapsed={isCollapsed}
                 />
                 <NavItem
