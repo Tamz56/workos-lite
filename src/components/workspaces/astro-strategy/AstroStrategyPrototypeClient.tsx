@@ -547,6 +547,85 @@ export default function AstroStrategyPrototypeClient() {
 
                                 {/* Right Output / Cycle Dashboard */}
                                 <div className="lg:col-span-2 space-y-6">
+                                    {/* Daily Timing Brief Card */}
+                                    <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-4 gap-2">
+                                            <div className="space-y-1">
+                                                <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                                                    <Zap className="w-5 h-5 text-amber-400" /> Daily Timing Brief
+                                                </h3>
+                                                <p className="text-sm text-slate-400 font-medium">สรุปจังหวะวันนี้ (ภาพรวมสำหรับใช้สะท้อนจังหวะงาน การใช้พลัง และการดูแลตนเองในวันนี้)</p>
+                                            </div>
+                                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-950/40 text-amber-200 border border-amber-500/20 self-start sm:self-center">
+                                                วันนี้ (Daily)
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                            {/* Today's Mode & Strategic Direction */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all sm:col-span-2">
+                                                <div className="flex items-center gap-2 text-violet-300">
+                                                    <Compass className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">Today’s Mode: Stabilize & Structure</h4>
+                                                </div>
+                                                <p className="text-sm text-slate-300 leading-relaxed">
+                                                    <strong>ทิศทางกลยุทธ์ (Strategic Direction):</strong> วันนี้เหมาะกับการจัดระบบ ตรวจงานที่ค้าง และวางแผนก่อนขยายงานใหม่
+                                                </p>
+                                            </div>
+
+                                            {/* Work Recommendation */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+                                                <div className="flex items-center gap-2 text-emerald-400">
+                                                    <CheckCircle className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">คำแนะนำการทำงาน (Work Recommendation)</h4>
+                                                </div>
+                                                <ul className="list-disc list-inside text-sm text-slate-300 space-y-1.5 leading-relaxed">
+                                                    <li>เหมาะกับการจัด task</li>
+                                                    <li>ตรวจ logic ของโปรเจกต์</li>
+                                                    <li>สรุปสิ่งที่ทำสำเร็จ</li>
+                                                    <li>วางแผนงานรอบถัดไป</li>
+                                                </ul>
+                                            </div>
+
+                                            {/* Risk Prevention */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+                                                <div className="flex items-center gap-2 text-rose-400">
+                                                    <ShieldAlert className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">การคุมความเสี่ยง (Risk Prevention)</h4>
+                                                </div>
+                                                <p className="text-sm text-slate-300 leading-relaxed">
+                                                    หลีกเลี่ยงการเปิดหลายโปรเจกต์พร้อมกันมากเกินไป เพราะอาจทำให้พลังงานกระจายและคิดวน
+                                                </p>
+                                            </div>
+
+                                            {/* Recovery Anchor */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+                                                <div className="flex items-center gap-2 text-violet-300">
+                                                    <Activity className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">สมอใจฟื้นฟู (Recovery Anchor)</h4>
+                                                </div>
+                                                <p className="text-sm text-slate-300 leading-relaxed">
+                                                    พักตา 3 นาทีหลังทำงานหน้าจอเป็นช่วง ๆ และใช้การหายใจช้า ๆ เพื่อพากลับมาที่ปัจจุบัน
+                                                </p>
+                                            </div>
+
+                                            {/* Reflection Prompt */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+                                                <div className="flex items-center gap-2 text-amber-400">
+                                                    <MessageSquare className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">คำถามสะท้อนคิด (Reflection Prompt)</h4>
+                                                </div>
+                                                <p className="text-sm text-slate-300 leading-relaxed font-medium italic">
+                                                    “วันนี้มีงานใดที่ควร ‘ทำให้น้อยลง แต่ชัดขึ้น’ หรือไม่”
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="text-[11px] text-slate-500 border-t border-slate-800/60 pt-4 leading-normal">
+                                            *ข้อความนี้เป็น mock brief สำหรับการสะท้อนตนเองและวางแผนส่วนบุคคลเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา
+                                        </div>
+                                    </div>
+
                                     <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-4 gap-2">
                                             <div className="space-y-1">
