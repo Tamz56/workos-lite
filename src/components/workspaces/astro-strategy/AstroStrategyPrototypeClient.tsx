@@ -424,6 +424,49 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
         );
     }
 
+    // ASTRO-APP-DEV-010B: Translation Maps for Daily Timing Brief v0.6
+    const workRecommendationThaiMap: Record<string, string> = {
+        "structure before expansion": "จัดระบบก่อนขยายงาน",
+        "one checkpoint at a time": "ปิดงานให้เป็น checkpoint ทีละเรื่อง",
+        "strategic planning": "วางแผนเชิงกลยุทธ์",
+        "content system design": "ออกแบบระบบคอนเทนต์",
+        "AI-assisted workflow building": "สร้าง workflow โดยใช้ AI ช่วยจัดระบบ",
+        "knowledge synthesis": "สังเคราะห์องค์ความรู้",
+        "green/nature-related work": "งานที่เกี่ยวข้องกับธรรมชาติและระบบความรู้สีเขียว"
+    };
+
+    const riskPreventionThaiMap: Record<string, string> = {
+        "looping thoughts": "สังเกตภาวะคิดวนและหยุดพักก่อนตัดสินใจต่อ",
+        "too much project switching": "ลดการสลับโปรเจกต์ถี่เกินไป",
+        "urge to fix everything at once": "ไม่ต้องแก้ทุกอย่างพร้อมกัน ให้เลือกจุดเดียวที่สำคัญที่สุด",
+        "difficulty stopping work": "ตั้งขอบเขตเวลาหยุดงานให้ชัด",
+        "opening too many dev/content tasks": "หลีกเลี่ยงการเปิดงาน dev/content หลายชิ้นพร้อมกัน",
+        "late-night screen work": "ระวังงานหน้าจอดึกเกินไป",
+        "lack of reflection pause": "เว้นช่วง reflection สั้น ๆ ก่อนเปิดงานถัดไป"
+    };
+
+    const recoveryAnchorThaiMap: Record<string, string> = {
+        "3-minute eye rest": "พักสายตา 3 นาที",
+        "5-minute breathing pause": "หยุดหายใจช้า ๆ 5 นาที",
+        "walk near trees": "เดินใกล้ต้นไม้หรือพื้นที่ธรรมชาติ",
+        "write one reflection note": "เขียน reflection note สั้น ๆ หนึ่งบันทึก",
+        "close one task before opening another": "ปิดงานหนึ่งเรื่องก่อนเปิดงานใหม่"
+    };
+
+    const profile = MOCK_PERSONAL_PROFILE;
+
+    const dailyWorkRecommendations = [
+        ...profile.workEnergyPattern.preferredWorkModes.slice(0, 2),
+        ...profile.workEnergyPattern.energizingWork.slice(0, 2),
+    ];
+
+    const dailyRiskPrevention = [
+        ...profile.personalWarningSigns.mental.slice(0, 2),
+        ...profile.personalWarningSigns.workPattern.slice(0, 2),
+    ];
+
+    const dailyRecoveryAnchors = profile.practiceAnchors.shortAnchors.slice(0, 4);
+
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 text-slate-100 font-sans pb-16">
             {/* Top Navigation Bar */}
@@ -627,10 +670,9 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <h4 className="font-bold text-sm sm:text-base">คำแนะนำการทำงาน (Work Recommendation)</h4>
                                                 </div>
                                                 <ul className="list-disc list-inside text-sm text-slate-300 space-y-1.5 leading-relaxed">
-                                                    <li>เหมาะกับการจัด task</li>
-                                                    <li>ตรวจ logic ของโปรเจกต์</li>
-                                                    <li>สรุปสิ่งที่ทำสำเร็จ</li>
-                                                    <li>วางแผนงานรอบถัดไป</li>
+                                                    {dailyWorkRecommendations.map((item, idx) => (
+                                                        <li key={idx}>{workRecommendationThaiMap[item] || item}</li>
+                                                    ))}
                                                 </ul>
                                             </div>
 
@@ -640,9 +682,11 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <ShieldAlert className="w-5 h-5" />
                                                     <h4 className="font-bold text-sm sm:text-base">การคุมความเสี่ยง (Risk Prevention)</h4>
                                                 </div>
-                                                <p className="text-sm text-slate-300 leading-relaxed">
-                                                    หลีกเลี่ยงการเปิดหลายโปรเจกต์พร้อมกันมากเกินไป เพราะอาจทำให้พลังงานกระจายและคิดวน
-                                                </p>
+                                                <ul className="list-disc list-inside text-sm text-slate-300 space-y-1.5 leading-relaxed">
+                                                    {dailyRiskPrevention.map((item, idx) => (
+                                                        <li key={idx}>{riskPreventionThaiMap[item] || item}</li>
+                                                    ))}
+                                                </ul>
                                             </div>
 
                                             {/* Recovery Anchor */}
@@ -651,9 +695,11 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <Activity className="w-5 h-5" />
                                                     <h4 className="font-bold text-sm sm:text-base">สมอใจฟื้นฟู (Recovery Anchor)</h4>
                                                 </div>
-                                                <p className="text-sm text-slate-300 leading-relaxed">
-                                                    พักตา 3 นาทีหลังทำงานหน้าจอเป็นช่วง ๆ และใช้การหายใจช้า ๆ เพื่อพากลับมาที่ปัจจุบัน
-                                                </p>
+                                                <ul className="list-disc list-inside text-sm text-slate-300 space-y-1.5 leading-relaxed">
+                                                    {dailyRecoveryAnchors.map((item, idx) => (
+                                                        <li key={idx}>{recoveryAnchorThaiMap[item] || item}</li>
+                                                    ))}
+                                                </ul>
                                             </div>
 
                                             {/* Reflection Prompt */}
