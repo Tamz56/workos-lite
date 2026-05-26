@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { MOCK_PERSONAL_PROFILE } from "@/lib/types/astro-strategy";
+import { deriveStrategyMode } from "@/lib/astro-strategy/strategy-rules";
 
 // Mock timing outcomes dataset based on Category
 interface TimingResult {
@@ -494,6 +495,8 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
         ...profile.practiceAnchors.eveningAnchors.slice(0, 2),
     ];
 
+    const strategyResult = deriveStrategyMode(MOCK_PERSONAL_PROFILE);
+
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 text-slate-100 font-sans pb-16">
             {/* Top Navigation Bar */}
@@ -664,6 +667,64 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
 
                                 {/* Right Output / Cycle Dashboard */}
                                 <div className="lg:col-span-2 space-y-6">
+                                    {/* Strategy Mode Card */}
+                                    <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-7 space-y-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
+                                            <div className="space-y-1">
+                                                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                                                    <Compass className="w-5 h-5 text-violet-400" /> Strategy Mode
+                                                </h3>
+                                                <p className="text-xs text-slate-400 font-medium">โหมดกลยุทธ์ส่วนบุคคลตามวิเคราะห์การแจ้งเตือนพฤติกรรม</p>
+                                            </div>
+                                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-950/40 text-violet-200 border border-violet-400/20 self-start sm:self-center">
+                                                {strategyResult.strategyMode}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {/* Trigger Signal & Reason */}
+                                            <div className="bg-slate-950/50 border border-slate-850 p-4 rounded-xl space-y-2">
+                                                <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider block">
+                                                    Trigger Signal & Reason
+                                                </span>
+                                                <p className="text-sm font-semibold text-slate-200">
+                                                    {strategyResult.triggerSignal}
+                                                </p>
+                                                <p className="text-xs text-slate-400 leading-relaxed">
+                                                    {strategyResult.reason}
+                                                </p>
+                                            </div>
+
+                                            {/* Action & Recovery rhythm */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {/* Recommended Move */}
+                                                <div className="bg-slate-950/50 border border-slate-850 p-4 rounded-xl space-y-1.5">
+                                                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <CheckCircle className="w-3.5 h-3.5" /> Recommended Move
+                                                    </span>
+                                                    <p className="text-xs sm:text-sm font-medium text-slate-300 leading-relaxed">
+                                                        {strategyResult.recommendedMove}
+                                                    </p>
+                                                </div>
+
+                                                {/* Recovery Support */}
+                                                <div className="bg-slate-950/50 border border-slate-850 p-4 rounded-xl space-y-1.5">
+                                                    <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <HeartHandshake className="w-3.5 h-3.5" /> Recovery Support
+                                                    </span>
+                                                    <p className="text-xs sm:text-sm font-medium text-slate-300 leading-relaxed">
+                                                        {strategyResult.recoverySupport}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Disclaimer Guardrail */}
+                                        <div className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-3 leading-normal">
+                                            * {strategyResult.guardrail}
+                                        </div>
+                                    </div>
+
                                     {/* Daily Timing Brief Card */}
                                     <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-4 gap-2">
