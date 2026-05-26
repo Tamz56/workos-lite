@@ -266,6 +266,10 @@ export default function AstroStrategyPrototypeClient() {
     const [todayIntention, setTodayIntention] = useState<string>("");
     const [cautionNote, setCautionNote] = useState<string>("");
 
+    // ASTRO-APP-DEV-018B: Reflection Log Local Persistence States
+    const [savedReflectionAt, setSavedReflectionAt] = useState<string>("");
+    const [reflectionSaveStatus, setReflectionSaveStatus] = useState<string>("");
+
     // Hydration check and LocalStorage loading
     useEffect(() => {
         setIsMounted(true);
@@ -297,6 +301,23 @@ export default function AstroStrategyPrototypeClient() {
             } else {
                 setReflections(DEFAULT_REFLECTIONS);
                 localStorage.setItem("astro.strategy.reflections", JSON.stringify(DEFAULT_REFLECTIONS));
+            }
+
+            // Load Saved Reflection Log Draft - ASTRO-APP-DEV-018B
+            try {
+                const savedReflectionDraft = localStorage.getItem("astro-strategy:reflection-log:v1");
+                if (savedReflectionDraft) {
+                    const parsed = JSON.parse(savedReflectionDraft);
+                    if (parsed && parsed.version === 1) {
+                        if (parsed.reflectionMode) setReflectionMode(parsed.reflectionMode);
+                        if (parsed.reflectionSummary) setReflectionSummary(parsed.reflectionSummary);
+                        if (parsed.noticedNotes) setNoticedNotes(parsed.noticedNotes);
+                        if (parsed.nextRightAction) setNextRightAction(parsed.nextRightAction);
+                        if (parsed.savedAt) setSavedReflectionAt(parsed.savedAt);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load saved reflection draft safely:", err);
             }
         }
     }, []);
@@ -429,6 +450,47 @@ export default function AstroStrategyPrototypeClient() {
             setBodySignal("tense");
             setTodayIntention("วันนี้ควรแบ่งงานเป็นรอบสั้น ๆ และลดการสลับบริบทมากเกินไป");
             setCautionNote("");
+        }
+    };
+
+    // ASTRO-APP-DEV-018B: Reflection Log Local Persistence Handlers
+    const handleSaveReflectionDraft = () => {
+        if (typeof window !== "undefined") {
+            try {
+                const timestamp = new Date().toLocaleString("th-TH");
+                const dataToSave = {
+                    version: 1,
+                    reflectionMode,
+                    reflectionDate: dateStr,
+                    reflectionSummary,
+                    noticedNotes,
+                    nextRightAction,
+                    savedAt: timestamp
+                };
+                localStorage.setItem("astro-strategy:reflection-log:v1", JSON.stringify(dataToSave));
+                setSavedReflectionAt(timestamp);
+                setReflectionSaveStatus("บันทึกร่างสะท้อนคิดเรียบร้อยแล้ว!");
+                setTimeout(() => setReflectionSaveStatus(""), 3550);
+            } catch (err) {
+                console.error("Failed to save reflection draft safely:", err);
+                setReflectionSaveStatus("ล้มเหลวในการบันทึกร่าง");
+                setTimeout(() => setReflectionSaveStatus(""), 3550);
+            }
+        }
+    };
+
+    const handleClearReflectionDraft = () => {
+        if (typeof window !== "undefined") {
+            if (window.confirm("คุณต้องการลบแบบร่างที่บันทึกไว้ใช่หรือไม่? (ข้อมูลที่กรอกปัจจุบันจะไม่หาย แต่จะไม่ถูกบันทึกในเครื่อง)")) {
+                try {
+                    localStorage.removeItem("astro-strategy:reflection-log:v1");
+                    setSavedReflectionAt("");
+                    setReflectionSaveStatus("ลบแบบร่างที่บันทึกแล้ว");
+                    setTimeout(() => setReflectionSaveStatus(""), 3550);
+                } catch (err) {
+                    console.error("Failed to clear reflection draft safely:", err);
+                }
+            }
         }
     };
 
@@ -1975,6 +2037,38 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     onChange={(e) => setNextRightAction(e.target.value)}
                                                     className="bg-slate-950/60 border border-slate-800/80 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-violet-400/50 w-full"
                                                 />
+                                            </div>
+
+                                            {/* Draft Persistence Actions */}
+                                            <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-800/60">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSaveReflectionDraft}
+                                                    className="px-4 py-2 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-slate-100 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.98] shadow-md shadow-violet-950/20"
+                                                >
+                                                    <Save className="w-3.5 h-3.5 text-violet-200" /> บันทึกร่างสะท้อนคิด (Save Draft)
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={handleClearReflectionDraft}
+                                                    className="px-4 py-2 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-slate-300 rounded-xl text-xs font-semibold transition-all border border-slate-700/60 active:scale-[0.98]"
+                                                >
+                                                    ล้างแบบร่างที่เซฟ
+                                                </button>
+
+                                                {savedReflectionAt && (
+                                                    <div className="w-full text-[10px] text-slate-400 flex items-center gap-1 pt-1">
+                                                        <span>บันทึกร่างเมื่อ:</span>
+                                                        <span className="font-mono text-slate-300 font-bold">{savedReflectionAt}</span>
+                                                    </div>
+                                                )}
+
+                                                {reflectionSaveStatus && (
+                                                    <div className="w-full text-xs text-emerald-400 font-medium animate-pulse pt-1">
+                                                        {reflectionSaveStatus}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
