@@ -257,6 +257,15 @@ export default function AstroStrategyPrototypeClient() {
     const [nextRightAction, setNextRightAction] = useState<string>("ปิดงานที่ค้าง 1 เรื่องให้เป็น checkpoint ก่อนเริ่มงานใหม่");
     const [copyStatus, setCopyStatus] = useState<string>("");
 
+    // ASTRO-APP-DEV-015B: Daily Check-in Form States
+    const [energyLevel, setEnergyLevel] = useState<string>("steady");
+    const [clarityLevel, setClarityLevel] = useState<string>("clear");
+    const [workloadPressure, setWorkloadPressure] = useState<string>("normal");
+    const [focusCondition, setFocusCondition] = useState<string>("deep_focus");
+    const [bodySignal, setBodySignal] = useState<string>("normal");
+    const [todayIntention, setTodayIntention] = useState<string>("");
+    const [cautionNote, setCautionNote] = useState<string>("");
+
     // Hydration check and LocalStorage loading
     useEffect(() => {
         setIsMounted(true);
@@ -473,6 +482,41 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
 
     const defaultReflectionPrompt =
         "วันนี้มีงานใดที่ควรทำให้น้อยลง แต่ชัดขึ้น หรือไม่?";
+
+    // ASTRO-APP-DEV-015B: Daily Check-in Translation Maps
+    const energyLevelLabels: Record<string, string> = {
+        low: "ต่ำ / ควรเบาแรง",
+        steady: "คงที่ / ทำงานต่อเนื่องได้",
+        high: "สูง / เหมาะกับงานสำคัญ",
+        scattered: "มีแรงแต่โฟกัสกระจาย"
+    };
+
+    const clarityLevelLabels: Record<string, string> = {
+        clear: "ชัดเจน",
+        moderate: "ปานกลาง",
+        unclear: "ยังไม่ชัด"
+    };
+
+    const workloadPressureLabels: Record<string, string> = {
+        light: "เบา",
+        normal: "ปกติ",
+        heavy: "หนัก",
+        overloaded: "มากเกินไป"
+    };
+
+    const focusConditionLabels: Record<string, string> = {
+        deep_focus: "เหมาะกับงานลึก",
+        short_bursts: "เหมาะกับงานสั้นเป็นรอบ",
+        distracted: "โฟกัสหลุดง่าย",
+        recovery: "ควรฟื้นพลัง / ทบทวน"
+    };
+
+    const bodySignalLabels: Record<string, string> = {
+        normal: "ปกติ",
+        tired: "เหนื่อย",
+        tense: "ตึง / กดดัน",
+        needs_rest: "ควรพักมากขึ้น"
+    };
 
     const profile = MOCK_PERSONAL_PROFILE;
 
@@ -742,6 +786,162 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                         {/* Disclaimer Guardrail */}
                                         <div className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-3 leading-normal">
                                             * {guardrailThaiMap[strategyResult.guardrail] || strategyResult.guardrail}
+                                        </div>
+                                    </div>
+
+                                    {/* Daily Check-in Card */}
+                                    <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-7 space-y-5">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
+                                            <div className="space-y-1">
+                                                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                                                    <ClipboardList className="w-5 h-5 text-violet-400" /> Daily Check-in
+                                                </h3>
+                                                <p className="text-xs text-slate-400 font-medium">เช็กอินสภาวะร่างกาย พลังงาน และระดับสมาธิของตนเองวันนี้</p>
+                                            </div>
+                                            <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-violet-400/10 text-violet-300 border border-violet-300/20 self-start sm:self-center">
+                                                สภาวะจริงวันนี้ (Check-in)
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                            {/* Energy Level */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs text-slate-400 font-semibold block">ระดับพลังงาน (Energy)</label>
+                                                <select
+                                                    value={energyLevel}
+                                                    onChange={(e) => setEnergyLevel(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
+                                                >
+                                                    {Object.entries(energyLevelLabels).map(([key, label]) => (
+                                                        <option key={key} value={key}>{label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Clarity Level */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs text-slate-400 font-semibold block">ระดับความคิด (Clarity)</label>
+                                                <select
+                                                    value={clarityLevel}
+                                                    onChange={(e) => setClarityLevel(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
+                                                >
+                                                    {Object.entries(clarityLevelLabels).map(([key, label]) => (
+                                                        <option key={key} value={key}>{label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Workload Pressure */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs text-slate-400 font-semibold block">ภาระงานวันนี้ (Workload)</label>
+                                                <select
+                                                    value={workloadPressure}
+                                                    onChange={(e) => setWorkloadPressure(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
+                                                >
+                                                    {Object.entries(workloadPressureLabels).map(([key, label]) => (
+                                                        <option key={key} value={key}>{label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Focus Condition */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs text-slate-400 font-semibold block">สภาวะสมาธิ (Focus)</label>
+                                                <select
+                                                    value={focusCondition}
+                                                    onChange={(e) => setFocusCondition(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
+                                                >
+                                                    {Object.entries(focusConditionLabels).map(([key, label]) => (
+                                                        <option key={key} value={key}>{label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Body Signal */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs text-slate-400 font-semibold block">สัญญาณร่างกาย (Body Signal)</label>
+                                                <select
+                                                    value={bodySignal}
+                                                    onChange={(e) => setBodySignal(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
+                                                >
+                                                    {Object.entries(bodySignalLabels).map(([key, label]) => (
+                                                        <option key={key} value={key}>{label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {/* Today Intention */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs text-slate-400 font-semibold block">ความตั้งใจหลักวันนี้ (Today’s Intention)</label>
+                                                <textarea
+                                                    value={todayIntention}
+                                                    onChange={(e) => setTodayIntention(e.target.value)}
+                                                    placeholder="เช่น โฟกัสงานพัฒนาแกนตรรกะระบบ หรือ จัดทำบันทึกสรุปความต้องการให้เสร็จ..."
+                                                    rows={2}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-700 leading-relaxed"
+                                                ></textarea>
+                                            </div>
+
+                                            {/* Caution Note */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs text-slate-400 font-semibold block">ข้อระวังเสริม (Caution Note - ไม่บังคับ)</label>
+                                                <textarea
+                                                    value={cautionNote}
+                                                    onChange={(e) => setCautionNote(e.target.value)}
+                                                    placeholder="ระบุข้อควรระวัง เช่น รู้สึกตึงบ่าไหล่เล็กน้อย หรือระวังความคิดวนซ้ำซ้อนรอบบ่าย..."
+                                                    rows={2}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-700 leading-relaxed"
+                                                ></textarea>
+                                            </div>
+                                        </div>
+
+                                        {/* Summary section inside the card */}
+                                        <div className="bg-slate-950/60 border border-slate-850 p-4 rounded-xl space-y-3 hover:border-slate-850 transition-all">
+                                            <h4 className="text-xs font-bold text-violet-300 tracking-wider uppercase flex items-center gap-1.5">
+                                                <Sparkles className="w-3.5 h-3.5 text-violet-400" /> Today’s Check-in Summary (สรุปความพร้อมสภาวะจริงวันนี้)
+                                            </h4>
+                                            
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs leading-relaxed border-b border-slate-800/60 pb-3">
+                                                <div>
+                                                    <span className="text-slate-400 block font-medium">ระดับพลังงาน:</span>
+                                                    <span className="text-slate-250 font-semibold">{energyLevelLabels[energyLevel] || energyLevel}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 block font-medium">ระดับความคิด:</span>
+                                                    <span className="text-slate-250 font-semibold">{clarityLevelLabels[clarityLevel] || clarityLevel}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 block font-medium">ภาระงานวันนี้:</span>
+                                                    <span className="text-slate-250 font-semibold">{workloadPressureLabels[workloadPressure] || workloadPressure}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 block font-medium">สภาวะสมาธิ:</span>
+                                                    <span className="text-slate-250 font-semibold">{focusConditionLabels[focusCondition] || focusCondition}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 block font-medium">สัญญาณร่างกาย:</span>
+                                                    <span className="text-slate-250 font-semibold">{bodySignalLabels[bodySignal] || bodySignal}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-xs space-y-2 leading-relaxed">
+                                                <div>
+                                                    <span className="text-slate-400 font-medium block">ความตั้งใจหลักวันนี้:</span>
+                                                    <p className="text-slate-250 font-medium whitespace-pre-wrap">{todayIntention.trim() || "(ยังไม่ได้กรอก)"}</p>
+                                                </div>
+                                                {cautionNote.trim() && (
+                                                    <div>
+                                                        <span className="text-slate-400 font-medium block">ข้อระวังเสริม:</span>
+                                                        <p className="text-slate-250 font-medium whitespace-pre-wrap">{cautionNote.trim()}</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
