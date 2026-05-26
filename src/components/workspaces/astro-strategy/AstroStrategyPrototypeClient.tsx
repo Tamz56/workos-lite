@@ -24,7 +24,8 @@ import {
     History,
     MessageSquare,
     Zap,
-    HeartHandshake
+    HeartHandshake,
+    Trash2
 } from "lucide-react";
 
 import { MOCK_PERSONAL_PROFILE } from "@/lib/types/astro-strategy";
@@ -218,6 +219,39 @@ const DEFAULT_REFLECTIONS: ReflectionLog[] = [
     }
 ];
 
+interface ReflectionHistoryItem {
+    id: string;
+    version: number;
+    createdAt: string;
+    updatedAt?: string;
+    reflectionDate: string;
+    reflectionMode: string;
+    reflectionSummary: string;
+    noticedNotes: string;
+    nextRightAction: string;
+    strategyMode: string;
+    dailyCheckinSnapshot: {
+        energyLevel: string;
+        clarityLevel: string;
+        workloadPressure: string;
+        focusCondition: string;
+        bodySignal: string;
+        todayIntention: string;
+        cautionNote: string;
+    };
+    markdownSnapshot: string;
+}
+
+function generateUniqueId(): string {
+    return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" 
+        ? crypto.randomUUID() 
+        : `reflection-${Date.now()}`;
+}
+
+function getThaiTimestamp(): string {
+    return new Date().toLocaleString("th-TH");
+}
+
 export default function AstroStrategyPrototypeClient() {
     const router = useRouter();
     const [isMounted, setIsMounted] = useState<boolean>(false);
@@ -270,6 +304,10 @@ export default function AstroStrategyPrototypeClient() {
     const [savedReflectionAt, setSavedReflectionAt] = useState<string>("");
     const [reflectionSaveStatus, setReflectionSaveStatus] = useState<string>("");
 
+    // ASTRO-APP-DEV-019B: Reflection History List States
+    const [historyLogs, setHistoryLogs] = useState<ReflectionHistoryItem[]>([]);
+    const [historySaveStatus, setHistorySaveStatus] = useState<string>("");
+
     // Hydration check and LocalStorage loading
     useEffect(() => {
         setIsMounted(true);
@@ -318,6 +356,25 @@ export default function AstroStrategyPrototypeClient() {
                 }
             } catch (err) {
                 console.error("Failed to load saved reflection draft safely:", err);
+            }
+
+            // Load Reflection History Logs - ASTRO-APP-DEV-019B
+            try {
+                const savedHistory = localStorage.getItem("astro-strategy:reflection-history:v1");
+                if (savedHistory) {
+                    const parsed = JSON.parse(savedHistory);
+                    if (Array.isArray(parsed)) {
+                        const validLogs = parsed.filter((item: any) => item && item.version === 1);
+                        setHistoryLogs(validLogs);
+                    } else {
+                        setHistoryLogs([]);
+                    }
+                } else {
+                    setHistoryLogs([]);
+                }
+            } catch (err) {
+                console.error("Failed to load reflection history safely:", err);
+                setHistoryLogs([]);
             }
         }
     }, []);
@@ -457,7 +514,7 @@ export default function AstroStrategyPrototypeClient() {
     const handleSaveReflectionDraft = () => {
         if (typeof window !== "undefined") {
             try {
-                const timestamp = new Date().toLocaleString("th-TH");
+                const timestamp = getThaiTimestamp();
                 const dataToSave = {
                     version: 1,
                     reflectionMode,
@@ -489,6 +546,97 @@ export default function AstroStrategyPrototypeClient() {
                     setTimeout(() => setReflectionSaveStatus(""), 3550);
                 } catch (err) {
                     console.error("Failed to clear reflection draft safely:", err);
+                }
+            }
+        }
+    };
+
+    // ASTRO-APP-DEV-019B: Reflection History List Handlers
+    const handleSaveToHistory = () => {
+        if (typeof window !== "undefined") {
+            try {
+                const timestamp = getThaiTimestamp();
+                const newId = generateUniqueId();
+                
+                const newHistoryItem: ReflectionHistoryItem = {
+                    id: newId,
+                    version: 1,
+                    createdAt: timestamp,
+                    reflectionDate: dateStr,
+                    reflectionMode,
+                    reflectionSummary,
+                    noticedNotes,
+                    nextRightAction,
+                    strategyMode: strategyResult ? strategyResult.strategyMode : "Stabilize",
+                    dailyCheckinSnapshot: {
+                        energyLevel,
+                        clarityLevel,
+                        workloadPressure,
+                        focusCondition,
+                        bodySignal,
+                        todayIntention,
+                        cautionNote
+                    },
+                    markdownSnapshot: getMarkdownContent()
+                };
+
+                const updatedHistory = [newHistoryItem, ...historyLogs].slice(0, 20);
+                localStorage.setItem("astro-strategy:reflection-history:v1", JSON.stringify(updatedHistory));
+                setHistoryLogs(updatedHistory);
+                setHistorySaveStatus("บันทึกเข้าระบบประวัติเรียบร้อยแล้ว!");
+                setTimeout(() => setHistorySaveStatus(""), 3500);
+            } catch (err) {
+                console.error("Failed to save to history:", err);
+                if (err instanceof Error && err.name === "QuotaExceededError") {
+                    setHistorySaveStatus("พื้นที่เก็บประวัติเต็ม กรุณาลบประวัติเก่าออกก่อน");
+                } else {
+                    setHistorySaveStatus("ล้มเหลวในการบันทึกประวัติ");
+                }
+                setTimeout(() => setHistorySaveStatus(""), 4500);
+            }
+        }
+    };
+
+    const handleLoadFromHistory = (log: ReflectionHistoryItem) => {
+        if (typeof window !== "undefined") {
+            if (window.confirm("คุณต้องการดึงข้อมูลสะท้อนคิดจากประวัติรายการนี้ใช่หรือไม่? การดึงข้อมูลจะเขียนทับอินพุตในแบบฟอร์มปัจจุบันของคุณ")) {
+                if (log.reflectionMode) setReflectionMode(log.reflectionMode);
+                if (log.reflectionSummary) setReflectionSummary(log.reflectionSummary);
+                if (log.noticedNotes) setNoticedNotes(log.noticedNotes);
+                if (log.nextRightAction) setNextRightAction(log.nextRightAction);
+                
+                setHistorySaveStatus(`โหลดประวัติของวันที่ ${log.reflectionDate} เรียบร้อย!`);
+                setTimeout(() => setHistorySaveStatus(""), 3500);
+            }
+        }
+    };
+
+    const handleDeleteFromHistory = (id: string) => {
+        if (typeof window !== "undefined") {
+            if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบประวัติรายการนี้?")) {
+                try {
+                    const updatedHistory = historyLogs.filter(item => item.id !== id);
+                    localStorage.setItem("astro-strategy:reflection-history:v1", JSON.stringify(updatedHistory));
+                    setHistoryLogs(updatedHistory);
+                    setHistorySaveStatus("ลบรายการประวัติสำเร็จ");
+                    setTimeout(() => setHistorySaveStatus(""), 3000);
+                } catch (err) {
+                    console.error("Failed to delete history item safely:", err);
+                }
+            }
+        }
+    };
+
+    const handleClearAllHistory = () => {
+        if (typeof window !== "undefined") {
+            if (window.confirm("คุณต้องการล้างคลังประวัติทั้งหมดใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้")) {
+                try {
+                    localStorage.removeItem("astro-strategy:reflection-history:v1");
+                    setHistoryLogs([]);
+                    setHistorySaveStatus("ล้างคลังประวัติทั้งหมดแล้ว");
+                    setTimeout(() => setHistorySaveStatus(""), 3000);
+                } catch (err) {
+                    console.error("Failed to clear all history safely:", err);
                 }
             }
         }
@@ -2057,6 +2205,14 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     ล้างแบบร่างที่เซฟ
                                                 </button>
 
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSaveToHistory}
+                                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-slate-100 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.98] shadow-md shadow-indigo-950/20"
+                                                >
+                                                    <History className="w-3.5 h-3.5 text-indigo-200" /> บันทึกเข้าประวัติ (Save as History)
+                                                </button>
+
                                                 {savedReflectionAt && (
                                                     <div className="w-full text-[10px] text-slate-400 flex items-center gap-1 pt-1">
                                                         <span>บันทึกร่างเมื่อ:</span>
@@ -2070,6 +2226,94 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     </div>
                                                 )}
                                             </div>
+                                        </div>
+
+                                        {/* Reflection History List UI - ASTRO-APP-DEV-019B */}
+                                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
+                                            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <History className="w-4.5 h-4.5 text-indigo-400" />
+                                                    <h4 className="text-sm font-semibold text-slate-200">ประวัติสะท้อนคิด ({historyLogs.length}/20)</h4>
+                                                </div>
+                                                {historyLogs.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleClearAllHistory}
+                                                        className="text-[10px] text-rose-400 hover:text-rose-350 active:text-rose-500 font-semibold transition-colors flex items-center gap-1 border border-rose-500/20 px-2 py-1 rounded bg-rose-950/10 hover:bg-rose-950/20"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" /> ล้างประวัติทั้งหมด
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {historySaveStatus && (
+                                                <div className="text-xs text-indigo-350 font-medium animate-pulse">
+                                                    {historySaveStatus}
+                                                </div>
+                                            )}
+
+                                            {historyLogs.length === 0 ? (
+                                                <div className="text-center py-6 text-xs text-slate-500 italic">
+                                                    ยังไม่มีประวัติสะท้อนคิดที่บันทึกไว้
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 scrollbar-thin">
+                                                    {historyLogs.map((item) => (
+                                                        <div 
+                                                            key={item.id} 
+                                                            className="bg-slate-955/65 border border-slate-850 rounded-lg p-3 space-y-2 text-xs transition-all hover:border-slate-750/80"
+                                                        >
+                                                            <div className="flex items-start justify-between gap-2 border-b border-slate-850 pb-1.5">
+                                                                <div className="space-y-0.5">
+                                                                    <span className="font-mono font-bold text-indigo-300 block text-[10px]">
+                                                                        {item.createdAt}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-slate-400 block">
+                                                                        วันที่กิจกรรม: <span className="font-mono text-slate-300">{item.reflectionDate}</span>
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="px-1.5 py-0.5 rounded bg-violet-950/50 text-violet-300 border border-violet-400/20 text-[9px] font-semibold">
+                                                                        {item.reflectionMode}
+                                                                    </span>
+                                                                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60 text-[9px] font-semibold">
+                                                                        {item.strategyMode}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="space-y-1 text-slate-300">
+                                                                <p className="line-clamp-2 leading-relaxed">
+                                                                    <span className="text-slate-450 font-medium">สรุปสะท้อนคิด:</span> {item.reflectionSummary || "(ไม่มี)"}
+                                                                </p>
+                                                                {item.nextRightAction && (
+                                                                    <p className="line-clamp-1 leading-relaxed text-emerald-400/90">
+                                                                        <span className="text-slate-450 font-medium">Next Right Action:</span> {item.nextRightAction}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-850/50">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleLoadFromHistory(item)}
+                                                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-[10px] text-slate-200 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-700/60 active:scale-[0.98]"
+                                                                >
+                                                                    <RefreshCw className="w-2.5 h-2.5 text-indigo-300" /> โหลดมาแทนที่
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteFromHistory(item.id)}
+                                                                    className="px-2 py-1 bg-slate-850 hover:bg-rose-950/20 text-[10px] text-rose-400 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-800 hover:border-rose-500/20 active:scale-[0.98]"
+                                                                    title="ลบรายการนี้"
+                                                                >
+                                                                    <Trash2 className="w-2.5 h-2.5" /> ลบ
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
