@@ -308,6 +308,10 @@ export default function AstroStrategyPrototypeClient() {
     const [historyLogs, setHistoryLogs] = useState<ReflectionHistoryItem[]>([]);
     const [historySaveStatus, setHistorySaveStatus] = useState<string>("");
 
+    // ASTRO-APP-DEV-022B: Export History Markdown States
+    const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
+    const [copiedAllHistoryStatus, setCopiedAllHistoryStatus] = useState<string>("");
+
     // Hydration check and LocalStorage loading
     useEffect(() => {
         setIsMounted(true);
@@ -687,6 +691,96 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
             setCopyStatus("คัดลอกอัตโนมัติไม่ได้ กรุณาคัดลอกจากกล่อง Preview");
         }
         setTimeout(() => setCopyStatus(""), 2500);
+    };
+
+    // ASTRO-APP-DEV-022B: Export History Markdown Handlers
+    const generateHistoryFallbackMarkdown = (item: ReflectionHistoryItem): string => {
+        const checkin = item.dailyCheckinSnapshot || {
+            energyLevel: "steady",
+            clarityLevel: "clear",
+            workloadPressure: "normal",
+            focusCondition: "deep_focus",
+            bodySignal: "normal",
+            todayIntention: "",
+            cautionNote: ""
+        };
+        return `# Astro Reflection Log
+
+Date: ${item.reflectionDate}
+Mode: ${item.reflectionMode || "Stabilize"}
+
+## Today’s Reflection
+${item.reflectionSummary || "(ไม่มีข้อมูล)"}
+
+## What I Noticed
+${item.noticedNotes || "(ไม่มีข้อมูล)"}
+
+## Next Right Action
+${item.nextRightAction || "(ไม่มีข้อมูล)"}
+
+## Daily Check-in Context / บริบทเช็กอินวันนี้
+- ระดับพลังงาน: ${energyLevelLabels[checkin.energyLevel] || checkin.energyLevel || "steady"}
+- ระดับความคิด: ${clarityLevelLabels[checkin.clarityLevel] || checkin.clarityLevel || "clear"}
+- ภาระงานวันนี้: ${workloadPressureLabels[checkin.workloadPressure] || checkin.workloadPressure || "normal"}
+- สภาวะสมาธิ: ${focusConditionLabels[checkin.focusCondition] || checkin.focusCondition || "deep_focus"}
+- สัญญาณร่างกายที่สังเกตวันนี้: ${bodySignalLabels[checkin.bodySignal] || checkin.bodySignal || "normal"}
+- ความตั้งใจหลักวันนี้: ${checkin.todayIntention ? checkin.todayIntention.trim() : "ยังไม่ได้กรอก"}
+- ข้อควรระวังเสริม: ${checkin.cautionNote ? checkin.cautionNote.trim() : "ไม่มี"}
+
+## Guardrail
+บันทึกนี้ใช้เพื่อการสะท้อนคิดและวางแผนส่วนบุคคล ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา`;
+    };
+
+    const handleCopyHistoryItem = async (item: ReflectionHistoryItem) => {
+        const markdown = item.markdownSnapshot || generateHistoryFallbackMarkdown(item);
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(markdown);
+                setCopiedHistoryId(item.id);
+                setTimeout(() => setCopiedHistoryId(null), 2000);
+            } else {
+                alert("เบราว์เซอร์ของคุณไม่รองรับการคัดลอกลงคลิปบอร์ดอัตโนมัติ");
+            }
+        } catch (err) {
+            console.error("Failed to copy history item:", err);
+        }
+    };
+
+    const handleCopyAllHistory = async () => {
+        if (historyLogs.length === 0) return;
+        
+        const timestamp = new Date().toLocaleString("th-TH");
+        let content = `# Astro Reflection History Archive
+
+Generated: ${timestamp} (เวลาท้องถิ่น)
+Total Records: ${historyLogs.length}
+
+`;
+
+        historyLogs.forEach((item, index) => {
+            const itemMarkdown = item.markdownSnapshot || generateHistoryFallbackMarkdown(item);
+            content += `---
+
+## Log ${index + 1} — ${item.reflectionDate || item.createdAt}
+
+${itemMarkdown}
+
+`;
+        });
+
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(content);
+                setCopiedAllHistoryStatus("คัดลอกทั้งหมดแล้ว! ✅");
+                setTimeout(() => setCopiedAllHistoryStatus(""), 2000);
+            } else {
+                alert("เบราว์เซอร์ของคุณไม่รองรับการคัดลอกลงคลิปบอร์ดอัตโนมัติ");
+            }
+        } catch (err) {
+            console.error("Failed to copy all history:", err);
+            setCopiedAllHistoryStatus("เกิดข้อผิดพลาดในการคัดลอก");
+            setTimeout(() => setCopiedAllHistoryStatus(""), 2500);
+        }
     };
 
     if (!isMounted) {
@@ -2290,13 +2384,23 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <h4 className="text-sm font-semibold text-slate-200">ประวัติการสะท้อนคิดย้อนหลัง (Reflection History - {historyLogs.length}/20)</h4>
                                                 </div>
                                                 {historyLogs.length > 0 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleClearAllHistory}
-                                                        className="text-[10px] text-rose-400 hover:text-rose-350 active:text-rose-500 font-semibold transition-colors flex items-center gap-1 border border-rose-500/20 px-2 py-1 rounded bg-rose-950/10 hover:bg-rose-950/20"
-                                                    >
-                                                        <Trash2 className="w-3 h-3" /> ล้างประวัติทั้งหมด
-                                                    </button>
+                                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleCopyAllHistory}
+                                                            className="text-[10px] text-indigo-400 hover:text-indigo-350 active:text-indigo-500 font-semibold transition-colors flex items-center gap-1 border border-indigo-500/20 px-2.5 py-1 rounded bg-indigo-950/10 hover:bg-indigo-950/20 active:scale-[0.98]"
+                                                        >
+                                                            <ClipboardList className="w-3.5 h-3.5 text-indigo-400" />
+                                                            {copiedAllHistoryStatus ? copiedAllHistoryStatus : "คัดลอกประวัติทั้งหมด"}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleClearAllHistory}
+                                                            className="text-[10px] text-rose-400 hover:text-rose-350 active:text-rose-500 font-semibold transition-colors flex items-center gap-1 border border-rose-500/20 px-2 py-1 rounded bg-rose-950/10 hover:bg-rose-950/20 active:scale-[0.98]"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" /> ล้างประวัติทั้งหมด
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </div>
 
@@ -2351,6 +2455,14 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                             </div>
 
                                                             <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-850/50">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleCopyHistoryItem(item)}
+                                                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-[10px] text-slate-200 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-700/60 active:scale-[0.98]"
+                                                                >
+                                                                    <ClipboardList className="w-2.5 h-2.5 text-indigo-300" />
+                                                                    {copiedHistoryId === item.id ? "คัดลอกแล้ว" : "คัดลอก"}
+                                                                </button>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleLoadFromHistory(item)}
