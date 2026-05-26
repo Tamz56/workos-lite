@@ -247,6 +247,13 @@ export default function AstroStrategyPrototypeClient() {
     const [newRefActivity, setNewRefActivity] = useState<string>("");
     const [reflectionSavedMessage, setReflectionSavedMessage] = useState<string>("");
 
+    // ASTRO-APP-DEV-008B: Reflection Export States
+    const [reflectionSummary, setReflectionSummary] = useState<string>("วันนี้เหมาะกับการจัดระบบ ตรวจงานที่ค้าง และไม่เปิดหลายโปรเจกต์พร้อมกันมากเกินไป");
+    const [reflectionMode, setReflectionMode] = useState<string>("Stabilize");
+    const [noticedNotes, setNoticedNotes] = useState<string>("พลังงานเหมาะกับงานหลังบ้าน ควรพักตาเป็นช่วง ๆ และทำงานให้เล็กลงแต่ชัดขึ้น");
+    const [nextRightAction, setNextRightAction] = useState<string>("ปิดงานที่ค้าง 1 เรื่องให้เป็น checkpoint ก่อนเริ่มงานใหม่");
+    const [copyStatus, setCopyStatus] = useState<string>("");
+
     // Hydration check and LocalStorage loading
     useEffect(() => {
         setIsMounted(true);
@@ -364,6 +371,44 @@ export default function AstroStrategyPrototypeClient() {
             setReflections(DEFAULT_REFLECTIONS);
             localStorage.setItem("astro.strategy.reflections", JSON.stringify(DEFAULT_REFLECTIONS));
         }
+    };
+
+    // ASTRO-APP-DEV-008B: derived markdown content and copy handler
+    const dateStr = isMounted ? new Date().toISOString().slice(0, 10) : "2026-05-26";
+
+    const getMarkdownContent = () => {
+        return `# Astro Reflection Log
+
+Date: ${dateStr}
+Mode: ${reflectionMode}
+
+## Today’s Reflection
+${reflectionSummary || "(ไม่มีข้อมูล)"}
+
+## What I Noticed
+${noticedNotes || "(ไม่มีข้อมูล)"}
+
+## Next Right Action
+${nextRightAction || "(ไม่มีข้อมูล)"}
+
+## Guardrail
+บันทึกนี้ใช้เพื่อการสะท้อนคิดและวางแผนส่วนบุคคล ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา`;
+    };
+
+    const handleCopyMarkdown = async () => {
+        const markdown = getMarkdownContent();
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(markdown);
+                setCopyStatus("คัดลอกลงคลิปบอร์ดเรียบร้อยแล้ว!");
+            } else {
+                setCopyStatus("คัดลอกอัตโนมัติไม่ได้ กรุณาคัดลอกจากกล่อง Preview");
+            }
+        } catch (err) {
+            console.error("Failed to copy:", err);
+            setCopyStatus("คัดลอกอัตโนมัติไม่ได้ กรุณาคัดลอกจากกล่อง Preview");
+        }
+        setTimeout(() => setCopyStatus(""), 2500);
     };
 
     if (!isMounted) {
@@ -1340,6 +1385,120 @@ export default function AstroStrategyPrototypeClient() {
                                                 ไม่มีบันทึกการสะท้อนคิดที่ผ่านมา
                                             </div>
                                         )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Reflection Export / Review Log - ASTRO-APP-DEV-008B */}
+                            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6 mt-8">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-4 gap-2">
+                                    <div className="space-y-1">
+                                        <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                                            <BookOpen className="w-5 h-5 text-violet-300" /> Reflection Export / Review Log
+                                        </h3>
+                                        <p className="text-sm text-slate-400 font-medium">
+                                            เครื่องมือจัดรูปแบบบันทึกสะท้อนคิดเป็น Markdown เพื่อคัดลอกไปใช้ต่อใน WorkOS, journal หรือ task note
+                                        </p>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-950/40 text-violet-300 border border-violet-400/20 self-start sm:self-center">
+                                        ส่งออกข้อมูล (Export)
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    {/* Left inputs */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-semibold text-slate-200">แก้ไขข้อมูลสรุปสะท้อนคิด</h4>
+
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-slate-400 font-medium">Energy / Work Mode</label>
+                                                    <select
+                                                        value={reflectionMode}
+                                                        onChange={(e) => setReflectionMode(e.target.value)}
+                                                        className="bg-slate-950/60 border border-slate-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-violet-400/50 w-full"
+                                                    >
+                                                        <option value="Focus">Focus</option>
+                                                        <option value="Stabilize">Stabilize</option>
+                                                        <option value="Restore">Restore</option>
+                                                        <option value="Communicate">Communicate</option>
+                                                        <option value="Reflect">Reflect</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-slate-400 font-medium">วันที่บันทึก (Date)</label>
+                                                    <input
+                                                        type="text"
+                                                        readOnly
+                                                        value={dateStr}
+                                                        className="bg-slate-900 border border-slate-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-400 font-mono w-full focus:outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-slate-400 font-medium">Reflection Summary (สรุปสะท้อนคิดวันนี้)</label>
+                                                <textarea
+                                                    value={reflectionSummary}
+                                                    onChange={(e) => setReflectionSummary(e.target.value)}
+                                                    rows={3}
+                                                    className="bg-slate-950/60 border border-slate-800/80 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-violet-400/50 w-full leading-relaxed"
+                                                ></textarea>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-slate-400 font-medium">What I Noticed (สิ่งที่สังเกตเห็นจากการจับคู่จังหวะเวลา)</label>
+                                                <textarea
+                                                    value={noticedNotes}
+                                                    onChange={(e) => setNoticedNotes(e.target.value)}
+                                                    rows={3}
+                                                    className="bg-slate-950/60 border border-slate-800/80 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-violet-400/50 w-full leading-relaxed"
+                                                ></textarea>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-slate-400 font-medium">Next Right Action (ก้าวถัดไปที่ต้องทำทันที)</label>
+                                                <input
+                                                    type="text"
+                                                    value={nextRightAction}
+                                                    onChange={(e) => setNextRightAction(e.target.value)}
+                                                    className="bg-slate-950/60 border border-slate-800/80 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-violet-400/50 w-full"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Preview */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-sm font-semibold text-slate-200">พรีวิวและกล่องสำรองคัดลอก (Markdown Preview)</h4>
+                                            {copyStatus && (
+                                                <span className="text-xs text-emerald-400 font-medium animate-pulse">
+                                                    {copyStatus}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <textarea
+                                                readOnly
+                                                value={getMarkdownContent()}
+                                                rows={10}
+                                                className="bg-slate-950/80 border border-slate-800/80 rounded-xl px-4 py-3 text-xs text-slate-300 font-mono focus:outline-none w-full leading-relaxed resize-none cursor-text select-all"
+                                                onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                                                title="คลิกเพื่อเลือกโค้ดทั้งหมดสำหรับคัดลอกด้วยตนเอง"
+                                            ></textarea>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleCopyMarkdown}
+                                                className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm"
+                                            >
+                                                <ClipboardList className="w-4 h-4 text-violet-300" />
+                                                {copyStatus ? "คัดลอกลงคลิปบอร์ดแล้ว!" : "คัดลอกเป็น Markdown (Copy Markdown)"}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
