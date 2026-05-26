@@ -626,6 +626,86 @@ export default function AstroStrategyPrototypeClient() {
                                         </div>
                                     </div>
 
+                                    {/* Weekly Strategy View Card - ASTRO-APP-DEV-007B */}
+                                    <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-4 gap-2">
+                                            <div className="space-y-1">
+                                                <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                                                    <Calendar className="w-5 h-5 text-violet-300" /> Weekly Strategy View
+                                                </h3>
+                                                <p className="text-sm text-slate-400 font-medium">ภาพรวมกลยุทธ์และการจัดสรรเวลาในสัปดาห์นี้</p>
+                                            </div>
+                                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-950/40 text-violet-300 border border-violet-400/20 self-start sm:self-center">
+                                                สัปดาห์นี้ (Weekly)
+                                            </span>
+                                        </div>
+
+                                        {/* Weekly Theme Banner */}
+                                        <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-2 hover:border-slate-800 transition-all">
+                                            <span className="text-[10px] font-bold text-violet-300 tracking-wider uppercase block">Theme ของสัปดาห์นี้</span>
+                                            <h4 className="text-lg font-bold text-slate-200">Structure Before Expansion</h4>
+                                        </div>
+
+                                        {/* Two Column Grid for Windows */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                            {/* Best Work Windows */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+                                                <div className="flex items-center gap-2 text-violet-300">
+                                                    <CheckCircle className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">Best Work Windows</h4>
+                                                </div>
+                                                <ul className="space-y-2 text-sm text-slate-300 leading-relaxed">
+                                                    <li><strong className="text-slate-200">ช่วงต้นสัปดาห์:</strong> เหมาะกับการจัดระบบ ตรวจ task และเคลียร์งานค้าง</li>
+                                                    <li><strong className="text-slate-200">ช่วงกลางสัปดาห์:</strong> เหมาะกับการตัดสินใจเชิงโครงสร้างและวางแผนรอบต่อไป</li>
+                                                    <li><strong className="text-slate-200">ช่วงปลายสัปดาห์:</strong> เหมาะกับ reflection และสรุปบทเรียน</li>
+                                                </ul>
+                                            </div>
+
+                                            {/* Caution Windows */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+                                                <div className="flex items-center gap-2 text-amber-300">
+                                                    <ShieldAlert className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">Caution Windows</h4>
+                                                </div>
+                                                <p className="text-sm text-slate-300 leading-relaxed pt-1">
+                                                    หลีกเลี่ยงการเปิดหลายโปรเจกต์พร้อมกัน หากยังไม่ได้ปิดงานเดิมให้ชัดเจนเพื่อป้องกันสมาธิกระจาย
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Two Column Grid for Rhythm & Focus */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                            {/* Recovery Rhythm */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+                                                <div className="flex items-center gap-2 text-violet-300">
+                                                    <Activity className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">จังหวะการฟื้นฟู (Recovery Rhythm)</h4>
+                                                </div>
+                                                <p className="text-sm text-slate-300 leading-relaxed pt-1">
+                                                    ใช้สมาธิสั้น 5–10 นาที หรือพักสายตาเป็นช่วง ๆ โดยเฉพาะหลังจากลุยงานหน้าจอที่ต้องใช้สมองหนักอย่างต่อเนื่อง
+                                                </p>
+                                            </div>
+
+                                            {/* Strategic Focus */}
+                                            <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+                                                <div className="flex items-center gap-2 text-amber-300">
+                                                    <Flame className="w-5 h-5" />
+                                                    <h4 className="font-bold text-sm sm:text-base">จุดโฟกัสเชิงกลยุทธ์ (Strategic Focus)</h4>
+                                                </div>
+                                                <ol className="list-decimal list-inside space-y-1.5 text-sm text-slate-300 leading-relaxed pt-1">
+                                                    <li>ปิดงานที่ commit แล้วให้เป็น checkpoint ที่ชัดเจน</li>
+                                                    <li>วางแผนและทำต้นแบบ v0.3 แบบไม่เพิ่ม scope เกินความจำเป็น</li>
+                                                    <li>รักษาจังหวะการสร้างสมาธิและการพักผ่อนให้มีความสมดุลอย่างต่อเนื่อง</li>
+                                                </ol>
+                                            </div>
+                                        </div>
+
+                                        {/* Disclaimer Guardrail */}
+                                        <div className="text-[11px] text-slate-500 border-t border-slate-800/60 pt-4 leading-normal">
+                                            *ข้อมูลนี้เป็นแนวทางจำลองเพื่อสนับสนุนกระบวนการสะท้อนคิดและการจัดการตนเองเชิงพฤติกรรมเท่านั้น ไม่ได้มีจุดประสงค์เพื่อใช้เป็นคำแนะนำทางการแพทย์ การรักษาโรค หรือการวินิจฉัยสุขภาพ
+                                        </div>
+                                    </div>
+
                                     <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-4 gap-2">
                                             <div className="space-y-1">
