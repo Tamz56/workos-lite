@@ -385,6 +385,53 @@ export default function AstroStrategyPrototypeClient() {
         }
     };
 
+    // ASTRO-APP-DEV-017B: Daily Check-in Presets and Reset UX
+    const resetToday = () => {
+        setEnergyLevel("steady");
+        setClarityLevel("clear");
+        setWorkloadPressure("normal");
+        setFocusCondition("deep_focus");
+        setBodySignal("normal");
+        setTodayIntention("");
+        setCautionNote("");
+    };
+
+    const applyCheckinPreset = (presetType: "stable" | "low_energy" | "deep_work" | "scattered") => {
+        if (presetType === "stable") {
+            setEnergyLevel("steady");
+            setClarityLevel("clear");
+            setWorkloadPressure("normal");
+            setFocusCondition("deep_focus");
+            setBodySignal("normal");
+            setTodayIntention("");
+            setCautionNote("");
+        } else if (presetType === "low_energy") {
+            setEnergyLevel("low");
+            setClarityLevel("moderate");
+            setWorkloadPressure("normal");
+            setFocusCondition("recovery");
+            setBodySignal("tired");
+            setTodayIntention("");
+            setCautionNote("");
+        } else if (presetType === "deep_work") {
+            setEnergyLevel("steady");
+            setClarityLevel("clear");
+            setWorkloadPressure("normal");
+            setFocusCondition("deep_focus");
+            setBodySignal("normal");
+            setTodayIntention("วันนี้เหมาะกับการทำงานลึก งานคิดระบบ หรืองานที่ต้องใช้สมาธิต่อเนื่อง");
+            setCautionNote("");
+        } else if (presetType === "scattered") {
+            setEnergyLevel("scattered");
+            setClarityLevel("moderate");
+            setWorkloadPressure("heavy");
+            setFocusCondition("short_bursts");
+            setBodySignal("tense");
+            setTodayIntention("วันนี้ควรแบ่งงานเป็นรอบสั้น ๆ และลดการสลับบริบทมากเกินไป");
+            setCautionNote("");
+        }
+    };
+
     // ASTRO-APP-DEV-008B: derived markdown content and copy handler
     const dateStr = isMounted ? new Date().toISOString().slice(0, 10) : "2026-05-26";
 
@@ -810,6 +857,53 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                             <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-violet-400/10 text-violet-300 border border-violet-300/20 self-start sm:self-center">
                                                 สภาวะจริงวันนี้ (Check-in)
                                             </span>
+                                        </div>
+
+                                        {/* Quick Presets and Reset row */}
+                                        <div className="flex flex-wrap items-center gap-2 bg-slate-955/40 p-3.5 rounded-xl border border-slate-800/80 text-xs">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block w-full sm:w-auto mr-1">
+                                                Quick Presets / ตัวช่วยตั้งค่าเร็ว:
+                                            </span>
+                                            
+                                            <button
+                                                type="button"
+                                                onClick={() => applyCheckinPreset("stable")}
+                                                className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-950 text-slate-200 rounded-lg text-[11px] font-semibold border border-slate-800 hover:border-slate-700 transition-all active:scale-[0.98]"
+                                            >
+                                                วันคงที่
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => applyCheckinPreset("low_energy")}
+                                                className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-950 text-slate-200 rounded-lg text-[11px] font-semibold border border-slate-800 hover:border-slate-700 transition-all active:scale-[0.98]"
+                                            >
+                                                วันพลังงานต่ำ
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => applyCheckinPreset("deep_work")}
+                                                className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-950 text-slate-200 rounded-lg text-[11px] font-semibold border border-slate-800 hover:border-slate-700 transition-all active:scale-[0.98]"
+                                            >
+                                                วันงานลึก
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => applyCheckinPreset("scattered")}
+                                                className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 active:bg-slate-950 text-slate-200 rounded-lg text-[11px] font-semibold border border-slate-800 hover:border-slate-700 transition-all active:scale-[0.98]"
+                                            >
+                                                วันโฟกัสกระจาย
+                                            </button>
+
+                                            <div className="sm:ml-auto w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={resetToday}
+                                                    className="px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/30 text-rose-300 rounded-lg text-[11px] font-semibold border border-rose-500/20 hover:border-rose-500/30 transition-all flex items-center gap-1 active:scale-[0.97]"
+                                                    title="ล้างข้อมูลการเช็กอินทั้งหมดกลับไปเป็นค่าดีฟอลต์"
+                                                >
+                                                    <RefreshCw className="w-3.5 h-3.5 text-rose-400" /> เริ่มวันใหม่ / Reset
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
