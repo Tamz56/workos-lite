@@ -984,6 +984,34 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                         </div>
                                     </div>
                                     
+                                    {/* Quick Start Guide - ASTRO-APP-DEV-021 */}
+                                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+                                        <div className="flex items-center gap-2 border-b border-slate-800 pb-2.5">
+                                            <Compass className="w-4.5 h-4.5 text-indigo-400" />
+                                            <h3 className="font-semibold text-sm text-slate-100">คู่มือการใช้งานด่วน (Quick Start Guide)</h3>
+                                        </div>
+                                        <div className="text-xs text-slate-350 space-y-3 leading-relaxed">
+                                            <div className="flex gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-850 flex items-center justify-center font-bold text-indigo-300 text-[10px] flex-shrink-0">1</span>
+                                                <p>
+                                                    <strong className="text-slate-200">ระบุเป้าหมายรอบเวลา</strong>: เลือกเดือนการพิจารณาและพิมพ์แผนยุทธศาสตร์ในแถบด้านบน เพื่อใช้เตือนใจตลอดรอบเดือน
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-850 flex items-center justify-center font-bold text-indigo-300 text-[10px] flex-shrink-0">2</span>
+                                                <p>
+                                                    <strong className="text-slate-200">ประเมินสภาวะจริง</strong>: ตอบดรอปดาวน์ **Daily Check-in** ในแผงขวาตามสภาพจริง เพื่อปรับโหมดการทำงานประจำวันให้สอดรับกับสภาวะและบริบทงานของวันนี้มากขึ้น
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-850 flex items-center justify-center font-bold text-indigo-300 text-[10px] flex-shrink-0">3</span>
+                                                <p>
+                                                    <strong className="text-slate-200">ทบทวนและทริกเกอร์บันทึก</strong>: สรุปผลงานที่เสร็จและข้อสังเกตลงในแท็บ **สะท้อนคิด** เพื่อคัดลอก Markdown หรือกดเก็บเข้าแฟ้มคลังประวัติศาสตร์
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
                                     <div className="bg-gradient-to-r from-slate-955/40 to-slate-900/40 border border-slate-800 rounded-xl p-6 space-y-3">
                                         <h4 className="text-sm font-semibold text-amber-250 tracking-wider uppercase flex items-center gap-2">
                                             <Info className="w-4 h-4 text-amber-300" /> คำแนะนำทางศีลธรรม
@@ -1113,6 +1141,11 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                 >
                                                     <RefreshCw className="w-3.5 h-3.5 text-rose-400" /> เริ่มวันใหม่ / Reset
                                                 </button>
+                                            </div>
+
+                                            {/* Guide Helper Text - ASTRO-APP-DEV-021B */}
+                                            <div className="w-full text-[10px] text-slate-450 italic block leading-relaxed pt-2.5 border-t border-slate-800/60 mt-1">
+                                                *คำแนะนำ: ใช้ตัวช่วยตั้งค่าด่วนเพื่อเริ่มต้นเช็กอิน จากนั้นปรับแต่ละช่องให้ตรงกับสภาวะและบริบทงานของวันนี้มากขึ้น
                                             </div>
                                         </div>
 
@@ -2056,8 +2089,11 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                 })}
                                             </div>
                                         ) : (
-                                            <div className="py-12 border border-dashed border-slate-800 rounded-xl text-center text-slate-600 text-xs">
-                                                ไม่มีบันทึกการสะท้อนคิดที่ผ่านมา
+                                            <div className="py-12 border border-dashed border-slate-800 rounded-xl text-center text-slate-500 text-xs bg-slate-950/10 space-y-1.5">
+                                                <p className="font-semibold text-slate-400">ไม่มีบันทึกการสะท้อนคิดย้อนหลัง</p>
+                                                <p className="text-[10px] text-slate-600 max-w-[220px] mx-auto leading-relaxed">
+                                                    เขียนบันทึกชิ้นใหม่ทางด้านซ้ายเพื่อสะท้อนทบทวนความคิดของการทดลองวันนี้
+                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -2187,6 +2223,24 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                 />
                                             </div>
 
+                                            {/* Button Explanations Card - ASTRO-APP-DEV-021B */}
+                                            <div className="bg-slate-955/45 rounded-xl p-3.5 border border-slate-850/60 text-[10px] text-slate-400 leading-relaxed space-y-1.5 mt-2 mb-3">
+                                                <div className="flex items-start gap-1.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1 flex-shrink-0"></span>
+                                                    <p>
+                                                        <strong className="text-indigo-300 font-semibold">บันทึกเข้าประวัติ (Save as History)</strong>: 
+                                                        จัดเก็บสะท้อนคิด, บริบทของวันนี้, และแผนงานแบบถาวรลงในคลังประวัติศาสตร์ย้อนหลังของเบราว์เซอร์ เพื่อใช้วิเคราะห์และเปรียบเทียบในอนาคต (จำกัดสูงสุด 20 บันทึก)
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-start gap-1.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500 mt-1 flex-shrink-0"></span>
+                                                    <p>
+                                                        <strong className="text-slate-300 font-semibold">บันทึกร่างแบบชั่วคราว (Save Draft)</strong>: 
+                                                        บันทึกเนื้อหาที่กำลังเขียนสะท้อนคิดเก็บไว้ในเบราว์เซอร์แบบทันที เพื่อป้องกันข้อมูลสูญหายเมื่อเผลอปิดหรือรีโหลดหน้าเว็บโดยไม่ได้ตั้งใจ
+                                                    </p>
+                                                </div>
+                                            </div>
+
                                             {/* Draft Persistence Actions */}
                                             <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t border-slate-800/60 w-full">
                                                 <button
@@ -2253,8 +2307,11 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                             )}
 
                                             {historyLogs.length === 0 ? (
-                                                <div className="text-center py-6 text-xs text-slate-500 italic">
-                                                    ยังไม่มีประวัติสะท้อนคิดที่บันทึกไว้
+                                                <div className="text-center py-8 px-4 border border-dashed border-slate-800 rounded-xl bg-slate-950/20 text-slate-500 italic space-y-1.5">
+                                                    <p className="text-xs">ยังไม่มีบันทึกประวัติการสะท้อนคิดถาวร</p>
+                                                    <p className="text-[10px] text-slate-600 max-w-xs mx-auto leading-relaxed not-italic">
+                                                        คุณสามารถเก็บบริบทและบันทึกของวันนี้ไว้เพื่อสังเกตแนวโน้มเชิงกลยุทธ์ย้อนหลัง โดยการกดปุ่ม <strong className="text-indigo-400 font-medium">&quot;บันทึกเข้าประวัติ (Save as History)&quot;</strong> ด้านบน
+                                                    </p>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 scrollbar-thin">
