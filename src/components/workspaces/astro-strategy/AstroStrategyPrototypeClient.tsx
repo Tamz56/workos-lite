@@ -467,6 +467,33 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
 
     const dailyRecoveryAnchors = profile.practiceAnchors.shortAnchors.slice(0, 4);
 
+    // ASTRO-APP-DEV-011B: Weekly Strategy View Translation Maps & Derived Variables
+    const weeklyThemeThaiMap: Record<string, string> = {
+        "structure before expansion": "Structure Before Expansion",
+        "one checkpoint at a time": "One Checkpoint at a Time",
+        "deep work with clear output": "Deep Work with Clear Output"
+    };
+
+    const weeklyWindowLabels = [
+        "ช่วงต้นสัปดาห์",
+        "ช่วงกลางสัปดาห์",
+        "ช่วงปลายสัปดาห์"
+    ];
+
+    const weeklyThemeRaw = profile.workEnergyPattern.preferredWorkModes[0] ?? "structure before expansion";
+
+    const weeklyBestWorkWindows = profile.workEnergyPattern.energizingWork.slice(0, 3);
+
+    const weeklyCautionWindows = [
+        ...profile.workEnergyPattern.drainingWork.slice(0, 2),
+        ...profile.personalWarningSigns.workPattern.slice(0, 2),
+    ];
+
+    const weeklyRecoveryRhythm = [
+        ...profile.practiceAnchors.shortAnchors.slice(0, 2),
+        ...profile.practiceAnchors.eveningAnchors.slice(0, 2),
+    ];
+
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 text-slate-100 font-sans pb-16">
             {/* Top Navigation Bar */}
@@ -736,7 +763,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                         {/* Weekly Theme Banner */}
                                         <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-2 hover:border-slate-800 transition-all">
                                             <span className="text-[10px] font-bold text-violet-300 tracking-wider uppercase block">Theme ของสัปดาห์นี้</span>
-                                            <h4 className="text-lg font-bold text-slate-200">Structure Before Expansion</h4>
+                                            <h4 className="text-lg font-bold text-slate-200">{weeklyThemeThaiMap[weeklyThemeRaw] || weeklyThemeRaw}</h4>
                                         </div>
 
                                         {/* Two Column Grid for Windows */}
@@ -748,9 +775,11 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <h4 className="font-bold text-sm sm:text-base">Best Work Windows</h4>
                                                 </div>
                                                 <ul className="space-y-2 text-sm text-slate-300 leading-relaxed">
-                                                    <li><strong className="text-slate-200">ช่วงต้นสัปดาห์:</strong> เหมาะกับการจัดระบบ ตรวจ task และเคลียร์งานค้าง</li>
-                                                    <li><strong className="text-slate-200">ช่วงกลางสัปดาห์:</strong> เหมาะกับการตัดสินใจเชิงโครงสร้างและวางแผนรอบต่อไป</li>
-                                                    <li><strong className="text-slate-200">ช่วงปลายสัปดาห์:</strong> เหมาะกับ reflection และสรุปบทเรียน</li>
+                                                    {weeklyBestWorkWindows.map((item, idx) => (
+                                                        <li key={idx}>
+                                                            <strong className="text-slate-200">{weeklyWindowLabels[idx] || `ช่วงที่ ${idx + 1}`}:</strong> {workRecommendationThaiMap[item] || item}
+                                                        </li>
+                                                    ))}
                                                 </ul>
                                             </div>
 
@@ -760,9 +789,11 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <ShieldAlert className="w-5 h-5" />
                                                     <h4 className="font-bold text-sm sm:text-base">Caution Windows</h4>
                                                 </div>
-                                                <p className="text-sm text-slate-300 leading-relaxed pt-1">
-                                                    หลีกเลี่ยงการเปิดหลายโปรเจกต์พร้อมกัน หากยังไม่ได้ปิดงานเดิมให้ชัดเจนเพื่อป้องกันสมาธิกระจาย
-                                                </p>
+                                                <ul className="list-disc list-inside text-sm text-slate-300 space-y-1.5 leading-relaxed">
+                                                    {weeklyCautionWindows.map((item, idx) => (
+                                                        <li key={idx}>{riskPreventionThaiMap[item] || item}</li>
+                                                    ))}
+                                                </ul>
                                             </div>
                                         </div>
 
@@ -774,9 +805,11 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <Activity className="w-5 h-5" />
                                                     <h4 className="font-bold text-sm sm:text-base">จังหวะการฟื้นฟู (Recovery Rhythm)</h4>
                                                 </div>
-                                                <p className="text-sm text-slate-300 leading-relaxed pt-1">
-                                                    ใช้สมาธิสั้น 5–10 นาที หรือพักสายตาเป็นช่วง ๆ โดยเฉพาะหลังจากลุยงานหน้าจอที่ต้องใช้สมองหนักอย่างต่อเนื่อง
-                                                </p>
+                                                <ul className="list-disc list-inside text-sm text-slate-300 space-y-1.5 leading-relaxed">
+                                                    {weeklyRecoveryRhythm.map((item, idx) => (
+                                                        <li key={idx}>{recoveryAnchorThaiMap[item] || item}</li>
+                                                    ))}
+                                                </ul>
                                             </div>
 
                                             {/* Strategic Focus */}
