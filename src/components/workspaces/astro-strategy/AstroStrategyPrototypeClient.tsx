@@ -27,6 +27,8 @@ import {
     HeartHandshake
 } from "lucide-react";
 
+import { MOCK_PERSONAL_PROFILE } from "@/lib/types/astro-strategy";
+
 // Mock timing outcomes dataset based on Category
 interface TimingResult {
     rating: "excellent" | "fair" | "warning" | "postpone";
@@ -1164,15 +1166,15 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                 <ul className="space-y-2 text-sm text-slate-300">
                                                     <li className="flex items-start gap-2">
                                                         <span className="text-violet-400 font-bold">•</span>
-                                                        <span>เริ่มฝึกปฏิบัติสมาธิเจริญสติมาแล้วประมาณ 10 เดือน</span>
+                                                        <span>เริ่มฝึกปฏิบัติสมาธิเจริญสติมาแล้วประมาณ {MOCK_PERSONAL_PROFILE.practiceProfile.meditationStartedApprox === "around 10 months ago" ? "10 เดือน" : MOCK_PERSONAL_PROFILE.practiceProfile.meditationStartedApprox}</span>
                                                     </li>
                                                     <li className="flex items-start gap-2">
                                                         <span className="text-violet-400 font-bold">•</span>
-                                                        <span>ความสม่ำเสมอในปัจจุบัน: ช่วงที่ผ่านมายังไม่ต่อเนื่อง</span>
+                                                        <span>ความสม่ำเสมอในปัจจุบัน: {MOCK_PERSONAL_PROFILE.practiceProfile.currentConsistency === "not fully consistent recently" ? "ช่วงที่ผ่านมายังไม่ต่อเนื่อง" : MOCK_PERSONAL_PROFILE.practiceProfile.currentConsistency}</span>
                                                     </li>
                                                     <li className="flex items-start gap-2">
                                                         <span className="text-violet-400 font-bold">•</span>
-                                                        <span>เคยอุปสมบทในบวรพระพุทธศาสนา: 3 พรรษา</span>
+                                                        <span>เคยอุปสมบทในบวรพระพุทธศาสนา: {MOCK_PERSONAL_PROFILE.practiceProfile.formerOrdination === "3 Buddhist rains" ? "3 พรรษา" : MOCK_PERSONAL_PROFILE.practiceProfile.formerOrdination}</span>
                                                     </li>
                                                 </ul>
                                             </div>
@@ -1183,14 +1185,16 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <AlertTriangle className="w-4 h-4" /> Health Turning Points (จุดเปลี่ยนทางสุขภาพ)
                                                 </h4>
                                                 <ul className="space-y-2 text-sm text-slate-300">
-                                                    <li className="flex items-start gap-2">
-                                                        <span className="text-rose-500 font-bold">•</span>
-                                                        <span>ภาวะบวม/มีน้ำในวุ้นตา (รับการตรวจรักษาประมาณ 4 เดือน)</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <span className="text-rose-500 font-bold">•</span>
-                                                        <span>ภาวะหอบหืด / อาการไอเรื้อรังและหายใจติดขัด</span>
-                                                    </li>
+                                                    {MOCK_PERSONAL_PROFILE.recoveryProfile.healthTurningPoints.map((pt, idx) => (
+                                                        <li key={idx} className="flex items-start gap-2">
+                                                            <span className="text-rose-500 font-bold">•</span>
+                                                            <span>
+                                                                {pt.type === "eye_condition" ? "ภาวะบวม/มีน้ำในวุ้นตา (รับการตรวจรักษาประมาณ 4 เดือน)" : 
+                                                                 pt.type === "respiratory_condition" ? "ภาวะหอบหืด / อาการไอเรื้อรังและหายใจติดขัด" : 
+                                                                 pt.summary}
+                                                            </span>
+                                                        </li>
+                                                    ))}
                                                 </ul>
                                             </div>
 
@@ -1200,22 +1204,20 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <Activity className="w-4 h-4" /> Recovery & Regulation Practices (แนวทางปรับสมดุล)
                                                 </h4>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm text-slate-300">
-                                                    <div className="flex items-start gap-2">
-                                                        <span className="text-emerald-500 font-bold mt-0.5">•</span>
-                                                        <span>Sound healing / เปิดคลื่นเสียงผ่อนคลายเพื่อช่วยพักสมอง</span>
-                                                    </div>
-                                                    <div className="flex items-start gap-2">
-                                                        <span className="text-emerald-500 font-bold mt-0.5">•</span>
-                                                        <span>การฝึกสมาธิเจริญสติเพื่อให้จิตใจมั่นคงและเกิดสมาธิ</span>
-                                                    </div>
-                                                    <div className="flex items-start gap-2">
-                                                        <span className="text-emerald-500 font-bold mt-0.5">•</span>
-                                                        <span>ศึกษาเรียนรู้ระบบจักระเพื่อทำความเข้าใจกลไกพลังงานภายใน</span>
-                                                    </div>
-                                                    <div className="flex items-start gap-2">
-                                                        <span className="text-emerald-500 font-bold mt-0.5">•</span>
-                                                        <span>จัดระเบียบโครงสร้างงานโดยมี AI ช่วยสนับสนุน</span>
-                                                    </div>
+                                                    {MOCK_PERSONAL_PROFILE.recoveryProfile.recoveryTools.map((tool, idx) => {
+                                                        let label = tool;
+                                                        if (tool === "meditation") label = "การฝึกสมาธิเจริญสติเพื่อให้จิตใจมั่นคงและเกิดสมาธิ";
+                                                        else if (tool === "calming audio") label = "Sound healing / เปิดคลื่นเสียงผ่อนคลายเพื่อช่วยพักสมอง";
+                                                        else if (tool === "chakra learning") label = "ศึกษาเรียนรู้ระบบจักระเพื่อทำความเข้าใจกลไกพลังงานภายใน";
+                                                        else if (tool === "AI-assisted work organization") label = "จัดระเบียบโครงสร้างงานโดยมี AI ช่วยสนับสนุน";
+
+                                                        return (
+                                                            <div key={idx} className="flex items-start gap-2">
+                                                                <span className="text-emerald-500 font-bold mt-0.5">•</span>
+                                                                <span>{label}</span>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         </div>
@@ -1241,7 +1243,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                         ข้อพิจารณาความเป็นส่วนตัวและการจำกัดความรับผิดชอบ (Disclaimer)
                                                     </span>
                                                     <p className="text-sm text-slate-200 font-mono tracking-tight leading-relaxed">
-                                                        “For reflection and personal planning only. Not medical advice, diagnosis, or treatment.”
+                                                        “{MOCK_PERSONAL_PROFILE.interpretationBoundary.disclaimer}”
                                                     </p>
                                                 </div>
                                             </div>
