@@ -853,7 +853,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                     
                     <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-950/50 px-3 py-1.5 rounded-lg border border-slate-800/80">
                         <Calendar className="w-4 h-4 text-amber-300" />
-                        <span className="font-mono">2026-05-25</span>
+                        <span className="font-mono">{dateStr}</span>
                     </div>
                 </div>
             </header>
@@ -2069,7 +2069,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-4 gap-2">
                                     <div className="space-y-1">
                                         <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                                            <BookOpen className="w-5 h-5 text-violet-300" /> Reflection Export / Review Log
+                                            <BookOpen className="w-5 h-5 text-violet-300" /> ส่งออกบันทึกสะท้อนคิด (Reflection Export / Review Log)
                                         </h3>
                                         <p className="text-sm text-slate-400 font-medium">
                                             เครื่องมือจัดรูปแบบบันทึกสะท้อนคิดเป็น Markdown เพื่อคัดลอกไปใช้ต่อใน WorkOS, journal หรือ task note
@@ -2090,7 +2090,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                             <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                                                 <ClipboardList className="w-4 h-4 text-violet-400" />
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-slate-200">Daily Check-in Context</span>
+                                                    <span className="text-xs font-bold text-slate-200">บริบทประเมินผลเช็กอินรายวัน (Daily Check-in Context)</span>
                                                     <span className="text-[10px] text-slate-400">บริบทเช็กอินวันนี้</span>
                                                 </div>
                                             </div>
@@ -2188,34 +2188,34 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                             </div>
 
                                             {/* Draft Persistence Actions */}
-                                            <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-800/60">
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t border-slate-800/60 w-full">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSaveToHistory}
+                                                    className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-slate-100 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] shadow-md shadow-indigo-950/20"
+                                                >
+                                                    <History className="w-3.5 h-3.5 text-indigo-200" /> บันทึกเข้าประวัติ (Save as History)
+                                                </button>
+
                                                 <button
                                                     type="button"
                                                     onClick={handleSaveReflectionDraft}
-                                                    className="px-4 py-2 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-slate-100 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.98] shadow-md shadow-violet-950/20"
+                                                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-slate-200 border border-slate-700/50 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                                                 >
-                                                    <Save className="w-3.5 h-3.5 text-violet-200" /> บันทึกร่างสะท้อนคิด (Save Draft)
+                                                    <Save className="w-3.5 h-3.5 text-slate-400" /> บันทึกร่างแบบชั่วคราว (Save Draft)
                                                 </button>
 
                                                 <button
                                                     type="button"
                                                     onClick={handleClearReflectionDraft}
-                                                    className="px-4 py-2 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-slate-300 rounded-xl text-xs font-semibold transition-all border border-slate-700/60 active:scale-[0.98]"
+                                                    className="w-full sm:w-auto px-4 py-2.5 bg-transparent hover:bg-rose-950/15 text-rose-400 hover:text-rose-350 border border-slate-800/80 hover:border-rose-900/20 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                                                 >
-                                                    ล้างแบบร่างที่เซฟ
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={handleSaveToHistory}
-                                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-slate-100 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.98] shadow-md shadow-indigo-950/20"
-                                                >
-                                                    <History className="w-3.5 h-3.5 text-indigo-200" /> บันทึกเข้าประวัติ (Save as History)
+                                                    ล้างแบบร่าง
                                                 </button>
 
                                                 {savedReflectionAt && (
-                                                    <div className="w-full text-[10px] text-slate-400 flex items-center gap-1 pt-1">
-                                                        <span>บันทึกร่างเมื่อ:</span>
+                                                    <div className="text-[10px] text-slate-400 flex items-center gap-1 sm:ml-auto">
+                                                        <span>ดราฟต์เซฟ:</span>
                                                         <span className="font-mono text-slate-300 font-bold">{savedReflectionAt}</span>
                                                     </div>
                                                 )}
@@ -2233,7 +2233,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                             <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
                                                 <div className="flex items-center gap-2">
                                                     <History className="w-4.5 h-4.5 text-indigo-400" />
-                                                    <h4 className="text-sm font-semibold text-slate-200">ประวัติสะท้อนคิด ({historyLogs.length}/20)</h4>
+                                                    <h4 className="text-sm font-semibold text-slate-200">ประวัติการสะท้อนคิดย้อนหลัง (Reflection History - {historyLogs.length}/20)</h4>
                                                 </div>
                                                 {historyLogs.length > 0 && (
                                                     <button
