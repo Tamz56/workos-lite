@@ -465,6 +465,15 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
             "ใช้เพื่อการสะท้อนคิดและวางแผนส่วนบุคคลเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา"
     };
 
+    const reflectionPromptThaiMap: Record<string, string> = {
+        "Stabilize & Structure": "วันนี้มีงานหรือโปรเจกต์ใดที่ควรปิดเป็น checkpoint เล็ก ๆ ก่อนเปิดเรื่องใหม่?",
+        "Focus & Deliver": "วันนี้ output สำคัญที่สุดเพียงหนึ่งเรื่องที่ควรโฟกัสและส่งมอบให้ชัดเจนคืออะไร?",
+        "Pause & Calibrate": "วันนี้มีสัญญาณใดที่บอกว่าควรพักจังหวะ ปรับสมดุล หรือชะลอก่อนเดินต่อ?"
+    };
+
+    const defaultReflectionPrompt =
+        "วันนี้มีงานใดที่ควรทำให้น้อยลง แต่ชัดขึ้น หรือไม่?";
+
     const profile = MOCK_PERSONAL_PROFILE;
 
     const dailyWorkRecommendations = [
@@ -808,7 +817,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                     <h4 className="font-bold text-sm sm:text-base">คำถามสะท้อนคิด (Reflection Prompt)</h4>
                                                 </div>
                                                 <p className="text-sm text-slate-300 leading-relaxed font-medium italic">
-                                                    “วันนี้มีงานใดที่ควร ‘ทำให้น้อยลง แต่ชัดขึ้น’ หรือไม่”
+                                                    {`“${reflectionPromptThaiMap[strategyResult.strategyMode] || defaultReflectionPrompt}”`}
                                                 </p>
                                             </div>
                                         </div>
