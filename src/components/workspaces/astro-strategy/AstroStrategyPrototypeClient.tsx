@@ -454,6 +454,17 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
         "close one task before opening another": "ปิดงานหนึ่งเรื่องก่อนเปิดงานใหม่"
     };
 
+    const strategyModeThaiMap: Record<string, string> = {
+        "Stabilize & Structure": "ประคองและจัดระบบ (Stabilize & Structure)",
+        "Focus & Deliver": "โฟกัสและส่งมอบงาน (Focus & Deliver)",
+        "Pause & Calibrate": "พักจังหวะและปรับสมดุล (Pause & Calibrate)"
+    };
+
+    const guardrailThaiMap: Record<string, string> = {
+        "For personal reflection and planning only. Not medical advice, diagnosis, or treatment.":
+            "ใช้เพื่อการสะท้อนคิดและวางแผนส่วนบุคคลเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา"
+    };
+
     const profile = MOCK_PERSONAL_PROFILE;
 
     const dailyWorkRecommendations = [
@@ -677,7 +688,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                 <p className="text-xs text-slate-400 font-medium">โหมดกลยุทธ์ส่วนบุคคลตามวิเคราะห์การแจ้งเตือนพฤติกรรม</p>
                                             </div>
                                             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-950/40 text-violet-200 border border-violet-400/20 self-start sm:self-center">
-                                                {strategyResult.strategyMode}
+                                                {strategyModeThaiMap[strategyResult.strategyMode] || strategyResult.strategyMode}
                                             </span>
                                         </div>
 
@@ -713,7 +724,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                                         <HeartHandshake className="w-3.5 h-3.5" /> Recovery Support
                                                     </span>
                                                     <p className="text-xs sm:text-sm font-medium text-slate-300 leading-relaxed">
-                                                        {strategyResult.recoverySupport}
+                                                        {recoveryAnchorThaiMap[strategyResult.recoverySupport] || strategyResult.recoverySupport}
                                                     </p>
                                                 </div>
                                             </div>
@@ -721,7 +732,7 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
 
                                         {/* Disclaimer Guardrail */}
                                         <div className="text-[10px] text-slate-500 border-t border-slate-800/60 pt-3 leading-normal">
-                                            * {strategyResult.guardrail}
+                                            * {guardrailThaiMap[strategyResult.guardrail] || strategyResult.guardrail}
                                         </div>
                                     </div>
 
