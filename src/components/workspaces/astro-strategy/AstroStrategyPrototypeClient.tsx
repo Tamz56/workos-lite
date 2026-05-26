@@ -403,6 +403,15 @@ ${noticedNotes || "(ไม่มีข้อมูล)"}
 ## Next Right Action
 ${nextRightAction || "(ไม่มีข้อมูล)"}
 
+## Daily Check-in Context / บริบทเช็กอินวันนี้
+- ระดับพลังงาน: ${energyLevelLabels[energyLevel] || energyLevel}
+- ระดับความคิด: ${clarityLevelLabels[clarityLevel] || clarityLevel}
+- ภาระงานวันนี้: ${workloadPressureLabels[workloadPressure] || workloadPressure}
+- สภาวะสมาธิ: ${focusConditionLabels[focusCondition] || focusCondition}
+- สัญญาณร่างกายที่สังเกตวันนี้: ${bodySignalLabels[bodySignal] || bodySignal}
+- ความตั้งใจหลักวันนี้: ${todayIntention.trim() || "ยังไม่ได้กรอก"}
+- ข้อควรระวังเสริม: ${cautionNote.trim() || "ไม่มี"}
+
 ## Guardrail
 บันทึกนี้ใช้เพื่อการสะท้อนคิดและวางแผนส่วนบุคคล ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา`;
     };
@@ -1771,6 +1780,51 @@ ${nextRightAction || "(ไม่มีข้อมูล)"}
                                     {/* Left inputs */}
                                     <div className="space-y-4">
                                         <h4 className="text-sm font-semibold text-slate-200">แก้ไขข้อมูลสรุปสะท้อนคิด</h4>
+
+                                        {/* Daily Check-in Context Read-only Card */}
+                                        <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 sm:p-5 space-y-4">
+                                            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+                                                <ClipboardList className="w-4 h-4 text-violet-400" />
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold text-slate-200">Daily Check-in Context</span>
+                                                    <span className="text-[10px] text-slate-400">บริบทเช็กอินวันนี้</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs leading-relaxed">
+                                                <div>
+                                                    <span className="text-slate-450 block font-medium">ระดับพลังงาน (Energy):</span>
+                                                    <span className="text-slate-200 font-semibold">{energyLevelLabels[energyLevel] || energyLevel}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-450 block font-medium">ระดับความคิด (Clarity):</span>
+                                                    <span className="text-slate-200 font-semibold">{clarityLevelLabels[clarityLevel] || clarityLevel}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-450 block font-medium">ภาระงานวันนี้ (Workload):</span>
+                                                    <span className="text-slate-200 font-semibold">{workloadPressureLabels[workloadPressure] || workloadPressure}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-450 block font-medium">สภาวะสมาธิ (Focus):</span>
+                                                    <span className="text-slate-200 font-semibold">{focusConditionLabels[focusCondition] || focusCondition}</span>
+                                                </div>
+                                                <div className="col-span-2 sm:col-span-3">
+                                                    <span className="text-slate-450 block font-medium">สัญญาณร่างกาย (Body Signal):</span>
+                                                    <span className="text-slate-200 font-semibold">{bodySignalLabels[bodySignal] || bodySignal}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-xs space-y-2 leading-relaxed border-t border-slate-800/60 pt-3">
+                                                <div>
+                                                    <span className="text-slate-450 font-medium block">ความตั้งใจหลักวันนี้:</span>
+                                                    <p className="text-slate-300 font-medium whitespace-pre-wrap italic">{todayIntention.trim() || "ยังไม่ได้กรอก"}</p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-450 font-medium block">ข้อควรระวังเสริม:</span>
+                                                    <p className="text-slate-300 font-medium whitespace-pre-wrap italic">{cautionNote.trim() || "ไม่มี"}</p>
+                                                </div>
+                                            </div>
+                                        </div>
 
                                         <div className="space-y-3">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
