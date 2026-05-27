@@ -861,6 +861,36 @@ ${cautionsMarkdown}
         }
     };
 
+    // ASTRO-APP-DEV-026B: Weekly Pattern Hints Helper Functions
+    const getDominantValue = (logs: ReflectionHistoryItem[], field: "energyLevel" | "focusCondition"): string => {
+        const counts: Record<string, number> = {};
+        let dominantVal = "";
+        let maxCount = 0;
+
+        logs.forEach(log => {
+            const val = log.dailyCheckinSnapshot?.[field];
+            if (val) {
+                counts[val] = (counts[val] || 0) + 1;
+                if (counts[val] > maxCount) {
+                    maxCount = counts[val];
+                    dominantVal = val;
+                }
+            }
+        });
+        return dominantVal;
+    };
+
+    const getRecentDistinctThemes = (logs: ReflectionHistoryItem[], field: "todayIntention" | "cautionNote"): string[] => {
+        const items: string[] = [];
+        logs.forEach(log => {
+            const val = log.dailyCheckinSnapshot?.[field]?.trim();
+            if (val && !items.includes(val)) {
+                items.push(val);
+            }
+        });
+        return items.slice(0, 3);
+    };
+
     if (!isMounted) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
@@ -2658,6 +2688,140 @@ ${cautionsMarkdown}
                                                         {/* Disclaimer */}
                                                         <div className="text-[9px] text-slate-500 leading-relaxed pt-2 border-t border-slate-850/40">
                                                             *หมายเหตุ: บททบทวนนี้ถูกคำนวณและสรุปโดยอัตโนมัติจากข้อมูลประวัติการสะท้อนคิดประจำวันและบริบทงานที่บันทึกไว้ในเบราว์เซอร์เครื่องนี้เท่านั้น ไม่ใช่ผลวินิจฉัยหรือคำแนะนำทางการแพทย์
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+
+                                        {/* ASTRO-APP-DEV-026B: Weekly Pattern Hints Section */}
+                                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
+                                            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <Compass className="w-4.5 h-4.5 text-indigo-400 animate-pulse" />
+                                                    <h4 className="text-sm font-semibold text-slate-200">แนวโน้มรอบจังหวะการทำงานส่วนบุคคล (Weekly Pattern Hints)</h4>
+                                                </div>
+                                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                                                    สถิติสะสมแบบโลคอล (Local Stats)
+                                                </span>
+                                            </div>
+
+                                            {historyLogs.length < 3 ? (
+                                                <div className="text-center py-6 px-4 border border-dashed border-slate-800 rounded-xl bg-slate-950/20 text-slate-500 italic">
+                                                    <p className="text-xs">
+                                                        ยังมีบันทึกไม่มากพอสำหรับดูแนวโน้มให้ชัดเจน ลองบันทึกต่ออีก 2–3 วัน เพื่อให้ระบบช่วยสะท้อน pattern เบื้องต้นจากข้อมูลที่คุณบันทึกไว้เอง
+                                                    </p>
+                                                </div>
+                                            ) : (() => {
+                                                const latest5Logs = historyLogs.slice(0, 5);
+                                                
+                                                // คำนวณความสม่ำเสมอสะสม
+                                                let consistencyLevel = "เริ่มต้นตั้งหลัก";
+                                                let consistencyBadge = "bg-slate-850 text-slate-400 border-slate-700/60";
+                                                if (historyLogs.length >= 7) {
+                                                    consistencyLevel = "สม่ำเสมอดีเยี่ยม (7+ วัน)";
+                                                    consistencyBadge = "bg-violet-955/40 text-violet-300 border-violet-500/20";
+                                                } else if (historyLogs.length >= 3) {
+                                                    consistencyLevel = "จังหวะคงที่ (3-6 วัน)";
+                                                    consistencyBadge = "bg-indigo-955/40 text-indigo-300 border-indigo-500/20";
+                                                }
+
+                                                // สกัดสถิติ Dominant
+                                                const dominantEnergy = getDominantValue(latest5Logs, "energyLevel");
+                                                const dominantFocus = getDominantValue(latest5Logs, "focusCondition");
+
+                                                // สกัด Intentions และ Cautions
+                                                const recentIntentions = getRecentDistinctThemes(latest5Logs, "todayIntention");
+                                                const recentCautions = getRecentDistinctThemes(latest5Logs, "cautionNote");
+
+                                                return (
+                                                    <div className="space-y-4 text-xs leading-relaxed text-slate-300">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {/* 1. ความสม่ำเสมอและสภาวะการทำงานที่พบบ่อย */}
+                                                            <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-3.5">
+                                                                <div className="space-y-1.5">
+                                                                    <h5 className="font-semibold text-slate-350 flex items-center gap-1.5">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                                                                        ความสม่ำเสมอในการจดบันทึก
+                                                                    </h5>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${consistencyBadge}`}>
+                                                                            {consistencyLevel}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-slate-400">จากประวัติทั้งหมด {historyLogs.length} รายการ</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="space-y-2 pt-1">
+                                                                    <h5 className="font-semibold text-slate-350 flex items-center gap-1.5">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                                                        สภาวะการทำงานที่พบบ่อย (จากบันทึกล่าสุด)
+                                                                    </h5>
+                                                                    <div className="space-y-1.5 text-[10px]">
+                                                                        <div className="flex items-center justify-between bg-slate-900/30 p-2 rounded border border-slate-800/40">
+                                                                            <span className="text-slate-400">⚡ พลังงานสะสมส่วนใหญ่:</span>
+                                                                            <span className="font-bold text-slate-200">
+                                                                                {energyLevelLabels[dominantEnergy] ? energyLevelLabels[dominantEnergy].split(" / ")[0].trim() : "ไม่มีข้อมูลหลัก"}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between bg-slate-900/30 p-2 rounded border border-slate-800/40">
+                                                                            <span className="text-slate-400">🎯 สมาธิและการจดจ่อส่วนใหญ่:</span>
+                                                                            <span className="font-bold text-slate-200">
+                                                                                {focusConditionLabels[dominantFocus] ? focusConditionLabels[dominantFocus].split(" / ")[0].trim() : "ไม่มีข้อมูลหลัก"}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* 2. ความตั้งใจและข้อพึงระวังสะสม */}
+                                                            <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-3.5">
+                                                                <div className="space-y-1.5">
+                                                                    <h5 className="font-semibold text-slate-350 flex items-center gap-1.5">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-450"></span>
+                                                                        ความตั้งใจที่ปรากฏล่าสุด
+                                                                    </h5>
+                                                                    {recentIntentions.length > 0 ? (
+                                                                        <ul className="list-disc list-inside space-y-1 pl-1 text-[10px] text-slate-400">
+                                                                            {recentIntentions.map((intent, idx) => (
+                                                                                <li key={idx} className="line-clamp-1 italic" title={intent}>
+                                                                                    &quot;{intent}&quot;
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    ) : (
+                                                                        <p className="text-[10px] text-slate-500 italic pl-1">
+                                                                            ยังไม่มีบันทึกเป้าหมายความตั้งใจ
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="space-y-1.5">
+                                                                    <h5 className="font-semibold text-slate-350 flex items-center gap-1.5">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-450"></span>
+                                                                        ข้อควรระวังที่ปรากฏล่าสุด
+                                                                    </h5>
+                                                                    {recentCautions.length > 0 ? (
+                                                                        <ul className="list-disc list-inside space-y-1 pl-1 text-[10px] text-slate-400">
+                                                                            {recentCautions.map((caution, idx) => (
+                                                                                <li key={idx} className="line-clamp-1 text-rose-350 italic" title={caution}>
+                                                                                    &quot;{caution}&quot;
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    ) : (
+                                                                        <p className="text-[10px] text-slate-500 italic pl-1">
+                                                                            ยังไม่มีข้อบันทึกเตือนความจำย้อนหลัง
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Cautious disclaimer */}
+                                                        <div className="text-[9px] text-slate-500 leading-relaxed pt-2 border-t border-slate-850/40 space-y-0.5">
+                                                            <p>*หมายเหตุ: ข้อมูลนี้สะท้อนจากบันทึกในเครื่องนี้เท่านั้น อาจมีแนวโน้มการปรับตัวที่แตกต่างกันไปในแต่ละรอบสัปดาห์</p>
+                                                            <p>*ใช้เพื่อการสะท้อนคิดและวางแผน ไม่ใช่ข้อสรุปตายตัวหรือการประเมินด้านการแพทย์ใดๆ ทั้งสิ้น</p>
                                                         </div>
                                                     </div>
                                                 );
