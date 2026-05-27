@@ -1101,6 +1101,74 @@ ${cautionsMarkdown}
                     {/* TAB 1: CURRENT CYCLE */}
                     {activeTab === "cycle" && (
                         <div className="space-y-8 animate-fadeIn">
+                            {/* Today Dashboard Compact Summary Card - ASTRO-APP-DEV-024B */}
+                            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl shadow-slate-950/20">
+                                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                                    <div className="flex items-center gap-2">
+                                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">แผงสรุปสภาวะและกลยุทธ์วันนี้ (Today Dashboard Summary)</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab("reflection")}
+                                        className="text-[10px] text-violet-400 hover:text-violet-350 active:text-violet-500 font-bold transition-colors flex items-center gap-1.5 active:scale-[0.98]"
+                                    >
+                                        เขียนบันทึกสะท้อนคิดวันนี้ →
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    {/* 1. โหมดกลยุทธ์วันนี้ */}
+                                    <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5 flex flex-col justify-between min-h-[72px]">
+                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">โหมดกลยุทธ์วันนี้</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                                            <span className="text-xs font-extrabold text-slate-200 truncate" title={strategyModeThaiMap[strategyResult.strategyMode] || strategyResult.strategyMode}>
+                                                {strategyResult.strategyMode === "Stabilize & Structure" && "ประคองและจัดระบบ"}
+                                                {strategyResult.strategyMode === "Focus & Deliver" && "โฟกัสและส่งมอบงาน"}
+                                                {strategyResult.strategyMode === "Pause & Calibrate" && "พักจังหวะและปรับสมดุล"}
+                                                {!["Stabilize & Structure", "Focus & Deliver", "Pause & Calibrate"].includes(strategyResult.strategyMode) && strategyResult.strategyMode}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. การขับเคลื่อนงานที่แนะนำ */}
+                                    <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5 flex flex-col justify-between min-h-[72px]">
+                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">การขับเคลื่อนงานที่แนะนำ</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                            <span className="text-xs font-bold text-slate-200 truncate" title={strategyResult.recommendedMove}>
+                                                {strategyResult.recommendedMove}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. สภาวะเช็กอินวันนี้ */}
+                                    <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5 flex flex-col justify-between min-h-[72px]">
+                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">สภาวะเช็กอินวันนี้</span>
+                                        <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-850 text-indigo-300 border border-slate-700/60 font-semibold truncate max-w-full">
+                                                ⚡ พลังงาน: {energyLevelLabels[energyLevel] ? energyLevelLabels[energyLevel].split(" / ")[0].trim() : energyLevel}
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-850 text-emerald-350 border border-slate-700/60 font-semibold truncate max-w-full">
+                                                🎯 โฟกัส: {focusConditionLabels[focusCondition] ? focusConditionLabels[focusCondition].split(" / ")[0].trim() : focusCondition}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* 4. ข้อควรระวังในการจัดจังหวะ */}
+                                    <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5 flex flex-col justify-between min-h-[72px]">
+                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">ข้อควรระวังในการจัดจังหวะ</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-rose-450 flex-shrink-0"></span>
+                                            <span className="text-xs font-bold text-rose-350 truncate" title={cautionNote ? cautionNote.trim() : "ยังไม่มีข้อควรระวังเพิ่มเติม"}>
+                                                {cautionNote && cautionNote.trim() ? cautionNote.trim() : "ยังไม่มีข้อควรระวังเพิ่มเติม"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                 
                                 {/* Left Input & Setting Card */}
