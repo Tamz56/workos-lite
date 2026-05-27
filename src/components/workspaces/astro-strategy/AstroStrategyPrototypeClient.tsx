@@ -907,6 +907,22 @@ ${cautionsMarkdown}
         "Pause & Calibrate": "พักจังหวะและปรับสมดุล (Pause & Calibrate)"
     };
 
+    // ASTRO-APP-DEV-025B: Priority Badge Mappings
+    const priorityBadgeThaiMap: Record<string, { label: string; className: string }> = {
+        "Stabilize & Structure": {
+            label: "ความสำคัญ: จัดระบบรากฐาน",
+            className: "px-2 py-0.5 rounded text-[10px] font-bold bg-violet-955/50 text-violet-300 border border-violet-500/20"
+        },
+        "Focus & Deliver": {
+            label: "ความสำคัญ: ส่งมอบงานหลัก",
+            className: "px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-955/50 text-emerald-300 border border-emerald-500/20"
+        },
+        "Pause & Calibrate": {
+            label: "ความสำคัญ: ตั้งหลักและจัดจังหวะใหม่",
+            className: "px-2 py-0.5 rounded text-[10px] font-bold bg-rose-955/50 text-rose-300 border border-rose-500/20"
+        }
+    };
+
     const guardrailThaiMap: Record<string, string> = {
         "For personal reflection and planning only. Not medical advice, diagnosis, or treatment.":
             "ใช้เพื่อการสะท้อนคิดและวางแผนส่วนบุคคลเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา"
@@ -1101,12 +1117,17 @@ ${cautionsMarkdown}
                     {/* TAB 1: CURRENT CYCLE */}
                     {activeTab === "cycle" && (
                         <div className="space-y-8 animate-fadeIn">
-                            {/* Today Dashboard Compact Summary Card - ASTRO-APP-DEV-024B */}
+                            {/* Today Dashboard Compact Summary Card - ASTRO-APP-DEV-025B */}
                             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl shadow-slate-950/20">
                                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2.5 flex-wrap">
                                         <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">แผงสรุปสภาวะและกลยุทธ์วันนี้ (Today Dashboard Summary)</span>
+                                        {priorityBadgeThaiMap[strategyResult.strategyMode] && (
+                                            <span className={priorityBadgeThaiMap[strategyResult.strategyMode].className}>
+                                                {priorityBadgeThaiMap[strategyResult.strategyMode].label}
+                                            </span>
+                                        )}
                                     </div>
                                     <button
                                         type="button"
@@ -1118,9 +1139,9 @@ ${cautionsMarkdown}
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {/* 1. โหมดกลยุทธ์วันนี้ */}
+                                    {/* 1. โหมดวันนี้ */}
                                     <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5 flex flex-col justify-between min-h-[72px]">
-                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">โหมดกลยุทธ์วันนี้</span>
+                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">โหมดวันนี้</span>
                                         <div className="flex items-center gap-1.5">
                                             <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
                                             <span className="text-xs font-extrabold text-slate-200 truncate" title={strategyModeThaiMap[strategyResult.strategyMode] || strategyResult.strategyMode}>
@@ -1132,9 +1153,9 @@ ${cautionsMarkdown}
                                         </div>
                                     </div>
 
-                                    {/* 2. การขับเคลื่อนงานที่แนะนำ */}
+                                    {/* 2. โฟกัสวันนี้ */}
                                     <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5 flex flex-col justify-between min-h-[72px]">
-                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">การขับเคลื่อนงานที่แนะนำ</span>
+                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">โฟกัสวันนี้</span>
                                         <div className="flex items-center gap-1.5">
                                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
                                             <span className="text-xs font-bold text-slate-200 truncate" title={strategyResult.recommendedMove}>
@@ -1143,9 +1164,9 @@ ${cautionsMarkdown}
                                         </div>
                                     </div>
 
-                                    {/* 3. สภาวะเช็กอินวันนี้ */}
+                                    {/* 3. เช็กอินวันนี้ */}
                                     <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5 flex flex-col justify-between min-h-[72px]">
-                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">สภาวะเช็กอินวันนี้</span>
+                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">เช็กอินวันนี้</span>
                                         <div className="flex flex-wrap items-center gap-1 text-[10px]">
                                             <span className="px-1.5 py-0.5 rounded bg-slate-850 text-indigo-300 border border-slate-700/60 font-semibold truncate max-w-full">
                                                 ⚡ พลังงาน: {energyLevelLabels[energyLevel] ? energyLevelLabels[energyLevel].split(" / ")[0].trim() : energyLevel}
@@ -1156,9 +1177,9 @@ ${cautionsMarkdown}
                                         </div>
                                     </div>
 
-                                    {/* 4. ข้อควรระวังในการจัดจังหวะ */}
+                                    {/* 4. จุดที่ควรระวัง */}
                                     <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5 flex flex-col justify-between min-h-[72px]">
-                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">ข้อควรระวังในการจัดจังหวะ</span>
+                                        <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">จุดที่ควรระวัง</span>
                                         <div className="flex items-center gap-1.5">
                                             <span className="w-1.5 h-1.5 rounded-full bg-rose-450 flex-shrink-0"></span>
                                             <span className="text-xs font-bold text-rose-350 truncate" title={cautionNote ? cautionNote.trim() : "ยังไม่มีข้อควรระวังเพิ่มเติม"}>
