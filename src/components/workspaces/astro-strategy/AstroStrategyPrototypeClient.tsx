@@ -312,6 +312,9 @@ export default function AstroStrategyPrototypeClient() {
     const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
     const [copiedAllHistoryStatus, setCopiedAllHistoryStatus] = useState<string>("");
 
+    // ASTRO-APP-DEV-023B: Weekly Review Summary States
+    const [copiedWeeklyReviewStatus, setCopiedWeeklyReviewStatus] = useState<string>("");
+
     // Hydration check and LocalStorage loading
     useEffect(() => {
         setIsMounted(true);
@@ -780,6 +783,81 @@ ${itemMarkdown}
             console.error("Failed to copy all history:", err);
             setCopiedAllHistoryStatus("เกิดข้อผิดพลาดในการคัดลอก");
             setTimeout(() => setCopiedAllHistoryStatus(""), 2500);
+        }
+    };
+
+    // ASTRO-APP-DEV-023B: Weekly Review Summary Logic
+    const generateWeeklyReviewMarkdown = (): string => {
+        if (historyLogs.length === 0) return "# Astro Weekly Review Summary\n\nยังไม่มีประวัติการสะท้อนคิดที่ถูกบันทึกในเครื่อง";
+
+        const timestamp = new Date().toLocaleString("th-TH");
+        const latestLogs = historyLogs.slice(0, 5);
+        
+        // 1. หา Intention ล่าสุดที่มีการระบุ
+        let latestIntention = "ยังไม่มีข้อมูลความตั้งใจล่าสุด";
+        for (const log of historyLogs) {
+            if (log.dailyCheckinSnapshot?.todayIntention?.trim()) {
+                latestIntention = log.dailyCheckinSnapshot.todayIntention.trim();
+                break;
+            }
+        }
+
+        // 2. รวบรวม Caution Notes ย้อนหลัง 5 รายการ (ที่มีการระบุ)
+        const recentCautions: string[] = [];
+        latestLogs.forEach(log => {
+            const note = log.dailyCheckinSnapshot?.cautionNote?.trim();
+            if (note && !recentCautions.includes(note)) {
+                recentCautions.push(note);
+            }
+        });
+
+        let logsMarkdown = "";
+        latestLogs.forEach((log) => {
+            const dateDisplay = log.reflectionDate || log.createdAt;
+            const summaryText = log.reflectionSummary ? log.reflectionSummary.trim() : "ไม่มีข้อมูลการสะท้อนคิด";
+            logsMarkdown += `- ${dateDisplay} — โหมดสะท้อนคิด: ${log.reflectionMode || "Stabilize"} | โหมดกลยุทธ์: ${log.strategyMode || "Normal"}\n  สรุป: ${summaryText}\n`;
+        });
+
+        let cautionsMarkdown = "";
+        if (recentCautions.length > 0) {
+            recentCautions.forEach(note => {
+                cautionsMarkdown += `- ${note}\n`;
+            });
+        } else {
+            cautionsMarkdown = "ไม่มีข้อควรระวังล่าสุดในการจัดจังหวะส่วนตัวสัปดาห์นี้\n";
+        }
+
+        return `# Astro Weekly Review Summary
+
+Generated At: ${timestamp} (เวลาท้องถิ่น)
+Total Records in Archive: ${historyLogs.length}
+
+## Recent Reflection Logs (บันทึกสะท้อนคิดล่าสุด 5 รายการ)
+${logsMarkdown || "- ยังไม่มีบันทึกการสะท้อนคิด\n"}
+## Latest Intention (เป้าหมายความตั้งใจล่าสุด)
+> ${latestIntention}
+
+## Recent Caution Notes (ข้อควรระวังล่าสุดในการจัดจังหวะส่วนตัว)
+${cautionsMarkdown}
+---
+หมายเหตุ: สรุปนี้เป็นสรุปเชิงข้อมูลเชิงยุทธศาสตร์ที่สร้างจากประวัติสะท้อนคิด (Reflection History) และบริบทงานที่บันทึกไว้ในเบราว์เซอร์เครื่องนี้เท่านั้น ไม่ใช่การประเมินหรือคำแนะนำทางการแพทย์`;
+    };
+
+    const handleCopyWeeklyReview = async () => {
+        if (historyLogs.length === 0) return;
+        const markdown = generateWeeklyReviewMarkdown();
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(markdown);
+                setCopiedWeeklyReviewStatus("คัดลอกสรุปสัปดาห์แล้ว! ✅");
+                setTimeout(() => setCopiedWeeklyReviewStatus(""), 2000);
+            } else {
+                alert("เบราว์เซอร์ของคุณไม่รองรับการคัดลอกลงคลิปบอร์ดอัตโนมัติ");
+            }
+        } catch (err) {
+            console.error("Failed to copy weekly review summary:", err);
+            setCopiedWeeklyReviewStatus("เกิดข้อผิดพลาดในการคัดลอก");
+            setTimeout(() => setCopiedWeeklyReviewStatus(""), 2000);
         }
     };
 
@@ -2374,6 +2452,127 @@ ${itemMarkdown}
                                                     </div>
                                                 )}
                                             </div>
+                                        </div>
+
+                                        {/* ASTRO-APP-DEV-023B: Weekly Review Summary Section */}
+                                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
+                                            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <Compass className="w-4.5 h-4.5 text-violet-400" />
+                                                    <h4 className="text-sm font-semibold text-slate-200">บททบทวนภาพรวมรายสัปดาห์ (Weekly Review Summary)</h4>
+                                                </div>
+                                                {historyLogs.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleCopyWeeklyReview}
+                                                        className="text-[10px] text-violet-400 hover:text-violet-350 active:text-violet-500 font-semibold transition-colors flex items-center gap-1 border border-violet-500/20 px-2.5 py-1 rounded bg-violet-955/20 hover:bg-violet-955/35 active:scale-[0.98]"
+                                                    >
+                                                        <ClipboardList className="w-3.5 h-3.5 text-violet-300" />
+                                                        {copiedWeeklyReviewStatus ? copiedWeeklyReviewStatus : "คัดลอกสรุปสัปดาห์"}
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {historyLogs.length === 0 ? (
+                                                <div className="text-center py-6 px-4 border border-dashed border-slate-800 rounded-xl bg-slate-950/20 text-slate-500 italic space-y-1.5">
+                                                    <p className="text-xs">ยังไม่มีข้อมูลสำหรับจัดทำบททบทวนประจำสัปดาห์</p>
+                                                    <p className="text-[10px] text-slate-600 max-w-sm mx-auto leading-relaxed not-italic">
+                                                        เมื่อคุณบันทึกสะท้อนคิดประจำวันเข้าสู่ระบบประวัติอย่างน้อย 1 รายการ คลังความรู้ท้องถิ่นนี้จะประมวลผลสรุปความตั้งใจหลัก โหมดกลยุทธ์ และข้อควรระวังให้โดยอัตโนมัติ
+                                                    </p>
+                                                </div>
+                                            ) : (() => {
+                                                const latestLogs = historyLogs.slice(0, 5);
+                                                
+                                                // ค้นหา Intention ล่าสุดที่มีข้อมูล
+                                                let latestIntention = "ยังไม่มีข้อมูลความตั้งใจล่าสุด";
+                                                for (const log of historyLogs) {
+                                                    if (log.dailyCheckinSnapshot?.todayIntention?.trim()) {
+                                                        latestIntention = log.dailyCheckinSnapshot.todayIntention.trim();
+                                                        break;
+                                                    }
+                                                }
+
+                                                // รวบรวม Caution Notes ล่าสุด (5 วันย้อนหลัง) ที่มีข้อมูลจริง
+                                                const recentCautions: string[] = [];
+                                                latestLogs.forEach(log => {
+                                                    const note = log.dailyCheckinSnapshot?.cautionNote?.trim();
+                                                    if (note && !recentCautions.includes(note)) {
+                                                        recentCautions.push(note);
+                                                    }
+                                                });
+
+                                                return (
+                                                    <div className="space-y-4 text-xs leading-relaxed text-slate-300">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {/* ฝั่งซ้าย: บันทึกล่าสุด */}
+                                                            <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-2">
+                                                                <h5 className="font-semibold text-slate-350 flex items-center gap-1.5 pb-1.5 border-b border-slate-800/40">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                                                                    ความเคลื่อนไหวสะท้อนคิด 5 รอบล่าสุด
+                                                                </h5>
+                                                                <ul className="space-y-2 max-h-[160px] overflow-y-auto pr-1 scrollbar-thin">
+                                                                    {latestLogs.map((log) => {
+                                                                        const dateDisplay = log.reflectionDate || log.createdAt;
+                                                                        return (
+                                                                            <li key={log.id} className="space-y-0.5 border-b border-slate-900/50 pb-1.5 last:border-0 last:pb-0">
+                                                                                <div className="flex justify-between items-center text-[10px]">
+                                                                                    <span className="font-mono text-slate-400">{dateDisplay}</span>
+                                                                                    <span className="px-1 py-0.2 rounded bg-slate-800 text-slate-300 font-semibold scale-90 border border-slate-700/60 text-[9px]">
+                                                                                        {log.strategyMode}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <p className="text-[10px] text-slate-400 line-clamp-1 italic">
+                                                                                    &quot;{log.reflectionSummary || "(ไม่มีข้อความ)"}&quot;
+                                                                                </p>
+                                                                            </li>
+                                                                        );
+                                                                    })}
+                                                                </ul>
+                                                            </div>
+
+                                                            {/* ฝั่งขวา: ข้อมูลสภาวะ/Caution Notes */}
+                                                            <div className="space-y-3">
+                                                                {/* ความตั้งใจล่าสุด */}
+                                                                <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5">
+                                                                    <h5 className="font-semibold text-slate-350 flex items-center gap-1.5">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-450"></span>
+                                                                        ความตั้งใจหลักรอบล่าสุด (Latest Intention)
+                                                                    </h5>
+                                                                    <p className="text-[11px] text-emerald-400 italic bg-emerald-950/10 border border-emerald-500/10 p-2 rounded-lg leading-relaxed">
+                                                                        &quot;{latestIntention}&quot;
+                                                                    </p>
+                                                                </div>
+
+                                                                {/* ข้อควรระวังในการจัดจังหวะส่วนตัว */}
+                                                                <div className="bg-slate-950/30 rounded-xl p-3.5 border border-slate-800/50 space-y-1.5">
+                                                                    <h5 className="font-semibold text-slate-350 flex items-center gap-1.5">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-450"></span>
+                                                                        ข้อควรระวังล่าสุดในการจัดจังหวะส่วนตัว
+                                                                    </h5>
+                                                                    {recentCautions.length > 0 ? (
+                                                                        <ul className="list-disc list-inside space-y-1 pl-1 text-[10px] text-slate-400">
+                                                                            {recentCautions.map((note, idx) => (
+                                                                                <li key={idx} className="line-clamp-1" title={note}>
+                                                                                    {note}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    ) : (
+                                                                        <p className="text-[10px] text-slate-500 italic pl-1">
+                                                                            ไม่มีข้อบันทึกเตือนความจำในสัปดาห์นี้
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Disclaimer */}
+                                                        <div className="text-[9px] text-slate-500 leading-relaxed pt-2 border-t border-slate-850/40">
+                                                            *หมายเหตุ: บททบทวนนี้ถูกคำนวณและสรุปโดยอัตโนมัติจากข้อมูลประวัติการสะท้อนคิดประจำวันและบริบทงานที่บันทึกไว้ในเบราว์เซอร์เครื่องนี้เท่านั้น ไม่ใช่ผลวินิจฉัยหรือคำแนะนำทางการแพทย์
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
 
                                         {/* Reflection History List UI - ASTRO-APP-DEV-019B */}
