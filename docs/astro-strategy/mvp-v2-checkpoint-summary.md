@@ -27,11 +27,14 @@ Weekly Pattern Hints:
 Weekly Pattern Hints QA Record:
 296c0716be03cf0b0a6d2b482791908299355b1b
 
+MVP v2.0 Checkpoint Summary:
+0d4d9972763f3268ff74c1bc2ba08711e955e782
+
 Strategy Planning Notes:
-c109f8e404b08709e8638b97d19e0cc5be807e3a
+c109f8e182284e8fd4fded6f7a1361e0d778d172
 
 Strategy Planning Notes QA Record:
-b9745b8423f03b22b64d1f2fb8e6a575a7c20c02
+b9745b870a6ef73625d3c925d6a8d85ad3be7660
 
 Monthly Reflection Snapshot (Minimal):
 1b7dd8e6afc95c548da38cc72c1f92bcbe9a59f3
@@ -42,11 +45,23 @@ Monthly Reflection Snapshot (Completed Sections):
 Monthly Reflection Snapshot QA Record:
 b8aef9d73299defac091714a89f1d8b44e74262c
 
-Wai Kru / Teacher Reverence Placeholder:
+MVP v2.0 Updated Checkpoint Summary:
+8bd30c10eb3d1c0cce2fe46e5312801e936a94b8
+
+Wai Kru / Teacher Reverence:
 1cebc190b4db42b7374357f4cdd3ff5555065729
 
 Wai Kru / Teacher Reverence QA Record:
 c4e00ab613778f04615bfeda97b0233446c9b576
+
+MVP v2.0 Summary with Wai Kru:
+945f5419c8a36dc1acbed8cc0eb6ae46eb2e521f
+
+Personal Timing Guide:
+806cd415f5b4ba13ece46fa4ab30f3bf06ac5d6f
+
+Personal Timing Guide QA Record:
+5e1c51e6cee7298c57cf54e53bc2fae382929f8a
 ```
 
 ---
@@ -76,9 +91,13 @@ c4e00ab613778f04615bfeda97b0233446c9b576
     *   ขยายขอบเขตฟังก์ชันเพิ่ม 3 หมวดรายละเอียดอักษรไทย: **ความตั้งใจที่ปรากฏซ้ำ** (Today Intentions), **ข้อควรระวังที่ปรากฏซ้ำ** (Caution Notes) และ **สิ่งที่ควรกลับมาติดตาม** (Review Later) โดยประมวลผลแบบเบาบางอย่างปลอดภัยสูงสุด
 5.  **Wai Kru / Teacher Reverence Placeholder (v0.1):**
     *   ติดตั้งการ์ดเคารพบูชาครู (Wai Kru) ที่ประณีตสวยงามและสอดคล้องกับจรรยาบรรณวิชาชีพ
-    *   นำเสนอหลักจริยธรรม ๓ ประการ: **กตัญญูปัญญา** ( Wisdom Reverence), **จริยธรรมการเรียนรู้** (Ethical Purpose) และ **อัตตาธิปไตยแห่งสติ** (Intellectual Balance)
+    *   นำเสนอหลักจริยธรรม ๓ ประการ: **กตัญญูปัญญา** (Wisdom Reverence), **จริยธรรมการเรียนรู้** (Ethical Purpose) และ **อัตตาธิปไตยแห่งสติ** (Intellectual Balance)
     *   กำหนดกรอบและขอบเขตทางความคิดเชิงกลยุทธ์ ปราศจากการกล่าวอ้างเรื่องเหนือธรรมชาติหรือวิธีการทำพิธีกรรมทางไสยศาสตร์ 100%
-6.  **Local-first Design Integrity:**
+6.  **Personal Timing Guide (v0.1):**
+    *   ติดตั้งการ์ดคู่มือการจัดจังหวะเวลาส่วนบุคคล (Personal Timing Guide) 4 มิติจังหวะกลยุทธ์ (Daily, Weekly, Monthly, Planning)
+    *   ช่วยอธิบายให้ผู้ใช้เข้าถึงโครงข่ายการสะท้อนคิดตนเองอย่างมีทัศนคติที่ดี มีสติ และรอบคอบ ไม่ตกเป็นทาสของความหวาดกลัวเชิงโชคชะตา
+    *   ประมวลผลแบบ Static อ่านอย่างเดียว ทำงานแบบออฟไลน์ ปราศจากการคำนวณใหม่หรือ API ระบบหลังบ้าน
+7.  **Local-first Design Integrity:**
     *   ทำงานแบบฝั่งผู้ใช้ออฟไลน์ทั้งหมด (Client-side Only) โดยใช้ `localStorage` ร่วมกับข้อมูลความปลอดภัย
     *   ไม่มีการทำ API Call หรือการเชื่อมต่อโมเดลระบบภายนอกใดๆ ช่วยรักษาความเป็นส่วนตัวอย่างสมบูรณ์
     *   มีบทแถลงจำกัดความรับผิดชอบอย่างรัดกุม (Safety boundaries & disclaimers) ในทุกกล่องสรุปผล
@@ -90,4 +109,3 @@ c4e00ab613778f04615bfeda97b0233446c9b576
 *   **Lint Status:** ผ่านสำเร็จสมบูรณ์ ไร้ข้อผิดพลาดด้าน Type หรือ Syntax (`npm run lint` $\rightarrow$ `0 errors`)
 *   **Build Status:** เจเนอเรตและ Prerender หน้า Static เพจ `/workspaces/astro-strategy` ได้สำเร็จลุล่วง ราบรื่น 100% (`npm run build` $\rightarrow$ `Compiled successfully`)
 *   **Git Status Integrity:** แก้ไขและคอมมิตเฉพาะส่วนโค้ดที่ผ่านการทดสอบเท่านั้น โดยไม่มีการเปลี่ยนแปลงที่ผิดจุดประสงค์ใน Workspace อื่น
-
