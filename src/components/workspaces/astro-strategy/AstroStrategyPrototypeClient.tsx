@@ -2357,6 +2357,61 @@ ${cautionsMarkdown}
                                 </div>
                             </div>
 
+                            {/* ASTRO-APP-DEV-030: Personal Timing Guide */}
+                            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-5">
+                                <div className="border-b border-slate-800 pb-3 flex items-center gap-2">
+                                    <Clock className="w-5 h-5 text-teal-400" />
+                                    <div className="space-y-0.5">
+                                        <h3 className="text-lg font-bold text-slate-100">คู่มือแนวทางการจัดจังหวะเวลาส่วนบุคคล (Personal Timing Guide)</h3>
+                                        <p className="text-xs text-slate-400">วิธีบูรณาการมิติต่างๆ ของเวลาเพื่อการจัดระเบียบสมาธิและการฟื้นฟูอย่างมีประสิทธิภาพ</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    {/* 1. Daily Check-in */}
+                                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-2">
+                                        <span className="text-[10px] text-teal-400 font-bold tracking-wider uppercase block">มิติรายวัน (Daily)</span>
+                                        <h4 className="text-xs font-bold text-slate-200">สังเกตสภาวะปัจจุบัน</h4>
+                                        <p className="text-[11px] text-slate-450 leading-relaxed">
+                                            บันทึกระดับพลังงาน สมาธิ และสัญญาณทางกายทุกวัน เพื่อจัดสรรงานที่เหมาะกับสภาพความเป็นจริงของร่างกายและสมอง ณ เวลานั้น
+                                        </p>
+                                    </div>
+
+                                    {/* 2. Weekly Review */}
+                                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-2">
+                                        <span className="text-[10px] text-violet-400 font-bold tracking-wider uppercase block">มิติรายสัปดาห์ (Weekly)</span>
+                                        <h4 className="text-xs font-bold text-slate-200">ตรวจสอบความถี่สะสม</h4>
+                                        <p className="text-[11px] text-slate-455 leading-relaxed">
+                                            สังเกตแนวโน้มพลังงานที่โดดเด่นและธีมที่ปรากฏซ้ำรอบ 5 วันล่าสุด เพื่อจัดปรับสมดุลกิจกรรมหลังบ้านและหน้าบ้านให้เหมาะสมสอดคล้องกัน
+                                        </p>
+                                    </div>
+
+                                    {/* 3. Monthly Snapshot */}
+                                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-2">
+                                        <span className="text-[10px] text-amber-400 font-bold tracking-wider uppercase block">มิติรายเดือน (Monthly)</span>
+                                        <h4 className="text-xs font-bold text-slate-200">ถอดรหัสภาพรวมกว้าง</h4>
+                                        <p className="text-[11px] text-slate-460 leading-relaxed">
+                                            ทบทวนสถิติภาพใหญ่ เพื่อวิเคราะห์ว่าระดับพลังงานหลักหรือข้อควรระวังประเภทใดที่เกิดซ้ำมากที่สุด ช่วยชี้วัดเป้าหมายระยะสั้น
+                                        </p>
+                                    </div>
+
+                                    {/* 4. Strategy Notes */}
+                                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-2">
+                                        <span className="text-[10px] text-indigo-400 font-bold tracking-wider uppercase block">แผนกลยุทธ์ (Planning)</span>
+                                        <h4 className="text-xs font-bold text-slate-200">แปลงผลสู่การลงมือทำ</h4>
+                                        <p className="text-[11px] text-slate-465 leading-relaxed">
+                                            นำสิ่งที่สังเกตพบจากทุกระดับเวลา มากำหนดสิ่งที่ต้องโฟกัส สิ่งที่ต้องชะลอตัวลง และระบุการกระทำเล็กๆ ที่พร้อมทำได้ทันที
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-950/20 border border-slate-850 p-4 rounded-xl text-center">
+                                    <p className="text-xs text-slate-400 leading-relaxed">
+                                        {"\u201Cการมีสติรับรู้จังหวะเวลาของตนเอง ไม่ใช่การยอมรับข้อจำกัดเชิงโชคชะตา แต่คือการประเมินกำลังเพื่อการเคลื่อนไหวที่ชาญฉลาดและปลอดภัยที่สุด\u201D"}
+                                    </p>
+                                </div>
+                            </div>
+
                             {/* Reflection Log Input & History */}
                             <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6">
                                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
