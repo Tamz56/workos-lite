@@ -41,6 +41,12 @@ Monthly Reflection Snapshot (Completed Sections):
 
 Monthly Reflection Snapshot QA Record:
 b8aef9d73299defac091714a89f1d8b44e74262c
+
+Wai Kru / Teacher Reverence Placeholder:
+1cebc190b4db42b7374357f4cdd3ff5555065729
+
+Wai Kru / Teacher Reverence QA Record:
+c4e00ab613778f04615bfeda97b0233446c9b576
 ```
 
 ---
@@ -68,7 +74,11 @@ b8aef9d73299defac091714a89f1d8b44e74262c
     *   ติดตั้งการ์ดสรุปภาพรวมรอบเดือน (Monthly Reflection Snapshot) ในตำแหน่งที่ถูกต้องตามข้อกำหนดการจัดเรียง
     *   นำเสนอตัวชี้วัดสถิติ 3 ด้าน: จำนวนบันทึกสะสมในเดือนปัจจุบัน, โหมดหลักที่โดดเด่น, และ ระดับพลังงานหลักที่เด่นชัด
     *   ขยายขอบเขตฟังก์ชันเพิ่ม 3 หมวดรายละเอียดอักษรไทย: **ความตั้งใจที่ปรากฏซ้ำ** (Today Intentions), **ข้อควรระวังที่ปรากฏซ้ำ** (Caution Notes) และ **สิ่งที่ควรกลับมาติดตาม** (Review Later) โดยประมวลผลแบบเบาบางอย่างปลอดภัยสูงสุด
-5.  **Local-first Design Integrity:**
+5.  **Wai Kru / Teacher Reverence Placeholder (v0.1):**
+    *   ติดตั้งการ์ดเคารพบูชาครู (Wai Kru) ที่ประณีตสวยงามและสอดคล้องกับจรรยาบรรณวิชาชีพ
+    *   นำเสนอหลักจริยธรรม ๓ ประการ: **กตัญญูปัญญา** ( Wisdom Reverence), **จริยธรรมการเรียนรู้** (Ethical Purpose) และ **อัตตาธิปไตยแห่งสติ** (Intellectual Balance)
+    *   กำหนดกรอบและขอบเขตทางความคิดเชิงกลยุทธ์ ปราศจากการกล่าวอ้างเรื่องเหนือธรรมชาติหรือวิธีการทำพิธีกรรมทางไสยศาสตร์ 100%
+6.  **Local-first Design Integrity:**
     *   ทำงานแบบฝั่งผู้ใช้ออฟไลน์ทั้งหมด (Client-side Only) โดยใช้ `localStorage` ร่วมกับข้อมูลความปลอดภัย
     *   ไม่มีการทำ API Call หรือการเชื่อมต่อโมเดลระบบภายนอกใดๆ ช่วยรักษาความเป็นส่วนตัวอย่างสมบูรณ์
     *   มีบทแถลงจำกัดความรับผิดชอบอย่างรัดกุม (Safety boundaries & disclaimers) ในทุกกล่องสรุปผล
