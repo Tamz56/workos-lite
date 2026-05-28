@@ -3001,6 +3001,93 @@ ${cautionsMarkdown}
                                             </div>
                                         </div>
 
+                                        {/* ASTRO-APP-DEV-027E: Monthly Reflection Snapshot */}
+                                        {(() => {
+                                            const now = new Date();
+                                            const currentYear = now.getFullYear();
+                                            const currentMonth = now.getMonth(); // 0-indexed
+                                            const monthLabel = now.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+
+                                            // Filter history logs for this month
+                                            const monthLogs = historyLogs.filter(log => {
+                                                try {
+                                                    const d = new Date(log.reflectionDate || log.createdAt);
+                                                    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+                                                } catch { return false; }
+                                            });
+
+                                            const totalThisMonth = monthLogs.length;
+
+                                            // Most frequent reflection mode
+                                            const modeCounts: Record<string, number> = {};
+                                            monthLogs.forEach(log => {
+                                                const m = log.reflectionMode || "ไม่ระบุ";
+                                                modeCounts[m] = (modeCounts[m] || 0) + 1;
+                                            });
+                                            const topMode = Object.entries(modeCounts).sort((a, b) => b[1] - a[1])[0];
+
+                                            // Most frequent energy level
+                                            const energyCounts: Record<string, number> = {};
+                                            monthLogs.forEach(log => {
+                                                const e = log.dailyCheckinSnapshot?.energyLevel || "ไม่ระบุ";
+                                                energyCounts[e] = (energyCounts[e] || 0) + 1;
+                                            });
+                                            const topEnergy = Object.entries(energyCounts).sort((a, b) => b[1] - a[1])[0];
+
+                                            const energyLabelMap: Record<string, string> = {
+                                                steady: "คงที่ (Steady)",
+                                                high: "สูง (High)",
+                                                low: "ต่ำ (Low)",
+                                                scattered: "กระจัดกระจาย (Scattered)",
+                                            };
+
+                                            return (
+                                                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-3 mt-6">
+                                                    <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
+                                                        <Calendar className="w-4.5 h-4.5 text-teal-400" />
+                                                        <h4 className="text-sm font-semibold text-slate-200">
+                                                            สรุปรอบเดือน (Monthly Reflection Snapshot)
+                                                        </h4>
+                                                        <span className="ml-auto text-[10px] text-slate-500">{monthLabel}</span>
+                                                    </div>
+
+                                                    {totalThisMonth === 0 ? (
+                                                        <p className="text-xs text-slate-500 italic py-2">
+                                                            ยังไม่มีบันทึกสะท้อนคิดในเดือนนี้ — เริ่มบันทึกจากแบบฟอร์มด้านบนได้เลย
+                                                        </p>
+                                                    ) : (
+                                                        <div className="grid grid-cols-3 gap-3">
+                                                            {/* Stat: Total reflections */}
+                                                            <div className="bg-slate-950/60 border border-slate-800/60 rounded-lg p-3 text-center">
+                                                                <div className="text-lg font-bold text-teal-300">{totalThisMonth}</div>
+                                                                <div className="text-[10px] text-slate-400 mt-0.5">บันทึกเดือนนี้</div>
+                                                            </div>
+
+                                                            {/* Stat: Top mode */}
+                                                            <div className="bg-slate-950/60 border border-slate-800/60 rounded-lg p-3 text-center">
+                                                                <div className="text-sm font-semibold text-violet-300 truncate" title={topMode ? topMode[0] : ""}>
+                                                                    {topMode ? topMode[0] : "—"}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-400 mt-0.5">โหมดหลัก</div>
+                                                            </div>
+
+                                                            {/* Stat: Top energy */}
+                                                            <div className="bg-slate-950/60 border border-slate-800/60 rounded-lg p-3 text-center">
+                                                                <div className="text-sm font-semibold text-amber-300 truncate" title={topEnergy ? topEnergy[0] : ""}>
+                                                                    {topEnergy ? (energyLabelMap[topEnergy[0]] || topEnergy[0]) : "—"}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-400 mt-0.5">พลังงานหลัก</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="text-[10px] text-slate-500 leading-relaxed pt-1 text-center">
+                                                        {"\u201Cสรุปอัตโนมัติจากประวัติสะท้อนคิดที่บันทึกในเบราว์เซอร์นี้เท่านั้น\u201D"}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
                                         {/* Reflection History List UI - ASTRO-APP-DEV-019B */}
                                         <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
                                             <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
