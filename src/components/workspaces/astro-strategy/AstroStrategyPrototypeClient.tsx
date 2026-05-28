@@ -2158,12 +2158,45 @@ ${cautionsMarkdown}
                                                 น้อมเคารพบูชาครู (Wai Kru)
                                             </h4>
                                         </div>
-                                        <p className="text-sm text-slate-200 leading-relaxed">
+                                        <p className="text-xs text-slate-300 leading-relaxed">
                                             ตามความเชื่อที่ได้รับการบอกเล่าและการศึกษาเชิงสัญศาสตร์ โหราศาสตร์และการคิดคำนวณจังหวะชีวิต 
                                             มีรากฐานมาจากความอุตสาหะของปราชญ์และครูบาอาจารย์ในอดีตหลายชั่วอายุคน 
-                                            เราขอนอบน้อมระลึกถึงพระคุณของครูบารวมถึงคุณธรรมในการถือจริยธรรมของนักพยากรณ์ 
-                                            ซึ่งเน้นการช่วยเหลือเกื้อกูลจิตใจเพื่อนมนุษย์ มิใช่เพื่อความโอ้อวดกิเลสหรือเอารัดเอาเปรียบผู้อื่น
+                                            เราขอนอบน้อมระลึกถึงพระคุณของครูบารวมถึงคุณธรรมในการถือจริยธรรมของนักพยากรณ์
                                         </p>
+
+                                        {/* Core Reverence Principles */}
+                                        <div className="space-y-3 pt-1">
+                                            <div className="p-2.5 bg-slate-950/40 border border-slate-800/80 rounded-lg space-y-1">
+                                                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                                                    <span>๑. กตัญญูปัญญา (Wisdom Reverence)</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 leading-relaxed">
+                                                    เคารพและระลึกถึงสติปัญญาของปราชญ์โบราณผู้พากเพียรสังเกตดวงดาว วางแผนที่ฟ้า และคำนวณปฏิทินเวลาเพื่อประโยชน์แก่มวลมนุษยชาติ
+                                                </p>
+                                            </div>
+
+                                            <div className="p-2.5 bg-slate-950/40 border border-slate-800/80 rounded-lg space-y-1">
+                                                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                                                    <span>๒. จริยธรรมการเรียนรู้ (Ethical Purpose)</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 leading-relaxed">
+                                                    มุ่งใช้ความรู้และการประเมินจังหวะชีวิตเพื่อเกื้อหนุน เยียวยาจิตใจ และสร้างสรรค์ความหวังในชีวิตแก่เพื่อนมนุษย์ มิใช่เพื่อความโอ้อวดหรือหลอกลวง
+                                                </p>
+                                            </div>
+
+                                            <div className="p-2.5 bg-slate-950/40 border border-slate-800/80 rounded-lg space-y-1">
+                                                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                                                    <span>๓. อัตตาธิปไตยแห่งสติ (Intellectual Balance)</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 leading-relaxed">
+                                                    ไม่ตกเป็นทาสความหวาดกลัวเชิงโชคชะตา ใช้สัญลักษณ์ดวงดาวเป็นกระจกส่องพฤติกรรม และมีสติเป็นเข็มทิศในการตัดสินใจเชิงกลยุทธ์สูงสุด
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="text-[9px] text-slate-500 italic text-center pt-1 border-t border-slate-850/40">
+                                            {"\u201Cกตัญญุตาต่อครูอาจารย์ด้วยการรักษาสัจจะและความมีจริยธรรม\u201D"}
+                                        </div>
                                     </div>
                                 </div>
 
