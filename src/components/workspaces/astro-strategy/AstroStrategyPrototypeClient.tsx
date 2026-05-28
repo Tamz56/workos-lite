@@ -3081,6 +3081,76 @@ ${cautionsMarkdown}
                                                         </div>
                                                     )}
 
+                                                    {/* ASTRO-APP-DEV-027F: Monthly text sections */}
+                                                    {totalThisMonth > 0 && (() => {
+                                                        // Collect todayIntention texts that are non-empty
+                                                        const intentions = monthLogs
+                                                            .map(log => log.dailyCheckinSnapshot?.todayIntention?.trim())
+                                                            .filter((t): t is string => !!t && t.length > 0);
+
+                                                        // Collect cautionNote texts that are non-empty
+                                                        const cautions = monthLogs
+                                                            .map(log => log.dailyCheckinSnapshot?.cautionNote?.trim())
+                                                            .filter((t): t is string => !!t && t.length > 0);
+
+                                                        // Follow-up: use planningReviewLater from Strategy Planning Notes
+                                                        const followUp = planningReviewLater?.trim() || "";
+
+                                                        return (
+                                                            <div className="space-y-3 pt-2 border-t border-slate-800/50">
+                                                                {/* 1. Recurring intentions */}
+                                                                <div>
+                                                                    <div className="text-[11px] font-semibold text-teal-400 mb-1">ความตั้งใจที่ปรากฏซ้ำ</div>
+                                                                    {intentions.length > 0 ? (
+                                                                        <ul className="space-y-1">
+                                                                            {intentions.slice(0, 5).map((text, i) => (
+                                                                                <li key={i} className="text-xs text-slate-300 leading-relaxed pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-teal-500/60">
+                                                                                    {text}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    ) : (
+                                                                        <p className="text-xs text-slate-500 italic">
+                                                                            ยังไม่พบข้อความความตั้งใจที่ชัดเจนพอจากบันทึกของเดือนนี้
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* 2. Recurring cautions */}
+                                                                <div>
+                                                                    <div className="text-[11px] font-semibold text-amber-400 mb-1">ข้อควรระวังที่ปรากฏซ้ำ</div>
+                                                                    {cautions.length > 0 ? (
+                                                                        <ul className="space-y-1">
+                                                                            {cautions.slice(0, 5).map((text, i) => (
+                                                                                <li key={i} className="text-xs text-slate-300 leading-relaxed pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-amber-500/60">
+                                                                                    {text}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    ) : (
+                                                                        <p className="text-xs text-slate-500 italic">
+                                                                            ยังไม่พบข้อความข้อควรระวังที่ชัดเจนพอจากบันทึกของเดือนนี้
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* 3. Things to follow up */}
+                                                                <div>
+                                                                    <div className="text-[11px] font-semibold text-indigo-400 mb-1">สิ่งที่ควรกลับมาติดตาม</div>
+                                                                    {followUp ? (
+                                                                        <p className="text-xs text-slate-300 leading-relaxed">
+                                                                            {followUp}
+                                                                        </p>
+                                                                    ) : (
+                                                                        <p className="text-xs text-slate-500 italic">
+                                                                            ยังไม่มีรายการติดตาม — สามารถเพิ่มได้จาก Strategy Planning Notes ด้านบน
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })()}
+
                                                     <div className="text-[10px] text-slate-500 leading-relaxed pt-1 text-center">
                                                         {"\u201Cสรุปอัตโนมัติจากประวัติสะท้อนคิดที่บันทึกในเบราว์เซอร์นี้เท่านั้น\u201D"}
                                                     </div>
