@@ -78,6 +78,15 @@ f7486be
 
 Local Backup / Import-Export Safety QA Record:
 8ae333d0d492c3c80fe61ff3e7fd0f368f253239
+
+MVP v2.0 Summary with Local Backup Safety:
+05ce3322cf04b6bdebd0f29028bbc223612b1d14
+
+Monthly Planning Review:
+a6680e5
+
+Monthly Planning Review QA Record:
+a6e04986c99d53503e39c3ac7549196f5c93fa45
 ```
 
 ---
@@ -195,6 +204,41 @@ Confirmed:
 * No new persistent localStorage key, API, database, AI call, or astrology calculation added.
 * deriveStrategyMode and Strategy Rules Layer remain untouched.
 
+### Monthly Planning Review v0.1
+
+```text
+Feature Commit:
+a6680e5
+
+QA Record:
+a6e04986c99d53503e39c3ac7549196f5c93fa45
+docs/astro-strategy/qa-014-monthly-planning-review-regression.md
+```
+
+Purpose:
+
+* Adds a Monthly Planning Review section in the Reflection tab.
+* Connects Monthly Reflection Snapshot, Strategy Planning Notes, and current-month reflection history into a simple planning review.
+* Helps the user identify:
+
+  1. ทิศทางที่เดือนนี้สะท้อน
+  2. สิ่งที่ควรทำต่อ
+  3. สิ่งที่ควรชะลอหรือหยุดทบทวน
+  4. เมล็ดตั้งต้นของเดือนถัดไป
+* Keeps the feature read-only, deterministic, local-first, and non-predictive.
+* Does not save monthly review answers in v0.1.
+
+Confirmed:
+
+* Monthly Planning Review appears after Monthly Reflection Snapshot and before Reflection Export Pack.
+* Uses existing local state only.
+* No new persistent localStorage key added.
+* No schema change.
+* No save/copy/export/import behavior added.
+* No API, database, AI call, or astrology calculation added.
+* deriveStrategyMode and Strategy Rules Layer remain untouched.
+* Existing Monthly Reflection Snapshot, Reflection Export Pack, Local Backup Safety, and Reflection History remain usable.
+
 ---
 
 ## Current MVP v2.0 Capability Snapshot
@@ -209,6 +253,7 @@ Confirmed:
 - Weekly Pattern Hints from local history
 - Strategy Planning Notes
 - Monthly Reflection Snapshot
+- Monthly Planning Review
 - Wai Kru / Teacher Reverence ethics layer
 - Personal Timing Guide orientation layer
 - Reflection Export Pack / Markdown backup layer
@@ -242,6 +287,9 @@ Confirmed — Reflection Export Pack does not mutate source data
 Confirmed — Local Backup Safety does not add persistent localStorage keys
 Confirmed — Local Backup Safety does not import, restore, merge, or write back to source data
 Confirmed — Local Backup Safety does not automatically download files
+Confirmed — Monthly Planning Review does not add persistent localStorage keys
+Confirmed — Monthly Planning Review does not save review answers in v0.1
+Confirmed — Monthly Planning Review does not add save/copy/export/import behavior
 ```
 
 ---
@@ -249,7 +297,7 @@ Confirmed — Local Backup Safety does not automatically download files
 ## Updated Decision
 
 ```text
-Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, ethics and orientation layers, Markdown export, and a non-destructive local backup safety layer for preparing future import/export workflows.
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, Markdown export, and a non-destructive local backup safety layer.
 ```
 
 ---
@@ -257,10 +305,10 @@ Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → pl
 ## Recommended Next Development Direction
 
 ```text
-1. ASTRO-APP-DEV-033 — Monthly Planning Review v0.1
-2. ASTRO-APP-DEV-034 — Personal Timing Guide Enhancements v0.2
-3. ASTRO-APP-DEV-035 — Reflection Export Pack Enhancements v0.2
-4. ASTRO-APP-DEV-036 — Import Preview Validator v0.1
+1. ASTRO-APP-DEV-034 — Personal Timing Guide Enhancements v0.2
+2. ASTRO-APP-DEV-035 — Reflection Export Pack Enhancements v0.2
+3. ASTRO-APP-DEV-036 — Import Preview Validator v0.1
+4. ASTRO-APP-DEV-037 — Monthly Review Export Integration v0.1
 ```
 
 ---
