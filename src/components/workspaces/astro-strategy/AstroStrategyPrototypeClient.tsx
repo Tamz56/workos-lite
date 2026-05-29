@@ -326,6 +326,8 @@ export default function AstroStrategyPrototypeClient() {
     // ASTRO-APP-DEV-031: Reflection Export Pack States
     const [reflectionExportMarkdown, setReflectionExportMarkdown] = useState<string>("");
     const [reflectionExportCopied, setReflectionExportCopied] = useState<boolean>(false);
+    // ASTRO-APP-DEV-035: Reflection Export Scope Selector State
+    const [reflectionExportScope, setReflectionExportScope] = useState<"full" | "planning" | "monthly" | "history">("full");
 
     // ASTRO-APP-DEV-032: Local Backup / Import-Export Safety States
     const [localBackupPreview, setLocalBackupPreview] = useState<string>("");
@@ -897,24 +899,48 @@ ${cautionsMarkdown}
     };
 
     // ASTRO-APP-DEV-031: Reflection Export Pack Helper Functions
-    const buildReflectionExportMarkdown = (): string => {
+    const buildReflectionExportMarkdown = (scope: "full" | "planning" | "monthly" | "history"): string => {
         const timestamp = new Date().toLocaleString("th-TH");
         
-        // 1. Daily Reflection Draft & Check-in
-        const energyLevelLabel = energyLevelLabels[energyLevel] || energyLevel || "ยังไม่มีข้อมูลในส่วนนี้";
-        const clarityLevelLabel = clarityLevelLabels[clarityLevel] || clarityLevel || "ยังไม่มีข้อมูลในส่วนนี้";
-        const workloadPressureLabel = workloadPressureLabels[workloadPressure] || workloadPressure || "ยังไม่มีข้อมูลในส่วนนี้";
-        const focusConditionLabel = focusConditionLabels[focusCondition] || focusCondition || "ยังไม่มีข้อมูลในส่วนนี้";
-        const bodySignalLabel = bodySignalLabels[bodySignal] || bodySignal || "ยังไม่มีข้อมูลในส่วนนี้";
+        let md = `---
+source: astro-strategy-lab
+export_type: reflection_export_pack
+export_scope: ${scope}
+generated_at: ${new Date().toISOString()}
+local_only: true
+---
 
-        const rMode = reflectionMode?.trim() ? reflectionMode.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
-        const rSummary = reflectionSummary?.trim() ? reflectionSummary.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
-        const rNoticed = noticedNotes?.trim() ? noticedNotes.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
-        const rNextAction = nextRightAction?.trim() ? nextRightAction.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
-        const rIntention = todayIntention?.trim() ? todayIntention.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
-        const rCaution = cautionNote?.trim() ? cautionNote.trim() : "ไม่มี";
+# Astro Strategy Lab — Reflection Export Pack
 
-        const dailySection = `### Daily Reflection Draft Details
+## Export Metadata
+- Generated at: ${timestamp} (เวลาท้องถิ่น)
+- Source: Local browser data only
+- Scope: ${
+            scope === "full" ? "Full Reflection Pack (Daily / Weekly / Planning / Monthly / History)" :
+            scope === "planning" ? "Planning Only (Strategy Planning Notes & Monthly Planning Review)" :
+            scope === "monthly" ? "Monthly Review Only (Monthly Snapshot & Monthly Planning Review)" :
+            "History Only (Recent Reflection History)"
+        }
+`;
+
+        // 1. Daily Reflection Draft & Check-in (Full Only)
+        if (scope === "full") {
+            const energyLevelLabel = energyLevelLabels[energyLevel] || energyLevel || "ยังไม่มีข้อมูลในส่วนนี้";
+            const clarityLevelLabel = clarityLevelLabels[clarityLevel] || clarityLevel || "ยังไม่มีข้อมูลในส่วนนี้";
+            const workloadPressureLabel = workloadPressureLabels[workloadPressure] || workloadPressure || "ยังไม่มีข้อมูลในส่วนนี้";
+            const focusConditionLabel = focusConditionLabels[focusCondition] || focusCondition || "ยังไม่มีข้อมูลในส่วนนี้";
+            const bodySignalLabel = bodySignalLabels[bodySignal] || bodySignal || "ยังไม่มีข้อมูลในส่วนนี้";
+
+            const rMode = reflectionMode?.trim() ? reflectionMode.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+            const rSummary = reflectionSummary?.trim() ? reflectionSummary.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+            const rNoticed = noticedNotes?.trim() ? noticedNotes.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+            const rNextAction = nextRightAction?.trim() ? nextRightAction.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+            const rIntention = todayIntention?.trim() ? todayIntention.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+            const rCaution = cautionNote?.trim() ? cautionNote.trim() : "ไม่มี";
+
+            md += `
+## Daily Reflection Draft
+### Daily Reflection Draft Details
 - **โหมดสะท้อนคิด (Reflection Mode)**: ${rMode}
 - **สรุปสะท้อนคิดวันนี้ (Reflection Summary)**: ${rSummary}
 - **สิ่งที่สังเกตเห็นจากการจับคู่จังหวะเวลา (What I Noticed)**: ${rNoticed}
@@ -927,95 +953,99 @@ ${cautionsMarkdown}
 - **สภาวะสมาธิ (Focus Condition)**: ${focusConditionLabel}
 - **สัญญาณร่างกาย (Body Signal)**: ${bodySignalLabel}
 - **ความตั้งใจหลักวันนี้ (Today's Intention)**: ${rIntention}
-- **ข้อควรระวังเสริม (Caution Note)**: ${rCaution}`;
+- **ข้อควรระวังเสริม (Caution Note)**: ${rCaution}
+`;
+        }
 
-        // 2. Weekly Review Summary
-        let weeklyReviewStr = "";
-        if (historyLogs.length === 0) {
-            weeklyReviewStr = "ยังไม่มีข้อมูลในส่วนนี้";
-        } else {
-            const latestLogs = historyLogs.slice(0, 5);
-            let latestIntention = "ยังไม่มีข้อมูลความตั้งใจล่าสุด";
-            for (const log of historyLogs) {
-                if (log.dailyCheckinSnapshot?.todayIntention?.trim()) {
-                    latestIntention = log.dailyCheckinSnapshot.todayIntention.trim();
-                    break;
-                }
-            }
-            const recentCautions: string[] = [];
-            latestLogs.forEach(log => {
-                const note = log.dailyCheckinSnapshot?.cautionNote?.trim();
-                if (note && !recentCautions.includes(note)) {
-                    recentCautions.push(note);
-                }
-            });
-
-            let logsMarkdown = "";
-            latestLogs.forEach((log) => {
-                const dateDisplay = log.reflectionDate || log.createdAt;
-                const summaryText = log.reflectionSummary ? log.reflectionSummary.trim() : "ไม่มีข้อมูลการสะท้อนคิด";
-                logsMarkdown += `- ${dateDisplay} — โหมดสะท้อนคิด: ${log.reflectionMode || "Stabilize"} | โหมดกลยุทธ์: ${log.strategyMode || "Normal"}\n  สรุป: ${summaryText}\n`;
-            });
-
-            let cautionsMarkdown = "";
-            if (recentCautions.length > 0) {
-                recentCautions.forEach(note => {
-                    cautionsMarkdown += `- ${note}\n`;
-                });
+        // 2. Weekly Review Summary & 3. Weekly Pattern Hints (Full Only)
+        if (scope === "full") {
+            // Weekly Review Summary
+            let weeklyReviewStr = "";
+            if (historyLogs.length === 0) {
+                weeklyReviewStr = "ยังไม่มีข้อมูลในส่วนนี้";
             } else {
-                cautionsMarkdown = "- ไม่มีข้อควรระวังล่าสุดในการจัดจังหวะส่วนตัวสัปดาห์นี้\n";
-            }
+                const latestLogs = historyLogs.slice(0, 5);
+                let latestIntention = "ยังไม่มีข้อมูลความตั้งใจล่าสุด";
+                for (const log of historyLogs) {
+                    if (log.dailyCheckinSnapshot?.todayIntention?.trim()) {
+                        latestIntention = log.dailyCheckinSnapshot.todayIntention.trim();
+                        break;
+                    }
+                }
+                const recentCautions: string[] = [];
+                latestLogs.forEach(log => {
+                    const note = log.dailyCheckinSnapshot?.cautionNote?.trim();
+                    if (note && !recentCautions.includes(note)) {
+                        recentCautions.push(note);
+                    }
+                });
 
-            weeklyReviewStr = `### Recent Reflection Logs (บันทึกสะท้อนคิดล่าสุด 5 รายการ)
+                let logsMarkdown = "";
+                latestLogs.forEach((log) => {
+                    const dateDisplay = log.reflectionDate || log.createdAt;
+                    const summaryText = log.reflectionSummary ? log.reflectionSummary.trim() : "ไม่มีข้อมูลการสะท้อนคิด";
+                    logsMarkdown += `- ${dateDisplay} — โหมดสะท้อนคิด: ${log.reflectionMode || "Stabilize"} | โหมดกลยุทธ์: ${log.strategyMode || "Normal"}\n  สรุป: ${summaryText}\n`;
+                });
+
+                let cautionsMarkdown = "";
+                if (recentCautions.length > 0) {
+                    recentCautions.forEach(note => {
+                        cautionsMarkdown += `- ${note}\n`;
+                    });
+                } else {
+                    cautionsMarkdown = "- ไม่มีข้อควรระวังล่าสุดในการจัดจังหวะส่วนตัวสัปดาห์นี้\n";
+                }
+
+                weeklyReviewStr = `### Recent Reflection Logs (บันทึกสะท้อนคิดล่าสุด 5 รายการ)
 ${logsMarkdown || "- ยังไม่มีบันทึกการสะท้อนคิด\n"}
 ### Latest Intention (เป้าหมายความตั้งใจล่าสุด)
 > ${latestIntention}
 
 ### Recent Caution Notes (ข้อควรระวังล่าสุดในการจัดจังหวะส่วนตัว)
 ${cautionsMarkdown}`;
-        }
-
-        // 3. Weekly Pattern Hints
-        let weeklyPatternStr = "";
-        if (historyLogs.length < 3) {
-            weeklyPatternStr = "ยังไม่มีข้อมูลในส่วนนี้";
-        } else {
-            const latest5Logs = historyLogs.slice(0, 5);
-            let consistencyLevel = "เริ่มต้นตั้งหลัก";
-            if (historyLogs.length >= 7) {
-                consistencyLevel = "สม่ำเสมอดีเยี่ยม (7+ วัน)";
-            } else if (historyLogs.length >= 3) {
-                consistencyLevel = "จังหวะคงที่ (3-6 วัน)";
             }
 
-            const dominantEnergy = getDominantValue(latest5Logs, "energyLevel");
-            const dominantFocus = getDominantValue(latest5Logs, "focusCondition");
-
-            const recentIntentions = getRecentDistinctThemes(latest5Logs, "todayIntention");
-            const recentCautions = getRecentDistinctThemes(latest5Logs, "cautionNote");
-
-            let intentList = "";
-            if (recentIntentions.length > 0) {
-                recentIntentions.forEach(intent => {
-                    intentList += `- "${intent}"\n`;
-                });
+            // Weekly Pattern Hints
+            let weeklyPatternStr = "";
+            if (historyLogs.length < 3) {
+                weeklyPatternStr = "ยังไม่มีข้อมูลในส่วนนี้";
             } else {
-                intentList = "- ยังไม่มีบันทึกเป้าหมายความตั้งใจ\n";
-            }
+                const latest5Logs = historyLogs.slice(0, 5);
+                let consistencyLevel = "เริ่มต้นตั้งหลัก";
+                if (historyLogs.length >= 7) {
+                    consistencyLevel = "สม่ำเสมอดีเยี่ยม (7+ วัน)";
+                } else if (historyLogs.length >= 3) {
+                    consistencyLevel = "จังหวะคงที่ (3-6 วัน)";
+                }
 
-            let cautionList = "";
-            if (recentCautions.length > 0) {
-                recentCautions.forEach(caution => {
-                    cautionList += `- "${caution}"\n`;
-                });
-            } else {
-                cautionList = "- ยังไม่มีข้อบันทึกเตือนความจำย้อนหลัง\n";
-            }
+                const dominantEnergy = getDominantValue(latest5Logs, "energyLevel");
+                const dominantFocus = getDominantValue(latest5Logs, "focusCondition");
 
-            const energyDisp = energyLevelLabels[dominantEnergy] ? energyLevelLabels[dominantEnergy].split(" / ")[0].trim() : "ไม่มีข้อมูลหลัก";
-            const focusDisp = focusConditionLabels[dominantFocus] ? focusConditionLabels[dominantFocus].split(" / ")[0].trim() : "ไม่มีข้อมูลหลัก";
+                const recentIntentions = getRecentDistinctThemes(latest5Logs, "todayIntention");
+                const recentCautions = getRecentDistinctThemes(latest5Logs, "cautionNote");
 
-            weeklyPatternStr = `- **ความสม่ำเสมอในการจดบันทึก**: ${consistencyLevel} (จากประวัติทั้งหมด ${historyLogs.length} รายการ)
+                let intentList = "";
+                if (recentIntentions.length > 0) {
+                    recentIntentions.forEach(intent => {
+                        intentList += `- "${intent}"\n`;
+                    });
+                } else {
+                    intentList = "- ยังไม่มีบันทึกเป้าหมายความตั้งใจ\n";
+                }
+
+                let cautionList = "";
+                if (recentCautions.length > 0) {
+                    recentCautions.forEach(caution => {
+                        cautionList += `- "${caution}"\n`;
+                    });
+                } else {
+                    cautionList = "- ยังไม่มีข้อบันทึกเตือนความจำย้อนหลัง\n";
+                }
+
+                const energyDisp = energyLevelLabels[dominantEnergy] ? energyLevelLabels[dominantEnergy].split(" / ")[0].trim() : "ไม่มีข้อมูลหลัก";
+                const focusDisp = focusConditionLabels[dominantFocus] ? focusConditionLabels[dominantFocus].split(" / ")[0].trim() : "ไม่มีข้อมูลหลัก";
+
+                weeklyPatternStr = `- **ความสม่ำเสมอในการจดบันทึก**: ${consistencyLevel} (จากประวัติทั้งหมด ${historyLogs.length} รายการ)
 - **พลังงานสะสมส่วนใหญ่**: ${energyDisp}
 - **สมาธิและการจดจ่อส่วนใหญ่**: ${focusDisp}
 
@@ -1023,15 +1053,27 @@ ${cautionsMarkdown}`;
 ${intentList}
 ### ข้อควรระวังที่ปรากฏล่าสุด
 ${cautionList}`;
+            }
+
+            md += `
+## Weekly Review Summary
+${weeklyReviewStr}
+
+## Weekly Pattern Hints
+${weeklyPatternStr}
+`;
         }
 
-        // 4. Strategy Planning Notes
-        const planFocus = planningFocusNext?.trim() ? planningFocusNext.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
-        const planSlow = planningSlowDown?.trim() ? planningSlowDown.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
-        const planSmall = planningNextSmallAction?.trim() ? planningNextSmallAction.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
-        const planLater = planningReviewLater?.trim() ? planningReviewLater.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+        // 4. Strategy Planning Notes (Full, Planning Only)
+        if (scope === "full" || scope === "planning") {
+            const planFocus = planningFocusNext?.trim() ? planningFocusNext.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+            const planSlow = planningSlowDown?.trim() ? planningSlowDown.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+            const planSmall = planningNextSmallAction?.trim() ? planningNextSmallAction.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
+            const planLater = planningReviewLater?.trim() ? planningReviewLater.trim() : "ยังไม่มีข้อมูลในส่วนนี้";
 
-        const strategyPlanningStr = `### Focus Next
+            md += `
+## Strategy Planning Notes
+### Focus Next
 ${planFocus}
 
 ### Slow Down
@@ -1041,13 +1083,107 @@ ${planSlow}
 ${planSmall}
 
 ### Review Later
-${planLater}`;
+${planLater}
+`;
+        }
 
-        // 5. Monthly Reflection Snapshot
-        let monthlySnapshotStr = "";
-        if (historyLogs.length === 0) {
-            monthlySnapshotStr = "ยังไม่มีข้อมูลในส่วนนี้";
-        } else {
+        // 5. Monthly Reflection Snapshot & Monthly Planning Review
+        if (scope === "full" || scope === "monthly") {
+            let monthlySnapshotStr = "";
+            if (historyLogs.length === 0) {
+                monthlySnapshotStr = "ยังไม่มีข้อมูลในส่วนนี้";
+            } else {
+                const now = new Date();
+                const currentYear = now.getFullYear();
+                const currentMonth = now.getMonth();
+                const monthLabel = now.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+                const monthLogs = historyLogs.filter(log => {
+                    try {
+                        const d = new Date(log.reflectionDate || log.createdAt);
+                        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+                    } catch { return false; }
+                });
+
+                if (monthLogs.length === 0) {
+                    monthlySnapshotStr = "ยังไม่มีข้อมูลในส่วนนี้";
+                } else {
+                    const totalThisMonth = monthLogs.length;
+
+                    const modeCounts: Record<string, number> = {};
+                    monthLogs.forEach(log => {
+                        const m = log.reflectionMode || "ไม่ระบุ";
+                        modeCounts[m] = (modeCounts[m] || 0) + 1;
+                    });
+                    const topMode = Object.entries(modeCounts).sort((a, b) => b[1] - a[1])[0];
+
+                    const energyCounts: Record<string, number> = {};
+                    monthLogs.forEach(log => {
+                        const e = log.dailyCheckinSnapshot?.energyLevel || "ไม่ระบุ";
+                        energyCounts[e] = (energyCounts[e] || 0) + 1;
+                    });
+                    const topEnergy = Object.entries(energyCounts).sort((a, b) => b[1] - a[1])[0];
+
+                    const energyLabelMap: Record<string, string> = {
+                        steady: "คงที่ (Steady)",
+                        high: "สูง (High)",
+                        low: "ต่ำ (Low)",
+                        scattered: "กระจัดกระจาย (Scattered)",
+                    };
+
+                    const intentions = monthLogs
+                        .map(log => log.dailyCheckinSnapshot?.todayIntention?.trim())
+                        .filter((t): t is string => !!t && t.length > 0);
+
+                    const cautions = monthLogs
+                        .map(log => log.dailyCheckinSnapshot?.cautionNote?.trim())
+                        .filter((t): t is string => !!t && t.length > 0);
+
+                    const followUp = planningReviewLater?.trim() || "";
+
+                    let intentionList = "";
+                    if (intentions.length > 0) {
+                        intentions.slice(0, 5).forEach(text => {
+                            intentionList += `- ${text}\n`;
+                        });
+                    } else {
+                        intentionList = "- ยังไม่พบข้อความความตั้งใจที่ชัดเจนพอจากบันทึกของเดือนนี้\n";
+                    }
+
+                    let cautionList = "";
+                    if (cautions.length > 0) {
+                        cautions.slice(0, 5).forEach(text => {
+                            cautionList += `- ${text}\n`;
+                        });
+                    } else {
+                        cautionList = "- ยังไม่พบข้อความข้อควรระวังที่ชัดเจนพอจากบันทึกของเดือนนี้\n";
+                    }
+
+                    const topModeText = topMode ? topMode[0] : "—";
+                    const topEnergyText = topEnergy ? (energyLabelMap[topEnergy[0]] || topEnergy[0]) : "—";
+                    const followUpText = followUp ? followUp : "ยังไม่มีรายการติดตาม — สามารถเพิ่มได้จาก Strategy Planning Notes";
+
+                    monthlySnapshotStr = `- **รอบเดือน**: ${monthLabel}
+- **จำนวนบันทึกในเดือนนี้**: ${totalThisMonth} รายการ
+- **โหมดการทำงานหลัก**: ${topModeText}
+- **ระดับพลังงานหลัก**: ${topEnergyText}
+
+### ความตั้งใจที่ปรากฏซ้ำในเดือนนี้
+${intentionList}
+### ข้อควรระวังที่ปรากฏซ้ำในเดือนนี้
+${cautionList}
+### สิ่งที่ควรกลับมาติดตาม
+${followUpText}`;
+                }
+            }
+
+            md += `
+## Monthly Reflection Snapshot
+${monthlySnapshotStr}
+`;
+        }
+
+        // Monthly Planning Review (Full, Planning, Monthly)
+        if (scope === "full" || scope === "planning" || scope === "monthly") {
             const now = new Date();
             const currentYear = now.getFullYear();
             const currentMonth = now.getMonth();
@@ -1059,117 +1195,125 @@ ${planLater}`;
                 } catch { return false; }
             });
 
-            if (monthLogs.length === 0) {
-                monthlySnapshotStr = "ยังไม่มีข้อมูลในส่วนนี้";
+            const totalThisMonth = monthLogs.length;
+
+            const modeCounts: Record<string, number> = {};
+            monthLogs.forEach(log => {
+                const m = log.reflectionMode || "ไม่ระบุ";
+                modeCounts[m] = (modeCounts[m] || 0) + 1;
+            });
+            const topMode = Object.entries(modeCounts).sort((a, b) => b[1] - a[1])[0];
+
+            const energyCounts: Record<string, number> = {};
+            monthLogs.forEach(log => {
+                const e = log.dailyCheckinSnapshot?.energyLevel || "ไม่ระบุ";
+                energyCounts[e] = (energyCounts[e] || 0) + 1;
+            });
+            const topEnergy = Object.entries(energyCounts).sort((a, b) => b[1] - a[1])[0];
+
+            const energyLabelMap: Record<string, string> = {
+                steady: "คงที่ (Steady)",
+                high: "สูง (High)",
+                low: "ต่ำ (Low)",
+                scattered: "กระจัดกระจาย (Scattered)",
+            };
+
+            let directionContent = "จากบันทึกของเดือนนี้ อาจเห็นทิศทางเบื้องต้นจากจำนวนบันทึก โหมดที่พบบ่อย และพลังงานหลักที่ปรากฏซ้ำ";
+            if (totalThisMonth === 0) {
+                directionContent = "ยังมีข้อมูลรายเดือนไม่มากพอสำหรับสะท้อนทิศทางที่ชัดเจน";
             } else {
-                const totalThisMonth = monthLogs.length;
+                const topModeStr = topMode ? topMode[0] : "";
+                const topEnergyStr = topEnergy ? (energyLabelMap[topEnergy[0]] || topEnergy[0]) : "";
+                
+                const details = [];
+                if (topModeStr && topModeStr !== "ไม่ระบุ") details.push(`โหมดที่พบเด่นชัดคือ "${topModeStr}"`);
+                if (topEnergyStr && topEnergyStr !== "ไม่ระบุ") details.push(`ระดับพลังงานหลักอยู่ในสภาวะ "${topEnergyStr}"`);
+                
+                if (details.length > 0) {
+                    directionContent = `ในรอบเดือน ${monthLabel} นี้ มีการบันทึกรวมทั้งหมด ${totalThisMonth} ครั้ง โดยภาพรวม ${details.join(" และ ")} ซึ่งสะท้อนถึงการจัดการจังหวะชีวิตเชิงระบบที่สอดคล้องกับคุณค่าส่วนบุคคล`;
+                }
+            }
 
-                const modeCounts: Record<string, number> = {};
-                monthLogs.forEach(log => {
-                    const m = log.reflectionMode || "ไม่ระบุ";
-                    modeCounts[m] = (modeCounts[m] || 0) + 1;
-                });
-                const topMode = Object.entries(modeCounts).sort((a, b) => b[1] - a[1])[0];
+            let continueContent = "";
+            if (planningFocusNext && planningFocusNext.trim()) {
+                continueContent = `เป้าหมายเชิงกลยุทธ์ที่ระบุในแผน: "${planningFocusNext.trim()}"`;
+            }
+            if (planningNextSmallAction && planningNextSmallAction.trim()) {
+                if (continueContent) continueContent += "\n\n";
+                continueContent += `การกระทำเล็กๆ ที่ทำได้ทันทีเพื่อหนุนนำแผน: "${planningNextSmallAction.trim()}"`;
+            }
+            if (!continueContent) {
+                continueContent = "ยังไม่มีหัวข้อที่ชัดเจนพอสำหรับระบุสิ่งที่ควรทำต่อ";
+            }
 
-                const energyCounts: Record<string, number> = {};
-                monthLogs.forEach(log => {
-                    const e = log.dailyCheckinSnapshot?.energyLevel || "ไม่ระบุ";
-                    energyCounts[e] = (energyCounts[e] || 0) + 1;
-                });
-                const topEnergy = Object.entries(energyCounts).sort((a, b) => b[1] - a[1])[0];
-
-                const energyLabelMap: Record<string, string> = {
-                    steady: "คงที่ (Steady)",
-                    high: "สูง (High)",
-                    low: "ต่ำ (Low)",
-                    scattered: "กระจัดกระจาย (Scattered)",
-                };
-
-                const intentions = monthLogs
-                    .map(log => log.dailyCheckinSnapshot?.todayIntention?.trim())
-                    .filter((t): t is string => !!t && t.length > 0);
-
+            let slowDownContent = "";
+            if (planningSlowDown && planningSlowDown.trim()) {
+                slowDownContent = `สิ่งที่ระบุในแผนที่ควรชะลอหรือถอยออก: "${planningSlowDown.trim()}"`;
+            } else {
                 const cautions = monthLogs
                     .map(log => log.dailyCheckinSnapshot?.cautionNote?.trim())
                     .filter((t): t is string => !!t && t.length > 0);
-
-                const followUp = planningReviewLater?.trim() || "";
-
-                let intentionList = "";
-                if (intentions.length > 0) {
-                    intentions.slice(0, 5).forEach(text => {
-                        intentionList += `- ${text}\n`;
-                    });
-                } else {
-                    intentionList = "- ยังไม่พบข้อความความตั้งใจที่ชัดเจนพอจากบันทึกของเดือนนี้\n";
-                }
-
-                let cautionList = "";
                 if (cautions.length > 0) {
-                    cautions.slice(0, 5).forEach(text => {
-                        cautionList += `- ${text}\n`;
-                    });
-                } else {
-                    cautionList = "- ยังไม่พบข้อความข้อควรระวังที่ชัดเจนพอจากบันทึกของเดือนนี้\n";
+                    slowDownContent = `ข้อควรระวังที่ปรากฏซ้ำในบันทึกเดือนนี้: "${cautions[0]}"`;
                 }
-
-                const topModeText = topMode ? topMode[0] : "—";
-                const topEnergyText = topEnergy ? (energyLabelMap[topEnergy[0]] || topEnergy[0]) : "—";
-                const followUpText = followUp ? followUp : "ยังไม่มีรายการติดตาม — สามารถเพิ่มได้จาก Strategy Planning Notes";
-
-                monthlySnapshotStr = `- **รอบเดือน**: ${monthLabel}
-- **จำนวนบันทึกในเดือนนี้**: ${totalThisMonth} รายการ
-- **โหมดการทำงานหลัก**: ${topModeText}
-- **ระดับพลังงานหลัก**: ${topEnergyText}
-
-### ความตั้งใจที่ปรากฏซ้ำในเดือนนี้
-${intentionList}
-### ข้อควรระวังที่ปรากฏซ้ำในเดือนนี้
-${cautionList}
-### สิ่งที่ควรกลับมาติดตาม
-${followUpText}`;
             }
+            if (!slowDownContent) {
+                slowDownContent = "ยังไม่มีข้อควรระวังที่ชัดเจนพอสำหรับใช้ทบทวนในเดือนนี้";
+            }
+
+            let nextMonthSeedContent = "";
+            if (planningReviewLater && planningReviewLater.trim()) {
+                nextMonthSeedContent = `ประเด็นสะสมสำหรับประเมิน/ติดตามในวันหน้า: "${planningReviewLater.trim()}"`;
+            }
+            if (!nextMonthSeedContent) {
+                nextMonthSeedContent = "ยังไม่มีหัวข้อสำหรับตั้งต้นเดือนถัดไป ลองเติมใน Strategy Planning Notes หรือบันทึกสะท้อนคิดเพิ่มเติม";
+            }
+
+            md += `
+## Monthly Planning Review
+### ทิศทางที่เดือนนี้สะท้อน (Monthly Direction)
+${directionContent}
+
+### สิ่งที่ควรทำต่อ (Continue)
+${continueContent}
+
+### สิ่งที่ควรชะลอหรือหยุดทบทวน (Slow Down / Stop)
+${slowDownContent}
+
+### เมล็ดตั้งต้นของเดือนถัดไป (Next Month Seed)
+${nextMonthSeedContent}
+`;
         }
 
-        // 6. Recent Reflection History
-        let historyLogsStr = "";
-        if (historyLogs.length === 0) {
-            historyLogsStr = "ยังไม่มีข้อมูลในส่วนนี้";
-        } else {
-            historyLogs.forEach((item, index) => {
-                const itemMarkdown = item.markdownSnapshot || generateHistoryFallbackMarkdown(item);
-                historyLogsStr += `### Log ${index + 1} — ${item.reflectionDate || item.createdAt}\n\n${itemMarkdown}\n\n`;
-            });
-        }
+        // 6. Recent Reflection History (Full, History Only)
+        if (scope === "full" || scope === "history") {
+            let historyLogsStr = "";
+            if (historyLogs.length === 0) {
+                historyLogsStr = "ยังไม่มีข้อมูลในส่วนนี้";
+            } else {
+                historyLogs.forEach((item, index) => {
+                    const itemMarkdown = item.markdownSnapshot || generateHistoryFallbackMarkdown(item);
+                    historyLogsStr += `### Log ${index + 1} — ${item.reflectionDate || item.createdAt}\n\n${itemMarkdown}\n\n`;
+                });
+            }
 
-        return `# Astro Strategy Lab — Reflection Export Pack
-
-## Export Metadata
-- Generated at: ${timestamp} (เวลาท้องถิ่น)
-- Source: Local browser data only
-- Scope: Reflection / Planning / Monthly snapshot
-
-## Daily Reflection Draft
-${dailySection}
-
-## Weekly Review Summary
-${weeklyReviewStr}
-
-## Weekly Pattern Hints
-${weeklyPatternStr}
-
-## Strategy Planning Notes
-${strategyPlanningStr}
-
-## Monthly Reflection Snapshot
-${monthlySnapshotStr}
-
+            md += `
 ## Recent Reflection History
-${historyLogsStr.trim()}`;
+${historyLogsStr.trim()}
+`;
+        }
+
+        return md.trim();
+    };
+
+    const handleScopeChange = (scope: "full" | "planning" | "monthly" | "history") => {
+        setReflectionExportScope(scope);
+        setReflectionExportMarkdown("");
+        setReflectionExportCopied(false);
     };
 
     const handleGenerateReflectionExport = () => {
-        const md = buildReflectionExportMarkdown();
+        const md = buildReflectionExportMarkdown(reflectionExportScope);
         setReflectionExportMarkdown(md);
         setReflectionExportCopied(false);
     };
@@ -3885,9 +4029,122 @@ ${historyLogsStr.trim()}`;
                                                 </div>
                                             </div>
 
-                                            <p className="text-xs text-slate-300 leading-relaxed">
-                                                ส่วนนี้ช่วยรวมข้อมูลจากบันทึกในเครื่องนี้เป็น Markdown เพื่อคัดลอกไปเก็บใน WorkOS, notes หรือไฟล์สำรองส่วนตัว
+                                            <p className="text-xs text-slate-350 leading-relaxed">
+                                                ส่วนนี้ช่วยรวมข้อมูลจากบันทึกในเครื่องนี้เป็น Markdown เพื่อคัดลอกไปเก็บ in WorkOS, notes หรือไฟล์สำรองส่วนตัว
                                             </p>
+
+                                            {/* Enhancement 1: Export Scope Selector */}
+                                            <div className="space-y-2 bg-slate-950/40 p-4 rounded-xl border border-slate-850/60">
+                                                <label className="block text-xs font-semibold text-slate-300">
+                                                    Export Scope / เลือกขอบเขตข้อมูลที่จะรวมใน Markdown
+                                                </label>
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    <label className="flex items-start gap-2.5 p-2 rounded-lg bg-slate-900/30 hover:bg-slate-900/60 border border-slate-850/50 cursor-pointer transition-all">
+                                                        <input 
+                                                            type="radio" 
+                                                            name="reflectionExportScope" 
+                                                            value="full" 
+                                                            checked={reflectionExportScope === "full"}
+                                                            onChange={() => handleScopeChange("full")}
+                                                            className="mt-0.5 text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-800"
+                                                        />
+                                                        <div>
+                                                            <span className="text-xs font-medium text-slate-200 block">Full Reflection Pack</span>
+                                                            <span className="text-[10px] text-slate-400">รวม Daily / Weekly / Planning / Monthly / History</span>
+                                                        </div>
+                                                    </label>
+
+                                                    <label className="flex items-start gap-2.5 p-2 rounded-lg bg-slate-900/30 hover:bg-slate-900/60 border border-slate-850/50 cursor-pointer transition-all">
+                                                        <input 
+                                                            type="radio" 
+                                                            name="reflectionExportScope" 
+                                                            value="planning" 
+                                                            checked={reflectionExportScope === "planning"}
+                                                            onChange={() => handleScopeChange("planning")}
+                                                            className="mt-0.5 text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-800"
+                                                        />
+                                                        <div>
+                                                            <span className="text-xs font-medium text-slate-200 block">Planning Only</span>
+                                                            <span className="text-[10px] text-slate-400">เฉพาะ Strategy Planning Notes และ Monthly Planning Review</span>
+                                                        </div>
+                                                    </label>
+
+                                                    <label className="flex items-start gap-2.5 p-2 rounded-lg bg-slate-900/30 hover:bg-slate-900/60 border border-slate-850/50 cursor-pointer transition-all">
+                                                        <input 
+                                                            type="radio" 
+                                                            name="reflectionExportScope" 
+                                                            value="monthly" 
+                                                            checked={reflectionExportScope === "monthly"}
+                                                            onChange={() => handleScopeChange("monthly")}
+                                                            className="mt-0.5 text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-800"
+                                                        />
+                                                        <div>
+                                                            <span className="text-xs font-medium text-slate-200 block">Monthly Review Only</span>
+                                                            <span className="text-[10px] text-slate-400">เฉพาะ Monthly Snapshot และ Monthly Planning Review</span>
+                                                        </div>
+                                                    </label>
+
+                                                    <label className="flex items-start gap-2.5 p-2 rounded-lg bg-slate-900/30 hover:bg-slate-900/60 border border-slate-850/50 cursor-pointer transition-all">
+                                                        <input 
+                                                            type="radio" 
+                                                            name="reflectionExportScope" 
+                                                            value="history" 
+                                                            checked={reflectionExportScope === "history"}
+                                                            onChange={() => handleScopeChange("history")}
+                                                            className="mt-0.5 text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-800"
+                                                        />
+                                                        <div>
+                                                            <span className="text-xs font-medium text-slate-200 block">History Only</span>
+                                                            <span className="text-[10px] text-slate-400">เฉพาะ Reflection History ล่าสุด</span>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            {/* Enhancement 2: Included Sections Preview */}
+                                            <div className="space-y-1.5 bg-slate-950/40 p-4 rounded-xl border border-slate-850/60">
+                                                <span className="text-xs font-semibold text-slate-300 block">
+                                                    Included Sections / ส่วนที่จะถูกรวมในไฟล์ Markdown
+                                                </span>
+                                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                                    <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-indigo-300 font-medium">
+                                                        - Export Metadata
+                                                    </span>
+                                                    {reflectionExportScope === "full" && (
+                                                        <>
+                                                            <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                                                                - Daily Reflection Draft
+                                                            </span>
+                                                            <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                                                                - Weekly Review Summary
+                                                            </span>
+                                                            <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                                                                - Weekly Pattern Hints
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                    {(reflectionExportScope === "full" || reflectionExportScope === "planning") && (
+                                                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                                                            - Strategy Planning Notes
+                                                        </span>
+                                                    )}
+                                                    {(reflectionExportScope === "full" || reflectionExportScope === "monthly") && (
+                                                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                                                            - Monthly Reflection Snapshot
+                                                        </span>
+                                                    )}
+                                                    {(reflectionExportScope === "full" || reflectionExportScope === "planning" || reflectionExportScope === "monthly") && (
+                                                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                                                            - Monthly Planning Review
+                                                        </span>
+                                                    )}
+                                                    {(reflectionExportScope === "full" || reflectionExportScope === "history") && (
+                                                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                                                            - Recent Reflection History
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
 
                                             <div className="flex flex-col sm:flex-row gap-3">
                                                 <button
@@ -3925,11 +4182,12 @@ ${historyLogsStr.trim()}`;
                                             )}
 
                                             <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-850/60 text-[10px] text-slate-400 space-y-1">
-                                                <div className="font-semibold text-slate-350">ข้อมูลนี้สร้างจากข้อมูลที่อยู่ในเครื่องนี้เท่านั้น:</div>
+                                                <div className="font-semibold text-slate-350">ข้อมูลนี้สร้างจากข้อมูลที่อยู่ในเครื่องนี้เท่านั้น</div>
                                                 <ul className="list-disc list-inside space-y-0.5 text-slate-500">
-                                                    <li>ไม่มีการส่งออกไปยังเซิร์ฟเวอร์</li>
+                                                    <li>การเลือกขอบเขต export มีผลเฉพาะ Markdown ที่สร้างในครั้งนี้</li>
+                                                    <li>ไม่มีการบันทึกค่าการเลือก export ลงในระบบ</li>
                                                     <li>ไม่เปลี่ยนข้อมูลต้นฉบับ</li>
-                                                    <li>ใช้เพื่อสำรองข้อมูลหรือย้ายไปจัดเก็บในระบบอื่น</li>
+                                                    <li>ไม่มีการส่งออกไปยังเซิร์ฟเวอร์ภายนอก</li>
                                                 </ul>
                                             </div>
                                         </div>
