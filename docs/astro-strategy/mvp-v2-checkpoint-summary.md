@@ -87,6 +87,18 @@ a6680e5
 
 Monthly Planning Review QA Record:
 a6e04986c99d53503e39c3ac7549196f5c93fa45
+
+MVP v2.0 Summary with Monthly Planning Review:
+d991c75ea39684b37837bf26271fdbab13ea105f
+
+Personal Timing Guide Enhancements:
+6a29170
+
+Personal Timing Guide Enhancements QA Record:
+cd50611a5a12d077e24f8fe7c40ad0c552762a6b
+
+MVP v2.0 Summary with Personal Timing Guide Enhancements:
+[Pending Commit]
 ```
 
 ---
@@ -239,6 +251,35 @@ Confirmed:
 * deriveStrategyMode and Strategy Rules Layer remain untouched.
 * Existing Monthly Reflection Snapshot, Reflection Export Pack, Local Backup Safety, and Reflection History remain usable.
 
+### Personal Timing Guide Enhancements v0.2
+
+```text
+Feature Commit:
+6a2917030fb682ce8be3bfead802367cf81dac31
+
+QA Record:
+cd50611a5a12d077e24f8fe7c40ad0c552762a6b
+docs/astro-strategy/qa-015-personal-timing-guide-enhancements-regression.md
+```
+
+Purpose:
+
+* Adds "Using the Timing Guide" (วิธีใช้คู่มือจังหวะเวลาให้กลายเป็นการตัดสินใจที่ใช้ได้จริง) subsection in the Reflection tab.
+* Guides the user on translating personal timing reflections into actionable decision points based on three core scenarios: when energy is low, when previous patterns recur, and when selecting the next planning focus.
+* Employs cautious, non-predictive Thai phrasing to preserve user discretion and avoid deterministic or supernatural claims.
+* Maintains a clean, static, client-side implementation with no database/API interactions, new reactive states, or persistent localStorage changes.
+
+Confirmed:
+
+* "Using the Timing Guide" card correctly renders below the Personal Timing Guide and before the Reflection Log Input & History.
+* Renders a responsive layout with three clear columns on desktop:
+  1. เมื่อพลังงานต่ำ (Low Energy)
+  2. เมื่อแนวโน้มเดิมกลับมาซ้ำ (Recurring Patterns)
+  3. เมื่อเลือกโฟกัสถัดไป (Next Focus Selection)
+* Footnote features strict, non-predictive disclaimer: `"คำแนะนำในส่วนนี้ใช้เพื่อช่วยตั้งคำถามและจัดลำดับความสำคัญ ไม่ใช่คำทำนาย ไม่ใช่คำสั่ง และไม่ควรใช้แทนข้อมูลจริงหรือดุลยพินิจของตนเอง"`
+* Existing components and page state remain entirely unaffected (Regression QA Passed).
+* Static pages successfully built and pre-rendered with zero runtime errors.
+
 ---
 
 ## Current MVP v2.0 Capability Snapshot
@@ -255,7 +296,7 @@ Confirmed:
 - Monthly Reflection Snapshot
 - Monthly Planning Review
 - Wai Kru / Teacher Reverence ethics layer
-- Personal Timing Guide orientation layer
+- Personal Timing Guide orientation & actionable decision guide layer
 - Reflection Export Pack / Markdown backup layer
 - Local Backup / Import-Export Safety layer
 - Local-first usage without external backend
@@ -290,6 +331,8 @@ Confirmed — Local Backup Safety does not automatically download files
 Confirmed — Monthly Planning Review does not add persistent localStorage keys
 Confirmed — Monthly Planning Review does not save review answers in v0.1
 Confirmed — Monthly Planning Review does not add save/copy/export/import behavior
+Confirmed — Personal Timing Guide Enhancements does not add persistent localStorage keys or change schema
+Confirmed — Personal Timing Guide Enhancements does not save answers or add interactive buttons/actions
 ```
 
 ---
@@ -297,7 +340,7 @@ Confirmed — Monthly Planning Review does not add save/copy/export/import behav
 ## Updated Decision
 
 ```text
-Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, Markdown export, and a non-destructive local backup safety layer.
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers (with actionable timing guide enhancements), Markdown export, and a non-destructive local backup safety layer.
 ```
 
 ---
@@ -305,10 +348,10 @@ Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → pl
 ## Recommended Next Development Direction
 
 ```text
-1. ASTRO-APP-DEV-034 — Personal Timing Guide Enhancements v0.2
-2. ASTRO-APP-DEV-035 — Reflection Export Pack Enhancements v0.2
-3. ASTRO-APP-DEV-036 — Import Preview Validator v0.1
-4. ASTRO-APP-DEV-037 — Monthly Review Export Integration v0.1
+1. ASTRO-APP-DEV-035 — Reflection Export Pack Enhancements v0.2
+2. ASTRO-APP-DEV-036 — Import Preview Validator v0.1
+3. ASTRO-APP-DEV-037 — Monthly Review Export Integration v0.1
+4. ASTRO-APP-DEV-038 — Import-Export Full Restore flow v0.1
 ```
 
 ---
