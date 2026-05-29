@@ -69,6 +69,15 @@ Reflection Export Pack:
 
 Reflection Export Pack QA Record:
 1dd02690217d5d484de2aff9f4d79d0eef43c8ab
+
+MVP v2.0 Summary with Reflection Export Pack:
+8ef02b2cb159f89f472691409faad2273dbca66a
+
+Local Backup / Import-Export Safety:
+f7486be
+
+Local Backup / Import-Export Safety QA Record:
+8ae333d0d492c3c80fe61ff3e7fd0f368f253239
 ```
 
 ---
@@ -151,6 +160,41 @@ Confirmed:
 * No new persistent localStorage key, API, database, AI call, or astrology calculation added.
 * deriveStrategyMode and Strategy Rules Layer remain untouched.
 
+### Local Backup / Import-Export Safety v0.1
+
+```text
+Feature Commit:
+f7486be
+
+QA Record:
+8ae333d0d492c3c80fe61ff3e7fd0f368f253239
+docs/astro-strategy/qa-013-local-backup-safety-regression.md
+```
+
+Purpose:
+
+* Adds a Local Backup / Import-Export Safety section in the Reflection tab.
+* Explains local-first backup boundaries and safe handling of locally stored data.
+* Adds a read-only JSON Backup Preview from current local state.
+* Supports copying the backup preview for manual storage.
+* Clearly states that import/restore/merge is not active in v0.1.
+* Prevents confusion between export/backup preview and destructive restore behavior.
+
+Confirmed:
+
+* Local Backup / Import-Export Safety appears after Reflection Export Pack and before Reflection History List.
+* Includes four safety guidance blocks:
+
+  1. ข้อมูล local คืออะไร
+  2. หลักการสำรองข้อมูล
+  3. ข้อควรระวังเรื่องการนำเข้าข้อมูล
+  4. ขอบเขตของเวอร์ชันนี้
+* Generate Backup Preview creates a readable JSON preview.
+* Copy Backup Preview works through clipboard interaction.
+* No import button, restore button, merge behavior, write-back into localStorage, or automatic file download added.
+* No new persistent localStorage key, API, database, AI call, or astrology calculation added.
+* deriveStrategyMode and Strategy Rules Layer remain untouched.
+
 ---
 
 ## Current MVP v2.0 Capability Snapshot
@@ -168,6 +212,7 @@ Confirmed:
 - Wai Kru / Teacher Reverence ethics layer
 - Personal Timing Guide orientation layer
 - Reflection Export Pack / Markdown backup layer
+- Local Backup / Import-Export Safety layer
 - Local-first usage without external backend
 - Cautious Thai strategic wording
 ```
@@ -194,6 +239,9 @@ Confirmed — Personal Timing Guide is static and does not add persistence
 Confirmed — Reflection Export Pack does not add persistent localStorage keys
 Confirmed — Reflection Export Pack does not save export history
 Confirmed — Reflection Export Pack does not mutate source data
+Confirmed — Local Backup Safety does not add persistent localStorage keys
+Confirmed — Local Backup Safety does not import, restore, merge, or write back to source data
+Confirmed — Local Backup Safety does not automatically download files
 ```
 
 ---
@@ -201,7 +249,7 @@ Confirmed — Reflection Export Pack does not mutate source data
 ## Updated Decision
 
 ```text
-Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, ethics and orientation layers, and a Markdown export layer for moving local reflection data into WorkOS, notes, or backup files.
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, ethics and orientation layers, Markdown export, and a non-destructive local backup safety layer for preparing future import/export workflows.
 ```
 
 ---
@@ -209,10 +257,10 @@ Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → pl
 ## Recommended Next Development Direction
 
 ```text
-1. ASTRO-APP-DEV-032 — Local Backup / Import-Export Safety v0.1
-2. ASTRO-APP-DEV-033 — Monthly Planning Review v0.1
-3. ASTRO-APP-DEV-034 — Personal Timing Guide Enhancements v0.2
-4. ASTRO-APP-DEV-035 — Reflection Export Pack Enhancements v0.2
+1. ASTRO-APP-DEV-033 — Monthly Planning Review v0.1
+2. ASTRO-APP-DEV-034 — Personal Timing Guide Enhancements v0.2
+3. ASTRO-APP-DEV-035 — Reflection Export Pack Enhancements v0.2
+4. ASTRO-APP-DEV-036 — Import Preview Validator v0.1
 ```
 
 ---
