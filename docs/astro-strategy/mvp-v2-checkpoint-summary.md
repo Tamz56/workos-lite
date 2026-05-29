@@ -36,10 +36,8 @@ c109f8e182284e8fd4fded6f7a1361e0d778d172
 Strategy Planning Notes QA Record:
 b9745b870a6ef73625d3c925d6a8d85ad3be7660
 
-Monthly Reflection Snapshot (Minimal):
-1b7dd8e6afc95c548da38cc72c1f92bcbe9a59f3
-
-Monthly Reflection Snapshot (Completed Sections):
+Monthly Reflection Snapshot:
+1b7dd8e
 357c07011e8503584bc1cff3482bb49f09b4b265
 
 Monthly Reflection Snapshot QA Record:
@@ -62,6 +60,15 @@ Personal Timing Guide:
 
 Personal Timing Guide QA Record:
 5e1c51e6cee7298c57cf54e53bc2fae382929f8a
+
+MVP v2.0 Summary with Personal Timing Guide:
+64a9a8a648b2c76e42842e7f38c9ef01ac57b766
+
+Reflection Export Pack:
+1f8bf7c1552a05e1d0eea003b703a7126e92d2fa
+
+Reflection Export Pack QA Record:
+1dd02690217d5d484de2aff9f4d79d0eef43c8ab
 ```
 
 ---
@@ -101,6 +108,112 @@ Personal Timing Guide QA Record:
     *   ทำงานแบบฝั่งผู้ใช้ออฟไลน์ทั้งหมด (Client-side Only) โดยใช้ `localStorage` ร่วมกับข้อมูลความปลอดภัย
     *   ไม่มีการทำ API Call หรือการเชื่อมต่อโมเดลระบบภายนอกใดๆ ช่วยรักษาความเป็นส่วนตัวอย่างสมบูรณ์
     *   มีบทแถลงจำกัดความรับผิดชอบอย่างรัดกุม (Safety boundaries & disclaimers) ในทุกกล่องสรุปผล
+
+---
+
+## Completed Checkpoints
+
+### Reflection Export Pack v0.1
+
+```text
+Feature Commit:
+1f8bf7c1552a05e1d0eea003b703a7126e92d2fa
+
+QA Record:
+1dd02690217d5d484de2aff9f4d79d0eef43c8ab
+docs/astro-strategy/qa-012-reflection-export-pack-regression.md
+```
+
+Purpose:
+
+* Adds a Reflection Export Pack section in the Reflection tab.
+* Allows the user to generate a Markdown export from existing local reflection and planning data.
+* Supports copying the generated Markdown into WorkOS, notes, or external backup files.
+* Keeps export behavior local-first and deterministic.
+* Does not mutate source data.
+* Does not save export history.
+
+Confirmed:
+
+* Reflection Export Pack appears after Monthly Reflection Snapshot and before Reflection History List.
+* Generate Markdown creates a readable Markdown export.
+* Copy Markdown works through clipboard interaction.
+* Missing data uses fallback text: `ยังไม่มีข้อมูลในส่วนนี้`.
+* Export includes:
+
+  1. Export Metadata
+  2. Daily Reflection Draft
+  3. Weekly Review Summary
+  4. Weekly Pattern Hints
+  5. Strategy Planning Notes
+  6. Monthly Reflection Snapshot
+  7. Recent Reflection History
+* No new persistent localStorage key, API, database, AI call, or astrology calculation added.
+* deriveStrategyMode and Strategy Rules Layer remain untouched.
+
+---
+
+## Current MVP v2.0 Capability Snapshot
+
+```text
+- Daily strategic check-in
+- Today Dashboard visibility
+- Priority Badge signal
+- Reflection Draft persistence
+- Reflection History
+- Weekly Review Summary
+- Weekly Pattern Hints from local history
+- Strategy Planning Notes
+- Monthly Reflection Snapshot
+- Wai Kru / Teacher Reverence ethics layer
+- Personal Timing Guide orientation layer
+- Reflection Export Pack / Markdown backup layer
+- Local-first usage without external backend
+- Cautious Thai strategic wording
+```
+
+---
+
+## Local-first Boundaries Confirmed
+
+```text
+Confirmed — Existing localStorage behavior preserved
+Confirmed — No localStorage shape change
+Confirmed — No historyLogs schema change
+Confirmed — No database added
+Confirmed — No API added
+Confirmed — No AI call added
+Confirmed — No astrology calculation added
+Confirmed — Strategy Rules Layer untouched
+Confirmed — deriveStrategyMode untouched
+Confirmed — Copy Weekly Review Markdown unchanged
+Confirmed — No Monthly Snapshot export/copy behavior added
+Confirmed — No Strategy Planning Notes export/copy behavior added
+Confirmed — Wai Kru section is static and does not add persistence
+Confirmed — Personal Timing Guide is static and does not add persistence
+Confirmed — Reflection Export Pack does not add persistent localStorage keys
+Confirmed — Reflection Export Pack does not save export history
+Confirmed — Reflection Export Pack does not mutate source data
+```
+
+---
+
+## Updated Decision
+
+```text
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, ethics and orientation layers, and a Markdown export layer for moving local reflection data into WorkOS, notes, or backup files.
+```
+
+---
+
+## Recommended Next Development Direction
+
+```text
+1. ASTRO-APP-DEV-032 — Local Backup / Import-Export Safety v0.1
+2. ASTRO-APP-DEV-033 — Monthly Planning Review v0.1
+3. ASTRO-APP-DEV-034 — Personal Timing Guide Enhancements v0.2
+4. ASTRO-APP-DEV-035 — Reflection Export Pack Enhancements v0.2
+```
 
 ---
 
