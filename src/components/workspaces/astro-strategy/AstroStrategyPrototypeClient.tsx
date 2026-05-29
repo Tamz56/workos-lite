@@ -327,6 +327,10 @@ export default function AstroStrategyPrototypeClient() {
     const [reflectionExportMarkdown, setReflectionExportMarkdown] = useState<string>("");
     const [reflectionExportCopied, setReflectionExportCopied] = useState<boolean>(false);
 
+    // ASTRO-APP-DEV-032: Local Backup / Import-Export Safety States
+    const [localBackupPreview, setLocalBackupPreview] = useState<string>("");
+    const [localBackupCopied, setLocalBackupCopied] = useState<boolean>(false);
+
     // Hydration check and LocalStorage loading
     useEffect(() => {
         setIsMounted(true);
@@ -1183,6 +1187,81 @@ ${historyLogsStr.trim()}`;
         } catch (err) {
             console.error("Failed to copy reflection export:", err);
             alert("เกิดข้อผิดพลาดในการคัดลอก");
+        }
+    };
+
+    // ASTRO-APP-DEV-032: Local Backup / Import-Export Safety Helper Functions
+    const handleGenerateLocalBackup = () => {
+        try {
+            const backupJSON = {
+                kind: "astro-strategy-local-backup-preview",
+                version: "0.1",
+                generatedAt: new Date().toISOString(),
+                source: "local-browser-state-only",
+                data: {
+                    reflectionDraft: {
+                        reflectionMode,
+                        reflectionSummary,
+                        noticedNotes,
+                        nextRightAction,
+                        savedAt: savedReflectionAt
+                    },
+                    dailyCheckinSnapshot: {
+                        energyLevel,
+                        clarityLevel,
+                        workloadPressure,
+                        focusCondition,
+                        bodySignal,
+                        todayIntention,
+                        cautionNote
+                    },
+                    strategyPlanningNotes: {
+                        focusNext: planningFocusNext,
+                        slowDown: planningSlowDown,
+                        nextSmallAction: planningNextSmallAction,
+                        reviewLater: planningReviewLater,
+                        updatedAt: planningNotesUpdatedAt
+                    },
+                    historyLogsPreview: historyLogs,
+                    counts: {
+                        historyLogs: historyLogs.length
+                    }
+                },
+                notes: [
+                    "This is a read-only backup preview.",
+                    "This file has not been imported or restored automatically."
+                ]
+            };
+            setLocalBackupPreview(JSON.stringify(backupJSON, null, 2));
+            setLocalBackupCopied(false);
+        } catch (err) {
+            console.error("Failed to generate local backup preview:", err);
+            alert("เกิดข้อผิดพลาดในการสร้างข้อมูลสำรอง");
+        }
+    };
+
+    const handleCopyLocalBackup = async () => {
+        if (!localBackupPreview) return;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(localBackupPreview);
+                setLocalBackupCopied(true);
+                setTimeout(() => setLocalBackupCopied(false), 2000);
+            } else {
+                // Fallback inside UI via selection
+                const textarea = document.getElementById("local-backup-preview-textarea") as HTMLTextAreaElement;
+                if (textarea) {
+                    textarea.select();
+                    document.execCommand("copy");
+                    setLocalBackupCopied(true);
+                    setTimeout(() => setLocalBackupCopied(false), 2000);
+                } else {
+                    alert("เบราว์เซอร์ของคุณไม่รองรับการคัดลอกอัตโนมัติ กรุณาคัดลอกข้อความในกล่องด้วยตัวเอง");
+                }
+            }
+        } catch (err) {
+            console.error("Failed to copy local backup preview:", err);
+            alert("ไม่สามารถคัดลอกลงคลิปบอร์ดได้ กรุณาคัดลอกด้วยตัวเองจากกล่องข้อความ");
         }
     };
 
@@ -3605,6 +3684,118 @@ ${historyLogsStr.trim()}`;
                                                     <li>ใช้เพื่อสำรองข้อมูลหรือย้ายไปจัดเก็บในระบบอื่น</li>
                                                 </ul>
                                             </div>
+                                        </div>
+
+                                        {/* ASTRO-APP-DEV-032: Local Backup / Import-Export Safety */}
+                                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
+                                            <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
+                                                <ShieldAlert className="w-4.5 h-4.5 text-amber-400" />
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-slate-200">
+                                                        Local Backup / Import-Export Safety
+                                                    </h4>
+                                                    <span className="text-[10px] text-amber-300 block mt-0.5 font-medium">
+                                                        ความปลอดภัยในการสำรองและย้ายข้อมูลที่เก็บอยู่ในเครื่องนี้
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-xs text-slate-300 leading-relaxed">
+                                                ส่วนนี้ช่วยเตือนขอบเขตของข้อมูล local-first และเตรียมแนวทางสำรองข้อมูลอย่างปลอดภัย ก่อนจะมีระบบ import/restore ที่สมบูรณ์ในอนาคต
+                                            </p>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/30 p-4 rounded-xl border border-slate-800/50">
+                                                <div className="space-y-1.5">
+                                                    <h5 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                                        ข้อมูล local คืออะไร
+                                                    </h5>
+                                                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                        ข้อมูล local คือข้อมูลที่เกิดจากการใช้งานในเบราว์เซอร์เครื่องนี้ เช่น บันทึกสะท้อนคิด แผนเชิงกลยุทธ์ และประวัติการเช็กอิน ข้อมูลเหล่านี้ไม่ได้ถูกออกแบบให้เป็นฐานข้อมูลกลางในรอบ MVP นี้
+                                                    </p>
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <h5 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                                        หลักการสำรองข้อมูล
+                                                    </h5>
+                                                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                        ควรสำรองข้อมูลเป็นไฟล์หรือข้อความที่อ่านได้ เช่น Markdown หรือ JSON snapshot และควรเก็บไว้ในพื้นที่ส่วนตัว เช่น WorkOS, notes, external drive หรือ private cloud ที่คุณควบคุมเอง
+                                                    </p>
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <h5 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                                        ข้อควรระวังเรื่องการนำเข้าข้อมูล
+                                                    </h5>
+                                                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                        การนำเข้าข้อมูลกลับเข้าระบบควรมีขั้นตอนตรวจสอบก่อนเสมอ เช่น ตรวจชนิดข้อมูล วันที่สร้าง จำนวนรายการ และตัวอย่างข้อมูลบางส่วน เพื่อป้องกันการเขียนทับหรือทำให้ข้อมูลเดิมเสียหาย
+                                                    </p>
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <h5 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                                        ขอบเขตของเวอร์ชันนี้
+                                                    </h5>
+                                                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                        เวอร์ชันนี้ทำหน้าที่เป็นชั้นเตรียมความปลอดภัยและอธิบายแนวทางเท่านั้น ยังไม่ import, restore, merge หรือเขียนทับข้อมูลใด ๆ
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-amber-950/20 border border-amber-900/30 p-3.5 rounded-lg space-y-2 text-[11px]">
+                                                <div className="flex items-start gap-2 text-amber-300">
+                                                    <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                                    <div className="space-y-1 leading-relaxed text-slate-300">
+                                                        <p className="font-semibold text-amber-300">⚠️ คำเตือนความปลอดภัยของข้อมูล:</p>
+                                                        <ul className="list-disc list-inside space-y-1 text-slate-400">
+                                                            <li><strong className="text-amber-200/90 font-medium">ข้อมูลนี้อยู่ในเครื่องนี้เป็นหลัก:</strong> ข้อมูลทั้งหมดประมวลผลบนเบราว์เซอร์ การล้างประวัติเบราว์เซอร์หรือเปลี่ยนเครื่องอาจทำให้ข้อมูลหาย</li>
+                                                            <li><strong className="text-amber-200/90 font-medium">ยังไม่มีการนำเข้ากลับเข้าระบบในเวอร์ชันนี้:</strong> เพื่อป้องกันความเสี่ยงต่อข้อมูลเดิม การ import/restore จะถูกออกแบบแยกในรอบถัดไปพร้อมขั้นตอนตรวจสอบก่อนเขียนทับ</li>
+                                                            <li><strong className="text-amber-200/90 font-medium">ไม่มีการเขียนทับข้อมูลเดิม:</strong> ปุ่มสำรองนี้เป็นแบบอ่านอย่างเดียว ปลอดภัยจากการสร้างความเสียหายต่อข้อมูล</li>
+                                                            <li><strong className="text-amber-200/90 font-medium">ใช้เพื่อเตรียมความพร้อมด้าน backup/import-export safety:</strong> ช่วยให้คุณสามารถเรียกดูโครงสร้าง JSON Snapshot ของข้อมูลสะท้อนคิดที่มีอยู่ เพื่อคัดลอกเก็บไว้ได้ด้วยตนเองอย่างปลอดภัย</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col sm:flex-row gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleGenerateLocalBackup}
+                                                    className="px-4 py-2 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-slate-100 rounded-xl text-xs font-bold transition-all active:scale-[0.98] shadow-md shadow-violet-950/20"
+                                                >
+                                                    Generate Backup Preview
+                                                </button>
+
+                                                {localBackupPreview && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleCopyLocalBackup}
+                                                        className="px-4 py-2 bg-slate-800 hover:bg-slate-750 active:bg-slate-855 text-slate-200 border border-slate-700/50 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                                                    >
+                                                        <ClipboardList className="w-3.5 h-3.5 text-slate-400" />
+                                                        {localBackupCopied ? "คัดลอกสำเร็จ! ✅" : "Copy Backup Preview"}
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {localBackupPreview && (
+                                                <div className="space-y-2">
+                                                    <textarea
+                                                        id="local-backup-preview-textarea"
+                                                        readOnly
+                                                        value={localBackupPreview}
+                                                        rows={10}
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-slate-350 focus:outline-none transition-all resize-y whitespace-pre overflow-x-auto"
+                                                    />
+                                                    <div className="text-[10px] text-slate-500 italic text-right">
+                                                        ข้อมูลด้านบนคือ JSON Snapshot ของคุณในเครื่องนี้ คุณสามารถคัดลอกเก็บไว้เป็นไฟล์ข้อความเพื่อสำรองข้อมูลแบบ Local-first
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Reflection History List UI - ASTRO-APP-DEV-019B */}
