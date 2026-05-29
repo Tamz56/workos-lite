@@ -3623,6 +3623,185 @@ ${historyLogsStr.trim()}`;
                                             );
                                         })()}
 
+                                        {/* ASTRO-APP-DEV-033: Monthly Planning Review */}
+                                        {(() => {
+                                            const now = new Date();
+                                            const currentYear = now.getFullYear();
+                                            const currentMonth = now.getMonth(); // 0-indexed
+                                            const monthLabel = now.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+
+                                            // Filter history logs for this month
+                                            const monthLogs = historyLogs.filter(log => {
+                                                try {
+                                                    const d = new Date(log.reflectionDate || log.createdAt);
+                                                    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+                                                } catch { return false; }
+                                            });
+
+                                            const totalThisMonth = monthLogs.length;
+
+                                            // Most frequent reflection mode
+                                            const modeCounts: Record<string, number> = {};
+                                            monthLogs.forEach(log => {
+                                                const m = log.reflectionMode || "ไม่ระบุ";
+                                                modeCounts[m] = (modeCounts[m] || 0) + 1;
+                                            });
+                                            const topMode = Object.entries(modeCounts).sort((a, b) => b[1] - a[1])[0];
+
+                                            // Most frequent energy level
+                                            const energyCounts: Record<string, number> = {};
+                                            monthLogs.forEach(log => {
+                                                const e = log.dailyCheckinSnapshot?.energyLevel || "ไม่ระบุ";
+                                                energyCounts[e] = (energyCounts[e] || 0) + 1;
+                                            });
+                                            const topEnergy = Object.entries(energyCounts).sort((a, b) => b[1] - a[1])[0];
+
+                                            const energyLabelMap: Record<string, string> = {
+                                                steady: "คงที่ (Steady)",
+                                                high: "สูง (High)",
+                                                low: "ต่ำ (Low)",
+                                                scattered: "กระจัดกระจาย (Scattered)",
+                                            };
+
+                                            // 1. Monthly Direction block logic
+                                            let directionContent = "จากบันทึกของเดือนนี้ อาจเห็นทิศทางเบื้องต้นจากจำนวนบันทึก โหมดที่พบบ่อย และพลังงานหลักที่ปรากฏซ้ำ";
+                                            if (totalThisMonth === 0) {
+                                                directionContent = "ยังมีข้อมูลรายเดือนไม่มากพอสำหรับสะท้อนทิศทางที่ชัดเจน";
+                                            } else {
+                                                const topModeStr = topMode ? topMode[0] : "";
+                                                const topEnergyStr = topEnergy ? (energyLabelMap[topEnergy[0]] || topEnergy[0]) : "";
+                                                
+                                                const details = [];
+                                                if (topModeStr && topModeStr !== "ไม่ระบุ") details.push(`โหมดที่พบเด่นชัดคือ "${topModeStr}"`);
+                                                if (topEnergyStr && topEnergyStr !== "ไม่ระบุ") details.push(`ระดับพลังงานหลักอยู่ในสภาวะ "${topEnergyStr}"`);
+                                                
+                                                if (details.length > 0) {
+                                                    directionContent = `ในรอบเดือน ${monthLabel} นี้ มีการบันทึกรวมทั้งหมด ${totalThisMonth} ครั้ง โดยภาพรวม ${details.join(" และ ")} ซึ่งสะท้อนถึงการจัดการจังหวะชีวิตเชิงระบบที่สอดคล้องกับคุณค่าส่วนบุคคล`;
+                                                }
+                                            }
+
+                                            // 2. Continue block logic
+                                            let continueContent = "";
+                                            if (planningFocusNext && planningFocusNext.trim()) {
+                                                continueContent = `เป้าหมายเชิงกลยุทธ์ที่ระบุ in แผน: "${planningFocusNext.trim()}"`;
+                                            }
+                                            if (planningNextSmallAction && planningNextSmallAction.trim()) {
+                                                if (continueContent) continueContent += "\n\n";
+                                                continueContent += `การกระทำเล็กๆ ที่ทำได้ทันทีเพื่อหนุนนำแผน: "${planningNextSmallAction.trim()}"`;
+                                            }
+                                            if (!continueContent) {
+                                                continueContent = "ยังไม่มีหัวข้อที่ชัดเจนพอสำหรับระบุสิ่งที่ควรทำต่อ";
+                                            }
+
+                                            // 3. Slow Down / Stop block logic
+                                            let slowDownContent = "";
+                                            if (planningSlowDown && planningSlowDown.trim()) {
+                                                slowDownContent = `สิ่งที่ระบุในแผนที่ควรชะลอหรือถอยออก: "${planningSlowDown.trim()}"`;
+                                            } else {
+                                                // Try recent caution notes from this month
+                                                const cautions = monthLogs
+                                                    .map(log => log.dailyCheckinSnapshot?.cautionNote?.trim())
+                                                    .filter((t): t is string => !!t && t.length > 0);
+                                                if (cautions.length > 0) {
+                                                    slowDownContent = `ข้อควรระวังที่ปรากฏซ้ำในบันทึกเดือนนี้: "${cautions[0]}"`;
+                                                }
+                                            }
+                                            if (!slowDownContent) {
+                                                slowDownContent = "ยังไม่มีข้อควรระวังที่ชัดเจนพอสำหรับใช้ทบทวนในเดือนนี้";
+                                            }
+
+                                            // 4. Next Month Seed block logic
+                                            let nextMonthSeedContent = "";
+                                            if (planningReviewLater && planningReviewLater.trim()) {
+                                                nextMonthSeedContent = `ประเด็นสะสมสำหรับประเมิน/ติดตามในวันหน้า: "${planningReviewLater.trim()}"`;
+                                            }
+                                            if (!nextMonthSeedContent) {
+                                                nextMonthSeedContent = "ยังไม่มีหัวข้อสำหรับตั้งต้นเดือนถัดไป ลองเติมใน Strategy Planning Notes หรือบันทึกสะท้อนคิดเพิ่มเติม";
+                                            }
+
+                                            return (
+                                                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
+                                                    <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
+                                                        <Activity className="w-4.5 h-4.5 text-violet-400" />
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-slate-200">
+                                                                Monthly Planning Review
+                                                            </h4>
+                                                            <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
+                                                                ทบทวนแผนรายเดือนจากบันทึกและจังหวะการทำงานที่เกิดขึ้นจริง
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <p className="text-xs text-slate-350 leading-relaxed">
+                                                        ส่วนนี้ช่วยเปลี่ยนภาพรวมรายเดือนให้กลายเป็นคำถามทบทวนแผน เพื่อเลือกสิ่งที่ควรทำต่อ ชะลอ ปรับ หรือใช้เป็นจุดตั้งต้นของเดือนถัดไป
+                                                    </p>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {/* Block 1: Monthly Direction */}
+                                                        <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850/60 space-y-1.5 flex flex-col justify-between">
+                                                            <div className="space-y-1">
+                                                                <h5 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                                                                    ทิศทางที่เดือนนี้สะท้อน
+                                                                </h5>
+                                                                <p className="text-[11px] text-slate-400 leading-relaxed whitespace-pre-line">
+                                                                    {directionContent}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Block 2: Continue */}
+                                                        <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850/60 space-y-1.5 flex flex-col justify-between">
+                                                            <div className="space-y-1">
+                                                                <h5 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
+                                                                    สิ่งที่ควรทำต่อ
+                                                                </h5>
+                                                                <p className="text-[11px] text-slate-400 leading-relaxed whitespace-pre-line">
+                                                                    {continueContent}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Block 3: Slow Down / Stop */}
+                                                        <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850/60 space-y-1.5 flex flex-col justify-between">
+                                                            <div className="space-y-1">
+                                                                <h5 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                                                    สิ่งที่ควรชะลอหรือหยุดทบทวน
+                                                                </h5>
+                                                                <p className="text-[11px] text-slate-400 leading-relaxed whitespace-pre-line">
+                                                                    {slowDownContent}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Block 4: Next Month Seed */}
+                                                        <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850/60 space-y-1.5 flex flex-col justify-between">
+                                                            <div className="space-y-1">
+                                                                <h5 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                                                    เมล็ดตั้งต้นของเดือนถัดไป
+                                                                </h5>
+                                                                <p className="text-[11px] text-slate-400 leading-relaxed whitespace-pre-line">
+                                                                    {nextMonthSeedContent}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-850/50 text-[10px] text-slate-400 leading-relaxed text-center italic">
+                                                        คำถามทบทวน: ถ้าเลือกได้เพียงหนึ่งเรื่องสำหรับเดือนถัดไป เรื่องใดควรได้รับพลังมากที่สุด?
+                                                    </div>
+
+                                                    <div className="text-[10px] text-slate-500 text-center leading-relaxed">
+                                                        ข้อมูลนี้สะท้อนจากบันทึกในเครื่องนี้เท่านั้น ใช้เพื่อการทบทวนและวางแผน ไม่ใช่คำทำนายหรือข้อสรุปตายตัว
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
                                         {/* ASTRO-APP-DEV-031: Reflection Export Pack */}
                                         <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
                                             <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
