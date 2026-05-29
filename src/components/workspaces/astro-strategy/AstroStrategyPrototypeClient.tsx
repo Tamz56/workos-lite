@@ -2789,6 +2789,75 @@ ${historyLogsStr.trim()}`;
                                 </div>
                             </div>
 
+                            {/* ASTRO-APP-DEV-034: Using the Timing Guide Sub-Card */}
+                            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-5 mt-6">
+                                <div className="border-b border-slate-800 pb-3 flex items-center gap-2">
+                                    <Compass className="w-5 h-5 text-indigo-400" />
+                                    <div className="space-y-0.5">
+                                        <h3 className="text-lg font-bold text-slate-100">Using the Timing Guide</h3>
+                                        <p className="text-xs text-slate-400">วิธีใช้คู่มือจังหวะเวลาให้กลายเป็นการตัดสินใจที่ใช้ได้จริง</p>
+                                    </div>
+                                </div>
+
+                                <p className="text-xs text-slate-300 leading-relaxed">
+                                    ส่วนนี้ช่วยแปลข้อมูลรายวัน รายสัปดาห์ รายเดือน และแผนเชิงกลยุทธ์ ให้กลายเป็นแนวทางเลือกงาน วางจังหวะ และลดความเสี่ยงในการทำงานจริง
+                                </p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {/* Block 1: เมื่อพลังงานต่ำ */}
+                                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-2 flex flex-col justify-between">
+                                        <div className="space-y-2">
+                                            <span className="text-[10px] text-teal-400 font-bold tracking-wider uppercase block">เมื่อพลังงานต่ำ</span>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                ให้ใช้ Daily Check-in เพื่อเลือกงานที่ใช้แรงน้อยลง เช่น ตรวจทาน จัดระบบ เก็บงานค้าง หรือวางแผนสั้น ๆ แทนการฝืนทำงานหนักหรือเปิดงานใหม่หลายเรื่องพร้อมกัน
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Block 2: เมื่อแนวโน้มเดิมกลับมาซ้ำ */}
+                                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-2 flex flex-col justify-between">
+                                        <div className="space-y-2">
+                                            <span className="text-[10px] text-amber-400 font-bold tracking-wider uppercase block">เมื่อแนวโน้มเดิมกลับมาซ้ำ</span>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                ให้ดู Weekly Pattern Hints และ Monthly Reflection Snapshot ร่วมกัน ถ้าความตั้งใจหรือข้อควรระวังเดิมปรากฏซ้ำ อาจใช้เป็นสัญญาณให้ทบทวนวิธีทำงาน ไม่ใช่สรุปว่าเหตุการณ์จะเกิดซ้ำแน่นอน
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Block 3: เมื่อเลือกโฟกัสถัดไป */}
+                                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-2 flex flex-col justify-between">
+                                        <div className="space-y-2">
+                                            <span className="text-[10px] text-violet-400 font-bold tracking-wider uppercase block">เมื่อเลือกโฟกัสถัดไป</span>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                ให้เริ่มจาก Strategy Planning Notes และ Monthly Planning Review <span className="text-violet-300 font-medium">เลือกเพียงหนึ่งเรื่องที่ควรได้รับพลังมากที่สุด</span> แล้วแปลงเป็นก้าวเล็ก ๆ ที่ทำได้จริงในรอบถัดไป
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Mini Decision Flow */}
+                                <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-xl text-center space-y-2.5">
+                                    <span className="text-[10px] text-slate-500 font-bold tracking-wider uppercase block">
+                                        แผนผังการตัดสินใจเชิงกลยุทธ์ (Mini Decision Flow)
+                                    </span>
+                                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs font-medium text-slate-300">
+                                        <div className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg">Check Today (เช็กวันนี้)</div>
+                                        <span className="text-slate-600 hidden sm:inline">→</span>
+                                        <div className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg">Read Pattern (อ่านแนวโน้ม)</div>
+                                        <span className="text-slate-600 hidden sm:inline">→</span>
+                                        <div className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg">Choose Focus (เลือกโฟกัส)</div>
+                                        <span className="text-slate-600 hidden sm:inline">→</span>
+                                        <div className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg">Review Later (กลับมาทบทวน)</div>
+                                    </div>
+                                </div>
+
+                                <div className="text-[10px] text-slate-500 text-center leading-relaxed max-w-2xl mx-auto space-y-1">
+                                    <p>
+                                        คำแนะนำในส่วนนี้<span className="text-slate-400">ใช้เพื่อช่วยตั้งคำถาม</span>และจัดลำดับความสำคัญ <span className="text-slate-400">ไม่ใช่คำทำนาย</span> <span className="text-slate-400">ไม่ใช่คำสั่ง</span> และ<span className="text-slate-400">ไม่ควรใช้แทนข้อมูลจริง</span>หรือดุลยพินิจของตนเอง
+                                    </p>
+                                </div>
+                            </div>
+
                             {/* Reflection Log Input & History */}
                             <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6">
                                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
