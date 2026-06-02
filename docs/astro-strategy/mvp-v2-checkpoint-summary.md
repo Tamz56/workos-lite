@@ -99,7 +99,18 @@ cd50611a5a12d077e24f8fe7c40ad0c552762a6b
 
 MVP v2.0 Summary with Personal Timing Guide Enhancements:
 3d86305471ae8bb63b2d926d3747e7bf36d3b278
+
+MVP v2.0 Timing Guide Summary Hash Finalization:
+ed43e3b5a19820ce42ae1b3f068df0fa524f9b7c
+
+Reflection Export Pack Enhancements:
+6df6d7beb286c28299a5ab16117284b708ce12fe
+
+Reflection Export Pack Enhancements QA Record:
+6df6d7beb286c28299a5ab16117284b708ce12fe
 ```
+
+*Note: DEV-035 and QA-016 were committed together in the same commit.*
 
 ---
 
@@ -280,6 +291,53 @@ Confirmed:
 * Existing components and page state remain entirely unaffected (Regression QA Passed).
 * Static pages successfully built and pre-rendered with zero runtime errors.
 
+### Reflection Export Pack Enhancements v0.2
+
+```text
+Feature + QA Record Commit:
+6df6d7beb286c28299a5ab16117284b708ce12fe
+
+QA Record:
+docs/astro-strategy/qa-016-reflection-export-pack-enhancements-regression.md
+```
+
+Purpose:
+
+* Enhances the existing Reflection Export Pack.
+* Adds Export Scope Selector.
+* Adds Included Sections Preview.
+* Adds WorkOS-friendly frontmatter to generated Markdown.
+* Supports scope-based Markdown generation.
+* Keeps the export flow local-first, deterministic, and read-only with respect to source data.
+
+Confirmed:
+
+* Reflection Export Pack still renders in the Reflection flow.
+* Export Scope selector appears with four options:
+
+  1. Full Reflection Pack
+  2. Planning Only
+  3. Monthly Review Only
+  4. History Only
+* Included Sections Preview updates based on selected scope.
+* Generated Markdown includes frontmatter-style metadata:
+
+  * source
+  * export_type
+  * export_scope
+  * generated_at
+  * local_only
+* Export Metadata remains included.
+* Generate Markdown uses the selected scope.
+* Copy Markdown still works.
+* Changing scope clears stale generated Markdown to avoid mismatch.
+* No persistent localStorage key added.
+* No schema change.
+* No export scope history saved.
+* No import/restore/merge behavior added.
+* No API, database, AI call, or astrology calculation added.
+* deriveStrategyMode and Strategy Rules Layer remain untouched.
+
 ---
 
 ## Current MVP v2.0 Capability Snapshot
@@ -296,8 +354,11 @@ Confirmed:
 - Monthly Reflection Snapshot
 - Monthly Planning Review
 - Wai Kru / Teacher Reverence ethics layer
-- Personal Timing Guide orientation & actionable decision guide layer
+- Personal Timing Guide orientation layer
+- Personal Timing Guide situation prompts
 - Reflection Export Pack / Markdown backup layer
+- Reflection Export Pack scope selector
+- Reflection Export Pack WorkOS-friendly frontmatter
 - Local Backup / Import-Export Safety layer
 - Local-first usage without external backend
 - Cautious Thai strategic wording
@@ -322,17 +383,17 @@ Confirmed — No Monthly Snapshot export/copy behavior added
 Confirmed — No Strategy Planning Notes export/copy behavior added
 Confirmed — Wai Kru section is static and does not add persistence
 Confirmed — Personal Timing Guide is static and does not add persistence
+Confirmed — Personal Timing Guide Enhancements are static and do not add persistence
 Confirmed — Reflection Export Pack does not add persistent localStorage keys
 Confirmed — Reflection Export Pack does not save export history
 Confirmed — Reflection Export Pack does not mutate source data
+Confirmed — Reflection Export Pack Enhancements do not persist export scope
+Confirmed — Reflection Export Pack Enhancements do not save export history
+Confirmed — Reflection Export Pack Enhancements do not add import/restore/merge behavior
 Confirmed — Local Backup Safety does not add persistent localStorage keys
 Confirmed — Local Backup Safety does not import, restore, merge, or write back to source data
-Confirmed — Local Backup Safety does not automatically download files
 Confirmed — Monthly Planning Review does not add persistent localStorage keys
 Confirmed — Monthly Planning Review does not save review answers in v0.1
-Confirmed — Monthly Planning Review does not add save/copy/export/import behavior
-Confirmed — Personal Timing Guide Enhancements does not add persistent localStorage keys or change schema
-Confirmed — Personal Timing Guide Enhancements does not save answers or add interactive buttons/actions
 ```
 
 ---
@@ -340,7 +401,7 @@ Confirmed — Personal Timing Guide Enhancements does not save answers or add in
 ## Updated Decision
 
 ```text
-Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers (with actionable timing guide enhancements), Markdown export, and a non-destructive local backup safety layer.
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, and a non-destructive local backup safety layer.
 ```
 
 ---
@@ -348,10 +409,10 @@ Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → pl
 ## Recommended Next Development Direction
 
 ```text
-1. ASTRO-APP-DEV-035 — Reflection Export Pack Enhancements v0.2
-2. ASTRO-APP-DEV-036 — Import Preview Validator v0.1
-3. ASTRO-APP-DEV-037 — Monthly Review Export Integration v0.1
-4. ASTRO-APP-DEV-038 — Import-Export Full Restore flow v0.1
+1. ASTRO-APP-DEV-036 — Import Preview Validator v0.1
+2. ASTRO-APP-DEV-037 — Monthly Review Export Integration v0.1
+3. ASTRO-APP-DEV-038 — Local Backup Safety Enhancements v0.2
+4. ASTRO-APP-DEV-039 — Reflection History Filters v0.1
 ```
 
 ---
