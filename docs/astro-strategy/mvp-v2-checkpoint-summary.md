@@ -108,6 +108,15 @@ Reflection Export Pack Enhancements:
 
 Reflection Export Pack Enhancements QA Record:
 6df6d7beb286c28299a5ab16117284b708ce12fe
+
+MVP v2.0 Summary with Reflection Export Pack Enhancements:
+8b096eabf6ff0a3f37b350706a1d4c1e69d9b32a
+
+Import Preview Validator:
+02dc013cfbeef6edac3397e18dbb01cc45310f77
+
+Import Preview Validator QA Record:
+3b4498b4c9708acaac63ea23dfb71a677ba9412c
 ```
 
 *Note: DEV-035 and QA-016 were committed together in the same commit.*
@@ -338,6 +347,39 @@ Confirmed:
 * No API, database, AI call, or astrology calculation added.
 * deriveStrategyMode and Strategy Rules Layer remain untouched.
 
+## Import Preview Validator v0.1
+
+```text
+Feature Commit:
+02dc013cfbeef6edac3397e18dbb01cc45310f77
+
+QA Record:
+3b4498b4c9708acaac63ea23dfb71a677ba9412c
+docs/astro-strategy/qa-017-import-preview-validator-regression.md
+```
+
+Purpose:
+
+* Adds an Import Preview Validator section in the Reflection tab.
+* Allows the user to paste a local backup JSON preview.
+* Validates basic structure before any future import/restore workflow is designed.
+* Works as preview-only and validation-only.
+* Helps reduce risk before future import/export workflows.
+* Does not import, restore, merge, write back, or mutate existing source data.
+
+Confirmed:
+
+* Import Preview Validator appears after Local Backup / Import-Export Safety and before Reflection History List.
+* Textarea accepts pasted JSON.
+* Validate Preview parses JSON safely.
+* Valid Astro Strategy local backup preview shows `ผ่านเบื้องต้น`.
+* Invalid JSON shows `ไม่สามารถอ่าน JSON ได้`.
+* Partial or unexpected JSON shows `ตรวจพบข้อควรระวัง`.
+* Result area displays detected fields, warnings, and safe preview counts.
+* No import button, restore button, merge behavior, write-back into localStorage, or automatic file download added.
+* No new persistent localStorage key, API, database, AI call, or astrology calculation added.
+* deriveStrategyMode and Strategy Rules Layer remain untouched.
+
 ---
 
 ## Current MVP v2.0 Capability Snapshot
@@ -360,6 +402,7 @@ Confirmed:
 - Reflection Export Pack scope selector
 - Reflection Export Pack WorkOS-friendly frontmatter
 - Local Backup / Import-Export Safety layer
+- Import Preview Validator / preview-only validation layer
 - Local-first usage without external backend
 - Cautious Thai strategic wording
 ```
@@ -394,6 +437,10 @@ Confirmed — Local Backup Safety does not add persistent localStorage keys
 Confirmed — Local Backup Safety does not import, restore, merge, or write back to source data
 Confirmed — Monthly Planning Review does not add persistent localStorage keys
 Confirmed — Monthly Planning Review does not save review answers in v0.1
+Confirmed — Import Preview Validator does not add persistent localStorage keys
+Confirmed — Import Preview Validator does not save validation history
+Confirmed — Import Preview Validator does not import, restore, merge, or write back to source data
+Confirmed — Import Preview Validator does not automatically download files
 ```
 
 ---
@@ -401,7 +448,7 @@ Confirmed — Monthly Planning Review does not save review answers in v0.1
 ## Updated Decision
 
 ```text
-Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, and a non-destructive local backup safety layer.
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, non-destructive local backup safety, and preview-only import validation for future data safety workflows.
 ```
 
 ---
@@ -409,10 +456,10 @@ Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → pl
 ## Recommended Next Development Direction
 
 ```text
-1. ASTRO-APP-DEV-036 — Import Preview Validator v0.1
-2. ASTRO-APP-DEV-037 — Monthly Review Export Integration v0.1
-3. ASTRO-APP-DEV-038 — Local Backup Safety Enhancements v0.2
-4. ASTRO-APP-DEV-039 — Reflection History Filters v0.1
+1. ASTRO-APP-DEV-037 — Monthly Review Export Integration v0.1
+2. ASTRO-APP-DEV-038 — Local Backup Safety Enhancements v0.2
+3. ASTRO-APP-DEV-039 — Reflection History Filters v0.1
+4. ASTRO-APP-DEV-040 — Import Preview Validator Enhancements v0.2
 ```
 
 ---
