@@ -333,6 +333,28 @@ export default function AstroStrategyPrototypeClient() {
     const [localBackupPreview, setLocalBackupPreview] = useState<string>("");
     const [localBackupCopied, setLocalBackupCopied] = useState<boolean>(false);
 
+    // ASTRO-APP-DEV-036: Import Preview Validator States
+    const [importPreviewText, setImportPreviewText] = useState<string>("");
+    const [importPreviewResult, setImportPreviewResult] = useState<{
+        status: "idle" | "valid" | "warning" | "error";
+        detectedKind: string;
+        version: string;
+        generatedAt: string;
+        source: string;
+        historyLogsCount: number;
+        previewCount: number;
+        warnings: string[];
+    }>({
+        status: "idle",
+        detectedKind: "",
+        version: "",
+        generatedAt: "",
+        source: "",
+        historyLogsCount: 0,
+        previewCount: 0,
+        warnings: []
+    });
+
     // Hydration check and LocalStorage loading
     useEffect(() => {
         setIsMounted(true);
@@ -1407,6 +1429,124 @@ ${historyLogsStr.trim()}
             console.error("Failed to copy local backup preview:", err);
             alert("ไม่สามารถคัดลอกลงคลิปบอร์ดได้ กรุณาคัดลอกด้วยตัวเองจากกล่องข้อความ");
         }
+    };
+
+    // ASTRO-APP-DEV-036: Import Preview Validator Helper Functions
+    const handleValidateImportPreview = () => {
+        if (!importPreviewText.trim()) {
+            setImportPreviewResult({
+                status: "idle",
+                detectedKind: "",
+                version: "",
+                generatedAt: "",
+                source: "",
+                historyLogsCount: 0,
+                previewCount: 0,
+                warnings: []
+            });
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(importPreviewText);
+            const warnings: string[] = [];
+
+            if (!parsed || typeof parsed !== "object") {
+                setImportPreviewResult({
+                    status: "error",
+                    detectedKind: "ไม่ใช่ Object",
+                    version: "ไม่มีข้อมูล",
+                    generatedAt: "ไม่มีข้อมูล",
+                    source: "ไม่มีข้อมูล",
+                    historyLogsCount: 0,
+                    previewCount: 0,
+                    warnings: ["ข้อมูลที่วางไม่ใช่ JSON Object ที่ถูกต้อง"]
+                });
+                return;
+            }
+
+            const kind = parsed.kind;
+            const version = parsed.version;
+            const generatedAt = parsed.generatedAt;
+            const source = parsed.source;
+            const data = parsed.data;
+
+            if (kind !== "astro-strategy-local-backup-preview") {
+                warnings.push("ฟิลด์ kind ไม่ถูกต้องหรือหายไป (คาดหวัง: 'astro-strategy-local-backup-preview')");
+            }
+            if (!version) {
+                warnings.push("ไม่พบฟิลด์ version");
+            }
+            if (!generatedAt) {
+                warnings.push("ไม่พบฟิลด์ generatedAt");
+            }
+            if (!source) {
+                warnings.push("ไม่พบฟิลด์ source");
+            }
+            if (!data || typeof data !== "object") {
+                warnings.push("ข้อมูลหลัก (data) สูญหายหรือมีรูปแบบไม่ถูกต้อง");
+            }
+
+            let historyLogsCount = 0;
+            let previewCount = 0;
+
+            if (data && typeof data === "object") {
+                const counts = data.counts;
+                if (!counts || typeof counts !== "object") {
+                    warnings.push("ฟิลด์ counts ภายใน data หายไปหรือมีรูปแบบไม่ถูกต้อง");
+                } else {
+                    historyLogsCount = typeof counts.historyLogs === "number" ? counts.historyLogs : 0;
+                }
+
+                const historyLogsPreview = data.historyLogsPreview;
+                if (historyLogsPreview !== undefined) {
+                    if (!Array.isArray(historyLogsPreview)) {
+                        warnings.push("รายการประวัติสำรอง (historyLogsPreview) ต้องเป็น Array");
+                    } else {
+                        previewCount = historyLogsPreview.length;
+                    }
+                }
+            }
+
+            const status = warnings.length > 0 ? "warning" : "valid";
+
+            setImportPreviewResult({
+                status,
+                detectedKind: String(kind || "ไม่มีข้อมูล"),
+                version: String(version || "ไม่มีข้อมูล"),
+                generatedAt: String(generatedAt || "ไม่มีข้อมูล"),
+                source: String(source || "ไม่มีข้อมูล"),
+                historyLogsCount,
+                previewCount,
+                warnings
+            });
+
+        } catch (err) {
+            setImportPreviewResult({
+                status: "error",
+                detectedKind: "ไม่สามารถแยกแยะได้",
+                version: "ไม่สามารถแยกแยะได้",
+                generatedAt: "ไม่สามารถแยกแยะได้",
+                source: "ไม่สามารถแยกแยะได้",
+                historyLogsCount: 0,
+                previewCount: 0,
+                warnings: ["ไม่สามารถอ่าน JSON ได้ (กรุณาตรวจสอบวงเล็บ ปีกกา หรือเครื่องหมายจุลภาค)"]
+            });
+        }
+    };
+
+    const handleClearImportPreview = () => {
+        setImportPreviewText("");
+        setImportPreviewResult({
+            status: "idle",
+            detectedKind: "",
+            version: "",
+            generatedAt: "",
+            source: "",
+            historyLogsCount: 0,
+            previewCount: 0,
+            warnings: []
+        });
     };
 
     // ASTRO-APP-DEV-026B: Weekly Pattern Hints Helper Functions
@@ -4303,6 +4443,134 @@ ${historyLogsStr.trim()}
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* ASTRO-APP-DEV-036: Import Preview Validator */}
+                                        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
+                                            <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
+                                                <ClipboardList className="w-4.5 h-4.5 text-indigo-400" />
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-slate-200">
+                                                        Import Preview Validator
+                                                     </h4>
+                                                     <span className="text-[10px] text-indigo-300 block mt-0.5 font-medium">
+                                                         ตรวจตัวอย่างไฟล์สำรองก่อนออกแบบระบบนำเข้าจริง
+                                                     </span>
+                                                 </div>
+                                             </div>
+
+                                             <p className="text-xs text-slate-300 leading-relaxed">
+                                                 ส่วนนี้ใช้สำหรับวาง JSON backup preview เพื่อตรวจโครงสร้างเบื้องต้นเท่านั้น ระบบจะไม่ import, restore, merge หรือเขียนทับข้อมูลใด ๆ ในเวอร์ชันนี้
+                                             </p>
+
+                                             <div className="bg-amber-950/20 border border-amber-900/30 p-3.5 rounded-lg space-y-2 text-[11px]">
+                                                 <div className="flex items-start gap-2 text-amber-300">
+                                                     <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                                     <div className="space-y-1 leading-relaxed text-slate-350">
+                                                         <p className="font-semibold text-amber-300">Preview only — ยังไม่มีการนำเข้าข้อมูลกลับเข้าระบบ</p>
+                                                         <p>ระบบนี้ทำหน้าที่ตรวจตัวอย่างข้อมูลเท่านั้น ยังไม่มีปุ่มนำเข้า ไม่มีการเขียนทับ และไม่มีการเปลี่ยนแปลงข้อมูลเดิม</p>
+                                                         <p className="text-slate-400">การตรวจนี้เกิดขึ้นในเครื่องนี้เท่านั้น ไม่มีการส่งข้อมูลออกไปยังเซิร์ฟเวอร์ และไม่มีการเปลี่ยนแปลงข้อมูลต้นฉบับ</p>
+                                                     </div>
+                                                 </div>
+                                             </div>
+
+                                             <div className="space-y-2">
+                                                 <textarea
+                                                     placeholder="วาง JSON backup preview ที่นี่เพื่อตรวจสอบโครงสร้างเบื้องต้น"
+                                                     value={importPreviewText}
+                                                     onChange={(e) => setImportPreviewText(e.target.value)}
+                                                     rows={6}
+                                                     className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-slate-300 focus:border-indigo-500/50 focus:outline-none transition-all resize-y"
+                                                 />
+                                             </div>
+
+                                             <div className="flex gap-3">
+                                                 <button
+                                                     type="button"
+                                                     onClick={handleValidateImportPreview}
+                                                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-slate-100 rounded-xl text-xs font-bold transition-all active:scale-[0.98] shadow-md shadow-indigo-950/20"
+                                                 >
+                                                     Validate Preview
+                                                 </button>
+                                                 <button
+                                                     type="button"
+                                                     onClick={handleClearImportPreview}
+                                                     className="px-4 py-2 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-slate-300 border border-slate-700/50 rounded-xl text-xs font-semibold transition-all active:scale-[0.98]"
+                                                 >
+                                                     Clear
+                                                 </button>
+                                             </div>
+
+                                             <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800 space-y-3.5">
+                                                 <div className="flex items-center gap-2 border-b border-slate-850/80 pb-2">
+                                                     <span className="text-xs text-slate-400 font-medium">ผลการตรวจสอบโครงสร้าง:</span>
+                                                     <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${
+                                                         importPreviewResult.status === "valid" 
+                                                             ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/20" 
+                                                             : importPreviewResult.status === "warning"
+                                                             ? "bg-amber-950/40 text-amber-300 border-amber-500/20"
+                                                             : importPreviewResult.status === "error"
+                                                             ? "bg-rose-950/40 text-rose-300 border-rose-500/20"
+                                                             : "bg-slate-900 text-slate-400 border-slate-700/50"
+                                                     }`}>
+                                                         {importPreviewResult.status === "idle" && "ยังไม่ได้ตรวจสอบ"}
+                                                         {importPreviewResult.status === "valid" && "ผ่านเบื้องต้น"}
+                                                         {importPreviewResult.status === "warning" && "ตรวจพบข้อควรระวัง"}
+                                                         {importPreviewResult.status === "error" && "ไม่สามารถอ่าน JSON ได้"}
+                                                     </span>
+                                                 </div>
+
+                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                                                     <div className="flex justify-between border-b border-slate-850/30 py-1">
+                                                         <span className="text-slate-400">ชนิดไฟล์ที่พบ:</span>
+                                                         <span className="font-mono text-slate-200">{importPreviewResult.status === "idle" ? "ยังไม่มีข้อมูลในส่วนนี้" : (importPreviewResult.detectedKind || "ยังไม่มีข้อมูลในส่วนนี้")}</span>
+                                                     </div>
+                                                     <div className="flex justify-between border-b border-slate-850/30 py-1">
+                                                         <span className="text-slate-400">เวอร์ชัน:</span>
+                                                         <span className="font-mono text-slate-200">{importPreviewResult.status === "idle" ? "ยังไม่มีข้อมูลในส่วนนี้" : (importPreviewResult.version || "ยังไม่มีข้อมูลในส่วนนี้")}</span>
+                                                     </div>
+                                                     <div className="flex justify-between border-b border-slate-850/30 py-1">
+                                                         <span className="text-slate-400">วันที่สร้าง:</span>
+                                                         <span className="text-slate-200">{importPreviewResult.status === "idle" ? "ยังไม่มีข้อมูลในส่วนนี้" : (importPreviewResult.generatedAt || "ยังไม่มีข้อมูลในส่วนนี้")}</span>
+                                                     </div>
+                                                     <div className="flex justify-between border-b border-slate-850/30 py-1">
+                                                         <span className="text-slate-400">แหล่งที่มา:</span>
+                                                         <span className="text-slate-200">{importPreviewResult.status === "idle" ? "ยังไม่มีข้อมูลในส่วนนี้" : (importPreviewResult.source || "ยังไม่มีข้อมูลในส่วนนี้")}</span>
+                                                     </div>
+                                                     <div className="flex justify-between border-b border-slate-850/30 py-1">
+                                                         <span className="text-slate-400">จำนวน historyLogs ที่ระบุ:</span>
+                                                         <span className="font-mono text-slate-200">{importPreviewResult.status === "idle" ? "ยังไม่มีข้อมูลในส่วนนี้" : importPreviewResult.historyLogsCount}</span>
+                                                     </div>
+                                                     <div className="flex justify-between border-b border-slate-850/30 py-1">
+                                                         <span className="text-slate-400">จำนวนรายการ preview ที่พบ:</span>
+                                                         <span className="font-mono text-slate-200">{importPreviewResult.status === "idle" ? "ยังไม่มีข้อมูลในส่วนนี้" : importPreviewResult.previewCount}</span>
+                                                     </div>
+                                                 </div>
+
+                                                 {importPreviewResult.status !== "idle" && importPreviewResult.warnings.length > 0 && (
+                                                     <div className="space-y-1.5 pt-1.5 border-t border-slate-850/60">
+                                                         <div className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                                                             <AlertTriangle className="w-3.5 h-3.5" />
+                                                             ข้อควรระวัง:
+                                                         </div>
+                                                         <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-400 pl-1 leading-relaxed">
+                                                             {importPreviewResult.warnings.map((warning, i) => (
+                                                                 <li key={i}>{warning}</li>
+                                                             ))}
+                                                         </ul>
+                                                     </div>
+                                                 )}
+
+                                                 <div className="bg-slate-950/50 border border-slate-800/80 p-3 rounded-lg text-[11px] text-slate-400 space-y-1 mt-2">
+                                                     <div className="font-semibold text-slate-350">เงื่อนไขการทำงานในเวอร์ชันนี้:</div>
+                                                     <ul className="list-disc list-inside space-y-0.5 text-slate-500">
+                                                         <li>ตรวจโครงสร้างเบื้องต้นเท่านั้น</li>
+                                                         <li>ยังไม่ import ข้อมูล และ ยังไม่ restore ข้อมูล</li>
+                                                         <li>ยังไม่ merge ข้อมูล และ ไม่เขียนทับ localStorage</li>
+                                                         <li>ไม่มีการส่งข้อมูลออกจากเครื่องนี้ (Local-first)</li>
+                                                     </ul>
+                                                 </div>
+                                             </div>
+                                         </div>
 
                                         {/* Reflection History List UI - ASTRO-APP-DEV-019B */}
                                         <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 mt-6">
