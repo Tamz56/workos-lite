@@ -117,6 +117,15 @@ Import Preview Validator:
 
 Import Preview Validator QA Record:
 3b4498b4c9708acaac63ea23dfb71a677ba9412c
+
+MVP v2.0 Summary with Import Preview Validator:
+b6a6c214bbb430556caf74203d176f5be8e271ac
+
+Monthly Review Export Integration:
+e571ce8827d5cdcf1511c6ea7ea70a576d862922
+
+Monthly Review Export Integration QA Record:
+43497e4f2b4ee22ee3f1bbfca9463ee8a85dda7c
 ```
 
 *Note: DEV-035 and QA-016 were committed together in the same commit.*
@@ -380,6 +389,47 @@ Confirmed:
 * No new persistent localStorage key, API, database, AI call, or astrology calculation added.
 * deriveStrategyMode and Strategy Rules Layer remain untouched.
 
+## Monthly Review Export Integration v0.1
+
+```text
+Feature Commit:
+e571ce8827d5cdcf1511c6ea7ea70a576d862922
+
+QA Record:
+43497e4f2b4ee22ee3f1bbfca9463ee8a85dda7c
+docs/astro-strategy/qa-018-monthly-review-export-integration-regression.md
+```
+
+Purpose:
+
+* Improves Reflection Export Pack so Monthly Planning Review is clearly included in relevant Markdown export scopes.
+* Makes monthly review output easier to copy into WorkOS, notes, or backup files.
+* Adds a structured Monthly Planning Review Markdown section.
+* Connects Monthly Reflection Snapshot, Monthly Planning Review, Strategy Planning Notes, and next-month review question.
+* Keeps the change local-first, export-only, deterministic, and read-only with respect to source data.
+
+Confirmed:
+
+* Full Reflection Pack includes Monthly Planning Review.
+* Planning Only includes Strategy Planning Notes and Monthly Planning Review.
+* Monthly Review Only includes Monthly Reflection Snapshot and Monthly Planning Review.
+* History Only does not include Monthly Planning Review.
+* Generated Markdown includes structured Thai subheadings:
+
+  1. ทิศทางที่เดือนนี้สะท้อน
+  2. สิ่งที่ควรทำต่อ
+  3. สิ่งที่ควรชะลอหรือหยุดทบทวน
+  4. เมล็ดตั้งต้นของเดือนถัดไป
+  5. คำถามทบทวน
+* WorkOS-friendly helper note was added to the Reflection Export Pack UI.
+* Copy Markdown still works.
+* No new persistent localStorage key added.
+* No schema change.
+* No export preferences or export history saved.
+* No import, restore, merge, or write-back behavior added.
+* No API, database, AI call, or astrology calculation added.
+* deriveStrategyMode and Strategy Rules Layer remain untouched.
+
 ---
 
 ## Current MVP v2.0 Capability Snapshot
@@ -395,6 +445,7 @@ Confirmed:
 - Strategy Planning Notes
 - Monthly Reflection Snapshot
 - Monthly Planning Review
+- Monthly Review Export Integration
 - Wai Kru / Teacher Reverence ethics layer
 - Personal Timing Guide orientation layer
 - Personal Timing Guide situation prompts
@@ -422,25 +473,24 @@ Confirmed — No astrology calculation added
 Confirmed — Strategy Rules Layer untouched
 Confirmed — deriveStrategyMode untouched
 Confirmed — Copy Weekly Review Markdown unchanged
-Confirmed — No Monthly Snapshot export/copy behavior added
-Confirmed — No Strategy Planning Notes export/copy behavior added
 Confirmed — Wai Kru section is static and does not add persistence
 Confirmed — Personal Timing Guide is static and does not add persistence
 Confirmed — Personal Timing Guide Enhancements are static and do not add persistence
+Confirmed — Monthly Planning Review does not add persistent localStorage keys
+Confirmed — Monthly Planning Review does not save review answers in v0.1
 Confirmed — Reflection Export Pack does not add persistent localStorage keys
 Confirmed — Reflection Export Pack does not save export history
 Confirmed — Reflection Export Pack does not mutate source data
 Confirmed — Reflection Export Pack Enhancements do not persist export scope
 Confirmed — Reflection Export Pack Enhancements do not save export history
-Confirmed — Reflection Export Pack Enhancements do not add import/restore/merge behavior
+Confirmed — Monthly Review Export Integration does not add persistent localStorage keys
+Confirmed — Monthly Review Export Integration does not save export preferences or export history
+Confirmed — Monthly Review Export Integration does not import, restore, merge, or write back to source data
 Confirmed — Local Backup Safety does not add persistent localStorage keys
 Confirmed — Local Backup Safety does not import, restore, merge, or write back to source data
-Confirmed — Monthly Planning Review does not add persistent localStorage keys
-Confirmed — Monthly Planning Review does not save review answers in v0.1
 Confirmed — Import Preview Validator does not add persistent localStorage keys
 Confirmed — Import Preview Validator does not save validation history
 Confirmed — Import Preview Validator does not import, restore, merge, or write back to source data
-Confirmed — Import Preview Validator does not automatically download files
 ```
 
 ---
@@ -448,7 +498,7 @@ Confirmed — Import Preview Validator does not automatically download files
 ## Updated Decision
 
 ```text
-Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, non-destructive local backup safety, and preview-only import validation for future data safety workflows.
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, monthly review export integration, non-destructive local backup safety, and preview-only import validation for future data safety workflows.
 ```
 
 ---
@@ -456,10 +506,10 @@ Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → pl
 ## Recommended Next Development Direction
 
 ```text
-1. ASTRO-APP-DEV-037 — Monthly Review Export Integration v0.1
-2. ASTRO-APP-DEV-038 — Local Backup Safety Enhancements v0.2
-3. ASTRO-APP-DEV-039 — Reflection History Filters v0.1
-4. ASTRO-APP-DEV-040 — Import Preview Validator Enhancements v0.2
+1. ASTRO-APP-DEV-038 — Local Backup Safety Enhancements v0.2
+2. ASTRO-APP-DEV-039 — Reflection History Filters v0.1
+3. ASTRO-APP-DEV-040 — Import Preview Validator Enhancements v0.2
+4. ASTRO-APP-DEV-041 — Monthly Review Export Templates v0.1
 ```
 
 ---
