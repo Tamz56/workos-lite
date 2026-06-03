@@ -1293,17 +1293,21 @@ ${monthlySnapshotStr}
 
             md += `
 ## Monthly Planning Review
-### ทิศทางที่เดือนนี้สะท้อน (Monthly Direction)
+
+### ทิศทางที่เดือนนี้สะท้อน
 ${directionContent}
 
-### สิ่งที่ควรทำต่อ (Continue)
+### สิ่งที่ควรทำต่อ
 ${continueContent}
 
-### สิ่งที่ควรชะลอหรือหยุดทบทวน (Slow Down / Stop)
+### สิ่งที่ควรชะลอหรือหยุดทบทวน
 ${slowDownContent}
 
-### เมล็ดตั้งต้นของเดือนถัดไป (Next Month Seed)
+### เมล็ดตั้งต้นของเดือนถัดไป
 ${nextMonthSeedContent}
+
+### คำถามทบทวน
+ถ้าเลือกได้เพียงหนึ่งเรื่องสำหรับเดือนถัดไป เรื่องใดควรได้รับพลังมากที่สุด?
 `;
         }
 
@@ -4279,10 +4283,13 @@ ${historyLogsStr.trim()}
                                                         </span>
                                                     )}
                                                     {(reflectionExportScope === "full" || reflectionExportScope === "history") && (
-                                                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
+                                                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-850/80 text-[10px] text-slate-300">
                                                             - Recent Reflection History
                                                         </span>
                                                     )}
+                                                </div>
+                                                <div className="text-[10px] text-indigo-400 pt-2 border-t border-slate-850/40 mt-2 font-medium">
+                                                    Monthly Planning Review จะถูกรวมใน export scope ที่เกี่ยวข้อง เพื่อให้คัดลอกไปเก็บใน WorkOS หรือ notes ได้ง่ายขึ้น
                                                 </div>
                                             </div>
 
