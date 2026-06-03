@@ -1368,6 +1368,13 @@ ${historyLogsStr.trim()}
                 version: "0.1",
                 generatedAt: new Date().toISOString(),
                 source: "local-browser-state-only",
+                metadata: {
+                    backupMode: "preview-only",
+                    localOnly: true,
+                    nonDestructive: true,
+                    containsSensitiveReflectionData: true,
+                    restoreSupported: false
+                },
                 data: {
                     reflectionDraft: {
                         reflectionMode,
@@ -1399,7 +1406,8 @@ ${historyLogsStr.trim()}
                 },
                 notes: [
                     "This is a read-only backup preview.",
-                    "This file has not been imported or restored automatically."
+                    "This file has not been imported or restored automatically.",
+                    "Keep this backup in a private location you control."
                 ]
             };
             setLocalBackupPreview(JSON.stringify(backupJSON, null, 2));
@@ -4396,6 +4404,73 @@ ${historyLogsStr.trim()}
                                                     <p className="text-[11px] text-slate-400 leading-relaxed">
                                                         เวอร์ชันนี้ทำหน้าที่เป็นชั้นเตรียมความปลอดภัยและอธิบายแนวทางเท่านั้น ยังไม่ import, restore, merge หรือเขียนทับข้อมูลใด ๆ
                                                     </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/20 p-4 rounded-xl border border-slate-800/40">
+                                                {/* Column 1: Backup Content Summary */}
+                                                <div className="space-y-2">
+                                                    <h5 className="text-xs font-semibold text-slate-250">
+                                                        Backup Content Summary / สรุปรายละเอียดไฟล์สำรอง
+                                                    </h5>
+                                                    <p className="text-[10px] text-slate-400">
+                                                        สรุปว่าตัวอย่างไฟล์สำรองนี้ประกอบด้วยข้อมูลส่วนใดบ้าง (preview-only)
+                                                     </p>
+                                                    <ul className="text-[11px] text-slate-350 space-y-1 list-disc list-inside pl-1">
+                                                        <li>ร่างบันทึกสะท้อนคิด</li>
+                                                        <li>สถานะเช็กอินรายวัน</li>
+                                                        <li>แผนเชิงกลยุทธ์</li>
+                                                        <li>ตัวอย่างประวัติสะท้อนคิดล่าสุด</li>
+                                                        <li>จำนวนประวัติที่ตรวจพบ ({historyLogs.length} รายการ)</li>
+                                                        <li>หมายเหตุของไฟล์สำรอง</li>
+                                                    </ul>
+                                                </div>
+
+                                                {/* Column 2: Backup Safety Checklist */}
+                                                <div className="space-y-2">
+                                                    <h5 className="text-xs font-semibold text-slate-250">
+                                                        Backup Safety Checklist / สิ่งที่ควรตรวจสอบ
+                                                    </h5>
+                                                    <p className="text-[10px] text-slate-400">
+                                                        สิ่งที่ควรตรวจสอบก่อนเก็บหรือส่งต่อไฟล์สำรอง
+                                                    </p>
+                                                    <ul className="text-[11px] text-slate-350 space-y-1.5 pl-1">
+                                                        <li className="flex items-start gap-1.5">
+                                                            <span className="text-indigo-400 shrink-0">✓</span>
+                                                            <span>ตรวจว่าไฟล์มาจากเครื่องหรือระบบที่คุณเชื่อถือ</span>
+                                                        </li>
+                                                        <li className="flex items-start gap-1.5">
+                                                            <span className="text-indigo-400 shrink-0">✓</span>
+                                                            <span>เก็บไฟล์สำรองไว้ในพื้นที่ส่วนตัวที่ควบคุมเอง</span>
+                                                        </li>
+                                                        <li className="flex items-start gap-1.5">
+                                                            <span className="text-indigo-400 shrink-0">✓</span>
+                                                            <span>หลีกเลี่ยงการส่งไฟล์สำรองในพื้นที่สาธารณะ</span>
+                                                        </li>
+                                                        <li className="flex items-start gap-1.5">
+                                                            <span className="text-indigo-400 shrink-0">✓</span>
+                                                            <span>ตรวจ preview ด้วย Import Preview Validator ก่อนคิดเรื่อง restore ในอนาคต</span>
+                                                        </li>
+                                                        <li className="flex items-start gap-1.5">
+                                                            <span className="text-indigo-400 shrink-0">✓</span>
+                                                            <span>อย่าใช้ไฟล์สำรองแทนการตัดสินใจหรือข้อมูลจริงทั้งหมด</span>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-rose-950/20 border border-rose-900/30 p-3.5 rounded-lg space-y-2 text-[11px]">
+                                                <div className="flex items-start gap-2 text-rose-300">
+                                                    <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                                                    <div className="space-y-1 leading-relaxed text-slate-300">
+                                                        <p className="font-semibold text-rose-300">สำคัญ: ไม่ใช่คำสั่งกู้คืนข้อมูล (Non-destructive Preview)</p>
+                                                        <p className="text-slate-350">
+                                                            สำคัญ: ไฟล์นี้เป็นเพียงตัวอย่างสำรองข้อมูล ไม่ใช่คำสั่งกู้คืนข้อมูล ระบบจะไม่ import, restore, merge หรือเขียนทับข้อมูลเดิมจากการสร้าง preview นี้
+                                                        </p>
+                                                        <p className="text-[10px] text-rose-400/90 mt-1">
+                                                            ℹ️ ควรตรวจไฟล์ด้วย Import Preview Validator ก่อนออกแบบขั้นตอนนำเข้าจริงในอนาคต
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
 
