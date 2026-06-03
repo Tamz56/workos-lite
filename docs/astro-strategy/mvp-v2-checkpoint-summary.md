@@ -126,6 +126,15 @@ e571ce8827d5cdcf1511c6ea7ea70a576d862922
 
 Monthly Review Export Integration QA Record:
 43497e4f2b4ee22ee3f1bbfca9463ee8a85dda7c
+
+MVP v2.0 Summary with Monthly Review Export Integration:
+0ae7dadd0febd0ee8d4ec0fdc68fbfa120b79d80
+
+Local Backup Safety Enhancements:
+1e278a42ca2fb5eeb087e836157c4f93c64f19ca
+
+Local Backup Safety Enhancements QA Record:
+5eff9c058e280a973e044cb7f5e5e133e249dbbe
 ```
 
 *Note: DEV-035 and QA-016 were committed together in the same commit.*
@@ -430,6 +439,44 @@ Confirmed:
 * No API, database, AI call, or astrology calculation added.
 * deriveStrategyMode and Strategy Rules Layer remain untouched.
 
+## Local Backup Safety Enhancements v0.2
+
+```text
+Feature Commit:
+1e278a42ca2fb5eeb087e836157c4f93c64f19ca
+
+QA Record:
+5eff9c058e280a973e044cb7f5e5e133e249dbbe
+docs/astro-strategy/qa-019-local-backup-safety-enhancements-regression.md
+```
+
+Purpose:
+
+* Enhances the existing Local Backup / Import-Export Safety section.
+* Adds Backup Content Summary.
+* Adds Backup Safety Checklist.
+* Adds stronger non-destructive warning.
+* Adds JSON metadata to the generated backup preview.
+* Helps users understand what the backup preview contains and how to handle it safely.
+* Keeps the feature local-first, preview-only, read-only, deterministic, and non-destructive.
+
+Confirmed:
+
+* Local Backup / Import-Export Safety card still renders.
+* Backup Content Summary appears.
+* Backup Safety Checklist appears.
+* Stronger non-destructive warning appears.
+* Generate Backup Preview still works.
+* Copy Backup Preview still works.
+* Generated JSON remains valid.
+* Generated JSON includes metadata or equivalent safety notes.
+* Import Preview Validator can validate the generated preview as `ผ่านเบื้องต้น`.
+* No new persistent localStorage key added.
+* No schema change.
+* No import, restore, merge, write-back, or automatic file download behavior added.
+* No API, database, AI call, or astrology calculation added.
+* deriveStrategyMode and Strategy Rules Layer remain untouched.
+
 ---
 
 ## Current MVP v2.0 Capability Snapshot
@@ -453,6 +500,7 @@ Confirmed:
 - Reflection Export Pack scope selector
 - Reflection Export Pack WorkOS-friendly frontmatter
 - Local Backup / Import-Export Safety layer
+- Local Backup Safety content summary and checklist
 - Import Preview Validator / preview-only validation layer
 - Local-first usage without external backend
 - Cautious Thai strategic wording
@@ -478,16 +526,19 @@ Confirmed — Personal Timing Guide is static and does not add persistence
 Confirmed — Personal Timing Guide Enhancements are static and do not add persistence
 Confirmed — Monthly Planning Review does not add persistent localStorage keys
 Confirmed — Monthly Planning Review does not save review answers in v0.1
+Confirmed — Monthly Review Export Integration does not add persistent localStorage keys
+Confirmed — Monthly Review Export Integration does not save export preferences or export history
+Confirmed — Monthly Review Export Integration does not import, restore, merge, or write back to source data
 Confirmed — Reflection Export Pack does not add persistent localStorage keys
 Confirmed — Reflection Export Pack does not save export history
 Confirmed — Reflection Export Pack does not mutate source data
 Confirmed — Reflection Export Pack Enhancements do not persist export scope
 Confirmed — Reflection Export Pack Enhancements do not save export history
-Confirmed — Monthly Review Export Integration does not add persistent localStorage keys
-Confirmed — Monthly Review Export Integration does not save export preferences or export history
-Confirmed — Monthly Review Export Integration does not import, restore, merge, or write back to source data
 Confirmed — Local Backup Safety does not add persistent localStorage keys
 Confirmed — Local Backup Safety does not import, restore, merge, or write back to source data
+Confirmed — Local Backup Safety Enhancements do not add persistent localStorage keys
+Confirmed — Local Backup Safety Enhancements do not save checklist state or backup metadata history
+Confirmed — Local Backup Safety Enhancements do not import, restore, merge, or write back to source data
 Confirmed — Import Preview Validator does not add persistent localStorage keys
 Confirmed — Import Preview Validator does not save validation history
 Confirmed — Import Preview Validator does not import, restore, merge, or write back to source data
@@ -498,7 +549,7 @@ Confirmed — Import Preview Validator does not import, restore, merge, or write
 ## Updated Decision
 
 ```text
-Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, monthly review export integration, non-destructive local backup safety, and preview-only import validation for future data safety workflows.
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, monthly review export integration, strengthened local backup safety, and preview-only import validation for future data safety workflows.
 ```
 
 ---
@@ -506,10 +557,10 @@ Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → pl
 ## Recommended Next Development Direction
 
 ```text
-1. ASTRO-APP-DEV-038 — Local Backup Safety Enhancements v0.2
-2. ASTRO-APP-DEV-039 — Reflection History Filters v0.1
-3. ASTRO-APP-DEV-040 — Import Preview Validator Enhancements v0.2
-4. ASTRO-APP-DEV-041 — Monthly Review Export Templates v0.1
+1. ASTRO-APP-DEV-039 — Reflection History Filters v0.1
+2. ASTRO-APP-DEV-040 — Import Preview Validator Enhancements v0.2
+3. ASTRO-APP-DEV-041 — Monthly Review Export Templates v0.1
+4. ASTRO-APP-DEV-042 — Local Data Health Check v0.1
 ```
 
 ---
