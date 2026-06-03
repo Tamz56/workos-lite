@@ -135,6 +135,15 @@ Local Backup Safety Enhancements:
 
 Local Backup Safety Enhancements QA Record:
 5eff9c058e280a973e044cb7f5e5e133e249dbbe
+
+MVP v2.0 Summary with Local Backup Safety Enhancements:
+1d0d02a7bca0412c5efdea8abff037397bd01079
+
+Reflection History Filters:
+fcdb5ca
+
+Reflection History Filters QA Record:
+34ce353aecb5ce2d2f5bb947f757dda8f481ca73
 ```
 
 *Note: DEV-035 and QA-016 were committed together in the same commit.*
@@ -477,6 +486,42 @@ Confirmed:
 * No API, database, AI call, or astrology calculation added.
 * deriveStrategyMode and Strategy Rules Layer remain untouched.
 
+### Reflection History Filters v0.1
+
+```text
+Feature Commit:
+fcdb5ca
+
+QA Record:
+34ce353aecb5ce2d2f5bb947f757dda8f481ca73
+docs/astro-strategy/qa-020-reflection-history-filters-regression.md
+```
+
+Purpose:
+
+* Adds lightweight filters to the existing Reflection History List.
+* Helps the user search and review local reflection history more easily as records grow.
+* Adds search text, mode filter, energy filter, month filter, count summary, empty filtered state, and Clear Filters.
+* Keeps the feature local-first, UI-only, read-only with respect to source data, and deterministic.
+* Does not modify saved history data or history schema.
+
+Confirmed:
+
+* Reflection History Filters appears above the Reflection History List.
+* Search input filters available text fields safely.
+* Mode filter works with available mode values from history logs.
+* Energy filter works with available daily check-in energy values.
+* Month filter works for All / This Month / Last Month.
+* Clear Filters resets search, mode, energy, and month filters.
+* Count summary shows filtered count and total count.
+* Empty filtered state appears when no records match.
+* Existing history cards remain readable.
+* No new persistent localStorage key added.
+* No schema change.
+* No edit, delete, import, restore, merge, or write-back behavior added.
+* No API, database, AI call, or astrology calculation added.
+* deriveStrategyMode and Strategy Rules Layer remain untouched.
+
 ---
 
 ## Current MVP v2.0 Capability Snapshot
@@ -487,6 +532,7 @@ Confirmed:
 - Priority Badge signal
 - Reflection Draft persistence
 - Reflection History
+- Reflection History Filters
 - Weekly Review Summary
 - Weekly Pattern Hints from local history
 - Strategy Planning Notes
@@ -542,6 +588,9 @@ Confirmed — Local Backup Safety Enhancements do not import, restore, merge, or
 Confirmed — Import Preview Validator does not add persistent localStorage keys
 Confirmed — Import Preview Validator does not save validation history
 Confirmed — Import Preview Validator does not import, restore, merge, or write back to source data
+Confirmed — Reflection History Filters do not add persistent localStorage keys
+Confirmed — Reflection History Filters do not save filter preferences
+Confirmed — Reflection History Filters do not modify, edit, delete, import, restore, merge, or write back to history data
 ```
 
 ---
@@ -549,7 +598,7 @@ Confirmed — Import Preview Validator does not import, restore, merge, or write
 ## Updated Decision
 
 ```text
-Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, monthly review export integration, strengthened local backup safety, and preview-only import validation for future data safety workflows.
+Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → planning → monthly reflection loop, monthly planning review, searchable reflection history, ethics and orientation layers, enhanced timing guide prompts, scoped Markdown export with WorkOS-friendly metadata, monthly review export integration, strengthened local backup safety, and preview-only import validation for future data safety workflows.
 ```
 
 ---
@@ -557,10 +606,10 @@ Astro Strategy Lab Local-first MVP v2.0 now has a stable daily → weekly → pl
 ## Recommended Next Development Direction
 
 ```text
-1. ASTRO-APP-DEV-039 — Reflection History Filters v0.1
-2. ASTRO-APP-DEV-040 — Import Preview Validator Enhancements v0.2
-3. ASTRO-APP-DEV-041 — Monthly Review Export Templates v0.1
-4. ASTRO-APP-DEV-042 — Local Data Health Check v0.1
+1. ASTRO-APP-DEV-040 — Import Preview Validator Enhancements v0.2
+2. ASTRO-APP-DEV-041 — Monthly Review Export Templates v0.1
+3. ASTRO-APP-DEV-042 — Local Data Health Check v0.1
+4. ASTRO-APP-DEV-043 — Reflection History Filter Enhancements v0.2
 ```
 
 ---
