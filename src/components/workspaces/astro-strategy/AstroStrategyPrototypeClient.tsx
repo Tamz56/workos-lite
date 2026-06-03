@@ -304,9 +304,101 @@ export default function AstroStrategyPrototypeClient() {
     const [savedReflectionAt, setSavedReflectionAt] = useState<string>("");
     const [reflectionSaveStatus, setReflectionSaveStatus] = useState<string>("");
 
-    // ASTRO-APP-DEV-019B: Reflection History List States
     const [historyLogs, setHistoryLogs] = useState<ReflectionHistoryItem[]>([]);
     const [historySaveStatus, setHistorySaveStatus] = useState<string>("");
+
+    // ASTRO-APP-DEV-039: Reflection History Filters States
+    const [historySearchQuery, setHistorySearchQuery] = useState("");
+    const [historyModeFilter, setHistoryModeFilter] = useState("all");
+    const [historyEnergyFilter, setHistoryEnergyFilter] = useState("all");
+    const [historyMonthFilter, setHistoryMonthFilter] = useState("all");
+
+    const uniqueModes = Array.from(
+        new Set(
+            historyLogs
+                .flatMap(log => [log.reflectionMode, log.strategyMode])
+                .filter(Boolean)
+        )
+    );
+
+    const uniqueEnergies = Array.from(
+        new Set(
+            historyLogs
+                .map(log => log.dailyCheckinSnapshot?.energyLevel)
+                .filter(Boolean)
+        )
+    );
+
+    const filteredHistoryLogs = historyLogs.filter(log => {
+        if (historySearchQuery.trim()) {
+            const query = historySearchQuery.toLowerCase();
+            const reflectionSummaryText = (log.reflectionSummary || "").toLowerCase();
+            const noticedNotesText = (log.noticedNotes || "").toLowerCase();
+            const nextRightActionText = (log.nextRightAction || "").toLowerCase();
+            const intentionText = (log.dailyCheckinSnapshot?.todayIntention || "").toLowerCase();
+            const cautionNoteText = (log.dailyCheckinSnapshot?.cautionNote || "").toLowerCase();
+            const reflectionModeText = (log.reflectionMode || "").toLowerCase();
+            const strategyModeText = (log.strategyMode || "").toLowerCase();
+
+            // planning fields if stored in history item
+            const planningFocusNextText = ((log as any).planningFocusNext || "").toLowerCase();
+            const planningSlowDownText = ((log as any).planningSlowDown || "").toLowerCase();
+            const planningNextSmallActionText = ((log as any).planningNextSmallAction || "").toLowerCase();
+            const planningReviewLaterText = ((log as any).planningReviewLater || "").toLowerCase();
+
+            const matchesText =
+                reflectionSummaryText.includes(query) ||
+                noticedNotesText.includes(query) ||
+                nextRightActionText.includes(query) ||
+                intentionText.includes(query) ||
+                cautionNoteText.includes(query) ||
+                reflectionModeText.includes(query) ||
+                strategyModeText.includes(query) ||
+                planningFocusNextText.includes(query) ||
+                planningSlowDownText.includes(query) ||
+                planningNextSmallActionText.includes(query) ||
+                planningReviewLaterText.includes(query);
+
+            if (!matchesText) return false;
+        }
+
+        if (historyModeFilter !== "all") {
+            const matchesMode = log.reflectionMode === historyModeFilter || log.strategyMode === historyModeFilter;
+            if (!matchesMode) return false;
+        }
+
+        if (historyEnergyFilter !== "all") {
+            const matchesEnergy = log.dailyCheckinSnapshot?.energyLevel === historyEnergyFilter;
+            if (!matchesEnergy) return false;
+        }
+
+        if (historyMonthFilter !== "all") {
+            const dateStr = log.reflectionDate || log.createdAt;
+            if (!dateStr) return false;
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return false;
+                const now = new Date();
+                if (historyMonthFilter === "this-month") {
+                    const matchesThisMonth = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+                    if (!matchesThisMonth) return false;
+                } else if (historyMonthFilter === "last-month") {
+                    let targetYear = now.getFullYear();
+                    let targetMonth = now.getMonth() - 1;
+                    if (targetMonth < 0) {
+                        targetMonth = 11;
+                        targetYear -= 1;
+                    }
+                    const matchesLastMonth = d.getFullYear() === targetYear && d.getMonth() === targetMonth;
+                    if (!matchesLastMonth) return false;
+                }
+            } catch {
+                return false;
+            }
+        }
+
+        return true;
+    });
 
     // ASTRO-APP-DEV-022B: Export History Markdown States
     const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
@@ -4696,69 +4788,193 @@ ${historyLogsStr.trim()}
                                                     </p>
                                                 </div>
                                             ) : (
-                                                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 scrollbar-thin">
-                                                    {historyLogs.map((item) => (
-                                                        <div 
-                                                            key={item.id} 
-                                                            className="bg-slate-955/65 border border-slate-850 rounded-lg p-3 space-y-2 text-xs transition-all hover:border-slate-750/80"
-                                                        >
-                                                            <div className="flex items-start justify-between gap-2 border-b border-slate-850 pb-1.5">
-                                                                <div className="space-y-0.5">
-                                                                    <span className="font-mono font-bold text-indigo-300 block text-[10px]">
-                                                                        {item.createdAt}
-                                                                    </span>
-                                                                    <span className="text-[10px] text-slate-400 block">
-                                                                        วันที่กิจกรรม: <span className="font-mono text-slate-300">{item.reflectionDate}</span>
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="px-1.5 py-0.5 rounded bg-violet-950/50 text-violet-300 border border-violet-400/20 text-[9px] font-semibold">
-                                                                        {item.reflectionMode}
-                                                                    </span>
-                                                                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60 text-[9px] font-semibold">
-                                                                        {item.strategyMode}
-                                                                    </span>
-                                                                </div>
+                                                <div className="space-y-4">
+                                                    {/* Filter Panel */}
+                                                    <div className="bg-slate-950/40 border border-slate-800/60 rounded-lg p-4 space-y-3.5 text-xs">
+                                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-800/60 pb-2">
+                                                            <div>
+                                                                <h5 className="font-semibold text-slate-200">Reflection History Filters</h5>
+                                                                <p className="text-[10px] text-slate-400">ช่วยค้นและกรองประวัติสะท้อนคิดในเครื่องนี้</p>
                                                             </div>
-
-                                                            <div className="space-y-1 text-slate-300">
-                                                                <p className="line-clamp-2 leading-relaxed">
-                                                                    <span className="text-slate-450 font-medium">สรุปสะท้อนคิด:</span> {item.reflectionSummary || "(ไม่มี)"}
-                                                                </p>
-                                                                {item.nextRightAction && (
-                                                                    <p className="line-clamp-1 leading-relaxed text-emerald-400/90">
-                                                                        <span className="text-slate-450 font-medium">Next Right Action:</span> {item.nextRightAction}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-
-                                                            <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-850/50">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleCopyHistoryItem(item)}
-                                                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-[10px] text-slate-200 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-700/60 active:scale-[0.98]"
-                                                                >
-                                                                    <ClipboardList className="w-2.5 h-2.5 text-indigo-300" />
-                                                                    {copiedHistoryId === item.id ? "คัดลอกแล้ว" : "คัดลอก"}
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleLoadFromHistory(item)}
-                                                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-[10px] text-slate-200 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-700/60 active:scale-[0.98]"
-                                                                >
-                                                                    <RefreshCw className="w-2.5 h-2.5 text-indigo-300" /> โหลดมาแทนที่
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleDeleteFromHistory(item.id)}
-                                                                    className="px-2 py-1 bg-slate-850 hover:bg-rose-950/20 text-[10px] text-rose-400 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-800 hover:border-rose-500/20 active:scale-[0.98]"
-                                                                    title="ลบรายการนี้"
-                                                                >
-                                                                    <Trash2 className="w-2.5 h-2.5" /> ลบ
-                                                                </button>
-                                                            </div>
+                                                            <span className="text-[10px] text-slate-500 italic max-w-xs md:text-right">
+                                                                ตัวกรองนี้ทำงานเฉพาะบนข้อมูลที่อยู่ในเครื่องนี้เท่านั้น ไม่เปลี่ยนแปลง ไม่ลบ และไม่บันทึกค่าการกรองลงในระบบ
+                                                            </span>
                                                         </div>
-                                                    ))}
+
+                                                        <div className="space-y-3">
+                                                            <div>
+                                                                <label htmlFor="historySearch" className="block text-slate-400 font-medium mb-1">
+                                                                    Search Reflection <span className="text-[10px] text-slate-500 font-normal">(ค้นจากข้อความในบันทึก ความตั้งใจ หรือข้อควรระวัง)</span>
+                                                                </label>
+                                                                <input
+                                                                    id="historySearch"
+                                                                    type="text"
+                                                                    value={historySearchQuery}
+                                                                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                                                                    placeholder="ค้นหา..."
+                                                                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-250 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                                                                />
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                                <div>
+                                                                    <label htmlFor="historyMode" className="block text-slate-400 font-medium mb-1">
+                                                                        Mode <span className="text-[10px] text-slate-500 font-normal">(กรองตามโหมดหรือจังหวะที่บันทึกไว้)</span>
+                                                                    </label>
+                                                                    <select
+                                                                        id="historyMode"
+                                                                        value={historyModeFilter}
+                                                                        onChange={(e) => setHistoryModeFilter(e.target.value)}
+                                                                        className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-slate-250 focus:outline-none focus:border-indigo-500 transition-colors"
+                                                                    >
+                                                                        <option value="all">All</option>
+                                                                        {uniqueModes.map((mode) => (
+                                                                            <option key={mode} value={mode}>{mode}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+
+                                                                <div>
+                                                                    <label htmlFor="historyEnergy" className="block text-slate-400 font-medium mb-1">
+                                                                        Energy <span className="text-[10px] text-slate-500 font-normal">(กรองตามระดับพลังงานที่เคยเช็กอิน)</span>
+                                                                    </label>
+                                                                    <select
+                                                                        id="historyEnergy"
+                                                                        value={historyEnergyFilter}
+                                                                        onChange={(e) => setHistoryEnergyFilter(e.target.value)}
+                                                                        className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-slate-250 focus:outline-none focus:border-indigo-500 transition-colors"
+                                                                    >
+                                                                        <option value="all">All</option>
+                                                                        {uniqueEnergies.map((energy) => (
+                                                                            <option key={energy} value={energy}>{energy}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+
+                                                                <div>
+                                                                    <label htmlFor="historyMonth" className="block text-slate-400 font-medium mb-1">
+                                                                        Month <span className="text-[10px] text-slate-500 font-normal">(กรองตามช่วงเดือนของบันทึก)</span>
+                                                                    </label>
+                                                                    <select
+                                                                        id="historyMonth"
+                                                                        value={historyMonthFilter}
+                                                                        onChange={(e) => setHistoryMonthFilter(e.target.value)}
+                                                                        className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-slate-250 focus:outline-none focus:border-indigo-500 transition-colors"
+                                                                    >
+                                                                        <option value="all">All</option>
+                                                                        <option value="this-month">This Month (เดือนนี้)</option>
+                                                                        <option value="last-month">Last Month (เดือนที่แล้ว)</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+
+                                                            {(historySearchQuery || historyModeFilter !== "all" || historyEnergyFilter !== "all" || historyMonthFilter !== "all") && (
+                                                                <div className="flex justify-end pt-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setHistorySearchQuery("");
+                                                                            setHistoryModeFilter("all");
+                                                                            setHistoryEnergyFilter("all");
+                                                                            setHistoryMonthFilter("all");
+                                                                        }}
+                                                                        className="px-3 py-1 bg-slate-800 hover:bg-slate-750 text-xs text-indigo-400 hover:text-indigo-350 rounded font-semibold transition-colors flex items-center gap-1 border border-slate-700/60 active:scale-[0.98]"
+                                                                    >
+                                                                        Clear Filters (ล้างตัวกรอง)
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Count Summary */}
+                                                    <div className="flex items-center justify-between text-xs text-slate-400 font-medium px-1">
+                                                        <span>Showing {filteredHistoryLogs.length} of {historyLogs.length} records</span>
+                                                        <span>แสดง {filteredHistoryLogs.length} จากทั้งหมด {historyLogs.length} บันทึก</span>
+                                                    </div>
+
+                                                    {filteredHistoryLogs.length === 0 ? (
+                                                        <div className="text-center py-8 px-4 border border-dashed border-slate-800 rounded-xl bg-slate-950/20 text-slate-500 italic space-y-3">
+                                                            <p className="text-xs">ไม่พบบันทึกที่ตรงกับตัวกรอง ลองล้างตัวกรองหรือค้นด้วยคำที่กว้างขึ้น</p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setHistorySearchQuery("");
+                                                                    setHistoryModeFilter("all");
+                                                                    setHistoryEnergyFilter("all");
+                                                                    setHistoryMonthFilter("all");
+                                                                }}
+                                                                className="mx-auto px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-xs text-indigo-400 hover:text-indigo-350 rounded font-semibold transition-colors flex items-center gap-1 border border-slate-700/60 active:scale-[0.98]"
+                                                            >
+                                                                Clear Filters (ล้างตัวกรอง)
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 scrollbar-thin">
+                                                            {filteredHistoryLogs.map((item) => (
+                                                                <div 
+                                                                    key={item.id} 
+                                                                    className="bg-slate-955/65 border border-slate-850 rounded-lg p-3 space-y-2 text-xs transition-all hover:border-slate-750/80"
+                                                                >
+                                                                    <div className="flex items-start justify-between gap-2 border-b border-slate-850 pb-1.5">
+                                                                        <div className="space-y-0.5">
+                                                                            <span className="font-mono font-bold text-indigo-300 block text-[10px]">
+                                                                                {item.createdAt}
+                                                                            </span>
+                                                                            <span className="text-[10px] text-slate-400 block">
+                                                                                วันที่กิจกรรม: <span className="font-mono text-slate-300">{item.reflectionDate}</span>
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="px-1.5 py-0.5 rounded bg-violet-950/50 text-violet-300 border border-violet-400/20 text-[9px] font-semibold">
+                                                                                {item.reflectionMode}
+                                                                            </span>
+                                                                            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60 text-[9px] font-semibold">
+                                                                                {item.strategyMode}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="space-y-1 text-slate-300">
+                                                                        <p className="line-clamp-2 leading-relaxed">
+                                                                            <span className="text-slate-450 font-medium">สรุปสะท้อนคิด:</span> {item.reflectionSummary || "(ไม่มี)"}
+                                                                        </p>
+                                                                        {item.nextRightAction && (
+                                                                            <p className="line-clamp-1 leading-relaxed text-emerald-400/90">
+                                                                                <span className="text-slate-450 font-medium">Next Right Action:</span> {item.nextRightAction}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-850/50">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleCopyHistoryItem(item)}
+                                                                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-[10px] text-slate-200 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-700/60 active:scale-[0.98]"
+                                                                        >
+                                                                            <ClipboardList className="w-2.5 h-2.5 text-indigo-300" />
+                                                                            {copiedHistoryId === item.id ? "คัดลอกแล้ว" : "คัดลอก"}
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleLoadFromHistory(item)}
+                                                                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 active:bg-slate-850 text-[10px] text-slate-200 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-700/60 active:scale-[0.98]"
+                                                                        >
+                                                                            <RefreshCw className="w-2.5 h-2.5 text-indigo-300" /> โหลดมาแทนที่
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleDeleteFromHistory(item.id)}
+                                                                            className="px-2 py-1 bg-slate-850 hover:bg-rose-950/20 text-[10px] text-rose-400 font-semibold rounded transition-colors flex items-center gap-1 border border-slate-800 hover:border-rose-500/20 active:scale-[0.98]"
+                                                                            title="ลบรายการนี้"
+                                                                        >
+                                                                            <Trash2 className="w-2.5 h-2.5" /> ลบ
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
