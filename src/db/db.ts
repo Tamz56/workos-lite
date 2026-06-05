@@ -1089,10 +1089,7 @@ export function seedArborWritingLab() {
     db.prepare(`
         INSERT INTO gf_episodes (id, story_set_id, title, role, status, created_at, updated_at)
         VALUES ('GF-S01-E07', 'STORY-SET-01', 'ธาตุอาหาร: วัตถุดิบที่พืชใช้สร้างชีวิต', 'core_episode', 'planned', datetime('now'), datetime('now'))
-        ON CONFLICT(id) DO UPDATE SET
-            story_set_id = excluded.story_set_id,
-            title = excluded.title,
-            updated_at = datetime('now')
+        ON CONFLICT(id) DO NOTHING
     `).run();
 
     // Check if writing project for EP.7 exists
@@ -1109,8 +1106,6 @@ export function seedArborWritingLab() {
             INSERT INTO gf_writing_blocks (id, project_id, writing_project_id, type, block_type, label, placeholder, content, content_md, sort_order)
             VALUES ('BLK-GF-S01-E07', ?, ?, 'text', 'text', 'Article Body', 'เริ่มร่างเนื้อหาของตอนที่นี่...', '', '', 0)
         `).run(projId, projId);
-    } else {
-        db.prepare("UPDATE gf_writing_projects SET title = ?, updated_at = datetime('now') WHERE episode_id = ?").run('จากต้นอ่อนสู่ต้นกล้า: พืชเริ่มเปลี่ยนอะไรบ้าง', 'GF-S01-E07');
     }
 }
 

@@ -17,3 +17,24 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function POST(req: Request) {
+  try {
+    const crypto = await import("crypto");
+    const body = await req.json();
+    const { title, description, status } = body;
+    if (!title) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
+    }
+    const id = `STORY-SET-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+    db.prepare(`
+      INSERT INTO gf_story_sets (id, title, description, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+    `).run(id, title, description || null, status || 'active');
+    
+    return NextResponse.json({ success: true, id });
+  } catch (error: any) {
+    console.error("Create story set failed", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

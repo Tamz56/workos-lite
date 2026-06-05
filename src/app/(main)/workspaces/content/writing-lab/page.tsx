@@ -17,7 +17,7 @@ import StoryMapTab from "@/components/workspaces/content/writing-lab/StoryMapTab
 import EpisodeBacklogTab from "@/components/workspaces/content/writing-lab/EpisodeBacklogTab";
 import ContentLibraryTab from "@/components/workspaces/content/writing-lab/ContentLibraryTab";
 import WritingStudioTab from "@/components/workspaces/content/writing-lab/WritingStudioTab";
-import CreateProjectModal from "@/components/workspaces/content/writing-lab/CreateProjectModal";
+import CreateLabResourceModal from "@/components/workspaces/content/writing-lab/CreateLabResourceModal";
 
 type TabKey = "story-map" | "episode-backlog" | "writing-studio" | "content-library";
 
@@ -104,10 +104,16 @@ function WritingLabContent() {
         setIsCreateProjectOpen(true);
     };
 
-    const handleProjectCreated = () => {
-        setToast({ isVisible: true, message: "🚀 Project created successfully!" });
+    const handleProjectCreated = async (createdItem?: any, type?: "story-set" | "episode") => {
+        setToast({ isVisible: true, message: `🚀 ${type === "story-set" ? "Story Set" : "Episode"} created successfully!` });
         setProjectInitialData(null);
-        fetchData();
+        await fetchData();
+
+        if (type === "episode" && createdItem?.id) {
+            setSelectedEpisodeId(createdItem.id);
+            setSelectedProjectId(null);
+            setActiveTab("writing-studio");
+        }
     };
 
     const handleSelectProject = (id: string) => {
@@ -228,12 +234,11 @@ function WritingLabContent() {
                 )}
             </div>
 
-            <CreateProjectModal 
+            <CreateLabResourceModal 
                 isOpen={isCreateProjectOpen}
                 onClose={() => setIsCreateProjectOpen(false)}
                 storySets={storySets}
                 onSuccess={handleProjectCreated}
-                initialData={projectInitialData}
             />
 
             <Toast 
