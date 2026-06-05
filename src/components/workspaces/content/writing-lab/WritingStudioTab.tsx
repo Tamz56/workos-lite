@@ -79,6 +79,7 @@ export default function WritingStudioTab({
 
     // States
     const [subTab, setSubTab] = useState<SubTabKey>("body");
+    const [isExpanded, setIsExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -150,6 +151,7 @@ export default function WritingStudioTab({
             setPageUtm("");
             setPersonalUtm("");
             setReviewResult(null);
+            setIsExpanded(false);
         }
     }, [activeProject]);
 
@@ -634,9 +636,10 @@ export default function WritingStudioTab({
                     กำลังเตรียมโต๊ะทำงานของคุณ...
                 </div>
             ) : (
-                <div className="grid grid-cols-12 gap-8 items-start">
+                <div className="grid grid-cols-12 gap-8 items-start animate-fadeIn">
                     {/* Sub tabs navigation */}
-                    <div className="col-span-12 md:col-span-3 space-y-2">
+                    {!(isExpanded && subTab === "body") && (
+                        <div className="col-span-12 md:col-span-3 space-y-2">
                         <div className="bg-theme-card border border-theme-border rounded-[24px] p-3 shadow-sm flex flex-col gap-1">
                             <button
                                 onClick={() => setSubTab("body")}
@@ -704,10 +707,11 @@ export default function WritingStudioTab({
                                 บันทึกล่าสุด: {lastSaved.toLocaleTimeString('th-TH')}
                             </div>
                         )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* Tab panels (Editor fields) */}
-                    <div className="col-span-12 md:col-span-9 bg-theme-card border border-theme-border rounded-[32px] p-8 shadow-sm min-h-[500px]">
+                    <div className={`col-span-12 ${(isExpanded && subTab === "body") ? "" : "md:col-span-9"} bg-theme-card border border-theme-border rounded-[32px] p-5 md:p-6 shadow-sm min-h-[500px] transition-all duration-300`}>
                         
                         {/* 1. Article Body Panel */}
                         {subTab === "body" && (
@@ -718,10 +722,18 @@ export default function WritingStudioTab({
                                     <div className="flex items-center gap-1.5 bg-theme-panel p-1 rounded-lg border border-theme-border/40">
                                         <button onClick={() => applyMarkdown('bold')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Bold"><Bold size={13} /></button>
                                         <button onClick={() => applyMarkdown('italic')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Italic"><Italic size={13} /></button>
-                                        <button onClick={() => applyMarkdown('bullet')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Bullet List">-</button>
+                                        <button onClick={() => applyMarkdown('bullet')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="-"> - </button>
                                         <button onClick={() => applyMarkdown('number')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Numbered List"><ListOrdered size={13} /></button>
                                         <button onClick={() => applyMarkdown('quote')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Quote"><Quote size={13} /></button>
                                         <button onClick={() => applyMarkdown('divider')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Divider"><Minus size={13} /></button>
+                                        <div className="w-px h-4 bg-theme-border/60 mx-1" />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setIsExpanded(!isExpanded)}
+                                            className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-black dark:bg-slate-800 text-white dark:text-theme-primary hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all rounded-md flex items-center gap-1"
+                                        >
+                                            {isExpanded ? "Collapse" : "Expand"}
+                                        </button>
                                     </div>
                                 </div>
                                 <textarea
@@ -729,7 +741,7 @@ export default function WritingStudioTab({
                                     value={articleBodyMarkdown}
                                     onChange={(e) => setArticleBodyMarkdown(e.target.value)}
                                     placeholder="เขียนเนื้อหาตอนหลักในรูปแบบ Markdown ที่นี่..."
-                                    className="w-full min-h-[400px] flex-1 bg-theme-input border border-theme-border rounded-2xl p-6 text-sm font-medium outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary leading-relaxed custom-scrollbar font-mono"
+                                    className={`w-full ${isExpanded ? 'min-h-[75vh]' : 'min-h-[65vh]'} flex-1 bg-theme-input border border-theme-border rounded-2xl p-6 text-sm font-medium outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary leading-relaxed custom-scrollbar font-mono`}
                                 />
                             </div>
                         )}
