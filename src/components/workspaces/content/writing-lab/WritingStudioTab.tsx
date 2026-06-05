@@ -3,86 +3,289 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { 
     PenTool, 
-    Settings, 
-    Target, 
-    Share2, 
-    Layout,
-    Type,
-    Zap,
+    Save, 
+    CheckCircle, 
+    AlertCircle, 
+    Loader2, 
+    FileText, 
+    Globe, 
+    Sparkles, 
+    Bold, 
+    Italic, 
+    ListOrdered, 
+    Quote, 
+    Minus,
+    Copy,
+    ArrowRight,
+    Share2,
+    Search,
     ChevronDown,
-    Plus,
-    Save,
-    CheckCircle,
-    RefreshCw,
-    AlertCircle,
-    Loader2,
-    FileText,
-    List,
-    Globe,
-    Box,
-    Hash,
-    MessageCircle,
-    User,
-    Users,
-    Flag,
-    Sparkles,
-    Wand2,
-    Bold,
-    Italic,
-    ListOrdered,
-    Quote,
-    Minus
+    Wand2
 } from "lucide-react";
-import ToneModal from "./ToneModal";
-import { WritingProject, WritingBlock } from "@/lib/types/writing-lab";
+
+interface WritingProject {
+    id: string;
+    topic_id: string | null;
+    title: string;
+    slug: string | null;
+    story_set_id: string | null;
+    episode_id: string | null;
+    writing_mode: string;
+    status: string;
+    summary: string | null;
+    notes: string | null;
+    meta_title: string | null;
+    meta_description: string | null;
+    keywords: string | null;
+    excerpt: string | null;
+    group_post_markdown: string | null;
+    page_post_markdown: string | null;
+    personal_post_markdown: string | null;
+    social_caption: string | null;
+    hashtags: string | null;
+    updated_at: string;
+}
 
 interface WritingStudioTabProps {
     projectId: string | null;
+    episodeId: string | null;
     projects: WritingProject[];
+    storySets: any[];
     onCreateProject: () => void;
     onSelectProject: (id: string) => void;
+    onSelectEpisode: (id: string) => void;
     onRefresh: () => void;
 }
 
+type SubTabKey = "body" | "social" | "seo" | "utm" | "review";
+
 export default function WritingStudioTab({ 
     projectId, 
+    episodeId, 
     projects, 
+    storySets,
     onCreateProject,
     onSelectProject,
+    onSelectEpisode,
     onRefresh
 }: WritingStudioTabProps) {
-    const activeProject = projects.find(p => p.id === projectId);
-    const [blocks, setBlocks] = useState<WritingBlock[]>([]);
+    const activeProject = projects.find(p => p.episode_id === episodeId || p.id === projectId);
+    const resolvedEpisodeId = episodeId || activeProject?.episode_id;
+    
+    // Flatten episodes to find the current active episode details
+    const activeEpisode = storySets
+        .flatMap(set => (set.episodes || []).map((ep: any) => ({ ...ep, story_set_title: set.title })))
+        .find(ep => ep.id === resolvedEpisodeId);
+
+    // States
+    const [subTab, setSubTab] = useState<SubTabKey>("body");
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
-    const [activeSubTab, setActiveSubTab] = useState<'chapter' | 'social' | 'preview'>('chapter');
-    const [copyStatus, setCopyStatus] = useState<string | null>(null);
-    const [isToneModalOpen, setIsToneModalOpen] = useState(false);
-    const [websiteFields, setWebsiteFields] = useState({
-        slug: "",
-        meta_title: "",
-        meta_description: "",
-        keywords: "",
-        excerpt: "",
-        internal_links_notes: "",
-        references_notes: ""
-    });
-    const [socialFields, setSocialFields] = useState({
-        group_post_markdown: "",
-        page_post_markdown: "",
-        personal_post_markdown: "",
-        social_caption: "",
-        hashtags: ""
-    });
-    const [isStructureCollapsed, setIsStructureCollapsed] = useState(false);
-    const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
+    const [localBlocks, setLocalBlocks] = useState<any[]>([]);
 
-    const applyMarkdown = (
-        blockId: string,
-        type: 'bold' | 'italic' | 'bullet' | 'number' | 'quote' | 'divider'
-    ) => {
-        const textarea = document.getElementById(`textarea-${blockId}`) as HTMLTextAreaElement;
+    // Form states
+    const [workingTitle, setWorkingTitle] = useState("");
+    const [articleBodyMarkdown, setArticleBodyMarkdown] = useState("");
+    const [facebookGroupPost, setFacebookGroupPost] = useState("");
+    const [facebookPagePost, setFacebookPagePost] = useState("");
+    const [personalPost, setPersonalPost] = useState("");
+    const [shortCaption, setShortCaption] = useState("");
+    const [hashtags, setHashtags] = useState("");
+    
+    const [slug, setSlug] = useState("");
+    const [heroSubtitle, setHeroSubtitle] = useState("");
+    const [shortSummary, setShortSummary] = useState("");
+    const [metaTitle, setMetaTitle] = useState("");
+    const [metaDescription, setMetaDescription] = useState("");
+    const [keywords, setKeywords] = useState("");
+
+    const [publishedUrl, setPublishedUrl] = useState("");
+    const [campaignName, setCampaignName] = useState("");
+
+    // Generated UTMs
+    const [groupUtm, setGroupUtm] = useState("");
+    const [pageUtm, setPageUtm] = useState("");
+    const [personalUtm, setPersonalUtm] = useState("");
+
+    // Review Result
+    const [reviewResult, setReviewResult] = useState<any>(null);
+    const [isReviewing, setIsReviewing] = useState(false);
+    const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
+    // Sync state when activeProject changes
+    useEffect(() => {
+        if (activeProject) {
+            setWorkingTitle(activeProject.title || "");
+            setSlug(activeProject.slug || "");
+            setShortSummary(activeProject.summary || "");
+            setMetaTitle(activeProject.meta_title || "");
+            setMetaDescription(activeProject.meta_description || "");
+            setKeywords(activeProject.keywords || "");
+            
+            setFacebookGroupPost(activeProject.group_post_markdown || "");
+            setFacebookPagePost(activeProject.page_post_markdown || "");
+            setPersonalPost(activeProject.personal_post_markdown || "");
+            setShortCaption(activeProject.social_caption || "");
+            setHashtags(activeProject.hashtags || "");
+
+            let heroSub = "";
+            let pubUrl = "";
+            let campName = "";
+            if (activeProject.notes) {
+                try {
+                    const parsed = JSON.parse(activeProject.notes);
+                    heroSub = parsed.hero_subtitle || "";
+                    pubUrl = parsed.published_url || "";
+                    campName = parsed.campaign_name || "";
+                } catch {
+                    // notes is plain text
+                }
+            }
+            setHeroSubtitle(heroSub);
+            setPublishedUrl(pubUrl);
+            setCampaignName(campName);
+
+            setGroupUtm("");
+            setPageUtm("");
+            setPersonalUtm("");
+            setReviewResult(null);
+        }
+    }, [activeProject]);
+
+    // Fetch Blocks for body
+    useEffect(() => {
+        const fetchBlocks = async () => {
+            if (!activeProject) return;
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/content/writing-lab/projects/${activeProject.id}/blocks`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        setLocalBlocks(data);
+                        // Check if multiple blocks have content, merge for single editor
+                        const withContent = data.filter((b: any) => b.content_md && b.content_md.trim() !== "");
+                        if (withContent.length > 1) {
+                            const merged = data.map((b: any) => b.content_md ? `## ${b.label}\n\n${b.content_md}` : "").filter(Boolean).join("\n\n");
+                            setArticleBodyMarkdown(merged);
+                        } else {
+                            setArticleBodyMarkdown(data[0].content_md || "");
+                        }
+                    } else {
+                        setArticleBodyMarkdown("");
+                        setLocalBlocks([]);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch blocks", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchBlocks();
+    }, [activeProject]);
+
+    const handleCreateProject = async () => {
+        if (!resolvedEpisodeId || !activeEpisode) return;
+        setSaving(true);
+        try {
+            const res = await fetch("/api/content/writing-lab/projects", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: activeEpisode.title,
+                    episode_id: resolvedEpisodeId,
+                    story_set_id: activeEpisode.story_set_id,
+                    writing_mode: "journey_chapter",
+                    status: "draft"
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                // Initialize blocks
+                await fetch(`/api/content/writing-lab/projects/${data.id}/blocks`, {
+                    method: "POST"
+                });
+                onRefresh();
+            }
+        } catch (error) {
+            console.error("Failed to create project", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!activeProject) return;
+        setSaving(true);
+        try {
+            const extraNotes = JSON.stringify({
+                hero_subtitle: heroSubtitle,
+                published_url: publishedUrl,
+                campaign_name: campaignName
+            });
+
+            // 1. Save metadata
+            const metadataRes = await fetch(`/api/content/writing-lab/projects/${activeProject.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: workingTitle,
+                    slug: slug,
+                    summary: shortSummary,
+                    meta_title: metaTitle,
+                    meta_description: metaDescription,
+                    keywords: keywords,
+                    group_post_markdown: facebookGroupPost,
+                    page_post_markdown: facebookPagePost,
+                    personal_post_markdown: personalPost,
+                    social_caption: shortCaption,
+                    hashtags: hashtags,
+                    notes: extraNotes,
+                    status: activeProject.status
+                })
+            });
+
+            // 2. Save blocks (Article Body goes into the first block)
+            let blocksToSave = [...localBlocks];
+            if (blocksToSave.length === 0) {
+                const initRes = await fetch(`/api/content/writing-lab/projects/${activeProject.id}/blocks`, {
+                    method: "POST"
+                });
+                if (initRes.ok) {
+                    blocksToSave = await initRes.json();
+                }
+            }
+
+            if (blocksToSave.length > 0) {
+                const updatedBlocks = blocksToSave.map((b, idx) => ({
+                    ...b,
+                    content_md: idx === 0 ? articleBodyMarkdown : ""
+                }));
+
+                await fetch(`/api/content/writing-lab/projects/${activeProject.id}/blocks`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ blocks: updatedBlocks })
+                });
+            }
+
+            if (metadataRes.ok) {
+                setLastSaved(new Date());
+                onRefresh();
+            }
+        } catch (error) {
+            console.error("Failed to save project content", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // Helper for formatting Markdown utilities inside Article Body
+    const applyMarkdown = (type: 'bold' | 'italic' | 'bullet' | 'number' | 'quote' | 'divider') => {
+        const textarea = document.getElementById("article-body-textarea") as HTMLTextAreaElement;
         if (!textarea) return;
 
         textarea.focus();
@@ -114,1192 +317,800 @@ export default function WritingStudioTab({
                 break;
         }
 
-        // Use execCommand to preserve undo history
-        try {
-            const success = document.execCommand('insertText', false, replacement);
-            if (!success) {
-                // Fallback for older browsers or environments
-                const before = text.substring(0, start);
-                const after = text.substring(end);
-                updateBlockContent(blockId, before + replacement + after);
-            }
-        } catch (e) {
-            const before = text.substring(0, start);
-            const after = text.substring(end);
-            updateBlockContent(blockId, before + replacement + after);
-        }
+        const before = text.substring(0, start);
+        const after = text.substring(end);
+        setArticleBodyMarkdown(before + replacement + after);
+
+        setTimeout(() => {
+            textarea.setSelectionRange(start + replacement.length, start + replacement.length);
+        }, 0);
+    };
+
+    // Deterministic Generator from Article Body
+    const handleGenerateSEO = () => {
+        if (!articleBodyMarkdown) return;
         
-        // Restore selection if text was selected
-        if (selection) {
-            setTimeout(() => {
-                textarea.setSelectionRange(start, start + replacement.length);
-            }, 0);
-        }
+        // 1. Slug generator (lowercase Thai/English and hyphens)
+        const cleanSlug = workingTitle
+            .toLowerCase()
+            .replace(/[^a-z0-9ก-๙\s-]/g, "")
+            .trim()
+            .replace(/\s+/g, "-");
+        setSlug(cleanSlug);
+
+        // 2. Meta Title: uses working title directly
+        setMetaTitle(workingTitle);
+
+        // 3. Hero Subtitle: first sentence of body
+        const firstSentence = articleBodyMarkdown.split(/[.!?\n]/).find(s => s.trim().length > 5) || "";
+        setHeroSubtitle(firstSentence.trim());
+
+        // 4. Short Summary: first 200 chars
+        const summaryText = articleBodyMarkdown.replace(/[#*`>_-]/g, "").slice(0, 200);
+        setShortSummary(summaryText.trim() + (articleBodyMarkdown.length > 200 ? "..." : ""));
+
+        // 5. Meta Description: first 150 chars
+        const descText = articleBodyMarkdown.replace(/[#*`>_-]/g, "").slice(0, 150);
+        setMetaDescription(descText.trim() + (articleBodyMarkdown.length > 150 ? "..." : ""));
+        
+        // 6. Keywords: check common content pillars
+        const commonWords = ["ดิน", "ปุ๋ย", "พืช", "อินทรียวัตถุ", "จุลินทรีย์", "ธาตุอาหาร", "ผลผลิต", "เกษตร"];
+        const matchedKeywords = commonWords.filter(w => articleBodyMarkdown.includes(w));
+        setKeywords(matchedKeywords.join(", ") || "Green Fineness, เกษตรกรรม");
     };
 
-    const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>, blockId: string) => {
-        const pastedText = e.clipboardData.getData('text');
-        if (!pastedText) return;
-
-        // Convert common bullet characters to Markdown bullets
-        // • (\u2022), ◦ (\u25e6), – (\u2013), — (\u2014)
-        const sanitizedText = pastedText
-            .replace(/^[\s]*[•◦–—][\s]+/gm, '- ')
-            .replace(/[\r\n][\s]*[•◦–—][\s]+/g, '\n- ');
-
-        if (sanitizedText !== pastedText) {
-            e.preventDefault();
-            const textarea = e.currentTarget;
-            
-            // Use execCommand to preserve undo history
-            try {
-                const success = document.execCommand('insertText', false, sanitizedText);
-                if (!success) {
-                    // Fallback
-                    const start = textarea.selectionStart;
-                    const end = textarea.selectionEnd;
-                    const text = textarea.value;
-                    const newVal = text.substring(0, start) + sanitizedText + text.substring(end);
-                    updateBlockContent(blockId, newVal);
-                    
-                    setTimeout(() => {
-                        const newPos = start + sanitizedText.length;
-                        textarea.setSelectionRange(newPos, newPos);
-                    }, 0);
-                }
-            } catch (err) {
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const text = textarea.value;
-                const newVal = text.substring(0, start) + sanitizedText + text.substring(end);
-                updateBlockContent(blockId, newVal);
-            }
-        }
+    // Generate UTM parameters
+    const handleGenerateUTM = () => {
+        if (!publishedUrl || !campaignName) return;
+        const group = `${publishedUrl}?utm_source=facebook&utm_medium=group&utm_campaign=${campaignName}&utm_content=group_post`;
+        const page = `${publishedUrl}?utm_source=facebook&utm_medium=page&utm_campaign=${campaignName}&utm_content=page_post`;
+        const personal = `${publishedUrl}?utm_source=facebook&utm_medium=personal&utm_campaign=${campaignName}&utm_content=personal_post`;
+        setGroupUtm(group);
+        setPageUtm(page);
+        setPersonalUtm(personal);
     };
 
-    useEffect(() => {
-        if (activeProject) {
-            setWebsiteFields({
-                slug: activeProject.slug || "",
-                meta_title: activeProject.meta_title || "",
-                meta_description: activeProject.meta_description || "",
-                keywords: activeProject.keywords || "",
-                excerpt: activeProject.excerpt || "",
-                internal_links_notes: activeProject.internal_links_notes || "",
-                references_notes: activeProject.references_notes || ""
-            });
-            setSocialFields({
-                group_post_markdown: activeProject.group_post_markdown || "",
-                page_post_markdown: activeProject.page_post_markdown || "",
-                personal_post_markdown: activeProject.personal_post_markdown || "",
-                social_caption: activeProject.social_caption || "",
-                hashtags: activeProject.hashtags || ""
-            });
-        }
-    }, [activeProject]);
+    // Local Review Engine matching standard rules
+    const handleRunArborReview = () => {
+        if (!articleBodyMarkdown) return;
+        setIsReviewing(true);
+        setTimeout(() => {
+            const hasPlaceholder = (text: string) => {
+                const placeholders = ["HOOK TEST", "TEST 123", "TODO", "placeholder", "Lorem", "[ใส่ลิงก์บทความ]", "[ใส่", "xxx"];
+                const lower = text.toLowerCase();
+                return placeholders.some(p => lower.includes(p.toLowerCase()));
+            };
 
-    useEffect(() => {
-        if (activeSubTab === 'preview') {
-            setIsStructureCollapsed(true);
-        } else {
-            setIsStructureCollapsed(false);
-        }
-    }, [activeSubTab]);
+            const getFirstLines = (text: string, count: number) => {
+                return text.split('\n').map(l => l.trim()).filter(l => l.length > 0).slice(0, count).join(' ');
+            };
 
-    const handleSaveFields = async () => {
-        if (!projectId) return;
-        setSaving(true);
-        try {
-            const res = await fetch(`/api/content/writing-lab/projects/${projectId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(websiteFields),
-            });
-            console.log(`Save fields response: ${res.status}`);
-            if (res.ok) {
-                setLastSaved(new Date());
-                onRefresh();
+            const lines = articleBodyMarkdown.split('\n');
+            const h2Lines = lines.filter(l => l.trim().startsWith('## '));
+            const hasHeadings = h2Lines.length > 0;
+            const opening = getFirstLines(articleBodyMarkdown, 4);
+
+            const weakOpeningPatterns = ['ในบทความนี้', 'บทความนี้จะ', 'เราจะมาพูดถึง', 'วันนี้เราจะ', 'ในเนื้อหาสี้'];
+            const hasWeakOpening = weakOpeningPatterns.some(p => opening.includes(p));
+
+            const riskyPhrases = ['100%', 'ทุกกรณี', 'รักษาได้', 'รักษาโรค', 'แน่นอน 100', 'ป้องกันได้ 100', 'ไม่มีผลข้างเคียง', 'เพิ่มผลผลิตได้ถึง', 'ลดโรคได้ถึง'];
+            const foundRiskyClaims = riskyPhrases.filter(p => articleBodyMarkdown.includes(p));
+
+            const FORBIDDEN_PHRASES = [
+                'พูดง่ายๆ คือ', 'มันคือ', 'มันทำให้', 'มันไม่ได้', 'ไม่ได้แปลว่า',
+                'ให้เราเห็นว่า', 'นั่นคือ', 'มองให้ลึกลงไป', 'ง่ายๆ คือ',
+                'จะเห็นว่า', 'พูดถึง', 'นั่นก็คือ',
+            ];
+            const flaggedPhrases = FORBIDDEN_PHRASES.filter(p => articleBodyMarkdown.includes(p));
+
+            const isPlc = hasPlaceholder(articleBodyMarkdown);
+
+            const structured = {
+                reviewedContentType: "web_article",
+                editorialSummary: hasHeadings && !hasWeakOpening && flaggedPhrases.length === 0
+                    ? "บทความมีโครงสร้างดีและน้ำเสียงชัดเจน พร้อมสำหรับการตรวจสอบเนื้อหาเชิงลึก"
+                    : "บทความมีความลึก แต่ยังมีประเด็นที่ต้องปรับก่อน Review ขั้นถัดไป",
+                contentStrength: [
+                    "ข้อมูลแน่นและลึก",
+                    "มีประโยชน์ต่อผู้อ่านที่ต้องการความรู้",
+                    ...(hasHeadings && h2Lines.length >= 2 ? ["โครงสร้าง H2/H3 ครบถ้วนแล้ว"] : []),
+                    ...(!hasWeakOpening ? ["ประโยคเปิดชัดเจน ไม่กว้างเกินไป"] : []),
+                    ...(flaggedPhrases.length === 0 ? ["น้ำเสียงตรงกับ Green Fineness Voice"] : []),
+                ],
+                revisionPoints: [
+                    ...(!hasHeadings ? ["ยังไม่มี H2/H3 Heading — ควรเพิ่มโครงสร้างบทความ"] : []),
+                    ...(hasWeakOpening ? ["ประโยคเปิดยังกว้างเกินไป ควรเริ่มด้วย Hook หรือประโยคชี้จุดประสงค์"] : []),
+                    ...(flaggedPhrases.length > 0 ? [`พบภาษาที่ไม่ตรงกับ Green Fineness Voice: ${flaggedPhrases.slice(0, 3).join(', ')}`] : []),
+                    ...(foundRiskyClaims.length > 0 ? [`พบคำที่มีความเสี่ยงสูง: "${foundRiskyClaims.join('", "')}"`] : []),
+                ],
+                claimSafetyNotes: foundRiskyClaims.length > 0
+                    ? [`⚠️ พบคำที่มีความเสี่ยง: "${foundRiskyClaims.join('", "')}" — ควรปรับให้อ่อนลง`, "ตรวจสอบแหล่งอ้างอิงของข้อมูล"]
+                    : ["💡 Reminder: ตรวจสอบแหล่งอ้างอิงของข้อมูลเชิงวิชาการก่อน Publish"],
+                toneNotes: ["Educational", "Authoritative", "Safe"],
+                recommendedNextEdit: "",
+                suggestedRevision: "",
+                claimSafetySuggestions: [] as string[],
+                voiceToneSuggestions: [] as string[],
+                nextEditChecklist: [] as string[]
+            };
+
+            if (structured.revisionPoints.length === 0) {
+                structured.revisionPoints = ["ไม่พบปัญหาหลักในรอบนี้"];
+                structured.recommendedNextEdit = "✅ ไม่พบปัญหาหลัก — พร้อมสำหรับ Manual Review";
+            } else if (!hasHeadings) {
+                structured.recommendedNextEdit = "เพิ่ม H2/H3 Heading ก่อน แล้ว Review ใหม่อีกครั้ง";
+            } else if (flaggedPhrases.length > 0) {
+                structured.recommendedNextEdit = `แทนที่ภาษา Casual (${flaggedPhrases.slice(0, 2).join(', ')}) แล้ว Review ใหม่`;
             } else {
-                const errorData = await res.json();
-                console.error("Save failed:", errorData);
-                alert(`Failed to save fields: ${errorData.error || res.statusText}`);
+                structured.recommendedNextEdit = "ตรวจสอบแหล่งอ้างอิงและความถูกต้องของข้อมูลทางวิชาการ";
             }
-        } catch (error) {
-            console.error("Failed to save fields", error);
-            alert("Failed to save fields. check console.");
-        } finally {
-            setSaving(false);
-        }
-    };
-    
-    const handleSaveSocialFields = async () => {
-        if (!projectId) return;
-        setSaving(true);
-        try {
-            const res = await fetch(`/api/content/writing-lab/projects/${projectId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(socialFields),
-            });
-            if (res.ok) {
-                setLastSaved(new Date());
-                onRefresh();
+
+            if (foundRiskyClaims.length > 0) {
+                structured.claimSafetySuggestions = foundRiskyClaims.map(claim => {
+                    const safer: Record<string, string> = {
+                        '100%': `แทน "100%" ด้วย "ในสภาวะที่เหมาะสม" หรือ "ส่วนใหญ่"`,
+                        'รักษาได้': `แทน "รักษาได้" ด้วย "ช่วยลดความรุนแรงของ..." หรือ "ช่วยสนับสนุนการฟื้นตัว"`,
+                        'ป้องกันได้ 100': `แทน "ป้องกันได้ 100" ด้วย "ลดความเสี่ยงได้อย่างมีนัยสำคัญ"`,
+                    };
+                    return safer[claim] || `แทน "${claim}" ด้วยภาษาที่อ่อนลงและมีเงื่อนไขมากขึ้น`;
+                });
             } else {
-                const errorData = await res.json();
-                alert(`Failed to save social drafts: ${errorData.error || res.statusText}`);
+                structured.claimSafetySuggestions = [
+                    `ตรวจสอบว่ามีประโยคที่ระบุตัวเลขผลผลิตหรืออัตราความสำเร็จโดยไม่มีแหล่งอ้างอิงหรือไม่`,
+                    `ภาษาที่ปลอดภัยกว่า: ใช้ "มีแนวโน้ม", "ในสภาวะที่เหมาะสม", "ขึ้นอยู่กับ..." แทนการระบุผลแน่นอน`,
+                ];
             }
-        } catch (error) {
-            console.error("Failed to save social drafts", error);
-            alert("Failed to save social drafts. check console.");
-        } finally {
-            setSaving(false);
-        }
+
+            if (flaggedPhrases.length > 0) {
+                structured.voiceToneSuggestions = flaggedPhrases.map(phrase => {
+                    const fixes: Record<string, string> = {
+                        'พูดง่ายๆ คือ': `"พูดง่ายๆ คือ" → ลบออก แล้วพูดตรงๆ เลย`,
+                        'มันคือ': `"มันคือ" → แทนด้วยชื่อสิ่งนั้นโดยตรง`,
+                        'มันทำให้': `"มันทำให้" → แทนด้วยประธานที่ชัดเจน เช่น "ไนโตรเจนทำให้..."`,
+                        'นั่นคือ': `"นั่นคือ" → ลบออก แล้วอธิบายต่อเนื่องทันที`,
+                        'ไม่ได้แปลว่า': `"ไม่ได้แปลว่า" → ปรับเป็น "แต่ไม่หมายความว่า..."`,
+                        'ให้เราเห็นว่า': `"ให้เราเห็นว่า" → แทนด้วย "ผลคือ..." หรือ "ทำให้เห็นว่า..."`,
+                        'มองให้ลึกลงไป': `"มองให้ลึกลงไป" → แทนด้วยประโยคที่บอกว่าลึกอย่างไร`,
+                    };
+                    return fixes[phrase] || `"${phrase}" → ปรับให้เป็นภาษาที่แม่นยำและเป็น Documentary Voice มากขึ้น`;
+                });
+            }
+
+            structured.nextEditChecklist = [
+                ...(!hasHeadings ? ["เพิ่ม H2 และ H3 Headings ให้ครบก่อน"] : []),
+                ...(hasWeakOpening ? ["ปรับประโยคเปิดให้เป็น Hook ที่ดึงดูดความสนใจ"] : []),
+                ...(flaggedPhrases.length > 0 ? [`แทนที่ภาษา Casual: ${flaggedPhrases.slice(0, 2).join(', ')}`] : []),
+                ...(foundRiskyClaims.length > 0 ? ["ตรวจสอบและปรับ Claim ที่มีความเสี่ยงทางวิชาการ"] : []),
+                "ตรวจสอบแหล่งอ้างอิงข้อมูลสำคัญ",
+                "ตรวจความสม่ำเสมอของ Narrative Style ตลอดบทความ",
+            ].slice(0, 5);
+
+            if (isPlc) {
+                structured.editorialSummary = `🚨 พบข้อความทดสอบหรือ Placeholder ในเนื้อหา\n${structured.editorialSummary}`;
+                structured.revisionPoints.unshift("ลบข้อความทดสอบ (TODO, Lorem, xxx, หรือวงเล็บต่างๆ) ก่อนนำไปใช้งานจริง");
+                structured.recommendedNextEdit = "ลบข้อความทดสอบและ Placeholder ออกก่อน";
+                structured.suggestedRevision = "กรุณาลบข้อความทดสอบหรือ Placeholder (เช่น [ใส่ลิงก์], TODO, xxx, HOOK TEST) ออกจากเนื้อหาก่อนนำไปใช้งานจริง";
+            }
+
+            setReviewResult({
+                summary: structured.editorialSummary,
+                next_step: structured.recommendedNextEdit,
+                strengths: structured.contentStrength,
+                revisions: structured.revisionPoints,
+                risks: structured.claimSafetyNotes,
+                tone: structured.toneNotes,
+                claimSuggestions: structured.claimSafetySuggestions,
+                voiceSuggestions: structured.voiceToneSuggestions
+            });
+            setIsReviewing(false);
+        }, 800);
     };
 
-    const handleCopySocial = (type: 'group' | 'page' | 'personal' | 'caption' | 'hashtags' | 'all') => {
-        if (!activeProject) return;
-
-        let content = "";
-        let feedback = "";
-
-        switch (type) {
-            case 'group':
-                content = (socialFields.group_post_markdown || "") + (socialFields.hashtags ? "\n\n" + socialFields.hashtags : "");
-                feedback = "Copied Group Post";
-                break;
-            case 'page':
-                content = (socialFields.page_post_markdown || "") + (socialFields.hashtags ? "\n\n" + socialFields.hashtags : "");
-                feedback = "Copied Page Post";
-                break;
-            case 'personal':
-                content = (socialFields.personal_post_markdown || "") + (socialFields.hashtags ? "\n\n" + socialFields.hashtags : "");
-                feedback = "Copied Personal Post";
-                break;
-            case 'caption':
-                content = socialFields.social_caption || "";
-                feedback = "Copied Caption";
-                break;
-            case 'hashtags':
-                content = socialFields.hashtags || "";
-                feedback = "Copied Hashtags";
-                break;
-            case 'all':
-                content = `# Social Drafts — ${activeProject.title}\n\n` +
-                          `## Facebook Group Post\n${socialFields.group_post_markdown || "—"}\n\n` +
-                          `## Facebook Page Post\n${socialFields.page_post_markdown || "—"}\n\n` +
-                          `## Personal Profile Post\n${socialFields.personal_post_markdown || "—"}\n\n` +
-                          `## Short Caption\n${socialFields.social_caption || "—"}\n\n` +
-                          `## Hashtags\n${socialFields.hashtags || "—"}`;
-                feedback = "Copied All Social Drafts";
-                break;
-        }
-
-        navigator.clipboard.writeText(content);
-        setCopyStatus(feedback);
+    const handleCopyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        setCopyStatus(label);
         setTimeout(() => setCopyStatus(null), 2000);
     };
 
-    const fetchBlocks = useCallback(async () => {
-        if (!projectId) return;
-        setLoading(true);
-        try {
-            const res = await fetch(`/api/content/writing-lab/projects/${projectId}/blocks`);
-            if (res.ok) {
-                const data = await res.json();
-                setBlocks(data);
-            }
-        } catch (error) {
-            console.error("Failed to fetch blocks", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [projectId]);
-
-    useEffect(() => {
-        fetchBlocks();
-    }, [fetchBlocks]);
-
-    const handleInitialize = async () => {
-        if (!activeProject) return;
-        setLoading(true);
-        try {
-            const res = await fetch(`/api/content/writing-lab/projects/${projectId}/blocks`, {
-                method: "POST"
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setBlocks(Array.isArray(data) ? data : []);
-            }
-        } catch (error) {
-            console.error("Failed to initialize blocks", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSave = async () => {
-        if (!projectId || blocks.length === 0) return;
-        setSaving(true);
-        try {
-            const res = await fetch(`/api/content/writing-lab/projects/${projectId}/blocks`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ blocks }),
-            });
-            if (res.ok) {
-                setLastSaved(new Date());
-            }
-        } catch (error) {
-            console.error("Failed to save blocks", error);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const updateBlockContent = (id: string, content_md: string) => {
-        setBlocks(prev => prev.map(b => b.id === id ? { ...b, content_md } : b));
-    };
-
-    // Export / Copy Pack Logic
-    const getMarkdownBlocks = (skipEmpty = false) => {
-        return blocks
-            .filter(b => !skipEmpty || b.content_md?.trim() !== "")
-            .map(b => `## ${b.label}\n\n${b.content_md || ""}`)
-            .join("\n\n");
-    };
-
-    const handleCopy = (type: 'markdown' | 'workos' | 'draft' | 'outline' | 'website' | 'studio') => {
-        if (!activeProject) return;
-
-        let content = "";
-        let feedback = "";
-
-        switch (type) {
-            case 'markdown':
-                content = getMarkdownBlocks();
-                feedback = "Copied Markdown";
-                break;
-            case 'workos':
-                content = `# ${activeProject.title}\n\n` +
-                          `Project ID: ${activeProject.id}\n` +
-                          `Topic ID: ${activeProject.topic_id || "—"}\n` +
-                          `Writing Mode: ${activeProject.writing_mode || "—"}\n` +
-                          `Episode Role: ${activeProject.episode_role || "—"}\n` +
-                          `Story Set: ${activeProject.story_set_id || "—"}\n` +
-                          `Episode: ${activeProject.episode_id || "—"}\n` +
-                          `Status: ${activeProject.status}\n\n` +
-                          `---\n\n` +
-                          `## Tone / Voice Guideline\n\n` +
-                          `Tone Profile: ${activeProject.tone_profile || "Tone not set"}\n` +
-                          `Web Voice: ${activeProject.web_voice_guideline || "—"}\n` +
-                          `Group Voice: ${activeProject.group_voice_guideline || "—"}\n` +
-                          `Page Voice: ${activeProject.page_voice_guideline || "—"}\n` +
-                          `Personal Voice: ${activeProject.personal_voice_guideline || "—"}\n` +
-                          `Claim Guardrail: ${activeProject.claim_guardrail_note || "—"}\n\n` +
-                          `---\n\n` +
-                          `## Website Fields\n\n` +
-                          `Meta Title: ${websiteFields.meta_title || "—"}\n` +
-                          `Meta Description: ${websiteFields.meta_description || "—"}\n` +
-                          `Excerpt: ${websiteFields.excerpt || "—"}\n\n` +
-                          `---\n\n` +
-                          `## Writing Blocks\n\n` +
-                          getMarkdownBlocks();
-                feedback = "Copied WorkOS Note";
-                break;
-            case 'draft':
-                content = `# ${activeProject.title}\n\n` + getMarkdownBlocks(true);
-                feedback = "Copied Article Draft";
-                break;
-            case 'outline':
-                content = `# Outline — ${activeProject.title}\n\n` +
-                          blocks.map((b, i) => `${i + 1}. ${b.label}`).join("\n");
-                feedback = "Copied Outline";
-                break;
-            case 'website':
-                content = `# ${activeProject.title}\n\n` +
-                          `## Website Fields\n\n` +
-                          `Meta Title:\n${websiteFields.meta_title || "—"}\n\n` +
-                          `Meta Description:\n${websiteFields.meta_description || "—"}\n\n` +
-                          `Keywords:\n${websiteFields.keywords || "—"}\n\n` +
-                          `Slug:\n${websiteFields.slug || activeProject.slug || "—"}\n\n` +
-                          `Excerpt:\n${websiteFields.excerpt || "—"}\n\n` +
-                          `## Internal Links Notes\n\n` +
-                          `${websiteFields.internal_links_notes || "—"}\n\n` +
-                          `## Body Markdown\n\n` +
-                          getMarkdownBlocks(true) + `\n\n` +
-                          `## References Notes\n\n` +
-                          `${websiteFields.references_notes || "—"}\n\n` +
-                          `---\n\n` +
-                          `## Tone Guideline\n\n` +
-                          `Tone Profile: ${activeProject.tone_profile || "—"}\n` +
-                          `Web Voice: ${activeProject.web_voice_guideline || "—"}\n` +
-                          `Claim Guardrail: ${activeProject.claim_guardrail_note || "—"}`;
-                feedback = "Copied Website Draft Pack";
-                break;
-            case 'studio':
-                const bodyBlocks = blocks.filter(b => 
-                    b.content_md?.trim() !== "" && 
-                    !["Read More / Bridge", "FAQ Notes", "References Notes"].includes(b.label || "")
-                ).map(b => `### ${b.label}\n\n${b.content_md}`).join("\n\n");
-
-                const readMoreBlock = blocks.find(b => b.label === "Read More / Bridge")?.content_md || "";
-                const faqBlock = blocks.find(b => b.label === "FAQ Notes")?.content_md || "";
-                const refBlock = blocks.find(b => b.label === "References Notes")?.content_md || "";
-
-                content = `---
-topic_id: ${activeProject.topic_id || ""}
-title: ${activeProject.title}
-slug: ${websiteFields.slug || activeProject.slug || ""}
-writing_mode: ${activeProject.writing_mode}
-episode_role: ${activeProject.episode_role || ""}
-status: ${activeProject.status}
-source: arbor_writing_lab
----
-
-# ${activeProject.title}
-
-## Website Fields
-
-Meta Title:
-${websiteFields.meta_title || "—"}
-
-Meta Description:
-${websiteFields.meta_description || "—"}
-
-Keywords:
-${websiteFields.keywords || "—"}
-
-Slug:
-${websiteFields.slug || activeProject.slug || "—"}
-
-Excerpt:
-${websiteFields.excerpt || "—"}
-
-## Body Markdown
-
-${bodyBlocks || "—"}
-
-## Read More
-
-${readMoreBlock || "—"}
-
-## FAQ
-
-${faqBlock || "—"}
-
-## References
-
-${websiteFields.references_notes || ""}
-${refBlock ? (websiteFields.references_notes ? "\n\n" : "") + refBlock : ""}
-${(!websiteFields.references_notes && !refBlock) ? "—" : ""}
-
-## Internal Links Notes
-${websiteFields.internal_links_notes || "—"}
-
-## Tone Guideline
-Tone Profile: ${activeProject.tone_profile || "—"}
-Web Voice Guideline: ${activeProject.web_voice_guideline || "—"}
-Claim Guardrail: ${activeProject.claim_guardrail_note || "—"}
-
-## Source Notes
-Generated from Arbor Writing Lab.
-Project ID: ${activeProject.id}
-Writing Mode: ${activeProject.writing_mode}
-Episode Role: ${activeProject.episode_role || "—"}
-`;
-                feedback = "Copied Article Studio Pack";
-                break;
-        }
-
-        navigator.clipboard.writeText(content);
-        setCopyStatus(feedback);
-        setTimeout(() => setCopyStatus(null), 2000);
-    };
+    // Flatten all episodes for selection drop down
+    const allEpisodes = storySets.flatMap(set => 
+        (set.episodes || []).map((ep: any) => ({
+            id: ep.id,
+            title: ep.title,
+            story_set_title: set.title
+        }))
+    );
 
     return (
-        <div className="grid grid-cols-12 gap-8 h-[calc(100vh-280px)] min-h-[600px]">
-            {/* Left Column: Context & Structure */}
-            <div className="col-span-3 flex flex-col gap-6 overflow-y-auto pr-2 scrollbar-theme pb-10">
-                {/* Project Selector */}
-                <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <PenTool className="w-4 h-4 text-theme-muted" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Active Project</h4>
+        <div className="space-y-6">
+            {/* Header: Episode selector & metadata */}
+            <div className="bg-theme-card border border-theme-border rounded-[28px] p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-3">
+                        <span className="px-2.5 py-1 bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-theme-secondary rounded-lg text-[10px] font-black uppercase tracking-widest border border-theme-border/40 shrink-0">
+                            {resolvedEpisodeId || "No Episode"}
+                        </span>
+                        
+                        {activeProject ? (
+                            <input 
+                                type="text"
+                                value={workingTitle}
+                                onChange={(e) => setWorkingTitle(e.target.value)}
+                                className="text-xl font-black text-theme-primary bg-transparent border-b border-transparent hover:border-theme-border/50 focus:border-theme-primary focus:outline-none py-0.5 outline-none w-full max-w-lg transition-all"
+                                placeholder="Edit working title..."
+                            />
+                        ) : activeEpisode ? (
+                            <h2 className="text-xl font-black text-theme-primary">{activeEpisode.title}</h2>
+                        ) : (
+                            <h2 className="text-xl font-black text-theme-primary italic">Select an episode to edit</h2>
+                        )}
+
+                        {activeProject && (
+                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400 text-[10px] font-bold uppercase shrink-0">
+                                {activeProject.status}
+                            </span>
+                        )}
                     </div>
-                    <div className="relative group">
+                    {activeEpisode && (
+                        <p className="text-xs text-theme-muted font-bold">
+                            Original: {activeEpisode.title} · Story Set: {activeEpisode.story_set_title}
+                        </p>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                    {/* Select episode dropdown */}
+                    <div className="relative">
                         <select 
-                            value={projectId || ""}
-                            onChange={(e) => onSelectProject(e.target.value)}
-                            className="w-full bg-theme-input border border-theme-border rounded-xl px-4 py-3 text-sm font-bold text-theme-primary appearance-none outline-none focus:ring-2 focus:ring-theme-accent/10 transition-all"
+                            value={resolvedEpisodeId || ""}
+                            onChange={(e) => onSelectEpisode(e.target.value)}
+                            className="bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-xs font-bold text-theme-primary appearance-none pr-8 outline-none focus:ring-2 focus:ring-theme-accent/10"
                         >
-                            <option value="">Select Project...</option>
-                            {projects.map(p => (
-                                <option key={p.id} value={p.id}>{p.title}</option>
+                            <option value="">Select Episode...</option>
+                            {allEpisodes.map(ep => (
+                                <option key={ep.id} value={ep.id}>{ep.title}</option>
                             ))}
                         </select>
-                        <ChevronDown className="w-4 h-4 text-theme-muted absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-theme-primary transition-colors" />
-                    </div>
-                    <button 
-                        onClick={onCreateProject}
-                        className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 border border-dashed border-theme-border rounded-xl text-[10px] font-black text-theme-muted uppercase tracking-widest hover:bg-theme-hover hover:text-theme-primary transition-all"
-                    >
-                        <Plus className="w-3 h-3" />
-                        New Project
-                    </button>
-                </div>
-
-                <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Target className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Context</h4>
-                    </div>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-[9px] font-bold text-theme-muted uppercase tracking-tight">Writing Mode</label>
-                            <div className="mt-1 text-sm font-bold text-theme-primary uppercase">
-                                {activeProject?.writing_mode?.replace(/_/g, ' ') || "—"}
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-[9px] font-bold text-theme-muted uppercase tracking-tight">Episode Role</label>
-                            <div className="mt-1 text-sm font-bold text-theme-primary uppercase">
-                                {activeProject?.episode_role?.replace(/_/g, ' ') || "—"}
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-[9px] font-bold text-theme-muted uppercase tracking-tight">Journey Stage</label>
-                            <div className="mt-1 text-sm font-bold text-theme-primary uppercase">
-                                {activeProject?.journey_stage || "—"}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-
-                {activeProject && (
-                    <>
-                        <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Globe className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Website Fields</h4>
-                            </div>
-                             <button 
-                                 onClick={handleSaveFields}
-                                 disabled={saving}
-                                 className="p-1.5 bg-black dark:bg-slate-800 text-white dark:text-theme-primary border border-transparent dark:border-slate-700 rounded-lg hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all disabled:opacity-30"
-                                 title="Save Website Fields"
-                             >
-                                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                            </button>
-                        </div>
-                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-theme">
-                            <div>
-                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">URL Slug</label>
-                                <input 
-                                    type="text"
-                                    value={websiteFields.slug}
-                                    onChange={(e) => setWebsiteFields({...websiteFields, slug: e.target.value})}
-                                    placeholder="article-slug-here..."
-                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Meta Title</label>
-                                <input 
-                                    type="text"
-                                    value={websiteFields.meta_title}
-                                    onChange={(e) => setWebsiteFields({...websiteFields, meta_title: e.target.value})}
-                                    placeholder="SEO Title..."
-                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Meta Description</label>
-                                <textarea 
-                                    value={websiteFields.meta_description}
-                                    onChange={(e) => setWebsiteFields({...websiteFields, meta_description: e.target.value})}
-                                    placeholder="SEO Description..."
-                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10 h-20 resize-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Keywords</label>
-                                <input 
-                                    type="text"
-                                    value={websiteFields.keywords}
-                                    onChange={(e) => setWebsiteFields({...websiteFields, keywords: e.target.value})}
-                                    placeholder="Keywords separated by comma..."
-                                    className="w-full mt-1 bg-neutral-50 dark:bg-slate-950/40 border border-neutral-100 dark:border-slate-800 rounded-lg px-3 py-2 text-xs font-bold text-neutral-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-emerald-500/10"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Excerpt</label>
-                                <textarea 
-                                    value={websiteFields.excerpt}
-                                    onChange={(e) => setWebsiteFields({...websiteFields, excerpt: e.target.value})}
-                                    placeholder="Brief summary for list view..."
-                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10 h-20 resize-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">Internal Links Notes</label>
-                                <textarea 
-                                    value={websiteFields.internal_links_notes}
-                                    onChange={(e) => setWebsiteFields({...websiteFields, internal_links_notes: e.target.value})}
-                                    placeholder="Links to include..."
-                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10 h-20 resize-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-tight">References Notes</label>
-                                <textarea 
-                                    value={websiteFields.references_notes}
-                                    onChange={(e) => setWebsiteFields({...websiteFields, references_notes: e.target.value})}
-                                    placeholder="Sources and citations..."
-                                    className="w-full mt-1 bg-theme-input border border-theme-border rounded-lg px-3 py-2 text-xs font-bold text-theme-primary outline-none focus:ring-2 focus:ring-theme-accent/10 h-20 resize-none"
-                                />
-                            </div>
-                        </div>
+                        <ChevronDown className="w-3.5 h-3.5 text-theme-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
 
-                    <div className="bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Share2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Social Drafts</h4>
-                            </div>
-                            <button 
-                                onClick={() => setActiveSubTab('social')}
-                                className="p-1.5 bg-theme-panel text-theme-muted rounded-lg hover:bg-theme-hover hover:text-theme-primary transition-all"
-                                title="Go to Social Workspace"
-                            >
-                                <PenTool className="w-3 h-3" />
-                            </button>
-                        </div>
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Group</span>
-                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${socialFields.group_post_markdown?.length > 100 ? 'bg-emerald-50 text-emerald-600' : socialFields.group_post_markdown?.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-neutral-50 text-neutral-400'}`}>
-                                    {socialFields.group_post_markdown?.length > 100 ? 'Ready' : socialFields.group_post_markdown?.length > 0 ? 'Draft' : 'Empty'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Page</span>
-                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${socialFields.page_post_markdown?.length > 50 ? 'bg-emerald-50 text-emerald-600' : socialFields.page_post_markdown?.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-neutral-50 text-neutral-400'}`}>
-                                    {socialFields.page_post_markdown?.length > 50 ? 'Ready' : socialFields.page_post_markdown?.length > 0 ? 'Draft' : 'Empty'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Personal</span>
-                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${socialFields.personal_post_markdown?.length > 30 ? 'bg-emerald-50 text-emerald-600' : socialFields.personal_post_markdown?.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-neutral-50 text-neutral-400'}`}>
-                                    {socialFields.personal_post_markdown?.length > 30 ? 'Ready' : socialFields.personal_post_markdown?.length > 0 ? 'Draft' : 'Empty'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className={`bg-theme-card border border-theme-border rounded-3xl p-5 shadow-sm transition-all duration-300 ${isStructureCollapsed ? 'flex-none' : 'flex-1 min-h-[200px]'}`}>
+                    {activeProject ? (
                         <button 
-                            onClick={() => setIsStructureCollapsed(!isStructureCollapsed)}
-                            className="w-full flex items-center justify-between mb-2 group"
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-black dark:bg-slate-800 text-white dark:text-theme-primary rounded-xl text-xs font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-md disabled:opacity-50"
                         >
-                            <div className="flex items-center gap-2">
-                                <Layout className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 dark:text-slate-500 group-hover:text-black dark:group-hover:text-white transition-colors">Structure</h4>
-                            </div>
-                            <ChevronDown className={`w-3 h-3 text-neutral-300 transition-transform duration-300 ${isStructureCollapsed ? '-rotate-90' : 'rotate-0'}`} />
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            {saving ? 'Saving...' : 'Save Content'}
                         </button>
+                    ) : resolvedEpisodeId ? (
+                        <button 
+                            onClick={handleCreateProject}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-black hover:bg-emerald-700 transition-all shadow-md disabled:opacity-50"
+                        >
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenTool className="w-4 h-4" />}
+                            Start Project / เริ่มเขียน
+                        </button>
+                    ) : null}
+                </div>
+            </div>
+
+            {/* Main content pane */}
+            {!resolvedEpisodeId ? (
+                <div className="py-24 text-center bg-theme-card border border-theme-border rounded-[32px] space-y-4">
+                    <div className="w-16 h-16 bg-theme-panel rounded-2xl flex items-center justify-center mx-auto">
+                        <PenTool className="w-8 h-8 text-theme-muted" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-black text-theme-primary">ยังไม่ได้เลือกตอน</h3>
+                        <p className="text-xs text-theme-muted mt-1 font-bold">
+                            กรุณาเลือกตอนจากปุ่มเมนูด้านขวา หรือกลับไปยังหน้า Story Map / Episode Backlog
+                        </p>
+                    </div>
+                </div>
+            ) : !activeProject && !loading ? (
+                <div className="py-24 text-center bg-theme-card border border-theme-border rounded-[32px] space-y-4">
+                    <div className="w-16 h-16 bg-theme-panel rounded-2xl flex items-center justify-center mx-auto">
+                        <FileText className="w-8 h-8 text-theme-muted" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-black text-theme-primary">ยังไม่มีโปรเจกต์เขียนร่างสำหรับตอนนี้</h3>
+                        <p className="text-xs text-theme-muted mt-1 mb-4 font-bold">
+                            ระบบจะบันทึกร่างของคุณเข้าสู่ Arbor Writing Lab โครงสร้างหลัก Green Fineness
+                        </p>
+                        <button 
+                            onClick={handleCreateProject}
+                            className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-black hover:bg-emerald-700 transition-all shadow-md inline-flex items-center gap-2"
+                        >
+                            <PenTool className="w-4 h-4" />
+                            เริ่มเขียนร่าง (Start Project)
+                        </button>
+                    </div>
+                </div>
+            ) : loading ? (
+                <div className="py-24 text-center text-theme-muted">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                    กำลังเตรียมโต๊ะทำงานของคุณ...
+                </div>
+            ) : (
+                <div className="grid grid-cols-12 gap-8 items-start">
+                    {/* Sub tabs navigation */}
+                    <div className="col-span-12 md:col-span-3 space-y-2">
+                        <div className="bg-theme-card border border-theme-border rounded-[24px] p-3 shadow-sm flex flex-col gap-1">
+                            <button
+                                onClick={() => setSubTab("body")}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                    subTab === "body" 
+                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
+                                        : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                            >
+                                <span>Article Body</span>
+                                <FileText className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button
+                                onClick={() => setSubTab("social")}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                    subTab === "social" 
+                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
+                                        : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                            >
+                                <span>Social Drafts</span>
+                                <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button
+                                onClick={() => setSubTab("seo")}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                    subTab === "seo" 
+                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
+                                        : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                            >
+                                <span>SEO & Website Fields</span>
+                                <Globe className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button
+                                onClick={() => setSubTab("utm")}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                    subTab === "utm" 
+                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
+                                        : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                            >
+                                <span>UTM / Publish</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                                onClick={() => setSubTab("review")}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                    subTab === "review" 
+                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
+                                        : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                            >
+                                <span>Arbor Review</span>
+                                <Sparkles className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        {lastSaved && (
+                            <div className="px-4 py-2 text-[10px] text-theme-muted font-bold text-center">
+                                บันทึกล่าสุด: {lastSaved.toLocaleTimeString('th-TH')}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Tab panels (Editor fields) */}
+                    <div className="col-span-12 md:col-span-9 bg-theme-card border border-theme-border rounded-[32px] p-8 shadow-sm min-h-[500px]">
                         
-                        {!isStructureCollapsed && (
-                            <div className="space-y-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                {activeProject ? (
-                                    <div className="space-y-3">
-                                        <div className="p-2.5 bg-neutral-50 dark:bg-slate-900/50 rounded-xl border border-neutral-100 dark:border-slate-800">
-                                            <div className="text-[9px] font-black text-neutral-400 dark:text-slate-500 uppercase tracking-tight mb-1">Summary</div>
-                                            <p className="text-[10px] text-neutral-500 dark:text-slate-400 leading-relaxed line-clamp-2 hover:line-clamp-none transition-all cursor-help">{activeProject.summary || "—"}</p>
+                        {/* 1. Article Body Panel */}
+                        {subTab === "body" && (
+                            <div className="space-y-4 h-full flex flex-col">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">Article Body</h3>
+                                    {/* Formatting toolbar */}
+                                    <div className="flex items-center gap-1.5 bg-theme-panel p-1 rounded-lg border border-theme-border/40">
+                                        <button onClick={() => applyMarkdown('bold')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Bold"><Bold size={13} /></button>
+                                        <button onClick={() => applyMarkdown('italic')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Italic"><Italic size={13} /></button>
+                                        <button onClick={() => applyMarkdown('bullet')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Bullet List">-</button>
+                                        <button onClick={() => applyMarkdown('number')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Numbered List"><ListOrdered size={13} /></button>
+                                        <button onClick={() => applyMarkdown('quote')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Quote"><Quote size={13} /></button>
+                                        <button onClick={() => applyMarkdown('divider')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Divider"><Minus size={13} /></button>
+                                    </div>
+                                </div>
+                                <textarea
+                                    id="article-body-textarea"
+                                    value={articleBodyMarkdown}
+                                    onChange={(e) => setArticleBodyMarkdown(e.target.value)}
+                                    placeholder="เขียนเนื้อหาตอนหลักในรูปแบบ Markdown ที่นี่..."
+                                    className="w-full min-h-[400px] flex-1 bg-theme-input border border-theme-border rounded-2xl p-6 text-sm font-medium outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary leading-relaxed custom-scrollbar font-mono"
+                                />
+                            </div>
+                        )}
+
+                        {/* 2. Social Drafts Panel */}
+                        {subTab === "social" && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">Social Drafts</h3>
+                                    {copyStatus && (
+                                        <span className="text-[10px] font-bold text-green-600 animate-pulse">{copyStatus}!</span>
+                                    )}
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider">Facebook Group Post</label>
+                                            <button 
+                                                onClick={() => handleCopyToClipboard(facebookGroupPost, "Copied Group Post")}
+                                                className="text-[9px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                            >
+                                                <Copy className="w-3 h-3" /> Copy
+                                            </button>
                                         </div>
-                                        
-                                        {blocks.length > 0 && (
-                                            <div className="mt-2">
-                                                <div className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-2 px-1">Blocks Outline</div>
-                                                <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1 scrollbar-theme">
-                                                    {blocks.map((b, i) => (
-                                                        <div key={b.id} className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 dark:text-slate-400 py-1.5 px-3 bg-neutral-50 dark:bg-slate-900/50 rounded-lg border border-neutral-100 dark:border-slate-800 hover:border-neutral-200 dark:hover:border-slate-700 transition-colors">
-                                                            <span className="text-neutral-300 dark:text-slate-700 w-3">{i + 1}</span>
-                                                            <span className="truncate">{b.label}</span>
+                                        <textarea
+                                            value={facebookGroupPost}
+                                            onChange={(e) => setFacebookGroupPost(e.target.value)}
+                                            placeholder="ย่อยสำหรับโพสต์ในคอมมูนิตี้ / กลุ่มเป้าหมาย..."
+                                            className="w-full min-h-[100px] bg-theme-input border border-theme-border rounded-xl p-3.5 text-xs font-bold outline-none focus:border-theme-border/80 text-theme-primary placeholder:text-theme-muted"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider">Facebook Page Post</label>
+                                            <button 
+                                                onClick={() => handleCopyToClipboard(facebookPagePost, "Copied Page Post")}
+                                                className="text-[9px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                            >
+                                                <Copy className="w-3 h-3" /> Copy
+                                            </button>
+                                        </div>
+                                        <textarea
+                                            value={facebookPagePost}
+                                            onChange={(e) => setFacebookPagePost(e.target.value)}
+                                            placeholder="โพสต์ประกาศสำหรับเพจหลักอย่างเป็นทางการ..."
+                                            className="w-full min-h-[100px] bg-theme-input border border-theme-border rounded-xl p-3.5 text-xs font-bold outline-none focus:border-theme-border/80 text-theme-primary placeholder:text-theme-muted"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider">Personal Profile Post</label>
+                                            <button 
+                                                onClick={() => handleCopyToClipboard(personalPost, "Copied Personal Post")}
+                                                className="text-[9px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                            >
+                                                <Copy className="w-3 h-3" /> Copy
+                                            </button>
+                                        </div>
+                                        <textarea
+                                            value={personalPost}
+                                            onChange={(e) => setPersonalPost(e.target.value)}
+                                            placeholder="บอกเล่าในโทนเสียงส่วนตัว / เล่าสู่กันฟัง..."
+                                            className="w-full min-h-[100px] bg-theme-input border border-theme-border rounded-xl p-3.5 text-xs font-bold outline-none focus:border-theme-border/80 text-theme-primary placeholder:text-theme-muted"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider">Short Caption</label>
+                                                <button 
+                                                    onClick={() => handleCopyToClipboard(shortCaption, "Copied Caption")}
+                                                    className="text-[9px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                                >
+                                                    <Copy className="w-3 h-3" /> Copy
+                                                </button>
+                                            </div>
+                                            <textarea
+                                                value={shortCaption}
+                                                onChange={(e) => setShortCaption(e.target.value)}
+                                                placeholder="แคปชันสั้นชวนสะดุดสายตา..."
+                                                className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3.5 text-xs font-bold outline-none focus:border-theme-border/80 text-theme-primary placeholder:text-theme-muted"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider">Hashtags</label>
+                                                <button 
+                                                    onClick={() => handleCopyToClipboard(hashtags, "Copied Hashtags")}
+                                                    className="text-[9px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                                >
+                                                    <Copy className="w-3 h-3" /> Copy
+                                                </button>
+                                            </div>
+                                            <textarea
+                                                value={hashtags}
+                                                onChange={(e) => setHashtags(e.target.value)}
+                                                placeholder="#tag1 #tag2..."
+                                                className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3.5 text-xs font-bold outline-none focus:border-theme-border/80 text-theme-primary placeholder:text-theme-muted"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. SEO & Website Fields Panel */}
+                        {subTab === "seo" && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">SEO & Website Fields</h3>
+                                    <button
+                                        type="button"
+                                        onClick={handleGenerateSEO}
+                                        disabled={!articleBodyMarkdown}
+                                        className="flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-theme-primary text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50"
+                                    >
+                                        <Wand2 className="w-3.5 h-3.5 text-blue-500" />
+                                        Generate from Article Body
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Slug</label>
+                                            <input
+                                                type="text"
+                                                value={slug}
+                                                onChange={(e) => setSlug(e.target.value)}
+                                                placeholder="article-slug-here"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Hero Subtitle</label>
+                                            <input
+                                                type="text"
+                                                value={heroSubtitle}
+                                                onChange={(e) => setHeroSubtitle(e.target.value)}
+                                                placeholder="Subheading below title..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Short Summary</label>
+                                        <textarea
+                                            value={shortSummary}
+                                            onChange={(e) => setShortSummary(e.target.value)}
+                                            placeholder="บทคัดย่อ/ข้อมูลนำเรื่องเชิงลึก..."
+                                            className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Meta Title</label>
+                                            <input
+                                                type="text"
+                                                value={metaTitle}
+                                                onChange={(e) => setMetaTitle(e.target.value)}
+                                                placeholder="SEO Search result title..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Keywords</label>
+                                            <input
+                                                type="text"
+                                                value={keywords}
+                                                onChange={(e) => setKeywords(e.target.value)}
+                                                placeholder="Keywords separated by comma..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Meta Description</label>
+                                        <textarea
+                                            value={metaDescription}
+                                            onChange={(e) => setMetaDescription(e.target.value)}
+                                            placeholder="SEO Description shown on search results..."
+                                            className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 4. UTM / Publish Panel */}
+                        {subTab === "utm" && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">UTM / Publish</h3>
+                                    <button
+                                        type="button"
+                                        onClick={handleGenerateUTM}
+                                        disabled={!publishedUrl || !campaignName}
+                                        className="flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-theme-primary text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50"
+                                    >
+                                        Generate UTM
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Published URL</label>
+                                            <input
+                                                type="text"
+                                                value={publishedUrl}
+                                                onChange={(e) => setPublishedUrl(e.target.value)}
+                                                placeholder="https://greenfineness.com/library/..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Campaign Name</label>
+                                            <input
+                                                type="text"
+                                                value={campaignName}
+                                                onChange={(e) => setCampaignName(e.target.value)}
+                                                placeholder="campaign-name-slug"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* UTM Output */}
+                                    {groupUtm && (
+                                        <div className="space-y-4 pt-4 border-t border-theme-border/40 animate-fadeIn">
+                                            <div>
+                                                <div className="flex justify-between text-[10px] font-bold text-neutral-400 mb-1">
+                                                    <span>Facebook Group UTM URL</span>
+                                                    <button onClick={() => handleCopyToClipboard(groupUtm, "Copied Group UTM")} className="text-blue-600 hover:underline">Copy Link</button>
+                                                </div>
+                                                <input readOnly value={groupUtm} className="w-full bg-theme-panel border border-theme-border rounded-lg p-2 font-mono text-[10px] text-theme-secondary" />
+                                            </div>
+
+                                            <div>
+                                                <div className="flex justify-between text-[10px] font-bold text-neutral-400 mb-1">
+                                                    <span>Facebook Page UTM URL</span>
+                                                    <button onClick={() => handleCopyToClipboard(pageUtm, "Copied Page UTM")} className="text-blue-600 hover:underline">Copy Link</button>
+                                                </div>
+                                                <input readOnly value={pageUtm} className="w-full bg-theme-panel border border-theme-border rounded-lg p-2 font-mono text-[10px] text-theme-secondary" />
+                                            </div>
+
+                                            <div>
+                                                <div className="flex justify-between text-[10px] font-bold text-neutral-400 mb-1">
+                                                    <span>Personal Profile UTM URL</span>
+                                                    <button onClick={() => handleCopyToClipboard(personalUtm, "Copied Personal UTM")} className="text-blue-600 hover:underline">Copy Link</button>
+                                                </div>
+                                                <input readOnly value={personalUtm} className="w-full bg-theme-panel border border-theme-border rounded-lg p-2 font-mono text-[10px] text-theme-secondary" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 5. Arbor Review Panel */}
+                        {subTab === "review" && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest flex items-center gap-2">
+                                        <Sparkles className="text-blue-600 w-4 h-4" />
+                                        Arbor Review
+                                    </h3>
+                                    <button
+                                        type="button"
+                                        onClick={handleRunArborReview}
+                                        disabled={isReviewing || !articleBodyMarkdown}
+                                        className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 transition-all shadow-md shadow-blue-100 disabled:opacity-50"
+                                    >
+                                        {isReviewing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} 
+                                        {isReviewing ? 'Analyzing...' : 'Run Arbor Review'}
+                                    </button>
+                                </div>
+
+                                {!reviewResult ? (
+                                    <div className="py-16 text-center text-theme-muted font-bold italic space-y-2">
+                                        <p>ยังไม่มีผลวิเคราะห์บทความเชิงลึก</p>
+                                        <p className="text-[10px] uppercase font-bold text-neutral-300">คลิกปุ่ม Run Arbor Review เพื่อเริ่มตรวจคำศัพท์ โทน และความเสี่ยงทางลิขสิทธิ์ / วิชาการ</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6 animate-fadeIn">
+                                        {/* Editorial Summary */}
+                                        <div className="p-5 bg-blue-50/40 dark:bg-blue-950/20 border border-blue-100/60 dark:border-blue-900/30 rounded-2xl">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">Editorial Summary</h4>
+                                            <p className="text-xs font-bold leading-relaxed text-theme-primary">{reviewResult.summary}</p>
+                                            <div className="text-[9px] font-bold text-blue-500 mt-2">Recommended: {reviewResult.next_step}</div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Strengths (Keep) */}
+                                            <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 border-b border-theme-border pb-1">Strengths (Keep)</h4>
+                                                <ul className="space-y-2">
+                                                    {reviewResult.strengths.map((str: string, i: number) => (
+                                                        <li key={i} className="text-xs font-bold text-theme-primary flex items-start gap-2">
+                                                            <span className="text-emerald-500 shrink-0">✓</span>
+                                                            <span>{str}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+
+                                            {/* Issues to Fix */}
+                                            <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-600 border-b border-theme-border pb-1">Issues to Fix</h4>
+                                                <ul className="space-y-2">
+                                                    {reviewResult.revisions.map((rev: string, i: number) => (
+                                                        <li key={i} className="text-xs font-bold text-theme-primary flex items-start gap-2">
+                                                            <span className="text-amber-500 shrink-0">!</span>
+                                                            <span>{rev}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+
+                                        {/* Tone Notes */}
+                                        <div className="space-y-3">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-purple-600 border-b border-theme-border pb-1">Tone Analysis</h4>
+                                            <div className="flex flex-wrap gap-2">
+                                                {reviewResult.tone.map((tn: string, i: number) => (
+                                                    <span key={i} className="px-3 py-1 rounded bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 border border-purple-100/40 text-[9px] font-black uppercase tracking-widest">
+                                                        {tn}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            {reviewResult.voiceSuggestions && reviewResult.voiceSuggestions.length > 0 && (
+                                                <div className="mt-2 space-y-2.5">
+                                                    {reviewResult.voiceSuggestions.map((vs: string, i: number) => (
+                                                        <div key={i} className="text-xs text-theme-secondary bg-theme-panel p-2.5 rounded-xl border border-theme-border/40">
+                                                            {vs}
                                                         </div>
                                                     ))}
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="p-3 bg-neutral-50 dark:bg-slate-900/50 rounded-xl border border-neutral-100 dark:border-slate-800 text-[10px] font-bold text-neutral-400 dark:text-slate-600 text-center border-dashed italic">
-                                        Select project to view structure
+                                            )}
+                                        </div>
+
+                                        {/* Claim safety & Risks */}
+                                        <div className="space-y-3">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-600 border-b border-theme-border pb-1">Claim Safety & Risks</h4>
+                                            <ul className="space-y-2">
+                                                {reviewResult.risks.map((rk: string, i: number) => (
+                                                    <li key={i} className="text-xs font-bold text-theme-primary flex items-start gap-2">
+                                                        <span className="text-rose-500 shrink-0">⚠️</span>
+                                                        <span>{rk}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            {reviewResult.claimSuggestions && reviewResult.claimSuggestions.length > 0 && (
+                                                <div className="mt-2 space-y-2 bg-rose-50/10 border border-rose-100/30 p-4 rounded-2xl">
+                                                    <div className="text-[9px] font-black uppercase tracking-widest text-rose-500 mb-2">Claim Safety Suggestions</div>
+                                                    {reviewResult.claimSuggestions.map((cs: string, i: number) => (
+                                                        <div key={i} className="text-xs font-bold text-rose-800 dark:text-rose-300 leading-normal">
+                                                            💡 {cs}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         )}
-                    </div>
-                    </>
-                )}
-            </div>
 
-            {/* Center Column: Wide Writing Area */}
-            <div className="col-span-9 flex flex-col gap-6">
-                {activeProject ? (
-                    <div className="bg-theme-card border border-theme-border rounded-[40px] shadow-sm flex-1 flex flex-col">
-                        {/* Writing Header */}
-                        <div className="px-10 py-8 border-b border-theme-border/50 flex items-center justify-between bg-theme-card sticky top-0 z-10">
-                            <div>
-                                <div className="flex items-center gap-4 mb-1">
-                                    <h2 className="text-2xl font-black text-neutral-900 dark:text-slate-100 leading-none">{activeProject.title}</h2>
-                                    {/* Sub-Tab Switcher */}
-                                    <div className="flex items-center bg-neutral-100 dark:bg-slate-900/50 p-1 rounded-2xl">
-                                        <button 
-                                            onClick={() => setActiveSubTab('chapter')}
-                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'chapter' ? 'bg-white dark:bg-slate-800 text-black dark:text-theme-primary shadow-sm border border-transparent dark:border-slate-700' : 'text-neutral-400 dark:text-slate-500 hover:text-neutral-600 dark:hover:text-slate-300'}`}
-                                        >
-                                            <PenTool className="w-3 h-3" />
-                                            Chapter Draft
-                                        </button>
-                                        <button 
-                                            onClick={() => setActiveSubTab('social')}
-                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'social' ? 'bg-white dark:bg-slate-800 text-black dark:text-theme-primary shadow-sm border border-transparent dark:border-slate-700' : 'text-neutral-400 dark:text-slate-500 hover:text-neutral-600 dark:hover:text-slate-300'}`}
-                                        >
-                                            <Share2 className="w-3 h-3" />
-                                            Social Drafts
-                                        </button>
-                                        <button 
-                                            onClick={() => setActiveSubTab('preview')}
-                                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'preview' ? 'bg-white dark:bg-slate-800 text-black dark:text-theme-primary shadow-sm border border-transparent dark:border-slate-700' : 'text-neutral-400 dark:text-slate-500 hover:text-neutral-600 dark:hover:text-slate-300'}`}
-                                        >
-                                            <Globe className="w-3 h-3" />
-                                            Preview / Export
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 mt-2">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-[9px] font-black text-neutral-400 dark:text-slate-500 uppercase tracking-widest">{activeProject.id}</span>
-                                        <span className="w-1 h-1 bg-neutral-200 dark:bg-slate-800 rounded-full" />
-                                        <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{activeProject.status}</span>
-                                    </div>
-                                    <span className="w-px h-3 bg-neutral-100 dark:bg-slate-800" />
-                                    {/* Compact Placeholder Toolbar */}
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 dark:bg-amber-950/30 rounded-md">
-                                            <Zap className="w-2.5 h-2.5 text-amber-500 dark:text-amber-400" />
-                                            <span className="text-[8px] font-black text-amber-700 dark:text-amber-500 uppercase">AI Disabled</span>
-                                        </div>
-                                        <button 
-                                            onClick={() => setIsToneModalOpen(true)}
-                                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-all ${activeProject.tone_profile ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50' : 'bg-neutral-100 dark:bg-slate-900 text-neutral-400 dark:text-slate-500 hover:bg-neutral-200 dark:hover:bg-slate-800'}`}
-                                        >
-                                            <Sparkles className={`w-2.5 h-2.5 ${activeProject.tone_profile ? 'text-blue-500' : 'text-neutral-400'}`} />
-                                            <span className="text-[8px] font-black uppercase">
-                                                {activeProject.tone_profile || "Tone not set"}
-                                            </span>
-                                        </button>
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-theme-input rounded-md border border-theme-border/50">
-                                            <Share2 className="w-2.5 h-2.5 text-theme-muted" />
-                                            <span className="text-[8px] font-black text-theme-secondary uppercase">Export Locked</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                {activeSubTab === 'preview' && blocks.length > 0 && (
-                                    <div className="flex items-center gap-2 bg-theme-panel/60 p-1.5 rounded-2xl border border-theme-border/40">
-                                        <button 
-                                            onClick={() => handleCopy('markdown')}
-                                            title="Copy As Markdown"
-                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
-                                        >
-                                            <Share2 className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleCopy('workos')}
-                                            title="Copy WorkOS Note"
-                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
-                                        >
-                                            <FileText className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleCopy('draft')}
-                                            title="Copy Article Draft"
-                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
-                                        >
-                                            <Type className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleCopy('website')}
-                                            title="Copy Website Draft Pack"
-                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
-                                        >
-                                            <Globe className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleCopy('studio')}
-                                            title="Copy Article Studio Pack"
-                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
-                                        >
-                                            <Box className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleCopy('outline')}
-                                            title="Copy Outline"
-                                            className="p-2 hover:bg-theme-hover rounded-xl text-theme-muted hover:text-theme-primary transition-all"
-                                        >
-                                            <List className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                )}
-
-                                {copyStatus && (
-                                    <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
-                                        <CheckCircle className="w-3 h-3" />
-                                        {copyStatus}
-                                    </span>
-                                )}
-                                
-                                {lastSaved && activeSubTab !== 'preview' && !copyStatus && (
-                                    <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
-                                        <CheckCircle className="w-3 h-3" />
-                                        Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                )}
-                                
-                                {activeSubTab === 'chapter' && (
-                                    <button 
-                                        onClick={handleSave}
-                                        disabled={saving || blocks.length === 0}
-                                        className="flex items-center gap-2 px-8 py-3 bg-black dark:bg-slate-800 border border-transparent dark:border-slate-700 text-white dark:text-theme-primary rounded-2xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
-                                    >
-                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                        {saving ? "Saving..." : "Save Content"}
-                                    </button>
-                                )}
-
-                                {activeSubTab === 'social' && (
-                                    <button 
-                                        onClick={handleSaveSocialFields}
-                                        disabled={saving}
-                                        className="flex items-center gap-2 px-8 py-3 bg-black dark:bg-slate-800 border border-transparent dark:border-slate-700 text-white dark:text-theme-primary rounded-2xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed transform active:scale-95"
-                                    >
-                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                        {saving ? "Saving Drafts..." : "Save Social Drafts"}
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Workspace Area */}
-                        <div className="flex-1 overflow-y-auto scrollbar-theme bg-theme-app/40 dark:bg-theme-app/60">
-                            <div className="p-12">
-                            {loading ? (
-                                <div className="flex flex-col items-center justify-center h-full text-neutral-300">
-                                    <RefreshCw className="w-8 h-8 animate-spin mb-4" />
-                                    <p className="text-sm font-bold uppercase tracking-widest">Loading Workspace...</p>
-                                </div>
-                            ) : activeSubTab === 'preview' ? (
-                                <div className="max-w-4xl mx-auto py-8">
-                                    {blocks.length > 0 ? (
-                                        <div className="bg-theme-card border border-theme-border rounded-3xl p-12 shadow-sm min-h-[500px]">
-                                            <div className="max-w-none">
-                                                {blocks.map((block) => (
-                                                    <div key={block.id} className="mb-12 last:mb-0">
-                                                        <h2 className="text-xl font-black text-theme-primary border-b border-theme-border/50 pb-3 mb-6 uppercase tracking-tight">
-                                                            {block.label}
-                                                        </h2>
-                                                        <div className="text-lg text-theme-secondary leading-relaxed whitespace-pre-wrap">
-                                                            {block.content_md || <span className="text-theme-muted italic font-medium">No content for this section</span>}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-20 bg-theme-card border border-theme-border rounded-3xl shadow-sm">
-                                            <AlertCircle className="w-12 h-12 text-theme-muted mx-auto mb-4" />
-                                            <p className="text-sm font-bold text-theme-muted uppercase">No content to preview</p>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Social Preview Section */}
-                                    <div className="mt-12 space-y-8">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-px bg-neutral-200 dark:bg-slate-800 flex-1" />
-                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-300 dark:text-slate-600">Social Draft Preview</h3>
-                                            <div className="h-px bg-neutral-200 dark:bg-slate-800 flex-1" />
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            {/* FB Group */}
-                                            <div className="bg-theme-card border border-theme-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                                                        <Users className="w-4 h-4" />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">FB Group Post</span>
-                                                    </div>
-                                                    <button onClick={() => handleCopySocial('group')} className="p-1.5 hover:bg-neutral-50 dark:hover:bg-slate-800 rounded-lg text-neutral-400 dark:text-slate-500 hover:text-black dark:hover:text-white transition-all">
-                                                        <Share2 className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                                <div className="text-sm text-neutral-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
-                                                    {socialFields.group_post_markdown || <span className="text-neutral-200 dark:text-slate-800 italic">No group draft...</span>}
-                                                </div>
-                                                {socialFields.hashtags && (
-                                                    <div className="mt-4 pt-4 border-t border-neutral-50 dark:border-slate-800 text-[10px] font-bold text-blue-500">
-                                                        {socialFields.hashtags}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* FB Page */}
-                                            <div className="bg-theme-card border border-theme-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                                                        <Flag className="w-4 h-4" />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">FB Page Post</span>
-                                                    </div>
-                                                    <button onClick={() => handleCopySocial('page')} className="p-1.5 hover:bg-neutral-50 dark:hover:bg-slate-800 rounded-lg text-neutral-400 dark:text-slate-500 hover:text-black dark:hover:text-white transition-all">
-                                                        <Share2 className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                                <div className="text-sm text-neutral-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
-                                                    {socialFields.page_post_markdown || <span className="text-neutral-200 dark:text-slate-800 italic">No page draft...</span>}
-                                                </div>
-                                                {socialFields.hashtags && (
-                                                    <div className="mt-4 pt-4 border-t border-neutral-50 dark:border-slate-800 text-[10px] font-bold text-blue-500">
-                                                        {socialFields.hashtags}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Personal Profile */}
-                                            <div className="bg-theme-card border border-theme-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center gap-2 text-neutral-900 dark:text-slate-100">
-                                                        <User className="w-4 h-4" />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">Personal Post</span>
-                                                    </div>
-                                                    <button onClick={() => handleCopySocial('personal')} className="p-1.5 hover:bg-neutral-50 dark:hover:bg-slate-800 rounded-lg text-neutral-400 dark:text-slate-500 hover:text-black dark:hover:text-white transition-all">
-                                                        <Share2 className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                                <div className="text-sm text-neutral-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
-                                                    {socialFields.personal_post_markdown || <span className="text-neutral-200 dark:text-slate-800 italic">No personal draft...</span>}
-                                                </div>
-                                                {socialFields.hashtags && (
-                                                    <div className="mt-4 pt-4 border-t border-neutral-50 dark:border-slate-800 text-[10px] font-bold text-blue-500">
-                                                        {socialFields.hashtags}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Caption & Hashtags */}
-                                            <div className="bg-theme-card border border-theme-border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                                                        <MessageCircle className="w-4 h-4" />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">Short Caption</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button onClick={() => handleCopySocial('caption')} className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all" title="Copy Caption">
-                                                            <Share2 className="w-3 h-3" />
-                                                        </button>
-                                                        <button onClick={() => handleCopySocial('hashtags')} className="p-1.5 hover:bg-neutral-50 dark:hover:bg-slate-800 rounded-lg text-neutral-400 dark:text-slate-500 hover:text-black dark:hover:text-white transition-all" title="Copy Hashtags">
-                                                            <Hash className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div className="text-sm text-theme-secondary whitespace-pre-wrap leading-relaxed mb-4">
-                                                    {socialFields.social_caption || <span className="text-theme-muted italic">No short caption...</span>}
-                                                </div>
-                                                <div className="text-[10px] font-bold text-neutral-400 dark:text-slate-600 border-t border-neutral-50 dark:border-slate-800 pt-4">
-                                                    <div className="flex items-center gap-1 mb-1 opacity-50">
-                                                        <Hash className="w-2 h-2" />
-                                                        <span>HASHTAGS</span>
-                                                    </div>
-                                                    <div className="text-blue-500 dark:text-blue-400 leading-relaxed">
-                                                        {socialFields.hashtags || "—"}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex justify-center">
-                                            <button 
-                                                onClick={() => handleCopySocial('all')}
-                                                className="flex items-center gap-2 px-6 py-3 bg-theme-panel hover:bg-theme-hover text-theme-secondary hover:text-theme-primary rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                            >
-                                                <Share2 className="w-3 h-3" />
-                                                Copy All Social Drafts
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : activeSubTab === 'social' ? (
-                                <div className="max-w-4xl mx-auto space-y-12 pb-20">
-                                    {/* FB Group Editor */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-blue-50 dark:bg-blue-950/30 rounded-2xl flex items-center justify-center">
-                                                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-black uppercase tracking-widest text-theme-primary">Facebook Group Post</h3>
-                                                <p className="text-[10px] font-bold text-neutral-400 dark:text-slate-500 uppercase">Educational Long-form (800–1,200 words)</p>
-                                            </div>
-                                        </div>
-                                            <textarea 
-                                                value={socialFields.group_post_markdown}
-                                                onChange={(e) => setSocialFields({...socialFields, group_post_markdown: e.target.value})}
-                                                placeholder={`[HOOK] — Grab attention with a scientific curiosity or common plant problem...\n\n[EDUCATIONAL BODY] — Deep dive into the mechanism of plant life...\n\n[BULLET POINTS] — Key takeaways or system checklists...\n\n[CAUTION / NUANCE] — Scientific guardrails and what to avoid...\n\n[READ MORE] — Link to full article or Hub...\n\n[QUESTION PROMPT] — Engaging question for the community...`}
-                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[600px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20"
-                                            />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        {/* FB Page Editor */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl flex items-center justify-center">
-                                                    <Flag className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900 dark:text-slate-100">Facebook Page Post</h3>
-                                                    <p className="text-[10px] font-bold text-neutral-400 dark:text-slate-500 uppercase">Editorial Summary (300–600 words)</p>
-                                                </div>
-                                            </div>
-                                            <textarea 
-                                                value={socialFields.page_post_markdown}
-                                                onChange={(e) => setSocialFields({...socialFields, page_post_markdown: e.target.value})}
-                                                placeholder={`[EDITORIAL SUMMARY] — Concise insight for broad reach...\n\n[BRAND TONE] — Calm, professional, and knowledge-first...\n\n[READ MORE] — Link to Journey Hub...\n\n[HASHTAGS] — Strategic tags...`}
-                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-base text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20"
-                                            />
-                                        </div>
-
-                                        {/* Personal Post Editor */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-neutral-100 dark:bg-slate-900 rounded-2xl flex items-center justify-center">
-                                                    <User className="w-5 h-5 text-neutral-900 dark:text-slate-100" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900 dark:text-slate-100">Personal Post</h3>
-                                                    <p className="text-[10px] font-bold text-neutral-400 dark:text-slate-500 uppercase">Reflection (150–350 words)</p>
-                                                </div>
-                                            </div>
-                                            <textarea 
-                                                value={socialFields.personal_post_markdown}
-                                                onChange={(e) => setSocialFields({...socialFields, personal_post_markdown: e.target.value})}
-                                                placeholder={`[FOUNDER REFLECTION] — Personal take on this chapter's discovery...\n\n[BEHIND-THE-SCENES] — Observation from the field or research process...\n\n[LEARNING NOTE] — Quick takeaway for fellow learners...\n\n[SOFT CTA] — Invite to follow the journey...`}
-                                                className="w-full bg-theme-input border border-theme-border rounded-[32px] p-8 text-base text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[400px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 scrollbar-theme"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        {/* Short Caption */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-amber-50 dark:bg-amber-950/30 rounded-2xl flex items-center justify-center">
-                                                    <MessageCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                                                </div>
-                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900 dark:text-slate-100">Short Caption</h3>
-                                            </div>
-                                            <textarea 
-                                                value={socialFields.social_caption}
-                                                onChange={(e) => setSocialFields({...socialFields, social_caption: e.target.value})}
-                                                placeholder="Short teaser for IG/TikTok/Stories..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-[24px] p-6 text-sm text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20"
-                                            />
-                                        </div>
-
-                                        {/* Hashtags */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-blue-50 dark:bg-blue-950/30 rounded-2xl flex items-center justify-center">
-                                                    <Hash className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                                                </div>
-                                                <h3 className="text-sm font-black uppercase tracking-widest text-neutral-900 dark:text-slate-100">Hashtags</h3>
-                                            </div>
-                                            <textarea 
-                                                value={socialFields.hashtags}
-                                                onChange={(e) => setSocialFields({...socialFields, hashtags: e.target.value})}
-                                                placeholder="#topic #insight #plantlife #greenfineness..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-[24px] p-6 text-sm text-theme-primary font-mono leading-relaxed placeholder:text-theme-muted outline-none min-h-[150px] shadow-sm focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : activeSubTab === 'chapter' && blocks.length > 0 ? (
-                                <div className="max-w-4xl mx-auto space-y-16">
-                                    {blocks.map((block) => (
-                                        <div key={block.id} className="group relative">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="w-8 h-8 flex items-center justify-center bg-theme-panel border border-theme-border rounded-lg text-[10px] font-black text-theme-muted uppercase tracking-tight group-hover:text-theme-primary transition-all shadow-sm">
-                                                        {block.sort_order + 1}
-                                                    </span>
-                                                    <div>
-                                                        <label className="text-[11px] font-black uppercase tracking-[0.15em] text-neutral-400 dark:text-slate-500 group-focus-within:text-neutral-900 dark:group-focus-within:text-slate-100 transition-colors">
-                                                            {block.label}
-                                                        </label>
-                                                        {block.placeholder && (
-                                                            <p className="text-[8px] font-bold text-neutral-300 dark:text-slate-700 uppercase tracking-wider mt-0.5">
-                                                                {block.placeholder.length > 40 ? block.placeholder.substring(0, 40) + '...' : block.placeholder}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="relative">
-                                                {focusedBlockId === block.id && (
-                                                    <div className="absolute -top-12 left-0 right-0 flex items-center gap-1 bg-theme-card border border-theme-border rounded-xl p-1.5 shadow-xl z-20 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                                        <button 
-                                                            type="button"
-                                                            onMouseDown={(e) => e.preventDefault()}
-                                                            onClick={() => applyMarkdown(block.id, 'bold')}
-                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
-                                                            title="Bold (**text**)"
-                                                        >
-                                                            <Bold className="w-4 h-4" />
-                                                        </button>
-                                                        <button 
-                                                            type="button"
-                                                            onMouseDown={(e) => e.preventDefault()}
-                                                            onClick={() => applyMarkdown(block.id, 'italic')}
-                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
-                                                            title="Italic (*text*)"
-                                                        >
-                                                            <Italic className="w-4 h-4" />
-                                                        </button>
-                                                        <div className="w-px h-4 bg-theme-border mx-1" />
-                                                        <button 
-                                                            type="button"
-                                                            onMouseDown={(e) => e.preventDefault()}
-                                                            onClick={() => applyMarkdown(block.id, 'bullet')}
-                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
-                                                            title="Bullet List (- item)"
-                                                        >
-                                                            <List className="w-4 h-4" />
-                                                        </button>
-                                                        <button 
-                                                            type="button"
-                                                            onMouseDown={(e) => e.preventDefault()}
-                                                            onClick={() => applyMarkdown(block.id, 'number')}
-                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
-                                                            title="Numbered List (1. item)"
-                                                        >
-                                                            <ListOrdered className="w-4 h-4" />
-                                                        </button>
-                                                        <button 
-                                                            type="button"
-                                                            onMouseDown={(e) => e.preventDefault()}
-                                                            onClick={() => applyMarkdown(block.id, 'quote')}
-                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
-                                                            title="Quote (> text)"
-                                                        >
-                                                            <Quote className="w-4 h-4" />
-                                                        </button>
-                                                        <button 
-                                                            type="button"
-                                                            onMouseDown={(e) => e.preventDefault()}
-                                                            onClick={() => applyMarkdown(block.id, 'divider')}
-                                                            className="p-1.5 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
-                                                            title="Divider (---)"
-                                                        >
-                                                            <Minus className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                <textarea 
-                                                    id={`textarea-${block.id}`}
-                                                    value={block.content_md}
-                                                    onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                                                    onFocus={() => setFocusedBlockId(block.id)}
-                                                    onBlur={() => setTimeout(() => setFocusedBlockId(prev => prev === block.id ? null : prev), 200)}
-                                                    onPaste={(e) => handlePaste(e, block.id)}
-                                                    placeholder={block.placeholder || "Start writing here..."}
-                                                    className="w-full bg-theme-input border border-theme-border rounded-2xl p-6 text-lg text-theme-primary leading-relaxed placeholder:text-theme-muted outline-none resize-none focus:ring-4 focus:ring-theme-accent/5 focus:border-theme-accent/20 shadow-sm group-hover:shadow-md scrollbar-theme"
-                                                    style={{ height: 'auto', minHeight: '160px' }}
-                                                    onInput={(e) => {
-                                                        const target = e.target as HTMLTextAreaElement;
-                                                        target.style.height = 'auto';
-                                                        target.style.height = target.scrollHeight + 'px';
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                    
-                                    <div className="pt-24 pb-12 text-center">
-                                        <div className="w-12 h-1 bg-neutral-200 dark:bg-slate-800 mx-auto rounded-full mb-8" />
-                                        <p className="text-[10px] font-black text-neutral-300 dark:text-slate-700 uppercase tracking-[0.3em]">End of Narrative Structure</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
-                                    <div className="w-24 h-24 bg-theme-panel border border-theme-border rounded-[32px] flex items-center justify-center mb-8 shadow-sm">
-                                        <Layout className="w-10 h-10 text-neutral-200 dark:text-slate-800" />
-                                    </div>
-                                    <h3 className="text-2xl font-black text-neutral-900 dark:text-slate-100 mb-3">No blocks initialized</h3>
-                                    <p className="text-sm text-neutral-400 dark:text-slate-500 max-w-sm mx-auto mb-10 leading-relaxed">
-                                        This project needs a writing structure. Click below to initialize blocks for 
-                                        <span className="text-black dark:text-white font-bold mx-2 uppercase border-b-2 border-amber-400">{activeProject.writing_mode.replace(/_/g, ' ')}</span>.
-                                    </p>
-                                    <button 
-                                        onClick={handleInitialize}
-                                        className="px-10 py-4 bg-black dark:bg-slate-800 text-white dark:text-theme-primary rounded-2xl text-sm font-black border border-transparent dark:border-slate-700 hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-xl hover:shadow-black/20 flex items-center gap-3 transform hover:-translate-y-1"
-                                    >
-                                        <Zap className="w-5 h-5 text-amber-400" />
-                                        Initialize Narrative Blocks
-                                    </button>
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
-                ) : (
-                    <div className="bg-theme-card border border-theme-border rounded-[40px] p-16 shadow-sm flex-1 flex flex-col items-center justify-center text-center">
-                        <div className="w-28 h-28 bg-theme-panel rounded-[40px] flex items-center justify-center mb-8">
-                            <PenTool className="w-12 h-12 text-theme-muted" />
-                        </div>
-                        <h2 className="text-3xl font-black text-theme-primary mb-3">Writing Studio</h2>
-                        <p className="text-base text-theme-secondary max-w-sm mx-auto leading-relaxed">
-                            Every great story starts with a single word. Select a project to begin your journey.
-                        </p>
-                        <button 
-                            onClick={onCreateProject}
-                            className="mt-10 px-10 py-4 bg-black dark:bg-slate-800 text-white dark:text-theme-primary rounded-[24px] text-sm font-black border border-transparent dark:border-slate-700 hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-xl shadow-black/10 flex items-center gap-3 transform hover:-translate-y-1"
-                        >
-                            <Plus className="w-5 h-5" />
-                            Create Your First Project
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            {activeProject && (
-                <ToneModal 
-                    isOpen={isToneModalOpen}
-                    onClose={() => setIsToneModalOpen(false)}
-                    projectId={activeProject.id}
-                    initialData={{
-                        tone_profile: activeProject.tone_profile,
-                        web_voice_guideline: activeProject.web_voice_guideline,
-                        group_voice_guideline: activeProject.group_voice_guideline,
-                        page_voice_guideline: activeProject.page_voice_guideline,
-                        personal_voice_guideline: activeProject.personal_voice_guideline,
-                        claim_guardrail_note: activeProject.claim_guardrail_note
-                    }}
-                    onSuccess={onRefresh}
-                />
             )}
         </div>
     );

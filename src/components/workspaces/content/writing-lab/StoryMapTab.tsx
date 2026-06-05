@@ -8,10 +8,20 @@ interface StoryMapTabProps {
     storySets: any[];
     loading: boolean;
     onRefresh: () => void;
-    onCreateProject: (initialData: any) => void;
+    onSelectEpisode: (id: string) => void;
 }
 
-export default function StoryMapTab({ storySets, loading, onRefresh, onCreateProject }: StoryMapTabProps) {
+// Helper to format title to "07 — Title" if it doesn't already start with numbering
+const formatEpisodeTitle = (id: string, title: string) => {
+    if (/^\d+/.test(title)) return title;
+    const match = id.match(/E(\d+)$/i) || id.match(/(\d+)$/);
+    if (match) {
+        return `${match[1]} — ${title}`;
+    }
+    return title;
+};
+
+export default function StoryMapTab({ storySets, loading, onRefresh, onSelectEpisode }: StoryMapTabProps) {
     const [selectedStorySet, setSelectedStorySet] = useState<{ id: string; title: string; episodes: any[] } | null>(null);
     const [showArchived, setShowArchived] = useState(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -109,68 +119,54 @@ export default function StoryMapTab({ storySets, loading, onRefresh, onCreatePro
                                     {set.episodes
                                         .filter((ep: any) => showArchived ? true : ep.status !== 'archived')
                                         .map((ep: any) => (
-                                          <div key={ep.id} className="group/ep">
+                                          <div 
+                                            key={ep.id} 
+                                            className="group/ep"
+                                            onClick={() => onSelectEpisode(ep.id)}
+                                          >
                                               <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-theme-hover transition-colors cursor-pointer">
                                                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${ep.role === 'core_episode' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)] dark:shadow-[0_0_12px_rgba(52,211,153,0.1)]' : 'bg-blue-400 dark:bg-blue-500/80'}`} />
                                                  <div className="flex flex-col min-w-0 flex-1">
                                                       <span className={`text-xs font-bold truncate ${ep.role === 'core_episode' ? 'text-theme-primary' : 'text-theme-secondary'} ${ep.status === 'archived' ? 'opacity-50 italic' : ''}`}>
-                                                         {ep.title} {ep.status === 'archived' && "(Archived)"}
+                                                         {formatEpisodeTitle(ep.id, ep.title)} {ep.status === 'archived' && "(Archived)"}
                                                       </span>
                                                       {ep.role !== 'core_episode' && (
                                                          <span className="text-[9px] text-theme-muted uppercase font-black tracking-tight">{ep.role.replace(/_/g, ' ')}</span>
                                                       )}
                                                  </div>
                                                  <div className="flex items-center gap-2 opacity-0 group-hover/ep:opacity-100 transition-opacity relative">
-                                                    {ep.status !== 'archived' && (
-                                                         <button 
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onCreateProject({ 
-                                                                    story_set_id: set.id, 
-                                                                    episode_id: ep.id,
-                                                                    title: ep.title,
-                                                                    episode_role: ep.role,
-                                                                    journey_stage: ep.journey_stage
-                                                                });
-                                                            }}
-                                                             className="px-2 py-1 bg-black dark:bg-slate-800 text-white dark:text-theme-primary text-[9px] font-black uppercase rounded-lg border border-transparent dark:border-slate-700 hover:bg-neutral-800 dark:hover:bg-slate-700 transition-colors"
-                                                        >
-                                                            Start Project
-                                                        </button>
-                                                    )}
-                                                    
-                                                     <button 
-                                                         onClick={(e) => {
-                                                             e.stopPropagation();
-                                                             setActiveMenu(activeMenu === ep.id ? null : ep.id);
-                                                         }}
-                                                         className="p-1 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
-                                                     >
-                                                         <MoreVertical className="w-3.5 h-3.5" />
-                                                     </button>
+                                                      <button 
+                                                          onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              setActiveMenu(activeMenu === ep.id ? null : ep.id);
+                                                          }}
+                                                          className="p-1 hover:bg-theme-hover rounded-lg text-theme-muted hover:text-theme-primary transition-all"
+                                                      >
+                                                          <MoreVertical className="w-3.5 h-3.5" />
+                                                      </button>
 
                                                       {activeMenu === ep.id && (
-                                                         <div className="absolute right-0 top-8 z-20 bg-theme-card border border-theme-border rounded-xl shadow-xl p-1.5 min-w-[120px] animate-in fade-in zoom-in-95 duration-200">
-                                                             <button 
-                                                                 onClick={(e) => handleArchiveEpisode(e, ep.id, ep.status)}
-                                                                 className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover hover:text-theme-primary rounded-lg transition-all"
-                                                             >
-                                                                <Archive className="w-3 h-3" />
-                                                                {ep.status === 'archived' ? 'Restore' : 'Archive'}
-                                                            </button>
-                                                            <button 
-                                                                onClick={(e) => handleDeleteEpisode(e, ep.id)}
-                                                                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all"
-                                                            >
-                                                                <Trash2 className="w-3 h-3" />
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                                          <div className="absolute right-0 top-8 z-20 bg-theme-card border border-theme-border rounded-xl shadow-xl p-1.5 min-w-[120px] animate-in fade-in zoom-in-95 duration-200">
+                                                              <button 
+                                                                  onClick={(e) => handleArchiveEpisode(e, ep.id, ep.status)}
+                                                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover hover:text-theme-primary rounded-lg transition-all"
+                                                              >
+                                                                 <Archive className="w-3 h-3" />
+                                                                 {ep.status === 'archived' ? 'Restore' : 'Archive'}
+                                                              </button>
+                                                              <button 
+                                                                  onClick={(e) => handleDeleteEpisode(e, ep.id)}
+                                                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all"
+                                                              >
+                                                                  <Trash2 className="w-3 h-3" />
+                                                                  Delete
+                                                              </button>
+                                                          </div>
+                                                      )}
+                                                 </div>
+                                              </div>
+                                          </div>
+                                        ))}
                                 </div>
                             ) : (
                                 <div className="py-4 text-center">
@@ -192,9 +188,6 @@ export default function StoryMapTab({ storySets, loading, onRefresh, onCreatePro
                                 </div>
                                 <span className="text-[10px] font-bold text-neutral-400 dark:text-slate-500 uppercase tracking-tight">{set.episodes?.length || 0} Project Nodes</span>
                             </div>
-                            <button className="text-[10px] font-black text-neutral-900 dark:text-slate-200 uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
-                                View Map <ChevronRight className="w-3 h-3" />
-                            </button>
                         </div>
                     </div>
                 ))}

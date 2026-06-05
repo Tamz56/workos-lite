@@ -19,6 +19,7 @@ import {
     RefreshCw
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PageShell } from "@/components/layout/PageShell";
 import CreateGfArticleModal from "./CreateGfArticleModal";
 
@@ -193,6 +194,10 @@ function Badge({ children, color = "blue" }: { children: React.ReactNode, color?
 // --- Main Component ---
 
 export default function WritingDeskLiteClient() {
+    const sp = useSearchParams();
+    const draftIdFromUrl = sp.get("draft_id");
+    const [isAdvancedMetaOpen, setIsAdvancedMetaOpen] = useState(false);
+
     const [drafts, setDrafts] = useState<Draft[]>([]);
     const [activeDraft, setActiveDraft] = useState<Draft | null>(null);
     const [review, setReview] = useState<ReviewResult | null>(null);
@@ -222,12 +227,24 @@ export default function WritingDeskLiteClient() {
             const res = await fetch("/api/content/writing-desk/drafts");
             const data = await res.json();
             setDrafts(data);
+            
+            // Set active draft if draft_id is in URL
+            if (draftIdFromUrl && data.length > 0) {
+                const found = data.find((d: any) => d.id === draftIdFromUrl);
+                if (found) {
+                    setActiveDraft(found);
+                } else {
+                    setActiveDraft(data[0]);
+                }
+            } else if (data.length > 0 && !activeDraft) {
+                setActiveDraft(data[0]);
+            }
         } catch (err) {
             console.error("Failed to fetch drafts", err);
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [draftIdFromUrl]);
 
     useEffect(() => {
         fetchDrafts();
@@ -944,7 +961,7 @@ priority: medium
                                 <ArrowLeft size={20} />
                             </Link>
                             <div>
-                                <h1 className="text-xl font-black tracking-tight text-theme-primary">Writing Desk Lite</h1>
+                                <h1 className="text-xl font-black tracking-tight text-theme-primary">Write</h1>
                                 <p className="text-[10px] font-bold text-theme-muted uppercase tracking-widest">Phase 1: Workflow Foundation</p>
                             </div>
                         </div>
@@ -1074,7 +1091,7 @@ priority: medium
                             <h2 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Context</h2>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Topic ID</label>
+                                    <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Project (Topic ID)</label>
                                     <input 
                                         value={activeDraft.topic_id || ""}
                                         onChange={e => {
@@ -1086,7 +1103,7 @@ priority: medium
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Content Type</label>
+                                    <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Document Type</label>
                                     <select 
                                         value={activeDraft.content_type}
                                         onChange={e => {
@@ -1103,7 +1120,7 @@ priority: medium
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Draft Stage</label>
+                                    <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Status</label>
                                     <select 
                                         value={activeDraft.draft_stage}
                                         onChange={e => {
@@ -1119,40 +1136,59 @@ priority: medium
                                         ))}
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Writing Mode</label>
-                                    <select 
-                                        value={activeDraft.writing_mode}
-                                        onChange={e => {
-                                            setActiveDraft({...activeDraft, writing_mode: e.target.value as WritingMode});
-                                            setSaveStatus('unsaved');
-                                        }}
-                                        className="w-full bg-theme-input border border-theme-border rounded-lg px-2 py-1.5 text-xs font-bold mt-1 outline-none"
+
+                                {/* Advanced Collapsible Section */}
+                                <div className="pt-2 border-t border-theme-border/50">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAdvancedMetaOpen(!isAdvancedMetaOpen)}
+                                        className="w-full flex items-center justify-between text-[10px] font-black uppercase text-theme-muted py-1"
                                     >
-                                        {WRITING_MODES.map(t => (
-                                            <option key={t} value={t}>
-                                                {t.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Source Step</label>
-                                    <select 
-                                        value={activeDraft.source_step || ""}
-                                        onChange={e => {
-                                            setActiveDraft({...activeDraft, source_step: (e.target.value || null) as SourceStep | null});
-                                            setSaveStatus('unsaved');
-                                        }}
-                                        className="w-full bg-theme-input border border-theme-border rounded-lg px-2 py-1.5 text-xs font-bold mt-1 outline-none"
-                                    >
-                                        <option value="">(None)</option>
-                                        {SOURCE_STEPS.map(t => (
-                                            <option key={t} value={t}>
-                                                {SOURCE_STEP_LABELS[t]}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <span>Advanced Metadata</span>
+                                        <span className="text-[10px] font-bold">
+                                            {isAdvancedMetaOpen ? "▲" : "▼"}
+                                        </span>
+                                    </button>
+                                    
+                                    {isAdvancedMetaOpen && (
+                                        <div className="space-y-3 mt-3 animate-fadeIn">
+                                            <div>
+                                                <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Advanced: Template Flow</label>
+                                                <select 
+                                                    value={activeDraft.writing_mode}
+                                                    onChange={e => {
+                                                        setActiveDraft({...activeDraft, writing_mode: e.target.value as WritingMode});
+                                                        setSaveStatus('unsaved');
+                                                    }}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-lg px-2 py-1.5 text-xs font-bold mt-1 outline-none"
+                                                >
+                                                    {WRITING_MODES.map(t => (
+                                                        <option key={t} value={t}>
+                                                            {t.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black uppercase text-theme-muted ml-1">Advanced: Source Step</label>
+                                                <select 
+                                                    value={activeDraft.source_step || ""}
+                                                    onChange={e => {
+                                                        setActiveDraft({...activeDraft, source_step: (e.target.value || null) as SourceStep | null});
+                                                        setSaveStatus('unsaved');
+                                                    }}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-lg px-2 py-1.5 text-xs font-bold mt-1 outline-none"
+                                                >
+                                                    <option value="">(None)</option>
+                                                    {SOURCE_STEPS.map(t => (
+                                                        <option key={t} value={t}>
+                                                            {SOURCE_STEP_LABELS[t]}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1249,8 +1285,8 @@ priority: medium
                                                     <span className="text-[9px] font-black uppercase text-theme-muted tracking-wider">Save to (บันทึกไปยัง)</span>
                                                     <div className="flex flex-wrap gap-1 bg-theme-input p-1 rounded-xl border border-theme-border">
                                                         {[
-                                                            { id: 'summary', label: 'Summary / Checkpoint' },
-                                                            { id: 'notes', label: 'Task Notes' },
+                                                            { id: 'summary', label: 'Notes / Task Notes' },
+                                                            { id: 'notes', label: 'Task Notes Details' },
                                                             { id: 'main_doc', label: 'Task Main Doc' },
                                                             { id: 'section', label: 'Specific Section' },
                                                             { id: 'new_doc', label: 'New Linked Doc' }
@@ -1317,7 +1353,7 @@ priority: medium
                                                 <span className="text-[9px] font-medium text-theme-muted italic">
                                                     {saveDestination === 'main_doc' && '💡 บันทึกเข้าสู่ Primary Document หลักที่เชื่อมโยงกับ Task'}
                                                     {saveDestination === 'new_doc' && '💡 สร้างเอกสารใหม่และลิงก์ประวัติอ้างอิงไว้ใน Task'}
-                                                    {saveDestination === 'summary' && '💡 บันทึกเข้าไปยัง Task Description ด้านบนสุดโดยเว้นระยะ Checklist ด้านล่าง'}
+                                                    {saveDestination === 'summary' && '💡 บันทึกเข้าไปยัง Notes / Task Notes ด้านบนสุดโดยเว้นระยะ Checklist ด้านล่าง'}
                                                     {saveDestination === 'notes' && saveMode === 'replace_all' && '⚠️ คำเตือน: โหมดเขียนทับ Notes ทั้งหมด จะแทนที่คำบรรยายเดิมของ Task'}
                                                     {saveDestination === 'notes' && saveMode === 'append' && '💡 เพิ่มข้อมูลต่อท้าย Task Notes ทั้งก้อนแบบเรียงลำดับเวลา'}
                                                     {saveDestination === 'section' && '💡 ค้นหา ## หัวข้อ และแทนที่เฉพาะเนื้อหานั้นๆ'}
@@ -1497,7 +1533,7 @@ priority: medium
                             
                             <p className="text-xs font-bold text-theme-secondary leading-relaxed">
                                 คุณแน่ใจหรือไม่ว่าต้องการ <span className="text-red-600 font-black">เขียนทับ (Replace)</span> เนื้อหาทั้งหมดในส่วนปลายทางที่เลือก? 
-                                การดำเนินการนี้จะเขียนทับข้อมูลคำบรรยายเดิมของ Task และไม่สามารถกู้คืนได้ (แต่ Checklist/Subtasks จะไม่ถูกลบหากเลือกปลายทางเป็น Summary / Checkpoint)
+                                การดำเนินการนี้จะเขียนทับข้อมูลคำบรรยายเดิมของ Task และไม่สามารถกู้คืนได้ (แต่ Checklist/Subtasks จะไม่ถูกลบหากเลือกปลายทางเป็น Notes / Task Notes)
                             </p>
 
                             <div className="flex gap-3">

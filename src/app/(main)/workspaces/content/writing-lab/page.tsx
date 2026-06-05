@@ -1,30 +1,38 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { 
     Map, 
     Library, 
     PenTool, 
     RefreshCcw, 
-    Plus
+    Plus,
+    List
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Toast } from "@/components/ui/Toast";
 
 // Components
 import StoryMapTab from "@/components/workspaces/content/writing-lab/StoryMapTab";
+import EpisodeBacklogTab from "@/components/workspaces/content/writing-lab/EpisodeBacklogTab";
 import ContentLibraryTab from "@/components/workspaces/content/writing-lab/ContentLibraryTab";
 import WritingStudioTab from "@/components/workspaces/content/writing-lab/WritingStudioTab";
 import CreateProjectModal from "@/components/workspaces/content/writing-lab/CreateProjectModal";
 
-type TabKey = "story-map" | "content-library" | "writing-studio";
+type TabKey = "story-map" | "episode-backlog" | "writing-studio" | "content-library";
 
-export default function WritingLabPage() {
+function WritingLabContent() {
+    const searchParams = useSearchParams();
+    const projectIdParam = searchParams.get("project_id");
+    const episodeIdParam = searchParams.get("episode_id");
+
     const [activeTab, setActiveTab] = useState<TabKey>("story-map");
     const [loading, setLoading] = useState(true);
     const [seeding, setSeeding] = useState(false);
     const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
     const [projectInitialData, setProjectInitialData] = useState<any>(null);
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+    const [selectedEpisodeId, setSelectedEpisodeId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ isVisible: boolean; message: string }>({ isVisible: false, message: "" });
     
     const [storySets, setStorySets] = useState<any[]>([]);
@@ -38,8 +46,14 @@ export default function WritingLabPage() {
                 fetch("/api/content/writing-lab/projects", { cache: 'no-store' })
             ]);
             
-            if (ssRes.ok) setStorySets(await ssRes.json());
-            if (pRes.ok) setProjects(await pRes.json());
+            if (ssRes.ok) {
+                const ssData = await ssRes.json();
+                setStorySets(ssData);
+            }
+            if (pRes.ok) {
+                const pData = await pRes.json();
+                setProjects(pData);
+            }
         } catch (error) {
             console.error("Failed to fetch Lab data", error);
         } finally {
@@ -50,6 +64,25 @@ export default function WritingLabPage() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // Handle deep links from URL search parameters
+    useEffect(() => {
+        if (projects.length > 0) {
+            if (episodeIdParam) {
+                setSelectedEpisodeId(episodeIdParam);
+                setActiveTab("writing-studio");
+            } else if (projectIdParam) {
+                const proj = projects.find(p => p.id === projectIdParam);
+                if (proj && proj.episode_id) {
+                    setSelectedEpisodeId(proj.episode_id);
+                } else {
+                    setSelectedProjectId(projectIdParam);
+                    setSelectedEpisodeId(null);
+                }
+                setActiveTab("writing-studio");
+            }
+        }
+    }, [projectIdParam, episodeIdParam, projects]);
 
     const handleSeed = async () => {
         setSeeding(true);
@@ -78,7 +111,19 @@ export default function WritingLabPage() {
     };
 
     const handleSelectProject = (id: string) => {
-        setSelectedProjectId(id);
+        const proj = projects.find(p => p.id === id);
+        if (proj && proj.episode_id) {
+            setSelectedEpisodeId(proj.episode_id);
+        } else {
+            setSelectedProjectId(id);
+            setSelectedEpisodeId(null);
+        }
+        setActiveTab("writing-studio");
+    };
+
+    const handleSelectEpisode = (id: string) => {
+        setSelectedEpisodeId(id);
+        setSelectedProjectId(null);
         setActiveTab("writing-studio");
     };
 
@@ -122,11 +167,11 @@ export default function WritingLabPage() {
                     Story Map
                 </button>
                 <button 
-                    onClick={() => setActiveTab("content-library")}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "content-library" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
+                    onClick={() => setActiveTab("episode-backlog")}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "episode-backlog" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
                 >
-                    <Library className="w-4 h-4" />
-                    Content Library
+                    <List className="w-4 h-4" />
+                    Episode Backlog
                 </button>
                 <button 
                     onClick={() => setActiveTab("writing-studio")}
@@ -134,6 +179,13 @@ export default function WritingLabPage() {
                 >
                     <PenTool className="w-4 h-4" />
                     Writing Studio
+                </button>
+                <button 
+                    onClick={() => setActiveTab("content-library")}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "content-library" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
+                >
+                    <Library className="w-4 h-4" />
+                    Content Library
                 </button>
             </div>
 
@@ -144,16 +196,33 @@ export default function WritingLabPage() {
                         storySets={storySets} 
                         loading={loading} 
                         onRefresh={fetchData} 
-                        onCreateProject={handleOpenCreateProject}
+                        onSelectEpisode={handleSelectEpisode}
                     />
                 )}
-                {activeTab === "content-library" && <ContentLibraryTab projects={projects} loading={loading} onSelectProject={handleSelectProject} onRefresh={fetchData} />}
+                {activeTab === "episode-backlog" && (
+                    <EpisodeBacklogTab 
+                        storySets={storySets} 
+                        loading={loading} 
+                        onSelectEpisode={handleSelectEpisode}
+                    />
+                )}
+                {activeTab === "content-library" && (
+                    <ContentLibraryTab 
+                        projects={projects} 
+                        loading={loading} 
+                        onSelectProject={handleSelectProject} 
+                        onRefresh={fetchData} 
+                    />
+                )}
                 {activeTab === "writing-studio" && (
                     <WritingStudioTab 
-                        projectId={selectedProjectId} 
+                        projectId={selectedProjectId}
+                        episodeId={selectedEpisodeId} 
                         projects={projects} 
+                        storySets={storySets}
                         onCreateProject={() => handleOpenCreateProject()}
-                        onSelectProject={setSelectedProjectId}
+                        onSelectProject={handleSelectProject}
+                        onSelectEpisode={handleSelectEpisode}
                         onRefresh={fetchData}
                     />
                 )}
@@ -173,5 +242,13 @@ export default function WritingLabPage() {
                 onClose={() => setToast({ ...toast, isVisible: false })} 
             />
         </div>
+    );
+}
+
+export default function WritingLabPage() {
+    return (
+        <Suspense fallback={<div className="p-8 text-neutral-400">Loading Writing Lab...</div>}>
+            <WritingLabContent />
+        </Suspense>
     );
 }
