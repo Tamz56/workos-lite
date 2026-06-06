@@ -161,7 +161,7 @@ const ACCENT_COLORS: Record<string, string> = {
   amber: "text-amber-400",
   indigo: "text-indigo-400",
   rose: "text-rose-400",
-  slate: "text-slate-400",
+  slate: "text-slate-300",
 };
 
 function getAccentColor(accent: string | undefined): string {
@@ -188,17 +188,17 @@ export function AstroGuideEthicsPanel({
       {/* 1. Quick Start Guide                                            */}
       {/* ---------------------------------------------------------------- */}
       {showQuickStart && (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-2.5">
+        <div className="bg-slate-900/70 border border-slate-700 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-700 pb-2.5">
             <Compass className="w-4.5 h-4.5 text-indigo-400" />
             <h3 className="font-semibold text-sm text-slate-100">
               คู่มือการใช้งานด่วน (Quick Start Guide)
             </h3>
           </div>
-          <div className="text-xs text-slate-350 space-y-3 leading-relaxed">
+          <div className="text-xs text-slate-200 space-y-3 leading-relaxed">
             {quickStartItems.map((item, idx) => (
               <div key={idx} className="flex gap-2">
-                <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-850 flex items-center justify-center font-bold text-indigo-300 text-[10px] flex-shrink-0">
+                <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-700 flex items-center justify-center font-bold text-indigo-300 text-[10px] flex-shrink-0">
                   {item.step}
                 </span>
                 <p>
@@ -213,7 +213,7 @@ export function AstroGuideEthicsPanel({
       {/* ---------------------------------------------------------------- */}
       {/* 2. Ethical Framing / คำแนะนำทางศีลธรรม                          */}
       {/* ---------------------------------------------------------------- */}
-      <div className="bg-gradient-to-r from-slate-955/40 to-slate-900/40 border border-slate-800 rounded-xl p-6 space-y-3">
+      <div className="bg-gradient-to-r from-slate-900/60 to-slate-900/70 border border-slate-700 rounded-xl p-6 space-y-3">
         <h4 className="text-sm font-semibold text-amber-250 tracking-wider uppercase flex items-center gap-2">
           <Shield className="w-4 h-4 text-amber-300" /> คำแนะนำทางศีลธรรม
         </h4>
@@ -225,7 +225,7 @@ export function AstroGuideEthicsPanel({
       {/* ---------------------------------------------------------------- */}
       {/* 3. Reflection Use Guidance                                      */}
       {/* ---------------------------------------------------------------- */}
-      <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 space-y-4">
+      <div className="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-6 space-y-4">
         <div className="space-y-1.5">
           <h4 className="text-sm font-bold text-slate-300 tracking-wider uppercase flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-violet-400" />
@@ -243,7 +243,7 @@ export function AstroGuideEthicsPanel({
       {disclaimerItems.map((item, idx) => (
         <div
           key={idx}
-          className="bg-slate-955/60 border border-slate-850 p-5 rounded-xl flex items-start gap-3"
+          className="bg-slate-955/65 border border-slate-700 p-5 rounded-xl flex items-start gap-3"
         >
           <Info
             className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getAccentColor(item.accent)}`}
@@ -254,7 +254,7 @@ export function AstroGuideEthicsPanel({
             >
               {item.title}
             </span>
-            <p className="text-sm text-slate-200 leading-relaxed">
+            <p className="text-sm text-slate-250 leading-relaxed">
               {item.body}
             </p>
           </div>
@@ -265,14 +265,14 @@ export function AstroGuideEthicsPanel({
       {/* 5. Personal Timing Guide Orientation                            */}
       {/* ---------------------------------------------------------------- */}
       {showTimingGuide && (
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-5">
-          <div className="border-b border-slate-800 pb-3 flex items-center gap-2">
+        <div className="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-6 sm:p-8 space-y-5">
+          <div className="border-b border-slate-700 pb-3 flex items-center gap-2">
             <Clock className="w-5 h-5 text-teal-400" />
             <div className="space-y-0.5">
               <h3 className="text-lg font-bold text-slate-100">
                 คู่มือแนวทางการจัดจังหวะเวลาส่วนบุคคล (Personal Timing Guide)
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-300">
                 วิธีบูรณาการมิติต่างๆ ของเวลาเพื่อการจัดระเบียบสมาธิและการฟื้นฟูอย่างมีประสิทธิภาพ
               </p>
             </div>
@@ -282,7 +282,7 @@ export function AstroGuideEthicsPanel({
             {timingGuideDimensions.map((dim, idx) => (
               <div
                 key={idx}
-                className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-2"
+                className="p-4 bg-slate-950/70 border border-slate-700 rounded-xl space-y-2"
               >
                 <span
                   className={`text-[10px] font-bold tracking-wider uppercase block ${getAccentColor(dim.accent)}`}
@@ -290,7 +290,7 @@ export function AstroGuideEthicsPanel({
                   {dim.label}
                 </span>
                 <h4 className="text-xs font-bold text-slate-200">{dim.heading}</h4>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <p className="text-[11px] text-slate-300 leading-relaxed">
                   {dim.description}
                 </p>
               </div>
@@ -298,8 +298,8 @@ export function AstroGuideEthicsPanel({
           </div>
 
           {/* Closing quote */}
-          <div className="bg-slate-950/20 border border-slate-850 p-4 rounded-xl text-center">
-            <p className="text-xs text-slate-400 leading-relaxed">
+          <div className="bg-slate-950/40 border border-slate-700 p-4 rounded-xl text-center">
+            <p className="text-xs text-slate-300 leading-relaxed">
               {closingQuote}
             </p>
           </div>
@@ -309,13 +309,13 @@ export function AstroGuideEthicsPanel({
       {/* ---------------------------------------------------------------- */}
       {/* Footer note                                                     */}
       {/* ---------------------------------------------------------------- */}
-      <div className="text-[10px] text-slate-400 leading-relaxed text-center">
+      <div className="text-[10px] text-slate-300 leading-relaxed text-center">
         คำแนะนำในส่วนนี้
-        <span className="text-slate-400"> ใช้เพื่อช่วยตั้งคำถาม</span>
+        <span className="text-slate-300"> ใช้เพื่อช่วยตั้งคำถาม</span>
         และจัดลำดับความสำคัญ
-        <span className="text-slate-400"> ไม่ใช่คำทำนาย</span>{" "}
-        <span className="text-slate-400">ไม่ใช่คำสั่ง</span> และ
-        <span className="text-slate-400">ไม่ควรใช้แทนข้อมูลจริง</span>
+        <span className="text-slate-300"> ไม่ใช่คำทำนาย</span>{" "}
+        <span className="text-slate-300">ไม่ใช่คำสั่ง</span> และ
+        <span className="text-slate-300">ไม่ควรใช้แทนข้อมูลจริง</span>
         หรือดุลยพินิจของตนเอง
       </div>
     </div>

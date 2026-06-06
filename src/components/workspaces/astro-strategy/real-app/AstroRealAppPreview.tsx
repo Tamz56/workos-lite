@@ -66,7 +66,7 @@ export function AstroRealAppPreview() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+          <div className="flex items-center gap-2 text-[10px] text-slate-300">
             <span className="px-2 py-0.5 rounded bg-violet-950/50 text-violet-300 border border-violet-400/20 font-bold">
               PREVIEW MODE
             </span>
@@ -78,7 +78,7 @@ export function AstroRealAppPreview() {
         {/* ---------------------------------------------------------------- */}
         {/* Tab Navigation                                                  */}
         {/* ---------------------------------------------------------------- */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-1.5 flex flex-wrap gap-1">
+        <div className="bg-slate-900/70 border border-slate-700/80 rounded-xl p-1.5 flex flex-wrap gap-1">
           {TAB_ITEMS.map((tab) => (
             <button
               key={tab.id}
@@ -96,7 +96,9 @@ export function AstroRealAppPreview() {
               title={tab.description}
             >
               <span>{tab.label}</span>
-              <span className="hidden sm:inline text-[10px] text-slate-400 font-normal">
+              <span className={`hidden sm:inline text-[10px] font-normal ${
+                activeTab === tab.id ? "text-violet-350" : "text-slate-400"
+              }`}>
                 {tab.description}
               </span>
             </button>
@@ -117,11 +119,11 @@ export function AstroRealAppPreview() {
         {/* ---------------------------------------------------------------- */}
         {/* Preview Footer                                                  */}
         {/* ---------------------------------------------------------------- */}
-        <div className="border-t border-slate-800/60 pt-4 text-center space-y-1">
-          <p className="text-[10px] text-slate-400">
+        <div className="border-t border-slate-700/60 pt-4 text-center space-y-1">
+          <p className="text-[10px] text-slate-300">
             Astro Strategy Lab — Real App Composition Preview (DEV-007)
           </p>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[10px] text-slate-400">
             คอมโพเนนต์ทั้งหมดใช้ข้อมูลจำลองเท่านั้น ยังไม่เชื่อมต่อ localStorage หรือระบบ persistence ใดๆ
           </p>
         </div>

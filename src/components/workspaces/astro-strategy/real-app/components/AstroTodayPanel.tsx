@@ -57,13 +57,13 @@ export function AstroTodayPanel({
   recoveryAnchorThaiMap = DEFAULT_RECOVERY_ANCHOR_MAP,
 }: AstroTodayPanelProps) {
   return (
-    <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-4 gap-2">
+    <div className="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-700/80 pb-4 gap-2">
         <div className="space-y-1">
           <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <Zap className="w-5 h-5 text-amber-400" /> Daily Timing Brief
           </h3>
-          <p className="text-sm text-slate-400 font-medium">สรุปจังหวะวันนี้ (ภาพรวมสำหรับใช้สะท้อนจังหวะงาน การใช้พลัง และการดูแลตนเองในวันนี้)</p>
+          <p className="text-sm text-slate-300 font-medium">สรุปจังหวะวันนี้ (ภาพรวมสำหรับใช้สะท้อนจังหวะงาน การใช้พลัง และการดูแลตนเองในวันนี้)</p>
         </div>
         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-950/40 text-amber-200 border border-amber-500/20 self-start sm:self-center">
           วันนี้ (Daily)
@@ -72,7 +72,7 @@ export function AstroTodayPanel({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Today's Mode & Strategic Direction */}
-        <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all sm:col-span-2">
+        <div className="bg-slate-950/70 border border-slate-700/80 p-6 rounded-xl space-y-3 hover:border-slate-650 transition-all sm:col-span-2">
           <div className="flex items-center gap-2 text-violet-300">
             <Compass className="w-5 h-5" />
             <h4 className="font-bold text-sm sm:text-base">Today’s Mode: {strategyMode}</h4>
@@ -83,7 +83,7 @@ export function AstroTodayPanel({
         </div>
 
         {/* Work Recommendation */}
-        <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+        <div className="bg-slate-950/70 border border-slate-700/80 p-6 rounded-xl space-y-3 hover:border-slate-650 transition-all">
           <div className="flex items-center gap-2 text-emerald-400">
             <CheckCircle className="w-5 h-5" />
             <h4 className="font-bold text-sm sm:text-base">คำแนะนำการทำงาน (Work Recommendation)</h4>
@@ -96,7 +96,7 @@ export function AstroTodayPanel({
         </div>
 
         {/* Risk Prevention */}
-        <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+        <div className="bg-slate-950/70 border border-slate-700/80 p-6 rounded-xl space-y-3 hover:border-slate-650 transition-all">
           <div className="flex items-center gap-2 text-rose-400">
             <ShieldAlert className="w-5 h-5" />
             <h4 className="font-bold text-sm sm:text-base">การคุมความเสี่ยง (Risk Prevention)</h4>
@@ -109,7 +109,7 @@ export function AstroTodayPanel({
         </div>
 
         {/* Recovery Anchor */}
-        <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+        <div className="bg-slate-950/70 border border-slate-700/80 p-6 rounded-xl space-y-3 hover:border-slate-650 transition-all">
           <div className="flex items-center gap-2 text-violet-300">
             <Activity className="w-5 h-5" />
             <h4 className="font-bold text-sm sm:text-base">สมอใจฟื้นฟู (Recovery Anchor)</h4>
@@ -122,7 +122,7 @@ export function AstroTodayPanel({
         </div>
 
         {/* Reflection Prompt */}
-        <div className="bg-slate-950/50 border border-slate-800/70 p-6 rounded-xl space-y-3 hover:border-slate-800 transition-all">
+        <div className="bg-slate-950/70 border border-slate-700/80 p-6 rounded-xl space-y-3 hover:border-slate-650 transition-all">
           <div className="flex items-center gap-2 text-amber-400">
             <MessageSquare className="w-5 h-5" />
             <h4 className="font-bold text-sm sm:text-base">คำถามสะท้อนคิด (Reflection Prompt)</h4>
@@ -133,7 +133,7 @@ export function AstroTodayPanel({
         </div>
       </div>
 
-      <div className="text-[11px] text-slate-400 border-t border-slate-800/60 pt-4 leading-normal">
+      <div className="text-[11px] text-slate-300 border-t border-slate-700/60 pt-4 leading-normal">
         *ข้อความนี้เป็น mock brief สำหรับการสะท้อนตนเองและวางแผนส่วนบุคคลเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา
       </div>
     </div>
