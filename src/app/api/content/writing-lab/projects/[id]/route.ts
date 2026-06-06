@@ -17,7 +17,14 @@ export async function PATCH(
       "social_caption", "hashtags",
       "tone_profile", "web_voice_guideline", "group_voice_guideline", 
       "page_voice_guideline", "personal_voice_guideline", "claim_guardrail_note",
-      "narrative_body", "knowledge_body"
+      "narrative_body", "knowledge_body",
+      "narrative_title", "narrative_slug", "narrative_hero_subtitle", "narrative_featured_image_url",
+      "narrative_short_summary", "narrative_meta_title", "narrative_meta_description", "narrative_keywords",
+      "narrative_schema_jsonld", "narrative_status", "narrative_editors_pick", "narrative_related_knowledge_article", "narrative_journey_stage",
+      "knowledge_title", "knowledge_slug", "knowledge_hero_subtitle", "knowledge_featured_image_url",
+      "knowledge_short_summary", "knowledge_meta_title", "knowledge_meta_description", "knowledge_keywords",
+      "knowledge_schema_jsonld", "knowledge_status", "knowledge_editors_pick", "knowledge_related_narrative_article",
+      "knowledge_primary_keyword", "knowledge_secondary_keywords", "knowledge_category"
     ];
 
     const updates: string[] = [];

@@ -31,6 +31,8 @@ interface WritingProject {
     story_set_id: string | null;
     episode_id: string | null;
     writing_mode: string;
+    episode_role: string | null;
+    journey_stage: string | null;
     status: string;
     summary: string | null;
     notes: string | null;
@@ -45,6 +47,34 @@ interface WritingProject {
     hashtags: string | null;
     narrative_body?: string | null;
     knowledge_body?: string | null;
+    narrative_title?: string | null;
+    narrative_slug?: string | null;
+    narrative_hero_subtitle?: string | null;
+    narrative_featured_image_url?: string | null;
+    narrative_short_summary?: string | null;
+    narrative_meta_title?: string | null;
+    narrative_meta_description?: string | null;
+    narrative_keywords?: string | null;
+    narrative_schema_jsonld?: string | null;
+    narrative_status?: string | null;
+    narrative_editors_pick?: number | null;
+    narrative_related_knowledge_article?: string | null;
+    narrative_journey_stage?: string | null;
+    knowledge_title?: string | null;
+    knowledge_slug?: string | null;
+    knowledge_hero_subtitle?: string | null;
+    knowledge_featured_image_url?: string | null;
+    knowledge_short_summary?: string | null;
+    knowledge_meta_title?: string | null;
+    knowledge_meta_description?: string | null;
+    knowledge_keywords?: string | null;
+    knowledge_schema_jsonld?: string | null;
+    knowledge_status?: string | null;
+    knowledge_editors_pick?: number | null;
+    knowledge_related_narrative_article?: string | null;
+    knowledge_primary_keyword?: string | null;
+    knowledge_secondary_keywords?: string | null;
+    knowledge_category?: string | null;
     updated_at: string;
 }
 
@@ -104,6 +134,41 @@ export default function WritingStudioTab({
     const [metaDescription, setMetaDescription] = useState("");
     const [keywords, setKeywords] = useState("");
 
+    // Horizontal tab selector
+    const [seoMode, setSeoMode] = useState<"narrative" | "knowledge">("narrative");
+
+    // Narrative SEO states
+    const [narrativeTitle, setNarrativeTitle] = useState("");
+    const [narrativeSlug, setNarrativeSlug] = useState("");
+    const [narrativeHeroSubtitle, setNarrativeHeroSubtitle] = useState("");
+    const [narrativeFeaturedImageUrl, setNarrativeFeaturedImageUrl] = useState("");
+    const [narrativeShortSummary, setNarrativeShortSummary] = useState("");
+    const [narrativeMetaTitle, setNarrativeMetaTitle] = useState("");
+    const [narrativeMetaDescription, setNarrativeMetaDescription] = useState("");
+    const [narrativeKeywords, setNarrativeKeywords] = useState("");
+    const [narrativeSchemaJsonld, setNarrativeSchemaJsonld] = useState("");
+    const [narrativeStatus, setNarrativeStatus] = useState("draft");
+    const [narrativeEditorsPick, setNarrativeEditorsPick] = useState<number>(0);
+    const [narrativeRelatedKnowledgeArticle, setNarrativeRelatedKnowledgeArticle] = useState("");
+    const [narrativeJourneyStage, setNarrativeJourneyStage] = useState("");
+
+    // Knowledge SEO states
+    const [knowledgeTitle, setKnowledgeTitle] = useState("");
+    const [knowledgeSlug, setKnowledgeSlug] = useState("");
+    const [knowledgeHeroSubtitle, setKnowledgeHeroSubtitle] = useState("");
+    const [knowledgeFeaturedImageUrl, setKnowledgeFeaturedImageUrl] = useState("");
+    const [knowledgeShortSummary, setKnowledgeShortSummary] = useState("");
+    const [knowledgeMetaTitle, setKnowledgeMetaTitle] = useState("");
+    const [knowledgeMetaDescription, setKnowledgeMetaDescription] = useState("");
+    const [knowledgeKeywords, setKnowledgeKeywords] = useState("");
+    const [knowledgeSchemaJsonld, setKnowledgeSchemaJsonld] = useState("");
+    const [knowledgeStatus, setKnowledgeStatus] = useState("draft");
+    const [knowledgeEditorsPick, setKnowledgeEditorsPick] = useState<number>(0);
+    const [knowledgeRelatedNarrativeArticle, setKnowledgeRelatedNarrativeArticle] = useState("");
+    const [knowledgePrimaryKeyword, setKnowledgePrimaryKeyword] = useState("");
+    const [knowledgeSecondaryKeywords, setKnowledgeSecondaryKeywords] = useState("");
+    const [knowledgeCategory, setKnowledgeCategory] = useState("");
+
     const [publishedUrl, setPublishedUrl] = useState("");
     const [campaignName, setCampaignName] = useState("");
 
@@ -135,28 +200,61 @@ export default function WritingStudioTab({
             setNarrativeBody(activeProject.narrative_body || "");
             setKnowledgeBody(activeProject.knowledge_body || "");
 
-            let heroSub = "";
+            let legacyHeroSub = "";
             let pubUrl = "";
             let campName = "";
             if (activeProject.notes) {
                 try {
                     const parsed = JSON.parse(activeProject.notes);
-                    heroSub = parsed.hero_subtitle || "";
+                    legacyHeroSub = parsed.hero_subtitle || "";
                     pubUrl = parsed.published_url || "";
                     campName = parsed.campaign_name || "";
                 } catch {
                     // notes is plain text
                 }
             }
-            setHeroSubtitle(heroSub);
+            setHeroSubtitle(legacyHeroSub);
             setPublishedUrl(pubUrl);
             setCampaignName(campName);
+
+            // Narrative fields fallback ONLY
+            setNarrativeTitle(activeProject.narrative_title || activeProject.title || "");
+            setNarrativeSlug(activeProject.narrative_slug || activeProject.slug || "");
+            setNarrativeHeroSubtitle(activeProject.narrative_hero_subtitle || legacyHeroSub);
+            setNarrativeFeaturedImageUrl(activeProject.narrative_featured_image_url || "");
+            setNarrativeShortSummary(activeProject.narrative_short_summary || activeProject.summary || "");
+            setNarrativeMetaTitle(activeProject.narrative_meta_title || activeProject.meta_title || "");
+            setNarrativeMetaDescription(activeProject.narrative_meta_description || activeProject.meta_description || "");
+            setNarrativeKeywords(activeProject.narrative_keywords || activeProject.keywords || "");
+            setNarrativeSchemaJsonld(activeProject.narrative_schema_jsonld || "");
+            setNarrativeStatus(activeProject.narrative_status || "draft");
+            setNarrativeEditorsPick(activeProject.narrative_editors_pick || 0);
+            setNarrativeRelatedKnowledgeArticle(activeProject.narrative_related_knowledge_article || "");
+            setNarrativeJourneyStage(activeProject.narrative_journey_stage || activeProject.journey_stage || "");
+
+            // Knowledge fields start empty unless explicit knowledge_* values exist
+            setKnowledgeTitle(activeProject.knowledge_title || "");
+            setKnowledgeSlug(activeProject.knowledge_slug || "");
+            setKnowledgeHeroSubtitle(activeProject.knowledge_hero_subtitle || "");
+            setKnowledgeFeaturedImageUrl(activeProject.knowledge_featured_image_url || "");
+            setKnowledgeShortSummary(activeProject.knowledge_short_summary || "");
+            setKnowledgeMetaTitle(activeProject.knowledge_meta_title || "");
+            setKnowledgeMetaDescription(activeProject.knowledge_meta_description || "");
+            setKnowledgeKeywords(activeProject.knowledge_keywords || "");
+            setKnowledgeSchemaJsonld(activeProject.knowledge_schema_jsonld || "");
+            setKnowledgeStatus(activeProject.knowledge_status || "draft");
+            setKnowledgeEditorsPick(activeProject.knowledge_editors_pick || 0);
+            setKnowledgeRelatedNarrativeArticle(activeProject.knowledge_related_narrative_article || "");
+            setKnowledgePrimaryKeyword(activeProject.knowledge_primary_keyword || "");
+            setKnowledgeSecondaryKeywords(activeProject.knowledge_secondary_keywords || "");
+            setKnowledgeCategory(activeProject.knowledge_category || "");
 
             setGroupUtm("");
             setPageUtm("");
             setPersonalUtm("");
             setReviewResult(null);
             setIsExpanded(false);
+            setSeoMode("narrative");
         }
     }, [activeProject]);
 
@@ -265,7 +363,39 @@ export default function WritingStudioTab({
                     notes: extraNotes,
                     status: activeProject.status,
                     narrative_body: narrativeBody,
-                    knowledge_body: knowledgeBody
+                    knowledge_body: knowledgeBody,
+
+                    // Narrative SEO
+                    narrative_title: narrativeTitle,
+                    narrative_slug: narrativeSlug,
+                    narrative_hero_subtitle: narrativeHeroSubtitle,
+                    narrative_featured_image_url: narrativeFeaturedImageUrl,
+                    narrative_short_summary: narrativeShortSummary,
+                    narrative_meta_title: narrativeMetaTitle,
+                    narrative_meta_description: narrativeMetaDescription,
+                    narrative_keywords: narrativeKeywords,
+                    narrative_schema_jsonld: narrativeSchemaJsonld,
+                    narrative_status: narrativeStatus,
+                    narrative_editors_pick: narrativeEditorsPick,
+                    narrative_related_knowledge_article: narrativeRelatedKnowledgeArticle,
+                    narrative_journey_stage: narrativeJourneyStage,
+
+                    // Knowledge SEO
+                    knowledge_title: knowledgeTitle,
+                    knowledge_slug: knowledgeSlug,
+                    knowledge_hero_subtitle: knowledgeHeroSubtitle,
+                    knowledge_featured_image_url: knowledgeFeaturedImageUrl,
+                    knowledge_short_summary: knowledgeShortSummary,
+                    knowledge_meta_title: knowledgeMetaTitle,
+                    knowledge_meta_description: knowledgeMetaDescription,
+                    knowledge_keywords: knowledgeKeywords,
+                    knowledge_schema_jsonld: knowledgeSchemaJsonld,
+                    knowledge_status: knowledgeStatus,
+                    knowledge_editors_pick: knowledgeEditorsPick,
+                    knowledge_related_narrative_article: knowledgeRelatedNarrativeArticle,
+                    knowledge_primary_keyword: knowledgePrimaryKeyword,
+                    knowledge_secondary_keywords: knowledgeSecondaryKeywords,
+                    knowledge_category: knowledgeCategory
                 })
             });
 
@@ -386,36 +516,61 @@ export default function WritingStudioTab({
 
     // Deterministic Generator from Article Body
     const handleGenerateSEO = () => {
-        const sourceText = narrativeBody || knowledgeBody || "";
-        if (!sourceText) return;
+        const isNarrative = seoMode === "narrative";
+        const sourceText = isNarrative ? narrativeBody : knowledgeBody;
         
+        if (!sourceText || sourceText.trim().length < 5) {
+            alert(isNarrative 
+                ? "เนื้อหา Narrative Article ยังว่างอยู่ ไม่สามารถใช้คำนวณฟิลด์อัตโนมัติได้" 
+                : "เนื้อหา Knowledge Article ยังว่างอยู่ ไม่สามารถใช้คำนวณฟิลด์อัตโนมัติได้"
+            );
+            return;
+        }
+
         // 1. Slug generator (lowercase Thai/English and hyphens)
         const cleanSlug = workingTitle
             .toLowerCase()
             .replace(/[^a-z0-9ก-๙\s-]/g, "")
             .trim()
             .replace(/\s+/g, "-");
-        setSlug(cleanSlug);
 
         // 2. Meta Title: uses working title directly
-        setMetaTitle(workingTitle);
+        const metaTitleVal = workingTitle;
 
         // 3. Hero Subtitle: first sentence of body
         const firstSentence = sourceText.split(/[.!?\n]/).find(s => s.trim().length > 5) || "";
-        setHeroSubtitle(firstSentence.trim());
+        const heroSubVal = firstSentence.trim();
 
         // 4. Short Summary: first 200 chars
         const summaryText = sourceText.replace(/[#*`>_-]/g, "").slice(0, 200);
-        setShortSummary(summaryText.trim() + (sourceText.length > 200 ? "..." : ""));
+        const shortSumVal = summaryText.trim() + (sourceText.length > 200 ? "..." : "");
 
         // 5. Meta Description: first 150 chars
         const descText = sourceText.replace(/[#*`>_-]/g, "").slice(0, 150);
-        setMetaDescription(descText.trim() + (sourceText.length > 150 ? "..." : ""));
+        const metaDescVal = descText.trim() + (sourceText.length > 150 ? "..." : "");
         
         // 6. Keywords: check common content pillars
         const commonWords = ["ดิน", "ปุ๋ย", "พืช", "อินทรียวัตถุ", "จุลินทรีย์", "ธาตุอาหาร", "ผลผลิต", "เกษตร"];
         const matchedKeywords = commonWords.filter(w => sourceText.includes(w));
-        setKeywords(matchedKeywords.join(", ") || "Green Fineness, เกษตรกรรม");
+        const keywordsVal = matchedKeywords.join(", ") || "Green Fineness, เกษตรกรรม";
+
+        if (isNarrative) {
+            setNarrativeTitle(workingTitle);
+            setNarrativeSlug(cleanSlug);
+            setNarrativeMetaTitle(metaTitleVal);
+            setNarrativeHeroSubtitle(heroSubVal);
+            setNarrativeShortSummary(shortSumVal);
+            setNarrativeMetaDescription(metaDescVal);
+            setNarrativeKeywords(keywordsVal);
+        } else {
+            setKnowledgeTitle(workingTitle);
+            setKnowledgeSlug(cleanSlug);
+            setKnowledgeMetaTitle(metaTitleVal);
+            setKnowledgeHeroSubtitle(heroSubVal);
+            setKnowledgeShortSummary(shortSumVal);
+            setKnowledgeMetaDescription(metaDescVal);
+            setKnowledgeKeywords(keywordsVal);
+        }
     };
 
     // Generate UTM parameters
@@ -972,87 +1127,388 @@ export default function WritingStudioTab({
                         {/* 3. SEO & Website Fields Panel */}
                         {subTab === "seo" && (
                             <div className="space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">SEO & Website Fields</h3>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-theme-border/40 pb-4">
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">SEO & Website Fields</h3>
+                                        {/* Mode Selector horizontal tab */}
+                                        <div className="flex items-center gap-1 bg-theme-panel p-1 rounded-xl border border-theme-border/40 w-fit">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSeoMode("narrative")}
+                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                                                    seoMode === "narrative" 
+                                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary shadow-sm" 
+                                                        : "text-theme-secondary hover:bg-theme-hover"
+                                                }`}
+                                            >
+                                                Narrative Article (เรื่องเล่า)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSeoMode("knowledge")}
+                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                                                    seoMode === "knowledge" 
+                                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary shadow-sm" 
+                                                        : "text-theme-secondary hover:bg-theme-hover"
+                                                }`}
+                                            >
+                                                Knowledge Article (ความรู้)
+                                            </button>
+                                        </div>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={handleGenerateSEO}
                                         disabled={!(narrativeBody || knowledgeBody)}
-                                        className="flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-theme-primary text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50"
+                                        className="flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-theme-primary text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50 h-fit"
                                     >
                                         <Wand2 className="w-3.5 h-3.5 text-blue-500" />
-                                        Generate from Article Body
+                                        Generate from Active Body
                                     </button>
                                 </div>
 
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Slug</label>
-                                            <input
-                                                type="text"
-                                                value={slug}
-                                                onChange={(e) => setSlug(e.target.value)}
-                                                placeholder="article-slug-here"
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
-                                            />
+                                    {seoMode === "narrative" ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Helper text */}
+                                            <div className="col-span-12 md:col-span-2 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-100/30 p-3.5 rounded-2xl">
+                                                <p className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300">
+                                                    💡 <strong>Narrative Mode:</strong> Plant Journey / story-driven article metadata (ดึงข้อมูลค่าเดิมเป็น Fallback เสมอ)
+                                                </p>
+                                            </div>
+
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Article Title</label>
+                                                <input
+                                                    type="text"
+                                                    value={narrativeTitle}
+                                                    onChange={(e) => setNarrativeTitle(e.target.value)}
+                                                    placeholder="ชื่อบทความเรื่องเล่า..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Slug</label>
+                                                <input
+                                                    type="text"
+                                                    value={narrativeSlug}
+                                                    onChange={(e) => setNarrativeSlug(e.target.value)}
+                                                    placeholder="narrative-article-slug"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Hero Subtitle</label>
+                                                <input
+                                                    type="text"
+                                                    value={narrativeHeroSubtitle}
+                                                    onChange={(e) => setNarrativeHeroSubtitle(e.target.value)}
+                                                    placeholder="คำโปรยรองบนเว็บ..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Featured Image URL</label>
+                                                <input
+                                                    type="text"
+                                                    value={narrativeFeaturedImageUrl}
+                                                    onChange={(e) => setNarrativeFeaturedImageUrl(e.target.value)}
+                                                    placeholder="https://greenfineness.com/images/..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Journey Stage</label>
+                                                <select
+                                                    value={narrativeJourneyStage}
+                                                    onChange={(e) => setNarrativeJourneyStage(e.target.value)}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80 appearance-none"
+                                                >
+                                                    <option value="">เลือก Journey Stage...</option>
+                                                    <option value="เมล็ดและสารอาหารสะสม">เมล็ดและสารอาหารสะสม</option>
+                                                    <option value="ต้นอ่อนเริ่มสร้างลำต้นและใบ">ต้นอ่อนเริ่มสร้างลำต้นและใบ</option>
+                                                    <option value="ระบบรากและการหาอาหาร">ระบบรากและการหาอาหาร</option>
+                                                    <option value="การเติบโตและการแตกกิ่งก้าน">การเติบโตและการแตกกิ่งก้าน</option>
+                                                    <option value="การออกดอกและผสมเกสร">การออกดอกและผสมเกสร</option>
+                                                    <option value="ผลผลิตและการสืบทอดสายพันธุ์">ผลผลิตและการสืบทอดสายพันธุ์</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Related Companion Article</label>
+                                                <select
+                                                    value={narrativeRelatedKnowledgeArticle}
+                                                    onChange={(e) => setNarrativeRelatedKnowledgeArticle(e.target.value)}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80 appearance-none"
+                                                >
+                                                    <option value="">เลือกบทความความรู้ประกอบ...</option>
+                                                    {allEpisodes.map(ep => (
+                                                        <option key={ep.id} value={ep.id}>{ep.title}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Status</label>
+                                                    <select
+                                                        value={narrativeStatus}
+                                                        onChange={(e) => setNarrativeStatus(e.target.value)}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80 appearance-none"
+                                                    >
+                                                        <option value="draft">Draft</option>
+                                                        <option value="website_draft">Website Draft</option>
+                                                        <option value="published">Published</option>
+                                                        <option value="archived">Archived</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-6">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="narrative-editors-pick"
+                                                        checked={narrativeEditorsPick === 1}
+                                                        onChange={(e) => setNarrativeEditorsPick(e.target.checked ? 1 : 0)}
+                                                        className="rounded border-theme-border text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                    />
+                                                    <label htmlFor="narrative-editors-pick" className="text-[10px] font-black uppercase text-theme-muted tracking-wider cursor-pointer select-none">Editor&apos;s Pick</label>
+                                                </div>
+                                            </div>
+
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Short Summary</label>
+                                                <textarea
+                                                    value={narrativeShortSummary}
+                                                    onChange={(e) => setNarrativeShortSummary(e.target.value)}
+                                                    placeholder="บทคัดย่อการเดินทางของพืช..."
+                                                    className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Meta Title</label>
+                                                <input
+                                                    type="text"
+                                                    value={narrativeMetaTitle}
+                                                    onChange={(e) => setNarrativeMetaTitle(e.target.value)}
+                                                    placeholder="SEO Meta Title..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Keywords</label>
+                                                <input
+                                                    type="text"
+                                                    value={narrativeKeywords}
+                                                    onChange={(e) => setNarrativeKeywords(e.target.value)}
+                                                    placeholder="คำสำคัญ (แยกด้วยจุลภาค)..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Meta Description</label>
+                                                <textarea
+                                                    value={narrativeMetaDescription}
+                                                    onChange={(e) => setNarrativeMetaDescription(e.target.value)}
+                                                    placeholder="SEO Meta Description..."
+                                                    className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1 font-mono">Schema / Custom JSON-LD (Large Area)</label>
+                                                <textarea
+                                                    value={narrativeSchemaJsonld}
+                                                    onChange={(e) => setNarrativeSchemaJsonld(e.target.value)}
+                                                    placeholder='{ "@context": "https://schema.org", "@type": "TechArticle", ... }'
+                                                    className="w-full min-h-[140px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-mono mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
                                         </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Helper text */}
+                                            <div className="col-span-12 md:col-span-2 bg-blue-50/40 dark:bg-blue-950/10 border border-blue-100/30 p-3.5 rounded-2xl">
+                                                <p className="text-[10px] font-bold text-blue-800 dark:text-blue-300">
+                                                    💡 <strong>Knowledge Mode:</strong> Library / Knowledge Companion article metadata (เริ่มว่างเป็นค่าตั้งต้น)
+                                                </p>
+                                            </div>
 
-                                        <div>
-                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Hero Subtitle</label>
-                                            <input
-                                                type="text"
-                                                value={heroSubtitle}
-                                                onChange={(e) => setHeroSubtitle(e.target.value)}
-                                                placeholder="Subheading below title..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
-                                            />
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Article Title</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgeTitle}
+                                                    onChange={(e) => setKnowledgeTitle(e.target.value)}
+                                                    placeholder="ชื่อบทความวิชาการ/สาระความรู้..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Slug</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgeSlug}
+                                                    onChange={(e) => setKnowledgeSlug(e.target.value)}
+                                                    placeholder="knowledge-article-slug"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Hero Subtitle</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgeHeroSubtitle}
+                                                    onChange={(e) => setKnowledgeHeroSubtitle(e.target.value)}
+                                                    placeholder="คำโปรยรองบทความความรู้..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Featured Image URL</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgeFeaturedImageUrl}
+                                                    onChange={(e) => setKnowledgeFeaturedImageUrl(e.target.value)}
+                                                    placeholder="https://greenfineness.com/images/..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Related Journey Chapter</label>
+                                                <select
+                                                    value={knowledgeRelatedNarrativeArticle}
+                                                    onChange={(e) => setKnowledgeRelatedNarrativeArticle(e.target.value)}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80 appearance-none"
+                                                >
+                                                    <option value="">เลือกบทความตอนหลัก (Journey Chapter)...</option>
+                                                    {allEpisodes.map(ep => (
+                                                        <option key={ep.id} value={ep.id}>{ep.title}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Primary Keyword</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgePrimaryKeyword}
+                                                    onChange={(e) => setKnowledgePrimaryKeyword(e.target.value)}
+                                                    placeholder="คีย์เวิร์ดหลัก..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Secondary Keywords</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgeSecondaryKeywords}
+                                                    onChange={(e) => setKnowledgeSecondaryKeywords(e.target.value)}
+                                                    placeholder="คีย์เวิร์ดรอง (แยกด้วยจุลภาค)..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Category</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgeCategory}
+                                                    onChange={(e) => setKnowledgeCategory(e.target.value)}
+                                                    placeholder="หมวดหมู่ความรู้..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Status</label>
+                                                    <select
+                                                        value={knowledgeStatus}
+                                                        onChange={(e) => setKnowledgeStatus(e.target.value)}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80 appearance-none"
+                                                    >
+                                                        <option value="draft">Draft</option>
+                                                        <option value="website_draft">Website Draft</option>
+                                                        <option value="published">Published</option>
+                                                        <option value="archived">Archived</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-6">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="knowledge-editors-pick"
+                                                        checked={knowledgeEditorsPick === 1}
+                                                        onChange={(e) => setKnowledgeEditorsPick(e.target.checked ? 1 : 0)}
+                                                        className="rounded border-theme-border text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                    />
+                                                    <label htmlFor="knowledge-editors-pick" className="text-[10px] font-black uppercase text-theme-muted tracking-wider cursor-pointer select-none">Editor&apos;s Pick</label>
+                                                </div>
+                                            </div>
+
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Short Summary</label>
+                                                <textarea
+                                                    value={knowledgeShortSummary}
+                                                    onChange={(e) => setKnowledgeShortSummary(e.target.value)}
+                                                    placeholder="สรุปย่อความรู้ประกอบ..."
+                                                    className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Meta Title</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgeMetaTitle}
+                                                    onChange={(e) => setKnowledgeMetaTitle(e.target.value)}
+                                                    placeholder="SEO Meta Title..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Keywords</label>
+                                                <input
+                                                    type="text"
+                                                    value={knowledgeKeywords}
+                                                    onChange={(e) => setKnowledgeKeywords(e.target.value)}
+                                                    placeholder="คำสำคัญ (แยกด้วยจุลภาค)..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Meta Description</label>
+                                                <textarea
+                                                    value={knowledgeMetaDescription}
+                                                    onChange={(e) => setKnowledgeMetaDescription(e.target.value)}
+                                                    placeholder="SEO Meta Description..."
+                                                    className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1 font-mono">Schema / Custom JSON-LD (Large Area)</label>
+                                                <textarea
+                                                    value={knowledgeSchemaJsonld}
+                                                    onChange={(e) => setKnowledgeSchemaJsonld(e.target.value)}
+                                                    placeholder='{ "@context": "https://schema.org", "@type": "NewsArticle", ... }'
+                                                    className="w-full min-h-[140px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-mono mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Short Summary</label>
-                                        <textarea
-                                            value={shortSummary}
-                                            onChange={(e) => setShortSummary(e.target.value)}
-                                            placeholder="บทคัดย่อ/ข้อมูลนำเรื่องเชิงลึก..."
-                                            className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Meta Title</label>
-                                            <input
-                                                type="text"
-                                                value={metaTitle}
-                                                onChange={(e) => setMetaTitle(e.target.value)}
-                                                placeholder="SEO Search result title..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Keywords</label>
-                                            <input
-                                                type="text"
-                                                value={keywords}
-                                                onChange={(e) => setKeywords(e.target.value)}
-                                                placeholder="Keywords separated by comma..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Meta Description</label>
-                                        <textarea
-                                            value={metaDescription}
-                                            onChange={(e) => setMetaDescription(e.target.value)}
-                                            placeholder="SEO Description shown on search results..."
-                                            className="w-full min-h-[80px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
-                                        />
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         )}

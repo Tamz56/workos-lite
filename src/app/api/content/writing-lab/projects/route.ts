@@ -59,7 +59,35 @@ export async function POST(req: Request) {
       claim_guardrail_note,
       attached_to,
       narrative_body,
-      knowledge_body
+      knowledge_body,
+      narrative_title,
+      narrative_slug,
+      narrative_hero_subtitle,
+      narrative_featured_image_url,
+      narrative_short_summary,
+      narrative_meta_title,
+      narrative_meta_description,
+      narrative_keywords,
+      narrative_schema_jsonld,
+      narrative_status,
+      narrative_editors_pick,
+      narrative_related_knowledge_article,
+      narrative_journey_stage,
+      knowledge_title,
+      knowledge_slug,
+      knowledge_hero_subtitle,
+      knowledge_featured_image_url,
+      knowledge_short_summary,
+      knowledge_meta_title,
+      knowledge_meta_description,
+      knowledge_keywords,
+      knowledge_schema_jsonld,
+      knowledge_status,
+      knowledge_editors_pick,
+      knowledge_related_narrative_article,
+      knowledge_primary_keyword,
+      knowledge_secondary_keywords,
+      knowledge_category
     } = body;
 
     db.prepare(`
@@ -71,9 +99,17 @@ export async function POST(req: Request) {
         group_post_markdown, page_post_markdown, personal_post_markdown,
         social_caption, hashtags,
         tone_profile, web_voice_guideline, group_voice_guideline, page_voice_guideline, personal_voice_guideline, claim_guardrail_note,
-        attached_to, narrative_body, knowledge_body, created_at, updated_at
+        attached_to, narrative_body, knowledge_body,
+        narrative_title, narrative_slug, narrative_hero_subtitle, narrative_featured_image_url,
+        narrative_short_summary, narrative_meta_title, narrative_meta_description, narrative_keywords,
+        narrative_schema_jsonld, narrative_status, narrative_editors_pick, narrative_related_knowledge_article, narrative_journey_stage,
+        knowledge_title, knowledge_slug, knowledge_hero_subtitle, knowledge_featured_image_url,
+        knowledge_short_summary, knowledge_meta_title, knowledge_meta_description, knowledge_keywords,
+        knowledge_schema_jsonld, knowledge_status, knowledge_editors_pick, knowledge_related_narrative_article,
+        knowledge_primary_keyword, knowledge_secondary_keywords, knowledge_category,
+        created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `).run(
       id, 
       topic_id || null, 
@@ -106,7 +142,35 @@ export async function POST(req: Request) {
       claim_guardrail_note || null,
       attached_to || null,
       narrative_body || null,
-      knowledge_body || null
+      knowledge_body || null,
+      narrative_title || null,
+      narrative_slug || null,
+      narrative_hero_subtitle || null,
+      narrative_featured_image_url || null,
+      narrative_short_summary || null,
+      narrative_meta_title || null,
+      narrative_meta_description || null,
+      narrative_keywords || null,
+      narrative_schema_jsonld || null,
+      narrative_status || 'draft',
+      narrative_editors_pick || 0,
+      narrative_related_knowledge_article || null,
+      narrative_journey_stage || null,
+      knowledge_title || null,
+      knowledge_slug || null,
+      knowledge_hero_subtitle || null,
+      knowledge_featured_image_url || null,
+      knowledge_short_summary || null,
+      knowledge_meta_title || null,
+      knowledge_meta_description || null,
+      knowledge_keywords || null,
+      knowledge_schema_jsonld || null,
+      knowledge_status || 'draft',
+      knowledge_editors_pick || 0,
+      knowledge_related_narrative_article || null,
+      knowledge_primary_keyword || null,
+      knowledge_secondary_keywords || null,
+      knowledge_category || null
     );
 
     return NextResponse.json({ id });
