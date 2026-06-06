@@ -43,3 +43,23 @@ npm run dev:             Already running, route accessible at /workspaces/astro-
 ## Status
 
 **PASSED** — additive route, lint clean, tsc clean, no behavior changes
+
+## Local Visual Smoke Test Update
+
+Status: Passed / Verified locally
+
+- Preview route opened successfully:
+  - `/workspaces/astro-strategy/real-app-preview`
+- Tab navigation works:
+  - Daily Timing Brief
+  - Reflection Log
+  - Reflection History
+  - Strategy Planning
+  - Guide & Ethics
+- Build: Passed / Verified locally
+- Lint: Passed with warnings / 0 errors
+
+Observed UI notes for DEV-009:
+- Some inactive tab labels and helper text have low contrast.
+- Some card text appears too faint against gray backgrounds.
+- Preview route is usable but should receive minor readability/layout fixes before deeper integration.
