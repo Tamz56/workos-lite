@@ -57,7 +57,9 @@ export async function POST(req: Request) {
       page_voice_guideline,
       personal_voice_guideline,
       claim_guardrail_note,
-      attached_to
+      attached_to,
+      narrative_body,
+      knowledge_body
     } = body;
 
     db.prepare(`
@@ -69,9 +71,9 @@ export async function POST(req: Request) {
         group_post_markdown, page_post_markdown, personal_post_markdown,
         social_caption, hashtags,
         tone_profile, web_voice_guideline, group_voice_guideline, page_voice_guideline, personal_voice_guideline, claim_guardrail_note,
-        attached_to, created_at, updated_at
+        attached_to, narrative_body, knowledge_body, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `).run(
       id, 
       topic_id || null, 
@@ -102,7 +104,9 @@ export async function POST(req: Request) {
       page_voice_guideline || null,
       personal_voice_guideline || null,
       claim_guardrail_note || null,
-      attached_to || null
+      attached_to || null,
+      narrative_body || null,
+      knowledge_body || null
     );
 
     return NextResponse.json({ id });

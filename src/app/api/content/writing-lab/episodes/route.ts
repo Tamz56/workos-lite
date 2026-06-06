@@ -101,9 +101,10 @@ export async function POST(req: Request) {
         VALUES (?, ?, ?, ?, 'journey_chapter', 'draft', '{}', datetime('now'), datetime('now'))
       `).run(projId, id, story_set_id, title);
 
-      // 3. Insert 5 default blocks
+      // 3. Insert 6 default blocks
       const blockTemplates = [
-        { label: "Article Body", placeholder: "เขียนเนื้อหาตอนหลักในรูปแบบ Markdown ที่นี่..." },
+        { label: "Narrative Article", placeholder: "เขียนเนื้อหาแบบเล่าเรื่องสำหรับ Plant Journey ที่นี่..." },
+        { label: "Knowledge Article", placeholder: "เขียนเนื้อหาเชิงลึก/ความรู้ประกอบที่นี่..." },
         { label: "Social Drafts", placeholder: "เขียนข้อความโซเชียลที่นี่..." },
         { label: "SEO & Website Fields", placeholder: "ระบุรายละเอียด SEO ที่นี่..." },
         { label: "UTM / Publish", placeholder: "กำหนดรายละเอียด UTM ที่นี่..." },

@@ -416,6 +416,8 @@ CREATE TABLE IF NOT EXISTS gf_writing_projects (
   internal_links_notes TEXT NULL,
   references_notes  TEXT NULL,
   attached_to       TEXT NULL, -- Topic ID or Task ID
+  narrative_body    TEXT NULL,
+  knowledge_body    TEXT NULL,
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE SET NULL,

@@ -43,6 +43,8 @@ interface WritingProject {
     personal_post_markdown: string | null;
     social_caption: string | null;
     hashtags: string | null;
+    narrative_body?: string | null;
+    knowledge_body?: string | null;
     updated_at: string;
 }
 
@@ -57,7 +59,7 @@ interface WritingStudioTabProps {
     onRefresh: () => void;
 }
 
-type SubTabKey = "body" | "social" | "seo" | "utm" | "review";
+type SubTabKey = "narrative" | "knowledge" | "social" | "seo" | "utm" | "review";
 
 export default function WritingStudioTab({ 
     projectId, 
@@ -77,8 +79,8 @@ export default function WritingStudioTab({
         .flatMap(set => (set.episodes || []).map((ep: any) => ({ ...ep, story_set_title: set.title })))
         .find(ep => ep.id === resolvedEpisodeId);
 
-    // States
-    const [subTab, setSubTab] = useState<SubTabKey>("body");
+        // States
+    const [subTab, setSubTab] = useState<SubTabKey>("narrative");
     const [isExpanded, setIsExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -87,7 +89,8 @@ export default function WritingStudioTab({
 
     // Form states
     const [workingTitle, setWorkingTitle] = useState("");
-    const [articleBodyMarkdown, setArticleBodyMarkdown] = useState("");
+    const [narrativeBody, setNarrativeBody] = useState("");
+    const [knowledgeBody, setKnowledgeBody] = useState("");
     const [facebookGroupPost, setFacebookGroupPost] = useState("");
     const [facebookPagePost, setFacebookPagePost] = useState("");
     const [personalPost, setPersonalPost] = useState("");
@@ -129,6 +132,8 @@ export default function WritingStudioTab({
             setPersonalPost(activeProject.personal_post_markdown || "");
             setShortCaption(activeProject.social_caption || "");
             setHashtags(activeProject.hashtags || "");
+            setNarrativeBody(activeProject.narrative_body || "");
+            setKnowledgeBody(activeProject.knowledge_body || "");
 
             let heroSub = "";
             let pubUrl = "";
@@ -166,16 +171,28 @@ export default function WritingStudioTab({
                     const data = await res.json();
                     if (Array.isArray(data) && data.length > 0) {
                         setLocalBlocks(data);
-                        // Check if multiple blocks have content, merge for single editor
-                        const withContent = data.filter((b: any) => b.content_md && b.content_md.trim() !== "");
-                        if (withContent.length > 1) {
-                            const merged = data.map((b: any) => b.content_md ? `## ${b.label}\n\n${b.content_md}` : "").filter(Boolean).join("\n\n");
-                            setArticleBodyMarkdown(merged);
-                        } else {
-                            setArticleBodyMarkdown(data[0].content_md || "");
+                        
+                        let initialNarrative = activeProject.narrative_body || "";
+                        let initialKnowledge = activeProject.knowledge_body || "";
+
+                        // Backward compatibility fallbacks
+                        if (!initialNarrative) {
+                            initialNarrative = data[0]?.content_md || "";
                         }
+                        if (!initialKnowledge) {
+                            const knowledgeBlock = data.find((b: any) => b.label === "Knowledge Article");
+                            if (knowledgeBlock) {
+                                initialKnowledge = knowledgeBlock.content_md || "";
+                            } else if (data.length > 1) {
+                                initialKnowledge = data[1]?.content_md || "";
+                            }
+                        }
+
+                        setNarrativeBody(initialNarrative);
+                        setKnowledgeBody(initialKnowledge);
                     } else {
-                        setArticleBodyMarkdown("");
+                        setNarrativeBody("");
+                        setKnowledgeBody("");
                         setLocalBlocks([]);
                     }
                 }
@@ -246,11 +263,13 @@ export default function WritingStudioTab({
                     social_caption: shortCaption,
                     hashtags: hashtags,
                     notes: extraNotes,
-                    status: activeProject.status
+                    status: activeProject.status,
+                    narrative_body: narrativeBody,
+                    knowledge_body: knowledgeBody
                 })
             });
 
-            // 2. Save blocks (Article Body goes into the first block)
+            // 2. Save blocks
             let blocksToSave = [...localBlocks];
             if (blocksToSave.length === 0) {
                 const initRes = await fetch(`/api/content/writing-lab/projects/${activeProject.id}/blocks`, {
@@ -262,10 +281,14 @@ export default function WritingStudioTab({
             }
 
             if (blocksToSave.length > 0) {
-                const updatedBlocks = blocksToSave.map((b, idx) => ({
-                    ...b,
-                    content_md: idx === 0 ? articleBodyMarkdown : ""
-                }));
+                const updatedBlocks = blocksToSave.map((b, idx) => {
+                    if (idx === 0) {
+                        return { ...b, content_md: narrativeBody };
+                    } else if (idx === 1) {
+                        return { ...b, content_md: knowledgeBody };
+                    }
+                    return b;
+                });
 
                 await fetch(`/api/content/writing-lab/projects/${activeProject.id}/blocks`, {
                     method: "PUT",
@@ -286,8 +309,12 @@ export default function WritingStudioTab({
     };
 
     // Helper for formatting Markdown utilities inside Article Body
-    const applyMarkdown = (type: 'bold' | 'italic' | 'bullet' | 'number' | 'quote' | 'divider') => {
-        const textarea = document.getElementById("article-body-textarea") as HTMLTextAreaElement;
+    const applyMarkdown = (
+        type: 'bold' | 'italic' | 'bullet' | 'number' | 'quote' | 'divider' | 'n_image' | 'source_note' | 'companion_links' | 'k_image' | 'references' | 'schema_notes',
+        target: 'narrative' | 'knowledge'
+    ) => {
+        const id = target === 'narrative' ? "narrative-body-textarea" : "knowledge-body-textarea";
+        const textarea = document.getElementById(id) as HTMLTextAreaElement;
         if (!textarea) return;
 
         textarea.focus();
@@ -317,11 +344,40 @@ export default function WritingStudioTab({
             case 'divider':
                 replacement = selection ? `\n---\n${selection}` : `\n---\n`;
                 break;
+            case 'n_image': {
+                const nMatches = text.match(/IMAGE_PLACEHOLDER: N0(\d)/g);
+                const nextN = nMatches ? Math.min(4, nMatches.length + 1) : 1;
+                replacement = `\n<!-- IMAGE_PLACEHOLDER: N0${nextN} [รายละเอียดภาพ] -->\n`;
+                break;
+            }
+            case 'source_note':
+                replacement = `\n> **บันทึกที่มา (Source Note):** [ระบุแหล่งที่มาและข้อมูลอ้างอิงตรงนี้]\n`;
+                break;
+            case 'companion_links':
+                replacement = `\n*อ่านความรู้ประกอบ:* [ชื่อบทความ](https://greenfineness.com/library/slug)\n`;
+                break;
+            case 'k_image': {
+                const kMatches = text.match(/IMAGE_PLACEHOLDER: K0(\d)/g);
+                const nextK = kMatches ? Math.min(4, kMatches.length + 1) : 1;
+                replacement = `\n<!-- IMAGE_PLACEHOLDER: K0${nextK} [รายละเอียดภาพ] -->\n`;
+                break;
+            }
+            case 'references':
+                replacement = `\n### เอกสารอ้างอิง (References)\n1. [ระบุแหล่งข้อมูลอ้างอิงหลักตรงนี้]\n`;
+                break;
+            case 'schema_notes':
+                replacement = `\n### บันทึกโครงสร้างข้อมูล (Schema Notes)\n- [ระบุหมายเหตุโครงสร้างข้อมูล/ตารางประกอบตรงนี้]\n`;
+                break;
         }
 
         const before = text.substring(0, start);
         const after = text.substring(end);
-        setArticleBodyMarkdown(before + replacement + after);
+        
+        if (target === 'narrative') {
+            setNarrativeBody(before + replacement + after);
+        } else {
+            setKnowledgeBody(before + replacement + after);
+        }
 
         setTimeout(() => {
             textarea.setSelectionRange(start + replacement.length, start + replacement.length);
@@ -330,7 +386,8 @@ export default function WritingStudioTab({
 
     // Deterministic Generator from Article Body
     const handleGenerateSEO = () => {
-        if (!articleBodyMarkdown) return;
+        const sourceText = narrativeBody || knowledgeBody || "";
+        if (!sourceText) return;
         
         // 1. Slug generator (lowercase Thai/English and hyphens)
         const cleanSlug = workingTitle
@@ -344,20 +401,20 @@ export default function WritingStudioTab({
         setMetaTitle(workingTitle);
 
         // 3. Hero Subtitle: first sentence of body
-        const firstSentence = articleBodyMarkdown.split(/[.!?\n]/).find(s => s.trim().length > 5) || "";
+        const firstSentence = sourceText.split(/[.!?\n]/).find(s => s.trim().length > 5) || "";
         setHeroSubtitle(firstSentence.trim());
 
         // 4. Short Summary: first 200 chars
-        const summaryText = articleBodyMarkdown.replace(/[#*`>_-]/g, "").slice(0, 200);
-        setShortSummary(summaryText.trim() + (articleBodyMarkdown.length > 200 ? "..." : ""));
+        const summaryText = sourceText.replace(/[#*`>_-]/g, "").slice(0, 200);
+        setShortSummary(summaryText.trim() + (sourceText.length > 200 ? "..." : ""));
 
         // 5. Meta Description: first 150 chars
-        const descText = articleBodyMarkdown.replace(/[#*`>_-]/g, "").slice(0, 150);
-        setMetaDescription(descText.trim() + (articleBodyMarkdown.length > 150 ? "..." : ""));
+        const descText = sourceText.replace(/[#*`>_-]/g, "").slice(0, 150);
+        setMetaDescription(descText.trim() + (sourceText.length > 150 ? "..." : ""));
         
         // 6. Keywords: check common content pillars
         const commonWords = ["ดิน", "ปุ๋ย", "พืช", "อินทรียวัตถุ", "จุลินทรีย์", "ธาตุอาหาร", "ผลผลิต", "เกษตร"];
-        const matchedKeywords = commonWords.filter(w => articleBodyMarkdown.includes(w));
+        const matchedKeywords = commonWords.filter(w => sourceText.includes(w));
         setKeywords(matchedKeywords.join(", ") || "Green Fineness, เกษตรกรรม");
     };
 
@@ -374,7 +431,8 @@ export default function WritingStudioTab({
 
     // Local Review Engine matching standard rules
     const handleRunArborReview = () => {
-        if (!articleBodyMarkdown) return;
+        const combinedText = `${narrativeBody}\n\n${knowledgeBody}`.trim();
+        if (!combinedText) return;
         setIsReviewing(true);
         setTimeout(() => {
             const hasPlaceholder = (text: string) => {
@@ -387,25 +445,25 @@ export default function WritingStudioTab({
                 return text.split('\n').map(l => l.trim()).filter(l => l.length > 0).slice(0, count).join(' ');
             };
 
-            const lines = articleBodyMarkdown.split('\n');
+            const lines = combinedText.split('\n');
             const h2Lines = lines.filter(l => l.trim().startsWith('## '));
             const hasHeadings = h2Lines.length > 0;
-            const opening = getFirstLines(articleBodyMarkdown, 4);
+            const opening = getFirstLines(combinedText, 4);
 
             const weakOpeningPatterns = ['ในบทความนี้', 'บทความนี้จะ', 'เราจะมาพูดถึง', 'วันนี้เราจะ', 'ในเนื้อหาสี้'];
             const hasWeakOpening = weakOpeningPatterns.some(p => opening.includes(p));
 
             const riskyPhrases = ['100%', 'ทุกกรณี', 'รักษาได้', 'รักษาโรค', 'แน่นอน 100', 'ป้องกันได้ 100', 'ไม่มีผลข้างเคียง', 'เพิ่มผลผลิตได้ถึง', 'ลดโรคได้ถึง'];
-            const foundRiskyClaims = riskyPhrases.filter(p => articleBodyMarkdown.includes(p));
+            const foundRiskyClaims = riskyPhrases.filter(p => combinedText.includes(p));
 
             const FORBIDDEN_PHRASES = [
                 'พูดง่ายๆ คือ', 'มันคือ', 'มันทำให้', 'มันไม่ได้', 'ไม่ได้แปลว่า',
                 'ให้เราเห็นว่า', 'นั่นคือ', 'มองให้ลึกลงไป', 'ง่ายๆ คือ',
                 'จะเห็นว่า', 'พูดถึง', 'นั่นก็คือ',
             ];
-            const flaggedPhrases = FORBIDDEN_PHRASES.filter(p => articleBodyMarkdown.includes(p));
+            const flaggedPhrases = FORBIDDEN_PHRASES.filter(p => combinedText.includes(p));
 
-            const isPlc = hasPlaceholder(articleBodyMarkdown);
+            const isPlc = hasPlaceholder(combinedText);
 
             const structured = {
                 reviewedContentType: "web_article",
@@ -638,18 +696,30 @@ export default function WritingStudioTab({
             ) : (
                 <div className="grid grid-cols-12 gap-8 items-start animate-fadeIn">
                     {/* Sub tabs navigation */}
-                    {!(isExpanded && subTab === "body") && (
+                    {!(isExpanded && (subTab === "narrative" || subTab === "knowledge")) && (
                         <div className="col-span-12 md:col-span-3 space-y-2">
                         <div className="bg-theme-card border border-theme-border rounded-[24px] p-3 shadow-sm flex flex-col gap-1">
                             <button
-                                onClick={() => setSubTab("body")}
+                                onClick={() => setSubTab("narrative")}
                                 className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
-                                    subTab === "body" 
+                                    subTab === "narrative" 
                                         ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
                                         : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
                                 }`}
                             >
-                                <span>Article Body</span>
+                                <span>Narrative Article</span>
+                                <FileText className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                                onClick={() => setSubTab("knowledge")}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                    subTab === "knowledge" 
+                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
+                                        : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                            >
+                                <span>Knowledge Article</span>
                                 <FileText className="w-3.5 h-3.5" />
                             </button>
                             
@@ -711,21 +781,28 @@ export default function WritingStudioTab({
                     )}
 
                     {/* Tab panels (Editor fields) */}
-                    <div className={`col-span-12 ${(isExpanded && subTab === "body") ? "" : "md:col-span-9"} bg-theme-card border border-theme-border rounded-[32px] p-5 md:p-6 shadow-sm min-h-[500px] transition-all duration-300`}>
+                    <div className={`col-span-12 ${(isExpanded && (subTab === "narrative" || subTab === "knowledge")) ? "" : "md:col-span-9"} bg-theme-card border border-theme-border rounded-[32px] p-5 md:p-6 shadow-sm min-h-[500px] transition-all duration-300`}>
                         
-                        {/* 1. Article Body Panel */}
-                        {subTab === "body" && (
+                        {/* 1. Narrative Article Panel */}
+                        {subTab === "narrative" && (
                             <div className="space-y-4 h-full flex flex-col">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">Article Body</h3>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">Narrative Article</h3>
+                                        <p className="text-[10px] font-bold text-theme-muted mt-0.5">Plant Journey / story-driven markdown body.</p>
+                                    </div>
                                     {/* Formatting toolbar */}
-                                    <div className="flex items-center gap-1.5 bg-theme-panel p-1 rounded-lg border border-theme-border/40">
-                                        <button onClick={() => applyMarkdown('bold')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Bold"><Bold size={13} /></button>
-                                        <button onClick={() => applyMarkdown('italic')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Italic"><Italic size={13} /></button>
-                                        <button onClick={() => applyMarkdown('bullet')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="-"> - </button>
-                                        <button onClick={() => applyMarkdown('number')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Numbered List"><ListOrdered size={13} /></button>
-                                        <button onClick={() => applyMarkdown('quote')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Quote"><Quote size={13} /></button>
-                                        <button onClick={() => applyMarkdown('divider')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Divider"><Minus size={13} /></button>
+                                    <div className="flex flex-wrap items-center gap-1.5 bg-theme-panel p-1 rounded-lg border border-theme-border/40">
+                                        <button onClick={() => applyMarkdown('bold', 'narrative')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Bold"><Bold size={13} /></button>
+                                        <button onClick={() => applyMarkdown('italic', 'narrative')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Italic"><Italic size={13} /></button>
+                                        <button onClick={() => applyMarkdown('bullet', 'narrative')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="-"> - </button>
+                                        <button onClick={() => applyMarkdown('number', 'narrative')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Numbered List"><ListOrdered size={13} /></button>
+                                        <button onClick={() => applyMarkdown('quote', 'narrative')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Quote"><Quote size={13} /></button>
+                                        <button onClick={() => applyMarkdown('divider', 'narrative')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Divider"><Minus size={13} /></button>
+                                        <div className="w-px h-4 bg-theme-border/60 mx-1" />
+                                        <button onClick={() => applyMarkdown('n_image', 'narrative')} className="px-2 py-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-theme-hover rounded border border-theme-border/30" title="Add N01-N04 placeholder">+ Image (N01-N04)</button>
+                                        <button onClick={() => applyMarkdown('source_note', 'narrative')} className="px-2 py-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-theme-hover rounded border border-theme-border/30" title="Add Source Note">+ Source Note</button>
+                                        <button onClick={() => applyMarkdown('companion_links', 'narrative')} className="px-2 py-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-theme-hover rounded border border-theme-border/30" title="Add Companion Link">+ Companion Link</button>
                                         <div className="w-px h-4 bg-theme-border/60 mx-1" />
                                         <button 
                                             type="button"
@@ -737,10 +814,50 @@ export default function WritingStudioTab({
                                     </div>
                                 </div>
                                 <textarea
-                                    id="article-body-textarea"
-                                    value={articleBodyMarkdown}
-                                    onChange={(e) => setArticleBodyMarkdown(e.target.value)}
+                                    id="narrative-body-textarea"
+                                    value={narrativeBody}
+                                    onChange={(e) => setNarrativeBody(e.target.value)}
                                     placeholder="เขียนเนื้อหาตอนหลักในรูปแบบ Markdown ที่นี่..."
+                                    className={`w-full ${isExpanded ? 'min-h-[75vh]' : 'min-h-[65vh]'} flex-1 bg-theme-input border border-theme-border rounded-2xl p-6 text-sm font-medium outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary leading-relaxed custom-scrollbar font-mono`}
+                                />
+                            </div>
+                        )}
+
+                        {/* 1.2 Knowledge Article Panel */}
+                        {subTab === "knowledge" && (
+                            <div className="space-y-4 h-full flex flex-col">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest">Knowledge Article</h3>
+                                        <p className="text-[10px] font-bold text-theme-muted mt-0.5">Library / Knowledge Companion article body.</p>
+                                    </div>
+                                    {/* Formatting toolbar */}
+                                    <div className="flex flex-wrap items-center gap-1.5 bg-theme-panel p-1 rounded-lg border border-theme-border/40">
+                                        <button onClick={() => applyMarkdown('bold', 'knowledge')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Bold"><Bold size={13} /></button>
+                                        <button onClick={() => applyMarkdown('italic', 'knowledge')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Italic"><Italic size={13} /></button>
+                                        <button onClick={() => applyMarkdown('bullet', 'knowledge')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="-"> - </button>
+                                        <button onClick={() => applyMarkdown('number', 'knowledge')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Numbered List"><ListOrdered size={13} /></button>
+                                        <button onClick={() => applyMarkdown('quote', 'knowledge')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Quote"><Quote size={13} /></button>
+                                        <button onClick={() => applyMarkdown('divider', 'knowledge')} className="p-1.5 hover:bg-theme-hover text-theme-secondary rounded" title="Divider"><Minus size={13} /></button>
+                                        <div className="w-px h-4 bg-theme-border/60 mx-1" />
+                                        <button onClick={() => applyMarkdown('k_image', 'knowledge')} className="px-2 py-1 text-[9px] font-bold text-blue-600 hover:bg-theme-hover rounded border border-theme-border/30" title="Add K01-K04 placeholder">+ Image (K01-K04)</button>
+                                        <button onClick={() => applyMarkdown('references', 'knowledge')} className="px-2 py-1 text-[9px] font-bold text-blue-600 hover:bg-theme-hover rounded border border-theme-border/30" title="Add References">+ References</button>
+                                        <button onClick={() => applyMarkdown('schema_notes', 'knowledge')} className="px-2 py-1 text-[9px] font-bold text-blue-600 hover:bg-theme-hover rounded border border-theme-border/30" title="Add Schema Notes">+ Schema Notes</button>
+                                        <div className="w-px h-4 bg-theme-border/60 mx-1" />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setIsExpanded(!isExpanded)}
+                                            className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-black dark:bg-slate-800 text-white dark:text-theme-primary hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all rounded-md flex items-center gap-1"
+                                        >
+                                            {isExpanded ? "Collapse" : "Expand"}
+                                        </button>
+                                    </div>
+                                </div>
+                                <textarea
+                                    id="knowledge-body-textarea"
+                                    value={knowledgeBody}
+                                    onChange={(e) => setKnowledgeBody(e.target.value)}
+                                    placeholder="เขียนเนื้อหาเชิงลึก/ความรู้ประกอบในรูปแบบ Markdown ที่นี่..."
                                     className={`w-full ${isExpanded ? 'min-h-[75vh]' : 'min-h-[65vh]'} flex-1 bg-theme-input border border-theme-border rounded-2xl p-6 text-sm font-medium outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary leading-relaxed custom-scrollbar font-mono`}
                                 />
                             </div>
@@ -860,7 +977,7 @@ export default function WritingStudioTab({
                                     <button
                                         type="button"
                                         onClick={handleGenerateSEO}
-                                        disabled={!articleBodyMarkdown}
+                                        disabled={!(narrativeBody || knowledgeBody)}
                                         className="flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-theme-primary text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50"
                                     >
                                         <Wand2 className="w-3.5 h-3.5 text-blue-500" />
@@ -1023,7 +1140,7 @@ export default function WritingStudioTab({
                                     <button
                                         type="button"
                                         onClick={handleRunArborReview}
-                                        disabled={isReviewing || !articleBodyMarkdown}
+                                        disabled={isReviewing || !(narrativeBody || knowledgeBody)}
                                         className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-blue-700 transition-all shadow-md shadow-blue-100 disabled:opacity-50"
                                     >
                                         {isReviewing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} 

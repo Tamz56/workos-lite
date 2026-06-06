@@ -931,6 +931,8 @@ function ensureArborWritingLab() {
           page_voice_guideline TEXT NULL,
           personal_voice_guideline TEXT NULL,
           claim_guardrail_note TEXT NULL,
+          narrative_body    TEXT NULL,
+          knowledge_body    TEXT NULL,
           created_at        TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
           FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE SET NULL,
@@ -1015,7 +1017,9 @@ function ensureArborWritingLab() {
         { name: 'group_voice_guideline', type: 'TEXT' },
         { name: 'page_voice_guideline', type: 'TEXT' },
         { name: 'personal_voice_guideline', type: 'TEXT' },
-        { name: 'claim_guardrail_note', type: 'TEXT' }
+        { name: 'claim_guardrail_note', type: 'TEXT' },
+        { name: 'narrative_body', type: 'TEXT' },
+        { name: 'knowledge_body', type: 'TEXT' }
     ];
 
     for (const col of additiveProjectCols) {

@@ -97,6 +97,8 @@ export interface WritingProject {
   personal_voice_guideline: string | null;
   claim_guardrail_note: string | null;
   attached_to: string | null;
+  narrative_body?: string | null;
+  knowledge_body?: string | null;
   created_at: string;
   updated_at: string;
 }
