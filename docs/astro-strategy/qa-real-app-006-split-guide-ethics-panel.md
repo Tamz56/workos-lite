@@ -57,3 +57,21 @@ npm run dev:             Already running, no compile errors observed
 ## Status
 
 **PASSED** — additive extraction, lint clean, tsc clean, no behavior changes
+
+## Local Verification Update
+
+Status: Passed / Verified locally
+
+- Lint: Passed with warnings / Verified locally
+  - `npm run lint`: 0 errors
+  - Existing warnings are not blocking this Guide & Ethics Panel extraction task
+- Build: Passed / Verified locally
+  - `npm run build`: Passed
+  - Verified at HEAD: `651cc3970af8f64785c89f5653afa7486b7830d1`
+
+Verification note:
+- This task is additive.
+- No route change.
+- No localStorage change.
+- No prototype behavior change.
+- No medical or spiritual certainty claims added.
