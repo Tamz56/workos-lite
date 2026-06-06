@@ -136,7 +136,7 @@ export function AstroReflectionPanel({
                 onChange={(e) => setText(e.target.value)}
                 placeholder="บันทึกความรู้สึก อุปสรรค และการเตรียมความพร้อมจริง เช่น โน้มน้าวตามคำชี้แนะได้ราบรื่น..."
                 rows={4}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-700 leading-relaxed"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-600 leading-relaxed"
               ></textarea>
             </div>
 
@@ -161,7 +161,7 @@ export function AstroReflectionPanel({
           <h4 className="text-xs font-bold text-slate-400 tracking-wider uppercase">ประวัติการบันทึก ({totalReflectionsCount} รายการ)</h4>
           <div className="py-12 border border-dashed border-slate-800 rounded-xl text-center text-slate-500 text-xs bg-slate-950/10 space-y-1.5">
             <p className="font-semibold text-slate-400">การแสดงรายการประวัติ (Reflection History)</p>
-            <p className="text-[10px] text-slate-600 max-w-[260px] mx-auto leading-relaxed">
+            <p className="text-[10px] text-slate-500 max-w-[260px] mx-auto leading-relaxed">
               โมดูลประวัติการสะท้อนคิดย้อนหลังและตัวกรองข้อมูลจะถูกดึงเข้าสู่คอมโพเนนต์หลักในขั้นตอนการปรับปรุงความปลอดภัยลำดับถัดไป (DEV-004)
             </p>
           </div>

@@ -61,12 +61,12 @@ export function AstroRealAppPreview() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight">
                 Astro Strategy Lab — Real App Preview
               </h1>
-              <p className="text-xs sm:text-sm text-slate-400 font-medium">
+              <p className="text-xs sm:text-sm text-slate-300 font-medium">
                 ตัวอย่างการประกอบคอมโพเนนต์แอปจริง (Composition Preview) — ยังไม่เชื่อมต่อข้อมูลจริง
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-slate-500">
+          <div className="flex items-center gap-2 text-[10px] text-slate-400">
             <span className="px-2 py-0.5 rounded bg-violet-950/50 text-violet-300 border border-violet-400/20 font-bold">
               PREVIEW MODE
             </span>
@@ -90,13 +90,13 @@ export function AstroRealAppPreview() {
                 ${
                   activeTab === tab.id
                     ? "bg-violet-950/60 text-violet-200 border border-violet-500/30 shadow-sm"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent"
+                    : "text-slate-300 hover:text-slate-100 hover:bg-slate-800/60 border border-transparent"
                 }
               `}
               title={tab.description}
             >
               <span>{tab.label}</span>
-              <span className="hidden sm:inline text-[10px] text-slate-500 font-normal">
+              <span className="hidden sm:inline text-[10px] text-slate-400 font-normal">
                 {tab.description}
               </span>
             </button>
@@ -118,10 +118,10 @@ export function AstroRealAppPreview() {
         {/* Preview Footer                                                  */}
         {/* ---------------------------------------------------------------- */}
         <div className="border-t border-slate-800/60 pt-4 text-center space-y-1">
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[10px] text-slate-400">
             Astro Strategy Lab — Real App Composition Preview (DEV-007)
           </p>
-          <p className="text-[10px] text-slate-600">
+          <p className="text-[10px] text-slate-500">
             คอมโพเนนต์ทั้งหมดใช้ข้อมูลจำลองเท่านั้น ยังไม่เชื่อมต่อ localStorage หรือระบบ persistence ใดๆ
           </p>
         </div>

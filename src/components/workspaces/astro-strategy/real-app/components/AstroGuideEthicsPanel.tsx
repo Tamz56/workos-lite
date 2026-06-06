@@ -290,7 +290,7 @@ export function AstroGuideEthicsPanel({
                   {dim.label}
                 </span>
                 <h4 className="text-xs font-bold text-slate-200">{dim.heading}</h4>
-                <p className="text-[11px] text-slate-450 leading-relaxed">
+                <p className="text-[11px] text-slate-400 leading-relaxed">
                   {dim.description}
                 </p>
               </div>
@@ -309,7 +309,7 @@ export function AstroGuideEthicsPanel({
       {/* ---------------------------------------------------------------- */}
       {/* Footer note                                                     */}
       {/* ---------------------------------------------------------------- */}
-      <div className="text-[10px] text-slate-500 leading-relaxed text-center">
+      <div className="text-[10px] text-slate-400 leading-relaxed text-center">
         คำแนะนำในส่วนนี้
         <span className="text-slate-400"> ใช้เพื่อช่วยตั้งคำถาม</span>
         และจัดลำดับความสำคัญ

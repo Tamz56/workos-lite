@@ -245,7 +245,7 @@ export function AstroReflectionHistoryPanel({
       {historyLogs.length === 0 ? (
         <div className="text-center py-8 px-4 border border-dashed border-slate-800 rounded-xl bg-slate-950/20 text-slate-500 italic space-y-1.5">
           <p className="text-xs">ยังไม่มีบันทึกประวัติการสะท้อนคิดถาวร</p>
-          <p className="text-[10px] text-slate-600 max-w-xs mx-auto leading-relaxed not-italic">
+          <p className="text-[10px] text-slate-500 max-w-xs mx-auto leading-relaxed not-italic">
             คุณสามารถเก็บบริบทและบันทึกของวันนี้ไว้เพื่อสังเกตแนวโน้มเชิงกลยุทธ์ย้อนหลัง โดยการกดปุ่ม <strong className="text-indigo-400 font-medium">&quot;บันทึกเข้าประวัติ (Save as History)&quot;</strong>
           </p>
         </div>
@@ -258,7 +258,7 @@ export function AstroReflectionHistoryPanel({
                 <h5 className="font-semibold text-slate-200">Reflection History Filters</h5>
                 <p className="text-[10px] text-slate-400">ช่วยค้นและกรองประวัติสะท้อนคิดในเครื่องนี้</p>
               </div>
-              <span className="text-[10px] text-slate-500 italic max-w-xs md:text-right">
+              <span className="text-[10px] text-slate-400 italic max-w-xs md:text-right">
                 ตัวกรองนี้ทำงานเฉพาะบนข้อมูลที่อยู่ในเครื่องนี้เท่านั้น ไม่เปลี่ยนแปลง ไม่ลบ และไม่บันทึกค่าการกรองลงในระบบ
               </span>
             </div>
@@ -266,7 +266,7 @@ export function AstroReflectionHistoryPanel({
             <div className="space-y-3">
               <div>
                 <label htmlFor="historySearch" className="block text-slate-400 font-medium mb-1">
-                  Search Reflection <span className="text-[10px] text-slate-500 font-normal">(ค้นจากข้อความในบันทึก ความตั้งใจ หรือข้อควรระวัง)</span>
+                    Search Reflection <span className="text-[10px] text-slate-400 font-normal">(ค้นจากข้อความในบันทึก ความตั้งใจ หรือข้อควรระวัง)</span>
                 </label>
                 <input
                   id="historySearch"
@@ -274,14 +274,14 @@ export function AstroReflectionHistoryPanel({
                   value={historySearchQuery}
                   onChange={(e) => setHistorySearchQuery(e.target.value)}
                   placeholder="ค้นหา..."
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-250 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-250 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="historyMode" className="block text-slate-400 font-medium mb-1">
-                    Mode <span className="text-[10px] text-slate-500 font-normal">(กรองตามโหมดหรือจังหวะที่บันทึกไว้)</span>
+                    Mode <span className="text-[10px] text-slate-400 font-normal">(กรองตามโหมดหรือจังหวะที่บันทึกไว้)</span>
                   </label>
                   <select
                     id="historyMode"
@@ -298,7 +298,7 @@ export function AstroReflectionHistoryPanel({
 
                 <div>
                   <label htmlFor="historyEnergy" className="block text-slate-400 font-medium mb-1">
-                    Energy <span className="text-[10px] text-slate-500 font-normal">(กรองตามระดับพลังงานที่เคยเช็กอิน)</span>
+                    Energy <span className="text-[10px] text-slate-400 font-normal">(กรองตามระดับพลังงานที่เคยเช็กอิน)</span>
                   </label>
                   <select
                     id="historyEnergy"
@@ -315,7 +315,7 @@ export function AstroReflectionHistoryPanel({
 
                 <div>
                   <label htmlFor="historyMonth" className="block text-slate-400 font-medium mb-1">
-                    Month <span className="text-[10px] text-slate-500 font-normal">(กรองตามช่วงเดือนของบันทึก)</span>
+                    Month <span className="text-[10px] text-slate-400 font-normal">(กรองตามช่วงเดือนของบันทึก)</span>
                   </label>
                   <select
                     id="historyMonth"
