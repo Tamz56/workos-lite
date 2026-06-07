@@ -97,7 +97,7 @@ export function AstroRealAppPreview() {
             >
               <span>{tab.label}</span>
               <span className={`hidden sm:inline text-[10px] font-normal ${
-                activeTab === tab.id ? "text-violet-350" : "text-slate-400"
+                activeTab === tab.id ? "text-violet-350" : "text-slate-300"
               }`}>
                 {tab.description}
               </span>
@@ -123,7 +123,7 @@ export function AstroRealAppPreview() {
           <p className="text-[10px] text-slate-300">
             Astro Strategy Lab — Real App Composition Preview (DEV-007)
           </p>
-          <p className="text-[10px] text-slate-400">
+          <p className="text-[10px] text-slate-300">
             คอมโพเนนต์ทั้งหมดใช้ข้อมูลจำลองเท่านั้น ยังไม่เชื่อมต่อ localStorage หรือระบบ persistence ใดๆ
           </p>
         </div>

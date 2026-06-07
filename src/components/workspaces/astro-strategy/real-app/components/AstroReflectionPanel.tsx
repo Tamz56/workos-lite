@@ -63,7 +63,7 @@ export function AstroReflectionPanel({
         </div>
         <button
           onClick={onResetReflections}
-          className="text-xs text-slate-400 hover:text-rose-400 transition-colors flex items-center gap-1"
+          className="text-xs text-slate-300 hover:text-rose-400 transition-colors flex items-center gap-1"
           title="ล้างข้อมูลและใช้ข้อมูลเริ่มต้น"
         >
           <RefreshCw className="w-3.5 h-3.5" /> ล้างข้อมูลทั้งหมด
@@ -89,7 +89,7 @@ export function AstroReflectionPanel({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="เช่น รีวิวการใช้ฤกษ์วันเปิดตัวแอป"
-                className="w-full bg-slate-950 border border-slate-750 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-500"
+                className="w-full bg-slate-950 border border-slate-750 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-400"
               />
             </div>
 
@@ -100,7 +100,7 @@ export function AstroReflectionPanel({
                 value={activity}
                 onChange={(e) => setActivity(e.target.value)}
                 placeholder="เช่น ดีลสัญญาร้านอาหารใหม่"
-                className="w-full bg-slate-950 border border-slate-750 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-500"
+                className="w-full bg-slate-950 border border-slate-750 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-400"
               />
             </div>
 
@@ -136,7 +136,7 @@ export function AstroReflectionPanel({
                 onChange={(e) => setText(e.target.value)}
                 placeholder="บันทึกความรู้สึก อุปสรรค และการเตรียมความพร้อมจริง เช่น โน้มน้าวตามคำชี้แนะได้ราบรื่น..."
                 rows={4}
-                className="w-full bg-slate-950 border border-slate-750 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-500 leading-relaxed"
+                className="w-full bg-slate-950 border border-slate-750 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-400 leading-relaxed"
               ></textarea>
             </div>
 
@@ -159,9 +159,9 @@ export function AstroReflectionPanel({
         {/* Right Section: Additive placeholder explaining that history list is handled separately */}
         <div className="lg:col-span-3 space-y-4 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
           <h4 className="text-xs font-bold text-slate-300 tracking-wider uppercase">ประวัติการบันทึก ({totalReflectionsCount} รายการ)</h4>
-          <div className="py-12 border border-dashed border-slate-700 rounded-xl text-center text-slate-400 text-xs bg-slate-950/40 space-y-1.5">
+          <div className="py-12 border border-dashed border-slate-700 rounded-xl text-center text-slate-300 text-xs bg-slate-950/70 space-y-1.5">
             <p className="font-semibold text-slate-300">การแสดงรายการประวัติ (Reflection History)</p>
-            <p className="text-[10px] text-slate-400 max-w-[260px] mx-auto leading-relaxed">
+            <p className="text-[10px] text-slate-300 max-w-[260px] mx-auto leading-relaxed">
               โมดูลประวัติการสะท้อนคิดย้อนหลังและตัวกรองข้อมูลจะถูกดึงเข้าสู่คอมโพเนนต์หลักในขั้นตอนการปรับปรุงความปลอดภัยลำดับถัดไป (DEV-004)
             </p>
           </div>

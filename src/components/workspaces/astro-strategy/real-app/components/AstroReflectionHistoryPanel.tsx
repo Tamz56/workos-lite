@@ -245,7 +245,7 @@ export function AstroReflectionHistoryPanel({
       {historyLogs.length === 0 ? (
         <div className="text-center py-8 px-4 border border-dashed border-slate-700 rounded-xl bg-slate-950/40 text-slate-300 italic space-y-1.5">
           <p className="text-xs">ยังไม่มีบันทึกประวัติการสะท้อนคิดถาวร</p>
-          <p className="text-[10px] text-slate-400 max-w-xs mx-auto leading-relaxed not-italic">
+          <p className="text-[10px] text-slate-300 max-w-xs mx-auto leading-relaxed not-italic">
             คุณสามารถเก็บบริบทและบันทึกของวันนี้ไว้เพื่อสังเกตแนวโน้มเชิงกลยุทธ์ย้อนหลัง โดยการกดปุ่ม <strong className="text-indigo-400 font-medium">&quot;บันทึกเข้าประวัติ (Save as History)&quot;</strong>
           </p>
         </div>
@@ -266,7 +266,7 @@ export function AstroReflectionHistoryPanel({
             <div className="space-y-3">
               <div>
                 <label htmlFor="historySearch" className="block text-slate-300 font-medium mb-1">
-                    Search Reflection <span className="text-[10px] text-slate-400 font-normal">(ค้นจากข้อความในบันทึก ความตั้งใจ หรือข้อควรระวัง)</span>
+                    Search Reflection <span className="text-[10px] text-slate-300 font-normal">(ค้นจากข้อความในบันทึก ความตั้งใจ หรือข้อควรระวัง)</span>
                 </label>
                 <input
                   id="historySearch"
@@ -281,7 +281,7 @@ export function AstroReflectionHistoryPanel({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="historyMode" className="block text-slate-300 font-medium mb-1">
-                    Mode <span className="text-[10px] text-slate-400 font-normal">(กรองตามโหมดหรือจังหวะที่บันทึกไว้)</span>
+                    Mode <span className="text-[10px] text-slate-300 font-normal">(กรองตามโหมดหรือจังหวะที่บันทึกไว้)</span>
                   </label>
                   <select
                     id="historyMode"
@@ -298,7 +298,7 @@ export function AstroReflectionHistoryPanel({
 
                 <div>
                   <label htmlFor="historyEnergy" className="block text-slate-300 font-medium mb-1">
-                    Energy <span className="text-[10px] text-slate-400 font-normal">(กรองตามระดับพลังงานที่เคยเช็กอิน)</span>
+                    Energy <span className="text-[10px] text-slate-300 font-normal">(กรองตามระดับพลังงานที่เคยเช็กอิน)</span>
                   </label>
                   <select
                     id="historyEnergy"
@@ -315,7 +315,7 @@ export function AstroReflectionHistoryPanel({
 
                 <div>
                   <label htmlFor="historyMonth" className="block text-slate-300 font-medium mb-1">
-                    Month <span className="text-[10px] text-slate-400 font-normal">(กรองตามช่วงเดือนของบันทึก)</span>
+                    Month <span className="text-[10px] text-slate-300 font-normal">(กรองตามช่วงเดือนของบันทึก)</span>
                   </label>
                   <select
                     id="historyMonth"
@@ -399,11 +399,11 @@ export function AstroReflectionHistoryPanel({
 
                   <div className="space-y-1 text-slate-300">
                     <p className="line-clamp-2 leading-relaxed">
-                      <span className="text-slate-400 font-medium">สรุปสะท้อนคิด:</span> {item.reflectionSummary || "(ไม่มี)"}
+                      <span className="text-slate-300 font-medium">สรุปสะท้อนคิด:</span> {item.reflectionSummary || "(ไม่มี)"}
                     </p>
                     {item.nextRightAction && (
                       <p className="line-clamp-1 leading-relaxed text-emerald-400/90">
-                        <span className="text-slate-400 font-medium">Next Right Action:</span> {item.nextRightAction}
+                        <span className="text-slate-300 font-medium">Next Right Action:</span> {item.nextRightAction}
                       </p>
                     )}
                   </div>

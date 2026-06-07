@@ -102,12 +102,12 @@ export function AstroStrategyPlanningPanel({
             onChange={(e) => handleFieldChange("focusNext", e.target.value)}
             placeholder="เช่น สรุปโครงสร้างระบบ API, ส่งมอบงานเขียนฉบับที่ 2"
             rows={2}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mt-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none placeholder:text-slate-500"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mt-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none placeholder:text-slate-400"
           />
         </div>
 
         {/* 2. สิ่งที่ควรชะลอหรือลดระดับ */}
-        <div className="bg-slate-950/40 p-3.5 rounded-xl border border-slate-700 space-y-1.5 flex flex-col justify-between">
+        <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-700 space-y-1.5 flex flex-col justify-between">
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-200 block">⏳ สิ่งที่ควรชะลอหรือลดระดับ (Slow Down)</label>
             <span className="text-[10px] text-slate-300 block leading-tight">ลดการเร่งงานส่วนเกิน ผ่อนจังหวะเพื่อฟื้นฟูสภาพพลังงาน</span>
@@ -117,7 +117,7 @@ export function AstroStrategyPlanningPanel({
             onChange={(e) => handleFieldChange("slowDown", e.target.value)}
             placeholder="เช่น ชะลอการตอบอีเมลที่ไม่ด่วนหลัง 6 โมงเย็น, เลื่อนประชุมทบทวนเล็กออกไป"
             rows={2}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mt-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none placeholder:text-slate-500"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mt-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none placeholder:text-slate-400"
           />
         </div>
 
@@ -132,12 +132,12 @@ export function AstroStrategyPlanningPanel({
             onChange={(e) => handleFieldChange("nextSmallAction", e.target.value)}
             placeholder="เช่น เคลียร์อินบอกซ์ 5 ข้อความแรก, โทรแจ้งยอดอัปเดตสั้นๆ"
             rows={2}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mt-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none placeholder:text-slate-500"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mt-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none placeholder:text-slate-400"
           />
         </div>
 
         {/* 4. สิ่งที่จะนำกลับมาทบทวนภายหลัง */}
-        <div className="bg-slate-950/40 p-3.5 rounded-xl border border-slate-700 space-y-1.5 flex flex-col justify-between">
+        <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-700 space-y-1.5 flex flex-col justify-between">
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-200 block">🔎 สิ่งที่จะนำกลับมาทบทวนภายหลัง (Review Later)</label>
             <span className="text-[10px] text-slate-300 block leading-tight">หัวข้อหรือประเด็นที่ต้องรอดูรอบเวลาและสถานะสัปดาห์หน้า</span>
@@ -147,7 +147,7 @@ export function AstroStrategyPlanningPanel({
             onChange={(e) => handleFieldChange("reviewLater", e.target.value)}
             placeholder="เช่น รูปแบบดราฟต์สัญญาเช่าร้าน, ตัวเลขวิเคราะห์สภาพคล่องของมิถุนายน"
             rows={2}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mt-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none placeholder:text-slate-500"
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 mt-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none placeholder:text-slate-400"
           />
         </div>
       </div>
