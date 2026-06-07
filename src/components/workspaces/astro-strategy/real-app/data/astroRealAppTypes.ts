@@ -259,5 +259,27 @@ export interface AstroEngineOutput {
   readonly metadata: AstroEngineMetadata;
 }
 
+export interface AstroWeeklyTimingDay {
+  date: string;
+  weekday: string;
+  mode: AstroTimingMode;
+  label: string;
+  strategicFocus: string;
+  recommendedAction: string;
+  riskNote: string;
+  recoveryAnchor: string;
+  source: "engine" | "fallback";
+  confidence: number;
+  isBirthWeekdayCycle: boolean;
+}
+
+export interface AstroWeeklyTimingViewModel {
+  days: AstroWeeklyTimingDay[];
+  weeklyTheme: string;
+  metadata: AstroEngineMetadata;
+  disclaimer: string;
+}
+
+
 
 

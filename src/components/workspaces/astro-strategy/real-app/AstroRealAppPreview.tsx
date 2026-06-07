@@ -20,19 +20,22 @@ import {
 } from "./data/astroRealAppMockData";
 
 import { AstroRealAppLocalStorageAdapter } from "./data/astroRealAppLocalStorageAdapter";
-import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData } from "./data/astroRealAppTypes";
+import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel } from "./data/astroRealAppTypes";
 import { loadAstroBirthProfile } from "./data/astroRealAppBirthProfileStorageAdapter";
 import { buildAstroTimingInput, buildAstroEngineOutput } from "./data/astroRealAppAstrologyEngineAdapter";
 import { mapEngineOutputToTodayData } from "./data/astroRealAppTodayTimingViewModel";
+import { buildWeeklyTimingViewModel } from "./data/astroRealAppWeeklyTimingViewModel";
+import { AstroWeeklyPanel } from "./components/AstroWeeklyPanel";
 
 // ---------------------------------------------------------------------------
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type PreviewTab = "today" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools";
+type PreviewTab = "today" | "weekly" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools";
 
 const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
   { id: "today", label: "📊 สรุปวันนี้", description: "Daily Timing Brief" },
+  { id: "weekly", label: "📅 สรุปสัปดาห์", description: "Weekly Timing View" },
   { id: "reflection", label: "✍️ สะท้อนคิด", description: "Reflection Log" },
   { id: "history", label: "📋 ประวัติ", description: "Reflection History" },
   { id: "planning", label: "🎯 แผนกลยุทธ์", description: "Strategy Planning" },
@@ -65,6 +68,20 @@ export function AstroRealAppPreview() {
   const [todayMetadata, setTodayMetadata] = React.useState<AstroEngineMetadata | undefined>(undefined);
   const [calculationFallbackNote, setCalculationFallbackNote] = React.useState<string | null>(null);
 
+  // DEV-028: Weekly calculation states
+  const [weeklyData, setWeeklyData] = React.useState<AstroWeeklyTimingViewModel>({
+    days: [],
+    weeklyTheme: "กำลังประมวลผล...",
+    metadata: {
+      calculationMode: "rule-based",
+      confidenceScore: 0.0,
+      sourceEngine: "ArborDesk Astrology Logic v0.1",
+      disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น"
+    },
+    disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น"
+  });
+  const [weeklyFallbackNote, setWeeklyFallbackNote] = React.useState<string | null>(null);
+
   // Hydration hook: Load from localStorage on client mount
   React.useEffect(() => {
     async function loadData() {
@@ -77,9 +94,11 @@ export function AstroRealAppPreview() {
         setReflectionDraft(loadedDraft);
       }
 
-      // DEV-024: Load birth profile and compute Today Timing
+      // DEV-024 & DEV-028: Load birth profile and compute Today and Weekly Timing
       try {
         const birthProfile = loadAstroBirthProfile();
+        
+        // Calculate Today Timing
         const timingInput = buildAstroTimingInput(birthProfile);
         const engineOutput = buildAstroEngineOutput(timingInput);
         if (engineOutput) {
@@ -92,17 +111,69 @@ export function AstroRealAppPreview() {
           setTodayMetadata(undefined);
           setCalculationFallbackNote("ระบบไม่สามารถประมวลผลดาราศาสตร์ได้ จึงใช้อภิปรายค่าประมาณการทั่วไปแทน");
         }
+
+        // Calculate Weekly Timing
+        const weeklyVM = buildWeeklyTimingViewModel(birthProfile);
+        setWeeklyData(weeklyVM);
+        setWeeklyFallbackNote(null);
       } catch (err) {
-        console.error("Failed to calculate today timing engine output:", err);
+        console.error("Failed to calculate today/weekly timing engine output on mount:", err);
         setTodayData(MOCK_TODAY_DATA);
         setTodayMetadata(undefined);
         setCalculationFallbackNote("ระบบเกิดข้อผิดพลาดในการคำนวณจังหวะดาราศาสตร์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
+
+        // Fallback Weekly calculation
+        const defaultProfile = loadAstroBirthProfile();
+        const weeklyFallbackVM = buildWeeklyTimingViewModel(defaultProfile, undefined, true);
+        setWeeklyData(weeklyFallbackVM);
+        setWeeklyFallbackNote("ระบบเกิดข้อผิดพลาดในการประมวลผลดาราศาสตร์รายสัปดาห์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
       }
 
       setIsHydrated(true);
     }
     loadData();
   }, []);
+
+  // Recalculate today and weekly timing whenever today or weekly tab is activated to capture new birth profile settings immediately
+  React.useEffect(() => {
+    if (!isHydrated) return;
+
+    if (activeTab === "today" || activeTab === "weekly") {
+      try {
+        const birthProfile = loadAstroBirthProfile();
+        
+        // Calculate Today Timing
+        const timingInput = buildAstroTimingInput(birthProfile);
+        const engineOutput = buildAstroEngineOutput(timingInput);
+        if (engineOutput) {
+          const mappedToday = mapEngineOutputToTodayData(engineOutput);
+          setTodayData(mappedToday);
+          setTodayMetadata(engineOutput.metadata);
+          setCalculationFallbackNote(null);
+        } else {
+          setTodayData(MOCK_TODAY_DATA);
+          setTodayMetadata(undefined);
+          setCalculationFallbackNote("ระบบไม่สามารถประมวลผลดาราศาสตร์ได้ จึงใช้อภิปรายค่าประมาณการทั่วไปแทน");
+        }
+
+        // Calculate Weekly Timing
+        const weeklyVM = buildWeeklyTimingViewModel(birthProfile);
+        setWeeklyData(weeklyVM);
+        setWeeklyFallbackNote(null);
+      } catch (err) {
+        console.error("Failed to calculate timing engine output on tab active:", err);
+        setTodayData(MOCK_TODAY_DATA);
+        setTodayMetadata(undefined);
+        setCalculationFallbackNote("ระบบเกิดข้อผิดพลาดในการคำนวณจังหวะดาราศาสตร์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
+
+        // Fallback Weekly calculation
+        const defaultProfile = loadAstroBirthProfile();
+        const weeklyFallbackVM = buildWeeklyTimingViewModel(defaultProfile, undefined, true);
+        setWeeklyData(weeklyFallbackVM);
+        setWeeklyFallbackNote("ระบบเกิดข้อผิดพลาดในการประมวลผลดาราศาสตร์รายสัปดาห์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
+      }
+    }
+  }, [activeTab, isHydrated]);
 
   // Handler to save new reflection history entry
   const handleSubmitReflection = async (data: {
@@ -253,6 +324,22 @@ export function AstroRealAppPreview() {
     };
     setReflectionDraft(clearedDraft);
     await AstroRealAppLocalStorageAdapter.clearAllPreviewData();
+
+    // Recalculate timing based on default birth profile
+    try {
+      const defaultProfile = loadAstroBirthProfile();
+      const timingInput = buildAstroTimingInput(defaultProfile);
+      const engineOutput = buildAstroEngineOutput(timingInput);
+      if (engineOutput) {
+        setTodayData(mapEngineOutputToTodayData(engineOutput));
+        setTodayMetadata(engineOutput.metadata);
+        setCalculationFallbackNote(null);
+      }
+      setWeeklyData(buildWeeklyTimingViewModel(defaultProfile));
+      setWeeklyFallbackNote(null);
+    } catch (err) {
+      console.error("Failed to recalculate timing on data reset:", err);
+    }
   };
 
   return (
@@ -333,6 +420,22 @@ export function AstroRealAppPreview() {
               reflectionPrompt={isHydrated ? todayData.reflectionPrompt : MOCK_TODAY_DATA.reflectionPrompt}
               engineMetadata={isHydrated ? todayMetadata : undefined}
               fallbackNote={isHydrated ? calculationFallbackNote : null}
+            />
+          )}
+          {activeTab === "weekly" && (
+            <AstroWeeklyPanel
+              weeklyData={isHydrated ? weeklyData : {
+                days: [],
+                weeklyTheme: "กำลังโหลดข้อมูล...",
+                metadata: {
+                  calculationMode: "rule-based",
+                  confidenceScore: 0,
+                  sourceEngine: "ArborDesk Astrology Logic v0.1",
+                  disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น"
+                },
+                disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น"
+              }}
+              fallbackNote={isHydrated ? weeklyFallbackNote : null}
             />
           )}
           {activeTab === "reflection" && (
