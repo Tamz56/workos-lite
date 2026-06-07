@@ -44,10 +44,10 @@ export function calculateAstroTimingBrief(input: AstroTimingInput): AstroTimingB
   const dayOfWeek = isNaN(targetDate.getTime()) ? 4 : targetDate.getDay();
 
   let mode: AstroTimingMode = "Focus & Deliver";
-  let triggerSignal = "กระแสพลังงานเคลื่อนตัวสู่โหมดลงมือทำ (Focus & Deliver)";
-  let reason = "เหมาะกับการใช้กำลังสมาธิเชิงลึกในการปิดงานและสร้างผลลัพธ์ที่เป็นชิ้นอันชัดเจน";
-  let recommendedMove = "เลือกงานสำคัญที่สุดเพียง 1 เรื่องในวันนี้ แล้วลงมือทำแบบ Deep Work จนส่งมอบได้";
-  let recoverySupport = "หยุดพักหายใจช้า ๆ 5 นาทีเพื่อรักษาโฟกัส";
+  let triggerSignal = "จังหวะเวลาสนับสนุนโหมดลงมือทำ (Focus & Deliver)";
+  let reason = "เหมาะกับการใช้สมาธิเชิงลึกเพื่อปิด Checkpoint และส่งมอบผลงานที่จับต้องได้";
+  let recommendedMove = "เลือกงานสำคัญอันดับแรกขึ้นมาสะสางและทำแบบ Deep Work จนกว่าจะสำเร็จทีละเรื่อง";
+  let recoverySupport = "หยุดพักหายใจผ่อนคลายช้า ๆ 5 นาทีเพื่อรักษาโฟกัสสมาธิ";
 
   const weekdayMap: Record<string, number> = {
     Sunday: 0,
@@ -63,8 +63,8 @@ export function calculateAstroTimingBrief(input: AstroTimingInput): AstroTimingB
 
   if (dayOfWeek === birthWeekdayIndex) {
     mode = "Pause & Calibrate";
-    triggerSignal = `ตรงกับวันเกิดทางดาราศาสตร์ประจำสัปดาห์ (${weekday}) เป็นช่วงจัดจังหวะรอบความเงียบ`;
-    reason = "จังหวะเวลาโคจรครบรอบสัปดาห์ของดาวเกิด เหมาะสำหรับหยุดประเมินภาระงานและพักผ่อนฟื้นฟูกำลังทางกาย";
+    triggerSignal = `ตรงกับวันเกิดทางสุริยคติประจำสัปดาห์ (${weekday}) เพื่อทบทวนจังหวะการทำงาน`;
+    reason = "จังหวะครบรอบวันเกิดประจำสัปดาห์ (Solar Weekday Cycle) เหมาะสำหรับหยุดประเมินภาพรวมและพักผ่อนฟื้นพลัง";
     recommendedMove = "จำกัดการเปิดประเด็นงานพัฒนาใหม่ ตรวจสอบและปิด checkpoint เก่าให้สมบูรณ์";
     recoverySupport = "พักสายตา 3 นาทีเป็นระยะ ท่องธรรมชาติใกล้ต้นไม้";
   } else if ([3, 5, 0].includes(dayOfWeek)) {
@@ -114,17 +114,17 @@ export function buildAstroRiskFlags(input: AstroTimingInput): AstroRiskFlag[] {
   const brief = calculateAstroTimingBrief(input);
   if (brief.strategyMode === "Pause & Calibrate") {
     return [
-      { text: "มีโอกาสเผชิญความล้าของดวงตาสะสม (Eye Strain Risk)", severity: "high" },
-      { text: "ความคิดวนเวียนและการตัดสินใจที่ไม่เด็ดขาด (Looping Thoughts)", severity: "medium" }
+      { text: "ข้อควรสังเกตเรื่องความล้าของดวงตาจากการทำงานหน้าจอสะสม (Eye Strain Watch)", severity: "medium" },
+      { text: "ข้อควรระวังเรื่องการติดหล่มความคิดวนเวียนและลังเล (Looping Thoughts)", severity: "medium" }
     ];
   } else if (brief.strategyMode === "Stabilize & Structure") {
     return [
-      { text: "ความเสี่ยงจากการสลับบริบทงานบ่อยเกินไป (Context Switching Load)", severity: "medium" },
-      { text: "การเปิดงานพัฒนาหลายชิ้นคาไว้โดยไม่มีเป้าหมายการปิด (Task Accumulation)", severity: "medium" }
+      { text: "ภาระสะสมจากการสลับบริบทหรือสลับงานบ่อยเกินไป (Context Switching Watch)", severity: "medium" },
+      { text: "การเปิดขอบเขตงานพัฒนาทิ้งไว้หลายชิ้นพร้อมกันโดยไม่ได้ปิด Checkpoint", severity: "medium" }
     ];
   } else {
     return [
-      { text: "อาจละเลยการพักสมาธิระหว่างคาบการทำงานต่อเนื่อง", severity: "low" }
+      { text: "ข้อแนะนำให้หยุดพักสายตาสั้นๆ ระหว่างช่วงการลงมือทำงานยาวนาน", severity: "low" }
     ];
   }
 }
