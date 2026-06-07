@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Database, Trash2, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { Database, Trash2, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw, Play, Info } from "lucide-react";
+import { buildLegacyMigrationDryRunReport } from "../data/astroRealAppMigrationDryRunAdapter";
+import { MigrationDryRunReport } from "../data/astroRealAppTypes";
 
 export type AstroPreviewDataToolsPanelProps = {
   onResetHistory: () => void;
@@ -28,6 +30,7 @@ export function AstroPreviewDataToolsPanel({
     draft: false,
   });
   const [statusMessage, setStatusMessage] = React.useState("");
+  const [report, setReport] = React.useState<MigrationDryRunReport | null>(null);
 
   const updateStatuses = React.useCallback(() => {
     if (typeof window !== "undefined") {
@@ -58,6 +61,12 @@ export function AstroPreviewDataToolsPanel({
       callback();
       showFeedback(`รีเซ็ต "${label}" สำเร็จ`);
     }
+  };
+
+  const handleRunDryRun = () => {
+    const r = buildLegacyMigrationDryRunReport();
+    setReport(r);
+    showFeedback("สแกนข้อมูลเดิม (Dry Run) สำเร็จ");
   };
 
   return (
@@ -163,6 +172,121 @@ export function AstroPreviewDataToolsPanel({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Legacy Migration Dry Run Section */}
+      <div className="border-t border-slate-700/60 pt-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-indigo-450" /> ตรวจสอบการโอนย้ายข้อมูลเดิม (Legacy Migration Dry Run)
+            </h4>
+            <p className="text-xs text-slate-300">
+              จำลองการโอนย้ายข้อมูลจากระบบโปรโตไทป์เดิมเพื่อตรวจสอบความพร้อมก่อนแทนที่เพจจริง
+            </p>
+          </div>
+          <button
+            onClick={handleRunDryRun}
+            className="py-2 px-4 bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-200 border border-indigo-700/50 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
+          >
+            <Play className="w-3.5 h-3.5" /> จำลองการโอนย้าย (Run Dry Run)
+          </button>
+        </div>
+
+        {/* Safety Note */}
+        <div className="bg-slate-950/40 border border-slate-800 p-3 rounded-xl flex items-center gap-2 text-[11px] text-slate-400">
+          <Info className="w-4 h-4 text-indigo-500 shrink-0" />
+          <span><strong>หมายเหตุความปลอดภัย</strong>: ทดสอบระบบแห้ง (Dry Run) เท่านั้น ไม่มีการคัดลอก ลบ หรือเขียนทับข้อมูลจริงใด ๆ ในระบบทั้งสิ้น</span>
+        </div>
+
+        {/* Report Results */}
+        {report && (
+          <div className="space-y-4 animate-fadeIn">
+            {/* Summary Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Legacy Keys Found</span>
+                <span className="text-lg font-bold text-slate-200">{report.legacyKeysFound.length}</span>
+              </div>
+              <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Ready to Migrate</span>
+                <span className="text-lg font-bold text-emerald-450">
+                  {report.mappings.filter(m => m.status === "ready").length}
+                </span>
+              </div>
+              <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Skipped (Target Exists)</span>
+                <span className="text-lg font-bold text-amber-400">
+                  {report.mappings.filter(m => m.status === "skip-target-exists").length}
+                </span>
+              </div>
+              <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Parse Errors</span>
+                <span className="text-lg font-bold text-rose-450">
+                  {report.mappings.filter(m => m.status === "parse-error").length}
+                </span>
+              </div>
+            </div>
+
+            {/* Mappings Detail Table */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-900 border-b border-slate-800 text-slate-300 font-semibold">
+                      <th className="p-3">คีย์เดิม (Legacy Key)</th>
+                      <th className="p-3">คีย์เป้าหมาย (Target Key)</th>
+                      <th className="p-3">ขนาด (Bytes) / โครงสร้าง</th>
+                      <th className="p-3 text-center">สถานะ</th>
+                      <th className="p-3">หมายเหตุ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                    {report.mappings.map((m, idx) => {
+                      let statusBadge = "bg-slate-900 text-slate-450 border-slate-800";
+                      if (m.status === "ready") statusBadge = "bg-emerald-950/30 text-emerald-300 border-emerald-800/40";
+                      if (m.status === "skip-target-exists") statusBadge = "bg-amber-950/30 text-amber-300 border-amber-800/40";
+                      if (m.status === "parse-error") statusBadge = "bg-rose-950/30 text-rose-300 border-rose-800/40";
+
+                      return (
+                        <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
+                          <td className="p-3 font-mono text-[10px] text-slate-400 break-all select-all">
+                            {m.legacyKey}
+                            {m.legacyExists && (
+                              <span className="ml-1.5 px-1 bg-indigo-950 text-indigo-300 rounded text-[9px]">Exists</span>
+                            )}
+                          </td>
+                          <td className="p-3 font-mono text-[10px] text-slate-400 break-all">
+                            {m.targetKey}
+                            {m.targetExists && (
+                              <span className="ml-1.5 px-1 bg-teal-950 text-teal-300 rounded text-[9px]">Target Exists</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {m.legacyExists ? (
+                              <span className="font-mono text-[11px]">
+                                {m.bytesDetected} B
+                                {m.itemCount !== undefined && ` (${m.itemCount} item${m.itemCount > 1 ? "s" : ""})`}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">—</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-0.5 border rounded-full text-[10px] font-semibold tracking-wide ${statusBadge}`}>
+                              {m.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-300 text-[11px] leading-tight">{m.notes}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Global Actions */}

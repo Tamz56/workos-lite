@@ -124,9 +124,12 @@ export interface AstroStrategyDataAdapter {
 export interface MigrationKeyMapping {
   legacyKey: string;
   targetKey: string;
+  legacyExists: boolean;
+  targetExists: boolean;
+  itemCount?: number;
+  status: "ready" | "skip-target-exists" | "missing-legacy" | "unsupported" | "parse-error";
+  notes?: string;
   bytesDetected: number;
-  status: "pending" | "ready" | "skipped_empty" | "error";
-  error?: string;
 }
 
 export interface MigrationDryRunReport {
