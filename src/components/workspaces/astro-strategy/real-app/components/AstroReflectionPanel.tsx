@@ -19,6 +19,12 @@ export type AstroReflectionPanelProps = {
   onResetReflections?: () => void;
   totalReflectionsCount?: number;
   savedMessage?: string;
+  onDraftChange?: (draft: {
+    title?: string;
+    activity?: string;
+    rating?: string;
+    text?: string;
+  }) => void;
 };
 
 export function AstroReflectionPanel({
@@ -31,12 +37,38 @@ export function AstroReflectionPanel({
   onResetReflections,
   totalReflectionsCount = 0,
   savedMessage = "",
+  onDraftChange,
 }: AstroReflectionPanelProps) {
   const [title, setTitle] = React.useState(defaultTitle);
   const [activity, setActivity] = React.useState(defaultActivity);
   const [rating, setRating] = React.useState(defaultRating);
   const [text, setText] = React.useState(defaultText);
   const [localSavedMessage, setLocalSavedMessage] = React.useState("");
+
+  // Sync state if props change externally (such as after hydration)
+  React.useEffect(() => {
+    if (defaultTitle !== undefined && defaultTitle !== title) {
+      setTitle(defaultTitle);
+    }
+  }, [defaultTitle, title]);
+
+  React.useEffect(() => {
+    if (defaultActivity !== undefined && defaultActivity !== activity) {
+      setActivity(defaultActivity);
+    }
+  }, [defaultActivity, activity]);
+
+  React.useEffect(() => {
+    if (defaultRating !== undefined && defaultRating !== rating) {
+      setRating(defaultRating);
+    }
+  }, [defaultRating, rating]);
+
+  React.useEffect(() => {
+    if (defaultText !== undefined && defaultText !== text) {
+      setText(defaultText);
+    }
+  }, [defaultText, text]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +88,22 @@ export function AstroReflectionPanel({
     } else {
       setLocalSavedMessage("บันทึกสำเร็จ (โหมดจำลอง)");
       setTimeout(() => setLocalSavedMessage(""), 3000);
+    }
+  };
+
+  const handleFieldChange = (field: "title" | "activity" | "rating" | "text", value: string) => {
+    if (field === "title") {
+      setTitle(value);
+      if (onDraftChange) onDraftChange({ title: value, activity, rating, text });
+    } else if (field === "activity") {
+      setActivity(value);
+      if (onDraftChange) onDraftChange({ title, activity: value, rating, text });
+    } else if (field === "rating") {
+      setRating(value);
+      if (onDraftChange) onDraftChange({ title, activity, rating: value, text });
+    } else if (field === "text") {
+      setText(value);
+      if (onDraftChange) onDraftChange({ title, activity, rating, text: value });
     }
   };
 
@@ -100,7 +148,7 @@ export function AstroReflectionPanel({
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => handleFieldChange("title", e.target.value)}
                 placeholder="เช่น รีวิวการใช้ฤกษ์วันเปิดตัวแอป"
                 className="w-full bg-slate-950 border border-slate-750 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-400"
               />
@@ -111,7 +159,7 @@ export function AstroReflectionPanel({
               <input
                 type="text"
                 value={activity}
-                onChange={(e) => setActivity(e.target.value)}
+                onChange={(e) => handleFieldChange("activity", e.target.value)}
                 placeholder="เช่น ดีลสัญญาร้านอาหารใหม่"
                 className="w-full bg-slate-950 border border-slate-750 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-400"
               />
@@ -122,7 +170,7 @@ export function AstroReflectionPanel({
                 <label className="text-[10px] text-slate-300">ผลประเมินในใบคำแนะนำ</label>
                 <select
                   value={rating}
-                  onChange={(e) => setRating(e.target.value)}
+                  onChange={(e) => handleFieldChange("rating", e.target.value)}
                   className="w-full bg-slate-950 border border-slate-750 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
                 >
                   <option value="เหมาะสมมาก">เหมาะสมมาก</option>
@@ -146,7 +194,7 @@ export function AstroReflectionPanel({
               <label className="text-[10px] text-slate-300">บันทึกสิ่งที่เกิดขึ้นจริงและการเปรียบเทียบ</label>
               <textarea
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => handleFieldChange("text", e.target.value)}
                 placeholder="บันทึกความรู้สึก อุปสรรค และการเตรียมความพร้อมจริง เช่น โน้มน้าวตามคำชี้แนะได้ราบรื่น..."
                 rows={4}
                 className="w-full bg-slate-950 border border-slate-750 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:text-slate-400 leading-relaxed"

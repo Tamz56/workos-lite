@@ -18,7 +18,7 @@ import {
 } from "./data/astroRealAppMockData";
 
 import { AstroRealAppLocalStorageAdapter } from "./data/astroRealAppLocalStorageAdapter";
-import { ReflectionHistoryItem, AstroPlanningNotes } from "./data/astroRealAppTypes";
+import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft } from "./data/astroRealAppTypes";
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -44,6 +44,12 @@ export function AstroRealAppPreview() {
   // Client states with fallback to mock data before hydration
   const [historyLogs, setHistoryLogs] = React.useState<ReflectionHistoryItem[]>(MOCK_HISTORY_LOGS);
   const [planningNotes, setPlanningNotes] = React.useState<AstroPlanningNotes>(MOCK_PLANNING_NOTES);
+  const [reflectionDraft, setReflectionDraft] = React.useState<AstroReflectionDraft>({
+    title: "",
+    activity: "",
+    rating: "เหมาะสมมาก",
+    text: ""
+  });
   const [isHydrated, setIsHydrated] = React.useState(false);
   const [historySaveStatus, setHistorySaveStatus] = React.useState("");
 
@@ -52,8 +58,12 @@ export function AstroRealAppPreview() {
     async function loadData() {
       const loadedHistory = await AstroRealAppLocalStorageAdapter.loadReflectionHistory();
       const loadedPlanning = await AstroRealAppLocalStorageAdapter.loadPlanningNotes();
+      const loadedDraft = await AstroRealAppLocalStorageAdapter.loadReflectionDraft();
       setHistoryLogs(loadedHistory);
       setPlanningNotes(loadedPlanning);
+      if (loadedDraft) {
+        setReflectionDraft(loadedDraft);
+      }
       setIsHydrated(true);
     }
     loadData();
@@ -93,8 +103,42 @@ export function AstroRealAppPreview() {
     setHistoryLogs(updatedHistory);
     await AstroRealAppLocalStorageAdapter.saveReflectionHistory(updatedHistory);
 
+    // Clear active draft after successful submission
+    const clearedDraft = {
+      title: "",
+      activity: "",
+      rating: "เหมาะสมมาก",
+      text: ""
+    };
+    setReflectionDraft(clearedDraft);
+    await AstroRealAppLocalStorageAdapter.clearReflectionDraft();
+
     setHistorySaveStatus("บันทึกเข้าระบบประวัติสำเร็จ");
     setTimeout(() => setHistorySaveStatus(""), 3000);
+  };
+
+  // Handler to save active draft as user edits
+  const handleDraftChange = async (updatedDraft: Partial<AstroReflectionDraft>) => {
+    const newDraft: AstroReflectionDraft = {
+      title: updatedDraft.title !== undefined ? updatedDraft.title : reflectionDraft.title,
+      activity: updatedDraft.activity !== undefined ? updatedDraft.activity : reflectionDraft.activity,
+      rating: updatedDraft.rating !== undefined ? updatedDraft.rating : reflectionDraft.rating,
+      text: updatedDraft.text !== undefined ? updatedDraft.text : reflectionDraft.text
+    };
+    setReflectionDraft(newDraft);
+    await AstroRealAppLocalStorageAdapter.saveReflectionDraft(newDraft);
+  };
+
+  // Handler to clear active draft when form is reset
+  const handleResetReflections = async () => {
+    const clearedDraft = {
+      title: "",
+      activity: "",
+      rating: "เหมาะสมมาก",
+      text: ""
+    };
+    setReflectionDraft(clearedDraft);
+    await AstroRealAppLocalStorageAdapter.clearReflectionDraft();
   };
 
   // Handler to clear history logs
@@ -214,6 +258,12 @@ export function AstroRealAppPreview() {
               totalReflectionsCount={isHydrated ? historyLogs.length : MOCK_HISTORY_LOGS.length}
               onSubmit={handleSubmitReflection}
               savedMessage={historySaveStatus}
+              defaultTitle={isHydrated ? reflectionDraft.title : ""}
+              defaultActivity={isHydrated ? reflectionDraft.activity : ""}
+              defaultRating={isHydrated ? reflectionDraft.rating : "เหมาะสมมาก"}
+              defaultText={isHydrated ? reflectionDraft.text : ""}
+              onDraftChange={handleDraftChange}
+              onResetReflections={handleResetReflections}
             />
           )}
           {activeTab === "history" && (

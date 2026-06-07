@@ -67,16 +67,23 @@ export const AstroRealAppLocalStorageAdapter: AstroStrategyDataAdapter = {
     return MOCK_GUIDE_DATA;
   },
 
-  // Stub/Delayed methods for Drafts
+  // Active methods for Drafts
   loadReflectionDraft: async (): Promise<AstroReflectionDraft | null> => {
-    return null;
+    if (typeof window === "undefined") return null;
+    return safeParse<AstroReflectionDraft | null>(localStorage.getItem(KEYS.REFLECTION_DRAFT), null);
   },
 
-  saveReflectionDraft: async (): Promise<void> => {
-    return;
+  saveReflectionDraft: async (draft: AstroReflectionDraft): Promise<void> => {
+    if (typeof window === "undefined") return;
+    safeSave(KEYS.REFLECTION_DRAFT, draft);
   },
 
   clearReflectionDraft: async (): Promise<void> => {
-    return;
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(KEYS.REFLECTION_DRAFT);
+    } catch (error) {
+      console.error("AstroRealAppLocalStorageAdapter: Failed to clear reflection draft.", error);
+    }
   }
 };
