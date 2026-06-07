@@ -48,6 +48,11 @@ export function AstroReflectionPanel({
         text,
         date: new Date().toLocaleDateString("en-CA"),
       });
+      // Clear fields upon successful submission
+      setTitle("");
+      setActivity("");
+      setRating("เหมาะสมมาก");
+      setText("");
     } else {
       setLocalSavedMessage("บันทึกสำเร็จ (โหมดจำลอง)");
       setTimeout(() => setLocalSavedMessage(""), 3000);
@@ -62,7 +67,15 @@ export function AstroReflectionPanel({
           <p className="text-xs text-slate-300">เปรียบเทียบคำพยากรณ์รอบเวลากับเหตุการณ์ที่เผชิญจริง เพื่อทบทวนการเรียนรู้</p>
         </div>
         <button
-          onClick={onResetReflections}
+          onClick={() => {
+            setTitle("");
+            setActivity("");
+            setRating("เหมาะสมมาก");
+            setText("");
+            if (onResetReflections) {
+              onResetReflections();
+            }
+          }}
           className="text-xs text-slate-300 hover:text-rose-400 transition-colors flex items-center gap-1"
           title="ล้างข้อมูลและใช้ข้อมูลเริ่มต้น"
         >
