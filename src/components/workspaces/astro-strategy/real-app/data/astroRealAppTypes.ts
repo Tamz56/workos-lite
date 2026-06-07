@@ -113,4 +113,10 @@ export interface AstroStrategyDataAdapter {
   
   /** Clears the active reflection draft (e.g. after successful history append) */
   clearReflectionDraft(): Promise<void>;
+
+  /** Clears the strategy planning notes key from persistence */
+  clearPlanningNotes(): Promise<void>;
+
+  /** Clears all preview keys from persistence */
+  clearAllPreviewData(): Promise<void>;
 }

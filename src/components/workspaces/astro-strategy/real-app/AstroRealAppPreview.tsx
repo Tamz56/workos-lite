@@ -8,6 +8,7 @@ import { AstroReflectionPanel } from "./components/AstroReflectionPanel";
 import { AstroReflectionHistoryPanel } from "./components/AstroReflectionHistoryPanel";
 import { AstroStrategyPlanningPanel } from "./components/AstroStrategyPlanningPanel";
 import { AstroGuideEthicsPanel } from "./components/AstroGuideEthicsPanel";
+import { AstroPreviewDataToolsPanel } from "./components/AstroPreviewDataToolsPanel";
 import { AstroStrategyAppShell } from "./AstroStrategyAppShell";
 
 import {
@@ -24,7 +25,7 @@ import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft } from 
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type PreviewTab = "today" | "reflection" | "history" | "planning" | "guide";
+type PreviewTab = "today" | "reflection" | "history" | "planning" | "guide" | "tools";
 
 const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
   { id: "today", label: "📊 สรุปวันนี้", description: "Daily Timing Brief" },
@@ -32,6 +33,7 @@ const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
   { id: "history", label: "📋 ประวัติ", description: "Reflection History" },
   { id: "planning", label: "🎯 แผนกลยุทธ์", description: "Strategy Planning" },
   { id: "guide", label: "📖 คู่มือ", description: "Guide & Ethics" },
+  { id: "tools", label: "⚙️ เครื่องมือข้อมูล", description: "Data Tools" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -174,6 +176,43 @@ export function AstroRealAppPreview() {
     await AstroRealAppLocalStorageAdapter.savePlanningNotes(updatedNotes);
   };
 
+  // Tools Handlers to Reset Individual or All preview LocalStorage namespaces safely
+  const handleResetHistoryOnly = async () => {
+    setHistoryLogs(MOCK_HISTORY_LOGS);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("astro-real-app:reflection-history:v1");
+    }
+  };
+
+  const handleResetPlanningOnly = async () => {
+    setPlanningNotes(MOCK_PLANNING_NOTES);
+    await AstroRealAppLocalStorageAdapter.clearPlanningNotes();
+  };
+
+  const handleResetDraftOnly = async () => {
+    const clearedDraft = {
+      title: "",
+      activity: "",
+      rating: "เหมาะสมมาก",
+      text: ""
+    };
+    setReflectionDraft(clearedDraft);
+    await AstroRealAppLocalStorageAdapter.clearReflectionDraft();
+  };
+
+  const handleResetAllData = async () => {
+    setHistoryLogs(MOCK_HISTORY_LOGS);
+    setPlanningNotes(MOCK_PLANNING_NOTES);
+    const clearedDraft = {
+      title: "",
+      activity: "",
+      rating: "เหมาะสมมาก",
+      text: ""
+    };
+    setReflectionDraft(clearedDraft);
+    await AstroRealAppLocalStorageAdapter.clearAllPreviewData();
+  };
+
   return (
     <AstroStrategyAppShell>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -292,6 +331,14 @@ export function AstroRealAppPreview() {
               ethicalFramingText={MOCK_GUIDE_DATA.ethicalFramingText}
               reflectionUseText={MOCK_GUIDE_DATA.reflectionUseText}
               closingQuote={MOCK_GUIDE_DATA.closingQuote}
+            />
+          )}
+          {activeTab === "tools" && (
+            <AstroPreviewDataToolsPanel
+              onResetHistory={handleResetHistoryOnly}
+              onResetPlanning={handleResetPlanningOnly}
+              onResetDraft={handleResetDraftOnly}
+              onResetAll={handleResetAllData}
             />
           )}
         </div>

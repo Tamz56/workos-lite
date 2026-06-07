@@ -85,5 +85,25 @@ export const AstroRealAppLocalStorageAdapter: AstroStrategyDataAdapter = {
     } catch (error) {
       console.error("AstroRealAppLocalStorageAdapter: Failed to clear reflection draft.", error);
     }
+  },
+
+  clearPlanningNotes: async (): Promise<void> => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(KEYS.PLANNING_NOTES);
+    } catch (error) {
+      console.error("AstroRealAppLocalStorageAdapter: Failed to clear planning notes.", error);
+    }
+  },
+
+  clearAllPreviewData: async (): Promise<void> => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(KEYS.REFLECTION_HISTORY);
+      localStorage.removeItem(KEYS.PLANNING_NOTES);
+      localStorage.removeItem(KEYS.REFLECTION_DRAFT);
+    } catch (error) {
+      console.error("AstroRealAppLocalStorageAdapter: Failed to clear all preview data.", error);
+    }
   }
 };
