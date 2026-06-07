@@ -4,6 +4,7 @@ import * as React from "react";
 import { Database, Trash2, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw, Play, Info } from "lucide-react";
 import { buildLegacyMigrationDryRunReport, migrateReadyLegacyKeysWithConfirmation } from "../data/astroRealAppMigrationDryRunAdapter";
 import { MigrationDryRunReport, MigrationExecutionResult } from "../data/astroRealAppTypes";
+import { resetAstroBirthProfileToDefault } from "../data/astroRealAppBirthProfileStorageAdapter";
 
 export type AstroPreviewDataToolsPanelProps = {
   onResetHistory: () => void;
@@ -16,6 +17,7 @@ const KEYS = {
   REFLECTION_HISTORY: "astro-real-app:reflection-history:v1",
   PLANNING_NOTES: "astro-real-app:planning-notes:v1",
   REFLECTION_DRAFT: "astro-real-app:reflection-draft:v1",
+  BIRTH_PROFILE: "astro-real-app:birth-profile:v1",
 };
 
 export function AstroPreviewDataToolsPanel({
@@ -28,7 +30,12 @@ export function AstroPreviewDataToolsPanel({
     history: false,
     planning: false,
     draft: false,
+    birthProfile: false,
   });
+  const [birthProfileMeta, setBirthProfileMeta] = React.useState<{
+    version?: number;
+    updatedAt?: string;
+  } | null>(null);
   const [statusMessage, setStatusMessage] = React.useState("");
   const [report, setReport] = React.useState<MigrationDryRunReport | null>(null);
   const [confirmed, setConfirmed] = React.useState(false);
@@ -40,7 +47,23 @@ export function AstroPreviewDataToolsPanel({
         history: localStorage.getItem(KEYS.REFLECTION_HISTORY) !== null,
         planning: localStorage.getItem(KEYS.PLANNING_NOTES) !== null,
         draft: localStorage.getItem(KEYS.REFLECTION_DRAFT) !== null,
+        birthProfile: localStorage.getItem(KEYS.BIRTH_PROFILE) !== null,
       });
+
+      const bpRaw = localStorage.getItem(KEYS.BIRTH_PROFILE);
+      if (bpRaw) {
+        try {
+          const parsed = JSON.parse(bpRaw);
+          setBirthProfileMeta({
+            version: parsed.version,
+            updatedAt: parsed.updatedAt,
+          });
+        } catch {
+          setBirthProfileMeta(null);
+        }
+      } else {
+        setBirthProfileMeta(null);
+      }
     }
   }, []);
 
@@ -62,6 +85,18 @@ export function AstroPreviewDataToolsPanel({
     if (confirmedAction) {
       callback();
       showFeedback(`รีเซ็ต "${label}" สำเร็จ`);
+    }
+  };
+
+  const handleResetBirthProfile = () => {
+    const confirmedAction = window.confirm("คุณต้องการรีเซ็ตโปรไฟล์วันเกิดเป็นค่าเริ่มต้น (คุณตั้ม) ใช่หรือไม่?");
+    if (confirmedAction) {
+      const res = resetAstroBirthProfileToDefault();
+      if (res.success) {
+        showFeedback("รีเซ็ตโปรไฟล์วันเกิดสำเร็จ");
+      } else {
+        showFeedback(`รีเซ็ตล้มเหลว: ${res.error}`);
+      }
     }
   };
 
@@ -108,7 +143,7 @@ export function AstroPreviewDataToolsPanel({
       <div className="space-y-3">
         <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">คีย์ตรวจวัดข้อมูล (LocalStorage Keys Status)</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* 1. History */}
           <div className="bg-slate-950/70 border border-slate-750 p-4 rounded-xl space-y-3 flex flex-col justify-between">
             <div className="space-y-1">
@@ -181,6 +216,36 @@ export function AstroPreviewDataToolsPanel({
               className="w-full py-1.5 px-3 bg-slate-900 hover:bg-rose-950/30 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-900/50 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
             >
               <Trash2 className="w-3.5 h-3.5" /> ล้างเฉพาะดราฟต์
+            </button>
+          </div>
+
+          {/* 4. Birth Profile */}
+          <div className="bg-slate-950/70 border border-slate-750 p-4 rounded-xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-400 font-mono block break-all">{KEYS.BIRTH_PROFILE}</span>
+              <p className="text-xs font-semibold text-slate-200">Birth Profile (โปรไฟล์วันเกิด)</p>
+              <div className="flex flex-col gap-1 text-[11px] pt-1">
+                {statuses.birthProfile ? (
+                  <>
+                    <span className="text-emerald-400 flex items-center gap-1 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> มีข้อมูลเก็บอยู่ (Exists)
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      v{birthProfileMeta?.version ?? "1"} | {birthProfileMeta?.updatedAt ? new Date(birthProfileMeta.updatedAt).toLocaleTimeString("en-GB") : "-"}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-slate-405 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5" /> ใช้ค่าตั้งต้น (คุณตั้ม)
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={handleResetBirthProfile}
+              className="w-full py-1.5 px-3 bg-slate-900 hover:bg-indigo-950/30 text-slate-300 hover:text-indigo-300 border border-slate-700 hover:border-indigo-900/50 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> รีเซ็ตโปรไฟล์ตั้งต้น
             </button>
           </div>
         </div>

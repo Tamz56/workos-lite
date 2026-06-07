@@ -167,12 +167,42 @@ export interface MigrationExecutionResult {
 }
 
 export interface AstroBirthProfile {
+  displayName?: string;
+  fullName?: string;
   birthDate: string;
   birthTime: string;
   birthPlace: string;
   timezone?: string;
+  utcOffset?: string;
   birthWeekday?: string;
+  notes?: string;
+  updatedAt?: string;
+  schemaVersion?: number;
 }
+
+export interface AstroBirthProfileStorageEnvelope {
+  version: number;
+  updatedAt: string;
+  data: AstroBirthProfile;
+}
+
+export interface AstroBirthProfileValidationIssue {
+  field: keyof AstroBirthProfile;
+  message: string;
+  severity: "error" | "warning";
+}
+
+export interface AstroBirthProfileValidationResult {
+  isValid: boolean;
+  issues: AstroBirthProfileValidationIssue[];
+}
+
+export interface AstroBirthProfilePersistenceResult {
+  success: boolean;
+  error?: string;
+  profile?: AstroBirthProfile;
+}
+
 
 export interface AstroTimingInput {
   birthProfile: AstroBirthProfile;
