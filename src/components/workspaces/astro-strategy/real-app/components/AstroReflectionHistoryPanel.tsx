@@ -24,6 +24,13 @@ export interface ReflectionHistoryItem {
     cautionNote: string;
   };
   markdownSnapshot: string;
+  timingContext?: {
+    mode: string;
+    label: string;
+    source: "engine" | "fallback" | "manual" | "legacy";
+    capturedAt: string;
+    disclaimer?: string;
+  };
 }
 
 export type AstroReflectionHistoryPanelProps = {
@@ -407,6 +414,18 @@ export function AstroReflectionHistoryPanel({
                       </p>
                     )}
                   </div>
+
+                  {item.timingContext && (
+                    <div className="bg-slate-955/20 border border-slate-850 rounded-lg px-2.5 py-1.5 space-y-0.5 text-[10px] text-slate-400">
+                      <div className="flex justify-between items-center text-[9px] font-mono text-slate-500">
+                        <span>จังหวะเวลาสะท้อนคิด: {item.timingContext.mode} ({item.timingContext.source})</span>
+                        <span>{item.timingContext.capturedAt ? new Date(item.timingContext.capturedAt).toLocaleTimeString("en-GB") : "-"}</span>
+                      </div>
+                      {item.timingContext.disclaimer && (
+                        <p className="text-[9px] text-slate-500 leading-normal italic">{item.timingContext.disclaimer}</p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-700/50">
                     <button

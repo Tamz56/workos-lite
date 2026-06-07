@@ -30,6 +30,13 @@ export interface ReflectionHistoryItem {
   strategyMode: string;
   dailyCheckinSnapshot: DailyCheckinSnapshot;
   markdownSnapshot: string;
+  timingContext?: {
+    mode: string;
+    label: string;
+    source: "engine" | "fallback" | "manual" | "legacy";
+    capturedAt: string;
+    disclaimer?: string;
+  };
 }
 
 export interface AstroPlanningNotes {

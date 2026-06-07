@@ -112,16 +112,18 @@ export function AstroRealAppPreview() {
     text: string;
     date: string;
   }) => {
+    const mappedMode = todayData.strategyMode === "Pause & Calibrate" ? "Pause" : todayData.strategyMode === "Stabilize & Structure" ? "Stabilize" : "Focus";
+
     const newItem: ReflectionHistoryItem = {
       id: "h_" + Date.now(),
       version: 1,
       createdAt: new Date().toLocaleDateString("en-CA") + " " + new Date().toLocaleTimeString("en-GB"),
       reflectionDate: data.date,
-      reflectionMode: "Focus", // Default mock category
+      reflectionMode: mappedMode,
       reflectionSummary: data.title,
       noticedNotes: data.text,
       nextRightAction: data.activity,
-      strategyMode: MOCK_TODAY_DATA.strategyMode,
+      strategyMode: todayData.strategyMode,
       dailyCheckinSnapshot: {
         energyLevel: "steady",
         clarityLevel: "clear",
@@ -131,7 +133,14 @@ export function AstroRealAppPreview() {
         todayIntention: data.activity,
         cautionNote: ""
       },
-      markdownSnapshot: ""
+      markdownSnapshot: "",
+      timingContext: {
+        mode: todayData.strategyMode,
+        label: mappedMode,
+        source: todayMetadata ? "engine" : "fallback",
+        capturedAt: new Date().toISOString(),
+        disclaimer: todayMetadata?.disclaimer || undefined
+      }
     };
 
     const updatedHistory = [newItem, ...historyLogs];
