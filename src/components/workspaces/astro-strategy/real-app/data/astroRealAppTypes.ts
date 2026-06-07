@@ -120,3 +120,22 @@ export interface AstroStrategyDataAdapter {
   /** Clears all preview keys from persistence */
   clearAllPreviewData(): Promise<void>;
 }
+
+export interface MigrationKeyMapping {
+  legacyKey: string;
+  targetKey: string;
+  bytesDetected: number;
+  status: "pending" | "ready" | "skipped_empty" | "error";
+  error?: string;
+}
+
+export interface MigrationDryRunReport {
+  timestamp: string;
+  dryRun: boolean;
+  status: "idle" | "success" | "skipped" | "error";
+  migrationNeeded: boolean;
+  legacyKeysFound: string[];
+  mappings: MigrationKeyMapping[];
+  errorMessage?: string;
+}
+
