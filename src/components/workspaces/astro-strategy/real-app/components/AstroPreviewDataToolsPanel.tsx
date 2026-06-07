@@ -301,90 +301,99 @@ export function AstroPreviewDataToolsPanel({
         )}
 
         {/* Controlled Migration Flow Block */}
-        {report && report.mappings.some(m => m.status === "ready") && (
-          <div className="bg-slate-950/60 border border-slate-800/80 p-5 rounded-xl space-y-4 mt-4 animate-fadeIn">
-            <div className="space-y-1">
-              <h5 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                ดำเนินการโอนย้ายข้อมูลจริง (Legacy Data Migration Execution)
-              </h5>
-              <p className="text-[11px] text-slate-400">
-                ระบบตรวจพบข้อมูลเดิมที่พร้อมโอนย้าย คุณสามารถดำเนินการคัดลอกข้อมูลมายังระบบใหม่ได้ตามกฎความปลอดภัย
-              </p>
-            </div>
+        {(() => {
+          const hasReadyItems = report !== null && report.mappings.some(m => m.status === "ready");
+          const isButtonDisabled = !report || !hasReadyItems || !confirmed;
+          const isCheckboxDisabled = !report || !hasReadyItems;
 
-            {/* Warning Callout */}
-            <div className="bg-indigo-950/30 border border-indigo-500/20 p-3 rounded-lg text-[11px] text-indigo-300">
-              <strong>คำแนะนำความปลอดภัย</strong>: การโอนย้ายนี้จะทำงานแบบ <strong>Copy-Only</strong> โดยจะเขียนข้อมูลเฉพาะคีย์เป้าหมายแอปใหม่ที่ยังไม่มีการจัดเก็บข้อมูลใดๆ เท่านั้น จะไม่มีการลบหรือดัดแปลงข้อมูลประวัติในระบบดั้งเดิมใดๆ ทั้งสิ้น
-            </div>
-
-            {/* Checkbox & Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-350 max-w-lg select-none">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                  className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900"
-                />
-                <span>ฉันเข้าใจและยอมรับว่าการกระทำนี้จะคัดลอกข้อมูลเดิมเฉพาะจุดที่พร้อมใช้งานเท่านั้น และไม่มีการลบข้อมูลระบบเก่าออก</span>
-              </label>
-
-              <button
-                disabled={!confirmed}
-                onClick={handleExecuteMigration}
-                className={`py-2 px-5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                  confirmed
-                    ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm cursor-pointer"
-                    : "bg-slate-850 text-slate-500 border border-slate-800/60 cursor-not-allowed"
-                }`}
-              >
-                คัดลอกข้อมูลที่พร้อมใช้งาน (Copy Ready Legacy Data)
-              </button>
-            </div>
-
-            {/* Execution Result Report */}
-            {execResult && (
-              <div className="mt-4 bg-slate-900/40 border border-slate-800 rounded-lg p-4 space-y-3 animate-fadeIn">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span className="text-xs font-bold text-slate-200">ผลลัพธ์การโอนย้ายข้อมูล (Migration Result)</span>
-                  <span className="text-[10px] text-slate-550 font-mono">{execResult.timestamp}</span>
-                </div>
-
-                {/* Summary Row */}
-                <div className="flex gap-4 text-xs font-semibold">
-                  <span className="text-emerald-400">คัดลอกสำเร็จ: {execResult.copiedCount} รายการ</span>
-                  <span className="text-slate-400">ข้าม: {execResult.skippedCount} รายการ</span>
-                  {execResult.failedCount > 0 && <span className="text-rose-450">ล้มเหลว: {execResult.failedCount} รายการ</span>}
-                </div>
-
-                {/* Key Execution List */}
-                <div className="max-h-48 overflow-y-auto divide-y divide-slate-800/40 text-[11px] font-mono space-y-1">
-                  {execResult.items.map((item, idx) => {
-                    let statusColor = "text-slate-400";
-                    if (item.status === "copied") statusColor = "text-emerald-400 font-bold";
-                    if (item.status.startsWith("skipped-")) statusColor = "text-slate-500";
-                    if (item.status === "failed") statusColor = "text-rose-400 font-bold";
-
-                    return (
-                      <div key={idx} className="py-1.5 flex flex-col sm:flex-row justify-between gap-1">
-                        <div className="truncate text-slate-400 select-all max-w-sm" title={item.legacyKey}>
-                          {item.legacyKey} → {item.targetKey}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={statusColor}>{item.status}</span>
-                          {item.bytesTransferred !== undefined && (
-                            <span className="text-slate-600 text-[10px]">({item.bytesTransferred} B)</span>
-                          )}
-                          {item.error && <span className="text-rose-550 text-[10px]" title={item.error}>{item.error}</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+          return (
+            <div className="bg-slate-950/60 border border-slate-800/80 p-5 rounded-xl space-y-4 mt-4">
+              <div className="space-y-1">
+                <h5 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  ดำเนินการโอนย้ายข้อมูลจริง (Legacy Data Migration Execution)
+                </h5>
+                <p className="text-[11px] text-slate-400">
+                  {isCheckboxDisabled
+                    ? "กรุณากด 'จำลองการโอนย้าย (Run Dry Run)' ก่อนเพื่อสแกนและยืนยันข้อมูลพร้อมย้าย"
+                    : "ระบบตรวจพบข้อมูลเดิมที่พร้อมโอนย้าย คุณสามารถดำเนินการคัดลอกข้อมูลมายังระบบใหม่ได้ตามกฎความปลอดภัย"}
+                </p>
               </div>
-            )}
-          </div>
-        )}
+
+              {/* Warning Callout */}
+              <div className="bg-indigo-950/30 border border-indigo-500/20 p-3 rounded-lg text-[11px] text-indigo-300">
+                <strong>คำแนะนำความปลอดภัย</strong>: การโอนย้ายนี้จะทำงานแบบ <strong>Copy-Only</strong> โดยจะเขียนข้อมูลเฉพาะคีย์เป้าหมายแอปใหม่ที่ยังไม่มีการจัดเก็บข้อมูลใดๆ เท่านั้น จะไม่มีการลบหรือดัดแปลงข้อมูลประวัติในระบบดั้งเดิมใดๆ ทั้งสิ้น
+              </div>
+
+              {/* Checkbox & Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+                <label className={`flex items-start gap-2.5 text-xs max-w-lg select-none ${isCheckboxDisabled ? "text-slate-500 cursor-not-allowed" : "text-slate-350 cursor-pointer"}`}>
+                  <input
+                    type="checkbox"
+                    checked={confirmed && !isCheckboxDisabled}
+                    disabled={isCheckboxDisabled}
+                    onChange={(e) => setConfirmed(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900 disabled:opacity-50"
+                  />
+                  <span>ฉันเข้าใจและยอมรับว่าการกระทำนี้จะคัดลอกข้อมูลเดิมเฉพาะจุดที่พร้อมใช้งานเท่านั้น และไม่มีการลบข้อมูลระบบเก่าออก</span>
+                </label>
+
+                <button
+                  disabled={isButtonDisabled}
+                  onClick={handleExecuteMigration}
+                  className={`py-2 px-5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                    !isButtonDisabled
+                      ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm cursor-pointer"
+                      : "bg-slate-850 text-slate-500 border border-slate-800/60 cursor-not-allowed"
+                  }`}
+                >
+                  คัดลอกข้อมูลที่พร้อมใช้งาน (Copy Ready Legacy Data)
+                </button>
+              </div>
+
+              {/* Execution Result Report */}
+              {execResult && (
+                <div className="mt-4 bg-slate-900/40 border border-slate-800 rounded-lg p-4 space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold text-slate-200">ผลลัพธ์การโอนย้ายข้อมูล (Migration Result)</span>
+                    <span className="text-[10px] text-slate-550 font-mono">{execResult.timestamp}</span>
+                  </div>
+
+                  {/* Summary Row */}
+                  <div className="flex gap-4 text-xs font-semibold">
+                    <span className="text-emerald-400">คัดลอกสำเร็จ: {execResult.copiedCount} รายการ</span>
+                    <span className="text-slate-400">ข้าม: {execResult.skippedCount} รายการ</span>
+                    {execResult.failedCount > 0 && <span className="text-rose-450">ล้มเหลว: {execResult.failedCount} รายการ</span>}
+                  </div>
+
+                  {/* Key Execution List */}
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-800/40 text-[11px] font-mono space-y-1">
+                    {execResult.items.map((item, idx) => {
+                      let statusColor = "text-slate-400";
+                      if (item.status === "copied") statusColor = "text-emerald-400 font-bold";
+                      if (item.status.startsWith("skipped-")) statusColor = "text-slate-500";
+                      if (item.status === "failed") statusColor = "text-rose-400 font-bold";
+
+                      return (
+                        <div key={idx} className="py-1.5 flex flex-col sm:flex-row justify-between gap-1">
+                          <div className="truncate text-slate-400 select-all max-w-sm" title={item.legacyKey}>
+                            {item.legacyKey} → {item.targetKey}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={statusColor}>{item.status}</span>
+                            {item.bytesTransferred !== undefined && (
+                              <span className="text-slate-600 text-[10px]">({item.bytesTransferred} B)</span>
+                            )}
+                            {item.error && <span className="text-rose-550 text-[10px]" title={item.error}>{item.error}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Global Actions */}
