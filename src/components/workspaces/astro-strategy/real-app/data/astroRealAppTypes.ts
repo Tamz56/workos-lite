@@ -142,3 +142,28 @@ export interface MigrationDryRunReport {
   errorMessage?: string;
 }
 
+export type MigrationExecutionStatus =
+  | "copied"
+  | "skipped-target-exists"
+  | "skipped-missing-legacy"
+  | "skipped-not-ready"
+  | "skipped-parse-error"
+  | "failed";
+
+export interface MigrationExecutionItem {
+  legacyKey: string;
+  targetKey: string;
+  status: MigrationExecutionStatus;
+  bytesTransferred?: number;
+  error?: string;
+}
+
+export interface MigrationExecutionResult {
+  timestamp: string;
+  copiedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  items: MigrationExecutionItem[];
+}
+
+

@@ -1,4 +1,4 @@
-import { MigrationDryRunReport, MigrationKeyMapping } from "./astroRealAppTypes";
+import { MigrationDryRunReport, MigrationKeyMapping, MigrationExecutionResult, MigrationExecutionItem } from "./astroRealAppTypes";
 
 /**
  * Safely parses legacy JSON strings.
@@ -141,5 +141,171 @@ export function buildLegacyMigrationDryRunReport(): MigrationDryRunReport {
     migrationNeeded,
     legacyKeysFound,
     mappings
+  };
+}
+
+/**
+ * Copies legacy data key into empty target key if valid and target is empty.
+ * Never deletes the legacy key.
+ */
+export function copyLegacyKeyToTargetIfEmpty(
+  legacyKey: string,
+  targetKey: string
+): MigrationExecutionItem {
+  if (typeof window === "undefined") {
+    return {
+      legacyKey,
+      targetKey,
+      status: "failed",
+      error: "ไม่สามารถเข้าถึง localStorage ในฝั่ง Server"
+    };
+  }
+
+  try {
+    // 1. Inspect status
+    const mapping = inspectMigrationKeyMapping(legacyKey, targetKey);
+    if (mapping.status === "missing-legacy") {
+      return { legacyKey, targetKey, status: "skipped-missing-legacy" };
+    }
+    if (mapping.status === "skip-target-exists") {
+      return { legacyKey, targetKey, status: "skipped-target-exists" };
+    }
+    if (mapping.status === "parse-error") {
+      return { legacyKey, targetKey, status: "skipped-parse-error" };
+    }
+    if (mapping.status !== "ready") {
+      return { legacyKey, targetKey, status: "skipped-not-ready" };
+    }
+
+    // 2. Read legacy value
+    const legacyVal = localStorage.getItem(legacyKey);
+    if (legacyVal === null) {
+      return { legacyKey, targetKey, status: "skipped-missing-legacy" };
+    }
+
+    // 3. Double check target presence immediately before write
+    const targetVal = localStorage.getItem(targetKey);
+    if (targetVal !== null) {
+      return { legacyKey, targetKey, status: "skipped-target-exists" };
+    }
+
+    // 4. Copy data safely
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(legacyVal);
+      // Check if it fits the payload wrapper structure
+      if (
+        parsedData &&
+        typeof parsedData === "object" &&
+        "version" in parsedData &&
+        "data" in parsedData
+      ) {
+        // Already versioned, write directly
+        localStorage.setItem(targetKey, legacyVal);
+        return {
+          legacyKey,
+          targetKey,
+          status: "copied",
+          bytesTransferred: legacyVal.length
+        };
+      }
+    } catch {
+      // Primitive fallback
+      parsedData = legacyVal;
+    }
+
+    // Wrap in standard payload envelope
+    const payload = {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      data: parsedData
+    };
+    const stringified = JSON.stringify(payload);
+    localStorage.setItem(targetKey, stringified);
+
+    return {
+      legacyKey,
+      targetKey,
+      status: "copied",
+      bytesTransferred: stringified.length
+    };
+  } catch (error) {
+    const err = error as Error;
+    return {
+      legacyKey,
+      targetKey,
+      status: "failed",
+      error: err?.message || String(error)
+    };
+  }
+}
+
+/**
+ * Runs controlled migration for all ready keys.
+ * Never deletes any legacy keys.
+ */
+export function migrateReadyLegacyKeysWithConfirmation(): MigrationExecutionResult {
+  const mappingsToMigrate = [
+    {
+      legacy: "astro-strategy:reflection-history:v1",
+      target: "astro-real-app:reflection-history:v1"
+    },
+    {
+      legacy: "astro-strategy:planning-notes:v1",
+      target: "astro-real-app:planning-notes:v1"
+    },
+    {
+      legacy: "astro-strategy:reflection-log:v1",
+      target: "astro-real-app:reflection-draft:v1"
+    },
+    {
+      legacy: "astro.strategy.reflections",
+      target: "astro-real-app:reflection-history:v1"
+    },
+    {
+      legacy: "astro.strategy.birthDate",
+      target: "astro-real-app:birth-profile:v1"
+    },
+    {
+      legacy: "astro.strategy.birthTime",
+      target: "astro-real-app:birth-profile:v1"
+    },
+    {
+      legacy: "astro.strategy.birthPlace",
+      target: "astro-real-app:birth-profile:v1"
+    },
+    {
+      legacy: "astro.strategy.cycleGoal",
+      target: "astro-real-app:cycle-config:v1"
+    },
+    {
+      legacy: "astro.strategy.cyclePeriod",
+      target: "astro-real-app:cycle-config:v1"
+    }
+  ];
+
+  const items: MigrationExecutionItem[] = [];
+  let copiedCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+
+  for (const m of mappingsToMigrate) {
+    const res = copyLegacyKeyToTargetIfEmpty(m.legacy, m.target);
+    if (res.status === "copied") {
+      copiedCount++;
+    } else if (res.status === "failed") {
+      failedCount++;
+    } else {
+      skippedCount++;
+    }
+    items.push(res);
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    copiedCount,
+    skippedCount,
+    failedCount,
+    items
   };
 }
