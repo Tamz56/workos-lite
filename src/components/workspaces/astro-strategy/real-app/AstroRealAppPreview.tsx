@@ -20,7 +20,10 @@ import {
 } from "./data/astroRealAppMockData";
 
 import { AstroRealAppLocalStorageAdapter } from "./data/astroRealAppLocalStorageAdapter";
-import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft } from "./data/astroRealAppTypes";
+import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData } from "./data/astroRealAppTypes";
+import { loadAstroBirthProfile } from "./data/astroRealAppBirthProfileStorageAdapter";
+import { buildAstroTimingInput, buildAstroEngineOutput } from "./data/astroRealAppAstrologyEngineAdapter";
+import { mapEngineOutputToTodayData } from "./data/astroRealAppTodayTimingViewModel";
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -57,6 +60,11 @@ export function AstroRealAppPreview() {
   const [isHydrated, setIsHydrated] = React.useState(false);
   const [historySaveStatus, setHistorySaveStatus] = React.useState("");
 
+  // DEV-024: Today calculation states
+  const [todayData, setTodayData] = React.useState<AstroTodayData>(MOCK_TODAY_DATA);
+  const [todayMetadata, setTodayMetadata] = React.useState<AstroEngineMetadata | undefined>(undefined);
+  const [calculationFallbackNote, setCalculationFallbackNote] = React.useState<string | null>(null);
+
   // Hydration hook: Load from localStorage on client mount
   React.useEffect(() => {
     async function loadData() {
@@ -68,6 +76,29 @@ export function AstroRealAppPreview() {
       if (loadedDraft) {
         setReflectionDraft(loadedDraft);
       }
+
+      // DEV-024: Load birth profile and compute Today Timing
+      try {
+        const birthProfile = loadAstroBirthProfile();
+        const timingInput = buildAstroTimingInput(birthProfile);
+        const engineOutput = buildAstroEngineOutput(timingInput);
+        if (engineOutput) {
+          const mappedToday = mapEngineOutputToTodayData(engineOutput);
+          setTodayData(mappedToday);
+          setTodayMetadata(engineOutput.metadata);
+          setCalculationFallbackNote(null);
+        } else {
+          setTodayData(MOCK_TODAY_DATA);
+          setTodayMetadata(undefined);
+          setCalculationFallbackNote("ระบบไม่สามารถประมวลผลดาราศาสตร์ได้ จึงใช้อภิปรายค่าประมาณการทั่วไปแทน");
+        }
+      } catch (err) {
+        console.error("Failed to calculate today timing engine output:", err);
+        setTodayData(MOCK_TODAY_DATA);
+        setTodayMetadata(undefined);
+        setCalculationFallbackNote("ระบบเกิดข้อผิดพลาดในการคำนวณจังหวะดาราศาสตร์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
+      }
+
       setIsHydrated(true);
     }
     loadData();
@@ -285,12 +316,14 @@ export function AstroRealAppPreview() {
         <div className="min-h-[400px]">
           {activeTab === "today" && (
             <AstroTodayPanel
-              strategyMode={MOCK_TODAY_DATA.strategyMode}
-              strategyDirection={MOCK_TODAY_DATA.strategyDirection}
-              workRecommendations={MOCK_TODAY_DATA.workRecommendations}
-              riskPreventions={MOCK_TODAY_DATA.riskPreventions}
-              recoveryAnchors={MOCK_TODAY_DATA.recoveryAnchors}
-              reflectionPrompt={MOCK_TODAY_DATA.reflectionPrompt}
+              strategyMode={isHydrated ? todayData.strategyMode : MOCK_TODAY_DATA.strategyMode}
+              strategyDirection={isHydrated ? todayData.strategyDirection : MOCK_TODAY_DATA.strategyDirection}
+              workRecommendations={isHydrated ? todayData.workRecommendations : MOCK_TODAY_DATA.workRecommendations}
+              riskPreventions={isHydrated ? todayData.riskPreventions : MOCK_TODAY_DATA.riskPreventions}
+              recoveryAnchors={isHydrated ? todayData.recoveryAnchors : MOCK_TODAY_DATA.recoveryAnchors}
+              reflectionPrompt={isHydrated ? todayData.reflectionPrompt : MOCK_TODAY_DATA.reflectionPrompt}
+              engineMetadata={isHydrated ? todayMetadata : undefined}
+              fallbackNote={isHydrated ? calculationFallbackNote : null}
             />
           )}
           {activeTab === "reflection" && (

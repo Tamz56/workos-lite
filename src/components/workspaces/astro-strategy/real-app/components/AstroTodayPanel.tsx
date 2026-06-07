@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Zap, Compass, CheckCircle, ShieldAlert, Activity, MessageSquare } from "lucide-react";
+import { AstroEngineMetadata } from "../data/astroRealAppTypes";
 
 export type AstroTodayPanelProps = {
   strategyMode?: string;
@@ -15,6 +16,10 @@ export type AstroTodayPanelProps = {
   workRecommendationThaiMap?: Record<string, string>;
   riskPreventionThaiMap?: Record<string, string>;
   recoveryAnchorThaiMap?: Record<string, string>;
+
+  // DEV-024 props
+  engineMetadata?: AstroEngineMetadata;
+  fallbackNote?: string | null;
 };
 
 const DEFAULT_WORK_RECOMMENDATION_MAP: Record<string, string> = {
@@ -55,6 +60,8 @@ export function AstroTodayPanel({
   workRecommendationThaiMap = DEFAULT_WORK_RECOMMENDATION_MAP,
   riskPreventionThaiMap = DEFAULT_RISK_PREVENTION_MAP,
   recoveryAnchorThaiMap = DEFAULT_RECOVERY_ANCHOR_MAP,
+  engineMetadata,
+  fallbackNote = null,
 }: AstroTodayPanelProps) {
   return (
     <div className="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
@@ -69,6 +76,13 @@ export function AstroTodayPanel({
           วันนี้ (Daily)
         </span>
       </div>
+
+      {fallbackNote && (
+        <div className="bg-amber-950/30 border border-amber-500/20 p-3.5 rounded-xl text-xs text-amber-300 flex items-start gap-2.5 animate-fadeIn">
+          <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <span>{fallbackNote}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Today's Mode & Strategic Direction */}
@@ -133,9 +147,24 @@ export function AstroTodayPanel({
         </div>
       </div>
 
-      <div className="text-[11px] text-slate-300 border-t border-slate-700/60 pt-4 leading-normal">
-        *ข้อความนี้เป็น mock brief สำหรับการสะท้อนตนเองและวางแผนส่วนบุคคลเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา
-      </div>
+      {engineMetadata ? (
+        <div className="text-[10px] text-slate-400 border-t border-slate-700/60 pt-4 leading-normal space-y-1.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[9px] text-slate-500">
+            <span>การคำนวณ: {engineMetadata.calculationMode}</span>
+            <span>•</span>
+            <span>เอนจิ้น: {engineMetadata.sourceEngine}</span>
+            <span>•</span>
+            <span>ระดับความมั่นใจ: {(engineMetadata.confidenceScore * 100).toFixed(0)}%</span>
+          </div>
+          <p className="leading-relaxed text-slate-400 text-[10px]">
+            *คำเตือน: {engineMetadata.disclaimer || "ข้อมูลนี้ใช้เพื่อการสะท้อนและวางแผนเชิงกลยุทธ์เท่านั้น ไม่ใช่คำทำนายตายตัวหรือคำแนะนำทางการแพทย์"}
+          </p>
+        </div>
+      ) : (
+        <div className="text-[11px] text-slate-350 border-t border-slate-700/60 pt-4 leading-normal">
+          *ข้อความนี้เป็นประมาณการจำลองสำหรับการสะท้อนตนเองและวางแผนส่วนบุคคลเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ การวินิจฉัย หรือการรักษา
+        </div>
+      )}
     </div>
   );
 }
