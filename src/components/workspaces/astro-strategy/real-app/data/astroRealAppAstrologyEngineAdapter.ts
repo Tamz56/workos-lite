@@ -148,7 +148,6 @@ export function buildAstroRecoveryAnchors(input: AstroTimingInput): AstroRecover
     ];
   }
 }
-
 export function buildAstroEngineOutput(input: AstroTimingInput): AstroEngineOutput {
   const brief = calculateAstroTimingBrief(input);
   const recommendations = buildAstroStrategyRecommendations(input);
@@ -163,7 +162,12 @@ export function buildAstroEngineOutput(input: AstroTimingInput): AstroEngineOutp
     recommendations,
     riskFlags,
     recoveryAnchors,
-    disclaimer
+    metadata: {
+      calculationMode: "rule-based",
+      confidenceScore: 1.0,
+      sourceEngine: "ArborDesk Astrology Logic v0.1",
+      disclaimer
+    }
   };
 }
 

@@ -205,14 +205,21 @@ export interface AstroRecoveryAnchor {
   type: "short" | "evening";
 }
 
+export interface AstroEngineMetadata {
+  readonly calculationMode: "rule-based" | "ephemeris" | "hybrid";
+  readonly confidenceScore: number; // 0.0 to 1.0 confidence representation
+  readonly sourceEngine: string; // identifier of source algorithm
+  readonly disclaimer: string; // safety and ethical disclaimer
+}
+
 export interface AstroEngineOutput {
-  timestamp: string;
-  timingInput: AstroTimingInput;
-  brief: AstroTimingBrief;
-  recommendations: AstroStrategyRecommendation[];
-  riskFlags: AstroRiskFlag[];
-  recoveryAnchors: AstroRecoveryAnchor[];
-  disclaimer: string;
+  readonly timestamp: string;
+  readonly timingInput: AstroTimingInput;
+  readonly brief: AstroTimingBrief;
+  readonly recommendations: readonly AstroStrategyRecommendation[];
+  readonly riskFlags: readonly AstroRiskFlag[];
+  readonly recoveryAnchors: readonly AstroRecoveryAnchor[];
+  readonly metadata: AstroEngineMetadata;
 }
 
 
