@@ -418,10 +418,20 @@ export function AstroReflectionHistoryPanel({
                   {item.timingContext && (
                     <div className="bg-slate-955/20 border border-slate-850 rounded-lg px-2.5 py-1.5 space-y-0.5 text-[10px] text-slate-400">
                       <div className="flex justify-between items-center text-[9px] font-mono text-slate-500">
-                        <span>จังหวะเวลาสะท้อนคิด: {item.timingContext.mode} ({item.timingContext.source})</span>
-                        <span>{item.timingContext.capturedAt ? new Date(item.timingContext.capturedAt).toLocaleTimeString("en-GB") : "-"}</span>
+                        <span>จังหวะเวลาสะท้อนคิด: {item.timingContext?.mode || "ไม่ทราบโหมด"} ({item.timingContext?.source || "ไม่ระบุ"})</span>
+                        <span>
+                          {(() => {
+                            if (!item.timingContext?.capturedAt) return "-";
+                            try {
+                              const d = new Date(item.timingContext.capturedAt);
+                              return isNaN(d.getTime()) ? "-" : d.toLocaleTimeString("en-GB");
+                            } catch {
+                              return "-";
+                            }
+                          })()}
+                        </span>
                       </div>
-                      {item.timingContext.disclaimer && (
+                      {item.timingContext?.disclaimer && (
                         <p className="text-[9px] text-slate-500 leading-normal italic">{item.timingContext.disclaimer}</p>
                       )}
                     </div>
