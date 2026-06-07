@@ -25,6 +25,13 @@ import { AstroStrategyPlanningPanel } from "./components/AstroStrategyPlanningPa
 import { AstroGuideEthicsPanel } from "./components/AstroGuideEthicsPanel";
 import { AstroStrategyAppShell } from "./AstroStrategyAppShell";
 
+import {
+  MOCK_TODAY_DATA,
+  MOCK_HISTORY_LOGS,
+  MOCK_PLANNING_NOTES,
+  MOCK_GUIDE_DATA,
+} from "./data/astroRealAppMockData";
+
 // ---------------------------------------------------------------------------
 // Tab definitions
 // ---------------------------------------------------------------------------
@@ -109,11 +116,46 @@ export function AstroRealAppPreview() {
         {/* Tab Content                                                     */}
         {/* ---------------------------------------------------------------- */}
         <div className="min-h-[400px]">
-          {activeTab === "today" && <AstroTodayPanel />}
-          {activeTab === "reflection" && <AstroReflectionPanel />}
-          {activeTab === "history" && <AstroReflectionHistoryPanel />}
-          {activeTab === "planning" && <AstroStrategyPlanningPanel />}
-          {activeTab === "guide" && <AstroGuideEthicsPanel />}
+          {activeTab === "today" && (
+            <AstroTodayPanel
+              strategyMode={MOCK_TODAY_DATA.strategyMode}
+              strategyDirection={MOCK_TODAY_DATA.strategyDirection}
+              workRecommendations={MOCK_TODAY_DATA.workRecommendations}
+              riskPreventions={MOCK_TODAY_DATA.riskPreventions}
+              recoveryAnchors={MOCK_TODAY_DATA.recoveryAnchors}
+              reflectionPrompt={MOCK_TODAY_DATA.reflectionPrompt}
+            />
+          )}
+          {activeTab === "reflection" && (
+            <AstroReflectionPanel
+              reflectionPrompt={MOCK_TODAY_DATA.reflectionPrompt}
+              totalReflectionsCount={MOCK_HISTORY_LOGS.length}
+            />
+          )}
+          {activeTab === "history" && (
+            <AstroReflectionHistoryPanel
+              historyLogs={MOCK_HISTORY_LOGS}
+            />
+          )}
+          {activeTab === "planning" && (
+            <AstroStrategyPlanningPanel
+              focusNext={MOCK_PLANNING_NOTES.focusNext}
+              slowDown={MOCK_PLANNING_NOTES.slowDown}
+              nextSmallAction={MOCK_PLANNING_NOTES.nextSmallAction}
+              reviewLater={MOCK_PLANNING_NOTES.reviewLater}
+              notesUpdatedAt={MOCK_PLANNING_NOTES.notesUpdatedAt}
+            />
+          )}
+          {activeTab === "guide" && (
+            <AstroGuideEthicsPanel
+              quickStartItems={MOCK_GUIDE_DATA.quickStartItems}
+              disclaimerItems={MOCK_GUIDE_DATA.disclaimerItems}
+              timingGuideDimensions={MOCK_GUIDE_DATA.timingGuideDimensions}
+              ethicalFramingText={MOCK_GUIDE_DATA.ethicalFramingText}
+              reflectionUseText={MOCK_GUIDE_DATA.reflectionUseText}
+              closingQuote={MOCK_GUIDE_DATA.closingQuote}
+            />
+          )}
         </div>
 
         {/* ---------------------------------------------------------------- */}
