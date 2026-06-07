@@ -9,6 +9,7 @@ import { AstroReflectionHistoryPanel } from "./components/AstroReflectionHistory
 import { AstroStrategyPlanningPanel } from "./components/AstroStrategyPlanningPanel";
 import { AstroGuideEthicsPanel } from "./components/AstroGuideEthicsPanel";
 import { AstroPreviewDataToolsPanel } from "./components/AstroPreviewDataToolsPanel";
+import { AstroBirthProfilePanel } from "./components/AstroBirthProfilePanel";
 import { AstroStrategyAppShell } from "./AstroStrategyAppShell";
 
 import {
@@ -25,13 +26,14 @@ import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft } from 
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type PreviewTab = "today" | "reflection" | "history" | "planning" | "guide" | "tools";
+type PreviewTab = "today" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools";
 
 const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
   { id: "today", label: "📊 สรุปวันนี้", description: "Daily Timing Brief" },
   { id: "reflection", label: "✍️ สะท้อนคิด", description: "Reflection Log" },
   { id: "history", label: "📋 ประวัติ", description: "Reflection History" },
   { id: "planning", label: "🎯 แผนกลยุทธ์", description: "Strategy Planning" },
+  { id: "profile", label: "👤 โปรไฟล์ดวงเกิด", description: "Birth Profile" },
   { id: "guide", label: "📖 คู่มือ", description: "Guide & Ethics" },
   { id: "tools", label: "⚙️ เครื่องมือข้อมูล", description: "Data Tools" },
 ];
@@ -322,6 +324,9 @@ export function AstroRealAppPreview() {
               notesUpdatedAt={isHydrated ? planningNotes.notesUpdatedAt : MOCK_PLANNING_NOTES.notesUpdatedAt}
               onPlanningChange={handlePlanningChange}
             />
+          )}
+          {activeTab === "profile" && (
+            <AstroBirthProfilePanel />
           )}
           {activeTab === "guide" && (
             <AstroGuideEthicsPanel
