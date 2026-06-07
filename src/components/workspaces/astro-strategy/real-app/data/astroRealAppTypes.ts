@@ -68,6 +68,20 @@ export interface AstroGuideData {
   closingQuote: string;
 }
 
+export interface AstroReflectionDraft {
+  title: string;
+  activity: string;
+  rating: string;
+  text: string;
+  updatedAt?: string;
+}
+
+export interface AstroPersistedPayload<T> {
+  version: number;
+  updatedAt: string;
+  data: T;
+}
+
 /**
  * AstroStrategyDataAdapter defines the core contracts for loading and saving real-app data.
  * In future persistence phases, this interface will be implemented to connect with LocalStorage, IndexDB, or backend APIs.
@@ -90,4 +104,13 @@ export interface AstroStrategyDataAdapter {
   
   /** Loads the guide & ethical settings */
   loadGuideData(): Promise<AstroGuideData>;
+
+  /** Loads the active unsaved reflection draft */
+  loadReflectionDraft(): Promise<AstroReflectionDraft | null>;
+  
+  /** Saves the active unsaved reflection draft */
+  saveReflectionDraft(draft: AstroReflectionDraft): Promise<void>;
+  
+  /** Clears the active reflection draft (e.g. after successful history append) */
+  clearReflectionDraft(): Promise<void>;
 }
