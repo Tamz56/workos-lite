@@ -166,4 +166,54 @@ export interface MigrationExecutionResult {
   items: MigrationExecutionItem[];
 }
 
+export interface AstroBirthProfile {
+  birthDate: string;
+  birthTime: string;
+  birthPlace: string;
+  timezone?: string;
+  birthWeekday?: string;
+}
+
+export interface AstroTimingInput {
+  birthProfile: AstroBirthProfile;
+  targetDate?: string; // Format: YYYY-MM-DD
+}
+
+export type AstroTimingMode = "Stabilize & Structure" | "Focus & Deliver" | "Pause & Calibrate";
+
+export interface AstroTimingBrief {
+  strategyMode: AstroTimingMode;
+  triggerSignal: string;
+  reason: string;
+  recommendedMove: string;
+  recoverySupport: string;
+  guardrail: string;
+}
+
+export interface AstroStrategyRecommendation {
+  text: string;
+  category: "work" | "planning" | "action";
+}
+
+export interface AstroRiskFlag {
+  text: string;
+  severity: "low" | "medium" | "high";
+}
+
+export interface AstroRecoveryAnchor {
+  text: string;
+  type: "short" | "evening";
+}
+
+export interface AstroEngineOutput {
+  timestamp: string;
+  timingInput: AstroTimingInput;
+  brief: AstroTimingBrief;
+  recommendations: AstroStrategyRecommendation[];
+  riskFlags: AstroRiskFlag[];
+  recoveryAnchors: AstroRecoveryAnchor[];
+  disclaimer: string;
+}
+
+
 
