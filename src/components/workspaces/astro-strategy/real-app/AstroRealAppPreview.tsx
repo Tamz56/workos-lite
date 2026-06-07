@@ -3,21 +3,6 @@
 import * as React from "react";
 import { Star } from "lucide-react";
 
-// ---------------------------------------------------------------------------
-// ASTRO-REAL-APP-DEV-007 — Real App Composition Preview
-//
-// Assembles all extracted real-app components into a single preview screen.
-// This is a composition/integration checkpoint only.
-//
-// Safety:
-//   - Does NOT replace the active /workspaces/astro-strategy route
-//   - Does NOT import from AstroStrategyPrototypeClient.tsx
-//   - Does NOT read/write localStorage
-//   - Does NOT add autosave, persistence, or export logic
-//   - Does NOT add astrology engine, AI, medical, or prediction logic
-//   - Uses mock/default data only
-// ---------------------------------------------------------------------------
-
 import { AstroTodayPanel } from "./components/AstroTodayPanel";
 import { AstroReflectionPanel } from "./components/AstroReflectionPanel";
 import { AstroReflectionHistoryPanel } from "./components/AstroReflectionHistoryPanel";
@@ -31,6 +16,9 @@ import {
   MOCK_PLANNING_NOTES,
   MOCK_GUIDE_DATA,
 } from "./data/astroRealAppMockData";
+
+import { AstroRealAppLocalStorageAdapter } from "./data/astroRealAppLocalStorageAdapter";
+import { ReflectionHistoryItem, AstroPlanningNotes } from "./data/astroRealAppTypes";
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -53,6 +41,95 @@ const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
 export function AstroRealAppPreview() {
   const [activeTab, setActiveTab] = React.useState<PreviewTab>("today");
 
+  // Client states with fallback to mock data before hydration
+  const [historyLogs, setHistoryLogs] = React.useState<ReflectionHistoryItem[]>(MOCK_HISTORY_LOGS);
+  const [planningNotes, setPlanningNotes] = React.useState<AstroPlanningNotes>(MOCK_PLANNING_NOTES);
+  const [isHydrated, setIsHydrated] = React.useState(false);
+  const [historySaveStatus, setHistorySaveStatus] = React.useState("");
+
+  // Hydration hook: Load from localStorage on client mount
+  React.useEffect(() => {
+    async function loadData() {
+      const loadedHistory = await AstroRealAppLocalStorageAdapter.loadReflectionHistory();
+      const loadedPlanning = await AstroRealAppLocalStorageAdapter.loadPlanningNotes();
+      setHistoryLogs(loadedHistory);
+      setPlanningNotes(loadedPlanning);
+      setIsHydrated(true);
+    }
+    loadData();
+  }, []);
+
+  // Handler to save new reflection history entry
+  const handleSubmitReflection = async (data: {
+    title: string;
+    activity: string;
+    rating: string;
+    text: string;
+    date: string;
+  }) => {
+    const newItem: ReflectionHistoryItem = {
+      id: "h_" + Date.now(),
+      version: 1,
+      createdAt: new Date().toLocaleDateString("en-CA") + " " + new Date().toLocaleTimeString("en-GB"),
+      reflectionDate: data.date,
+      reflectionMode: "Focus", // Default mock category
+      reflectionSummary: data.title,
+      noticedNotes: data.text,
+      nextRightAction: data.activity,
+      strategyMode: MOCK_TODAY_DATA.strategyMode,
+      dailyCheckinSnapshot: {
+        energyLevel: "steady",
+        clarityLevel: "clear",
+        workloadPressure: "normal",
+        focusCondition: "deep_focus",
+        bodySignal: "normal",
+        todayIntention: data.activity,
+        cautionNote: ""
+      },
+      markdownSnapshot: ""
+    };
+
+    const updatedHistory = [newItem, ...historyLogs];
+    setHistoryLogs(updatedHistory);
+    await AstroRealAppLocalStorageAdapter.saveReflectionHistory(updatedHistory);
+
+    setHistorySaveStatus("บันทึกเข้าระบบประวัติสำเร็จ");
+    setTimeout(() => setHistorySaveStatus(""), 3000);
+  };
+
+  // Handler to clear history logs
+  const handleClearAllHistory = async () => {
+    const confirmed = window.confirm("คุณแน่ใจหรือไม่ที่จะล้างประวัติการบันทึกทั้งหมดในเครื่องนี้?");
+    if (!confirmed) return;
+    setHistoryLogs([]);
+    await AstroRealAppLocalStorageAdapter.saveReflectionHistory([]);
+  };
+
+  // Handler to delete a single history log
+  const handleDeleteHistoryItem = async (id: string) => {
+    const updated = historyLogs.filter((item) => item.id !== id);
+    setHistoryLogs(updated);
+    await AstroRealAppLocalStorageAdapter.saveReflectionHistory(updated);
+  };
+
+  // Handler to update strategy planning notes
+  const handlePlanningChange = async (updatedFields: {
+    focusNext?: string;
+    slowDown?: string;
+    nextSmallAction?: string;
+    reviewLater?: string;
+  }) => {
+    const updatedNotes: AstroPlanningNotes = {
+      focusNext: updatedFields.focusNext !== undefined ? updatedFields.focusNext : planningNotes.focusNext,
+      slowDown: updatedFields.slowDown !== undefined ? updatedFields.slowDown : planningNotes.slowDown,
+      nextSmallAction: updatedFields.nextSmallAction !== undefined ? updatedFields.nextSmallAction : planningNotes.nextSmallAction,
+      reviewLater: updatedFields.reviewLater !== undefined ? updatedFields.reviewLater : planningNotes.reviewLater,
+      notesUpdatedAt: new Date().toLocaleDateString("en-CA") + " " + new Date().toLocaleTimeString("en-GB")
+    };
+    setPlanningNotes(updatedNotes);
+    await AstroRealAppLocalStorageAdapter.savePlanningNotes(updatedNotes);
+  };
+
   return (
     <AstroStrategyAppShell>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -69,7 +146,7 @@ export function AstroRealAppPreview() {
                 Astro Strategy Lab — Real App Preview
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 font-medium">
-                ตัวอย่างการประกอบคอมโพเนนต์แอปจริง (Composition Preview) — ยังไม่เชื่อมต่อข้อมูลจริง
+                ตัวอย่างการประกอบคอมโพเนนต์แอปจริง (Composition Preview) — บันทึกข้อมูลจำลองลงเครื่องจริงได้แล้ว
               </p>
             </div>
           </div>
@@ -78,7 +155,12 @@ export function AstroRealAppPreview() {
               PREVIEW MODE
             </span>
             <span>•</span>
-            <span>ข้อมูลทั้งหมดเป็น mock data เพื่อทดสอบการ compose เท่านั้น</span>
+            <span>
+              {!isHydrated 
+                ? "กำลังเตรียมโหลดข้อมูลจากเครื่อง..." 
+                : "ข้อมูลประวัติและแผนงานจะเซฟเก็บไว้ในบราวเซอร์นี้โดยอัตโนมัติ"
+              }
+            </span>
           </div>
         </div>
 
@@ -129,21 +211,27 @@ export function AstroRealAppPreview() {
           {activeTab === "reflection" && (
             <AstroReflectionPanel
               reflectionPrompt={MOCK_TODAY_DATA.reflectionPrompt}
-              totalReflectionsCount={MOCK_HISTORY_LOGS.length}
+              totalReflectionsCount={isHydrated ? historyLogs.length : MOCK_HISTORY_LOGS.length}
+              onSubmit={handleSubmitReflection}
+              savedMessage={historySaveStatus}
             />
           )}
           {activeTab === "history" && (
             <AstroReflectionHistoryPanel
-              historyLogs={MOCK_HISTORY_LOGS}
+              historyLogs={isHydrated ? historyLogs : MOCK_HISTORY_LOGS}
+              historySaveStatus={historySaveStatus}
+              onClearAllHistory={handleClearAllHistory}
+              onDeleteFromHistory={handleDeleteHistoryItem}
             />
           )}
           {activeTab === "planning" && (
             <AstroStrategyPlanningPanel
-              focusNext={MOCK_PLANNING_NOTES.focusNext}
-              slowDown={MOCK_PLANNING_NOTES.slowDown}
-              nextSmallAction={MOCK_PLANNING_NOTES.nextSmallAction}
-              reviewLater={MOCK_PLANNING_NOTES.reviewLater}
-              notesUpdatedAt={MOCK_PLANNING_NOTES.notesUpdatedAt}
+              focusNext={isHydrated ? planningNotes.focusNext : MOCK_PLANNING_NOTES.focusNext}
+              slowDown={isHydrated ? planningNotes.slowDown : MOCK_PLANNING_NOTES.slowDown}
+              nextSmallAction={isHydrated ? planningNotes.nextSmallAction : MOCK_PLANNING_NOTES.nextSmallAction}
+              reviewLater={isHydrated ? planningNotes.reviewLater : MOCK_PLANNING_NOTES.reviewLater}
+              notesUpdatedAt={isHydrated ? planningNotes.notesUpdatedAt : MOCK_PLANNING_NOTES.notesUpdatedAt}
+              onPlanningChange={handlePlanningChange}
             />
           )}
           {activeTab === "guide" && (
@@ -163,10 +251,10 @@ export function AstroRealAppPreview() {
         {/* ---------------------------------------------------------------- */}
         <div className="border-t border-slate-700/60 pt-4 text-center space-y-1">
           <p className="text-[10px] text-slate-300">
-            Astro Strategy Lab — Real App Composition Preview (DEV-007)
+            Astro Strategy Lab — Real App LocalStorage Preview (DEV-012)
           </p>
           <p className="text-[10px] text-slate-300">
-            คอมโพเนนต์ทั้งหมดใช้ข้อมูลจำลองเท่านั้น ยังไม่เชื่อมต่อ localStorage หรือระบบ persistence ใดๆ
+            ข้อมูลประวัติและแผนกลยุทธ์จะถูกแยกจัดเก็บไว้ในพื้นที่เบราว์เซอร์นี้ ไม่กระทบข้อมูลการทำงานหลักของระบบเดิม
           </p>
         </div>
       </div>
