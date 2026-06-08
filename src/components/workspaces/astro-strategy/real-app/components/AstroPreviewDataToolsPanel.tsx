@@ -11,6 +11,7 @@ export type AstroPreviewDataToolsPanelProps = {
   onResetPlanning: () => void;
   onResetDraft: () => void;
   onResetAll: () => void;
+  onResetOnboarding?: () => void;
 };
 
 const KEYS = {
@@ -18,6 +19,7 @@ const KEYS = {
   PLANNING_NOTES: "astro-real-app:planning-notes:v1",
   REFLECTION_DRAFT: "astro-real-app:reflection-draft:v1",
   BIRTH_PROFILE: "astro-real-app:birth-profile:v1",
+  ONBOARDING: "astro-real-app:onboarding:v1",
 };
 
 export function AstroPreviewDataToolsPanel({
@@ -25,12 +27,14 @@ export function AstroPreviewDataToolsPanel({
   onResetPlanning,
   onResetDraft,
   onResetAll,
+  onResetOnboarding,
 }: AstroPreviewDataToolsPanelProps) {
   const [statuses, setStatuses] = React.useState<Record<string, boolean>>({
     history: false,
     planning: false,
     draft: false,
     birthProfile: false,
+    onboarding: false,
   });
   const [birthProfileMeta, setBirthProfileMeta] = React.useState<{
     version?: number;
@@ -48,6 +52,7 @@ export function AstroPreviewDataToolsPanel({
         planning: localStorage.getItem(KEYS.PLANNING_NOTES) !== null,
         draft: localStorage.getItem(KEYS.REFLECTION_DRAFT) !== null,
         birthProfile: localStorage.getItem(KEYS.BIRTH_PROFILE) !== null,
+        onboarding: localStorage.getItem(KEYS.ONBOARDING) !== null,
       });
 
       const bpRaw = localStorage.getItem(KEYS.BIRTH_PROFILE);
@@ -143,7 +148,7 @@ export function AstroPreviewDataToolsPanel({
       <div className="space-y-3">
         <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">คีย์ตรวจวัดข้อมูล (LocalStorage Keys Status)</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {/* 1. History */}
           <div className="bg-slate-950/70 border border-slate-750 p-4 rounded-xl space-y-3 flex flex-col justify-between">
             <div className="space-y-1">
@@ -155,7 +160,7 @@ export function AstroPreviewDataToolsPanel({
                     <CheckCircle2 className="w-3.5 h-3.5" /> มีข้อมูลเก็บอยู่ (Exists)
                   </span>
                 ) : (
-                  <span className="text-slate-400 flex items-center gap-1 font-medium">
+                  <span className="text-slate-404 flex items-center gap-1 font-medium">
                     <AlertCircle className="w-3.5 h-3.5" /> ว่างเปล่า / ใช้ค่า Mock
                   </span>
                 )}
@@ -180,7 +185,7 @@ export function AstroPreviewDataToolsPanel({
                     <CheckCircle2 className="w-3.5 h-3.5" /> มีข้อมูลเก็บอยู่ (Exists)
                   </span>
                 ) : (
-                  <span className="text-slate-400 flex items-center gap-1 font-medium">
+                  <span className="text-slate-404 flex items-center gap-1 font-medium">
                     <AlertCircle className="w-3.5 h-3.5" /> ว่างเปล่า / ใช้ค่า Mock
                   </span>
                 )}
@@ -205,7 +210,7 @@ export function AstroPreviewDataToolsPanel({
                     <CheckCircle2 className="w-3.5 h-3.5" /> มีข้อมูลเก็บอยู่ (Exists)
                   </span>
                 ) : (
-                  <span className="text-slate-400 flex items-center gap-1 font-medium">
+                  <span className="text-slate-404 flex items-center gap-1 font-medium">
                     <AlertCircle className="w-3.5 h-3.5" /> ไม่มีดราฟต์ชั่วคราว
                   </span>
                 )}
@@ -246,6 +251,32 @@ export function AstroPreviewDataToolsPanel({
               className="w-full py-1.5 px-3 bg-slate-900 hover:bg-indigo-950/30 text-slate-300 hover:text-indigo-300 border border-slate-700 hover:border-indigo-900/50 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" /> รีเซ็ตโปรไฟล์ตั้งต้น
+            </button>
+          </div>
+
+          {/* 5. Onboarding Status */}
+          <div className="bg-slate-950/70 border border-slate-750 p-4 rounded-xl space-y-3 flex flex-col justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-400 font-mono block break-all">{KEYS.ONBOARDING}</span>
+              <p className="text-xs font-semibold text-slate-200">Onboarding Banner (สถานะปิดคำแนะนำ)</p>
+              <div className="flex items-center gap-1 text-[11px] pt-1">
+                {statuses.onboarding ? (
+                  <span className="text-emerald-400 flex items-center gap-1 font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> ซ่อนไว้แล้ว (Dismissed)
+                  </span>
+                ) : (
+                  <span className="text-slate-404 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5" /> กำลังแสดงผลอยู่ / ยังไม่ปิด
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => handleAction("สถานะแผง Onboarding (Onboarding Dismissed State)", onResetOnboarding || (() => {}))}
+              disabled={!onResetOnboarding}
+              className="w-full py-1.5 px-3 bg-slate-900 hover:bg-indigo-950/30 text-slate-300 hover:text-indigo-300 border border-slate-700 hover:border-indigo-900/50 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> รีเซ็ตเพื่อให้แสดงแผง
             </button>
           </div>
         </div>

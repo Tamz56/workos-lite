@@ -20,7 +20,7 @@ import {
 } from "./data/astroRealAppMockData";
 
 import { AstroRealAppLocalStorageAdapter } from "./data/astroRealAppLocalStorageAdapter";
-import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel, AstroMonthlyReflectionViewModel } from "./data/astroRealAppTypes";
+import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel, AstroMonthlyReflectionViewModel, AstroOnboardingStatus } from "./data/astroRealAppTypes";
 import { loadAstroBirthProfile } from "./data/astroRealAppBirthProfileStorageAdapter";
 import { buildAstroTimingInput, buildAstroEngineOutput } from "./data/astroRealAppAstrologyEngineAdapter";
 import { mapEngineOutputToTodayData } from "./data/astroRealAppTodayTimingViewModel";
@@ -28,6 +28,13 @@ import { buildWeeklyTimingViewModel } from "./data/astroRealAppWeeklyTimingViewM
 import { AstroWeeklyPanel } from "./components/AstroWeeklyPanel";
 import { buildMonthlyReflectionViewModel } from "./data/astroRealAppMonthlyReflectionViewModel";
 import { AstroMonthlyPanel } from "./components/AstroMonthlyPanel";
+import { AstroOnboardingPanel } from "./components/AstroOnboardingPanel";
+import {
+  buildAstroOnboardingStatus,
+  saveOnboardingDismissedState,
+  resetOnboardingDismissedStateForPreviewOnly,
+  detectFirstRunSignals
+} from "./data/astroRealAppOnboardingAdapter";
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -78,6 +85,12 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
   });
   const [isHydrated, setIsHydrated] = React.useState(false);
   const [historySaveStatus, setHistorySaveStatus] = React.useState("");
+  
+  const [onboardingStatus, setOnboardingStatus] = React.useState<AstroOnboardingStatus>({
+    isFirstRun: false,
+    isDismissed: true,
+    detectedSignals: []
+  });
 
   // DEV-024: Today calculation states
   const [todayData, setTodayData] = React.useState<AstroTodayData>(MOCK_TODAY_DATA);
@@ -181,6 +194,10 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
         setMonthlyData(monthlyFallbackVM);
         setMonthlyFallbackNote("ระบบเกิดข้อผิดพลาดในการประมวลผลดาราศาสตร์รายเดือน จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
       }
+
+      // Load onboarding status on client mount
+      const onboardingStatus = buildAstroOnboardingStatus();
+      setOnboardingStatus(onboardingStatus);
 
       setIsHydrated(true);
     }
@@ -388,6 +405,10 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
     setReflectionDraft(clearedDraft);
     await AstroRealAppLocalStorageAdapter.clearAllPreviewData();
 
+    // Also reset onboarding state!
+    resetOnboardingDismissedStateForPreviewOnly();
+    setOnboardingStatus(buildAstroOnboardingStatus());
+
     // Recalculate timing based on default birth profile
     try {
       const defaultProfile = loadAstroBirthProfile();
@@ -409,7 +430,28 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
     }
   };
 
+  const handleResetOnboarding = async () => {
+    resetOnboardingDismissedStateForPreviewOnly();
+    setOnboardingStatus(buildAstroOnboardingStatus());
+  };
 
+  const handleDismissOnboarding = () => {
+    saveOnboardingDismissedState(true);
+    setOnboardingStatus(prev => ({ ...prev, isDismissed: true }));
+  };
+
+  const legacyKeysExist = React.useMemo(() => {
+    if (!isHydrated) return false;
+    try {
+      return detectFirstRunSignals().legacyKeysExist;
+    } catch {
+      return false;
+    }
+  }, [isHydrated]);
+
+  const handleNavigateFromOnboarding = (tabId: PreviewTab) => {
+    setActiveTab(tabId);
+  };
 
   return (
     <AstroStrategyAppShell>
@@ -451,6 +493,15 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
             </span>
           </div>
         </div>
+
+        {/* Onboarding Guidance Panel */}
+        {isHydrated && onboardingStatus.isFirstRun && !onboardingStatus.isDismissed && (
+          <AstroOnboardingPanel
+            onDismiss={handleDismissOnboarding}
+            onNavigateToTab={handleNavigateFromOnboarding}
+            legacyKeysExist={legacyKeysExist}
+          />
+        )}
 
         {/* ---------------------------------------------------------------- */}
         {/* Tab Navigation                                                  */}
@@ -594,6 +645,7 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
               onResetPlanning={handleResetPlanningOnly}
               onResetDraft={handleResetDraftOnly}
               onResetAll={handleResetAllData}
+              onResetOnboarding={handleResetOnboarding}
             />
           )}
         </div>

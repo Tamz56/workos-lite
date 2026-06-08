@@ -300,6 +300,25 @@ export interface AstroMonthlyReflectionViewModel {
   metadata: AstroEngineMetadata;
 }
 
+export interface AstroOnboardingStatus {
+  isFirstRun: boolean;
+  isDismissed: boolean;
+  detectedSignals: string[];
+}
+
+export interface AstroOnboardingSignal {
+  birthProfileExists: boolean;
+  reflectionHistoryExists: boolean;
+  planningNotesExists: boolean;
+  reflectionDraftExists: boolean;
+}
+
+export interface AstroOnboardingStorageEnvelope {
+  version: number;
+  updatedAt: string;
+  isDismissed: boolean;
+}
+
 
 
 
