@@ -1,18 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { Compass, User, Clock, Edit3, Database, X, ArrowRight, Lightbulb } from "lucide-react";
+import { Compass, User, Clock, Edit3, Database, X, ArrowRight, Lightbulb, BookOpen } from "lucide-react";
 
 interface AstroOnboardingPanelProps {
   onDismiss: () => void;
   onNavigateToTab: (tabId: "today" | "weekly" | "monthly" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools") => void;
   legacyKeysExist?: boolean;
+  showDataTools?: boolean;
 }
 
 export function AstroOnboardingPanel({
   onDismiss,
   onNavigateToTab,
   legacyKeysExist = false,
+  showDataTools = true,
 }: AstroOnboardingPanelProps) {
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950/40 border border-violet-500/30 rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xl">
@@ -111,31 +113,53 @@ export function AstroOnboardingPanel({
           </button>
         </div>
 
-        {/* Step 4: Legacy Migration / Data Tools */}
-        <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2 hover:border-slate-700/80 transition-all">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-              <Database className="w-4 h-4 text-indigo-400" />
+        {/* Step 4: Legacy Migration / Data Tools OR Guide & Ethics */}
+        {showDataTools ? (
+          <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2 hover:border-slate-700/80 transition-all">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                <Database className="w-4 h-4 text-indigo-400" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-200">
+                {legacyKeysExist ? "4. ตรวจพบประวัติเก่าดั้งเดิม" : "4. โยกย้ายและจัดการข้อมูล"}
+              </h3>
             </div>
-            <h3 className="text-sm font-bold text-slate-200">
-              {legacyKeysExist ? "4. ตรวจพบประวัติเก่าดั้งเดิม" : "4. โยกย้ายและจัดการข้อมูล"}
-            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {legacyKeysExist
+                ? "ระบบตรวจพบคีย์ประวัติบันทึกเดิมในบราวเซอร์นี้ คุณสามารถเลือกโอนย้ายไปยังแอปใหม่ได้อย่างปลอดภัย"
+                : "นำเข้าหรือส่งออกประวัติสะสมทางกลยุทธ์ของคุณได้ตามต้องการ ผ่านแท็บควบคุมโดยตรง"
+              }
+            </p>
+            <button
+              onClick={() => onNavigateToTab("tools")}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-400 hover:text-indigo-300 hover:underline pt-1"
+              type="button"
+            >
+              <span>ไปที่แท็บเครื่องมือข้อมูล</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            {legacyKeysExist
-              ? "ระบบตรวจพบคีย์ประวัติบันทึกเดิมในบราวเซอร์นี้ คุณสามารถเลือกโอนย้ายไปยังแอปใหม่ได้อย่างปลอดภัย"
-              : "นำเข้าหรือส่งออกประวัติสะสมทางกลยุทธ์ของคุณได้ตามต้องการ ผ่านแท็บควบคุมโดยตรง"
-            }
-          </p>
-          <button
-            onClick={() => onNavigateToTab("tools")}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-400 hover:text-indigo-300 hover:underline pt-1"
-            type="button"
-          >
-            <span>ไปที่แท็บเครื่องมือข้อมูล</span>
-            <ArrowRight className="w-3 h-3" />
-          </button>
-        </div>
+        ) : (
+          <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2 hover:border-slate-700/80 transition-all">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                <BookOpen className="w-4 h-4 text-indigo-400" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-200">4. คู่มือและจริยธรรมข้อมูล</h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              ศึกษากระบวนการจัดจังหวะเวลาส่วนบุคคล และหลักจริยธรรมข้อมูลเพื่อการวางแผนงานอย่างปลอดภัยและโปร่งใส
+            </p>
+            <button
+              onClick={() => onNavigateToTab("guide")}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-400 hover:text-indigo-300 hover:underline pt-1"
+              type="button"
+            >
+              <span>ไปที่แท็บคู่มือและจริยธรรม</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Ethical guidance footnote & Dismiss action */}

@@ -500,6 +500,7 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
             onDismiss={handleDismissOnboarding}
             onNavigateToTab={handleNavigateFromOnboarding}
             legacyKeysExist={legacyKeysExist}
+            showDataTools={variant !== "production"}
           />
         )}
 
