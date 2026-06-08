@@ -280,6 +280,26 @@ export interface AstroWeeklyTimingViewModel {
   disclaimer: string;
 }
 
+export interface AstroMonthlyReflectionViewModel {
+  monthLabel: string;
+  primaryMode: AstroTimingMode;
+  secondaryMode: AstroTimingMode;
+  monthlyTheme: string;
+  strategicFocus: string;
+  recommendedFocusAreas: string[];
+  riskWatch: string[];
+  recoveryAnchors: string[];
+  reflectionPatternSummary: string;
+  totalLogsThisMonth: number;
+  topLoggedMode: string;
+  topLoggedEnergy: string;
+  source: "engine" | "fallback";
+  confidence: number;
+  generatedAt: string;
+  disclaimer: string;
+  metadata: AstroEngineMetadata;
+}
+
 
 
 

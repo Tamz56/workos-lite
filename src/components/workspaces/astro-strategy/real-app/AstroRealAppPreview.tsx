@@ -20,22 +20,25 @@ import {
 } from "./data/astroRealAppMockData";
 
 import { AstroRealAppLocalStorageAdapter } from "./data/astroRealAppLocalStorageAdapter";
-import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel } from "./data/astroRealAppTypes";
+import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel, AstroMonthlyReflectionViewModel } from "./data/astroRealAppTypes";
 import { loadAstroBirthProfile } from "./data/astroRealAppBirthProfileStorageAdapter";
 import { buildAstroTimingInput, buildAstroEngineOutput } from "./data/astroRealAppAstrologyEngineAdapter";
 import { mapEngineOutputToTodayData } from "./data/astroRealAppTodayTimingViewModel";
 import { buildWeeklyTimingViewModel } from "./data/astroRealAppWeeklyTimingViewModel";
 import { AstroWeeklyPanel } from "./components/AstroWeeklyPanel";
+import { buildMonthlyReflectionViewModel } from "./data/astroRealAppMonthlyReflectionViewModel";
+import { AstroMonthlyPanel } from "./components/AstroMonthlyPanel";
 
 // ---------------------------------------------------------------------------
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type PreviewTab = "today" | "weekly" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools";
+type PreviewTab = "today" | "weekly" | "monthly" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools";
 
 const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
   { id: "today", label: "📊 สรุปวันนี้", description: "Daily Timing Brief" },
   { id: "weekly", label: "📅 สรุปสัปดาห์", description: "Weekly Timing View" },
+  { id: "monthly", label: "📅 สรุปรอบเดือน", description: "Monthly Strategy" },
   { id: "reflection", label: "✍️ สะท้อนคิด", description: "Reflection Log" },
   { id: "history", label: "📋 ประวัติ", description: "Reflection History" },
   { id: "planning", label: "🎯 แผนกลยุทธ์", description: "Strategy Planning" },
@@ -82,6 +85,33 @@ export function AstroRealAppPreview() {
   });
   const [weeklyFallbackNote, setWeeklyFallbackNote] = React.useState<string | null>(null);
 
+  // DEV-030: Monthly calculation states
+  const [monthlyData, setMonthlyData] = React.useState<AstroMonthlyReflectionViewModel>({
+    monthLabel: "กำลังประมวลผล...",
+    primaryMode: "Focus & Deliver",
+    secondaryMode: "Stabilize & Structure",
+    monthlyTheme: "กำลังประมวลผล...",
+    strategicFocus: "กำลังประมวลผล...",
+    recommendedFocusAreas: [],
+    riskWatch: [],
+    recoveryAnchors: [],
+    reflectionPatternSummary: "กำลังโหลดข้อมูล...",
+    totalLogsThisMonth: 0,
+    topLoggedMode: "—",
+    topLoggedEnergy: "—",
+    source: "engine",
+    confidence: 0.0,
+    generatedAt: "",
+    disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น",
+    metadata: {
+      calculationMode: "rule-based",
+      confidenceScore: 0.0,
+      sourceEngine: "ArborDesk Monthly Strategy Engine v0.1",
+      disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น"
+    }
+  });
+  const [monthlyFallbackNote, setMonthlyFallbackNote] = React.useState<string | null>(null);
+
   // Hydration hook: Load from localStorage on client mount
   React.useEffect(() => {
     async function loadData() {
@@ -94,7 +124,7 @@ export function AstroRealAppPreview() {
         setReflectionDraft(loadedDraft);
       }
 
-      // DEV-024 & DEV-028: Load birth profile and compute Today and Weekly Timing
+      // DEV-024, DEV-028 & DEV-030: Load birth profile and compute Today, Weekly, and Monthly Timing
       try {
         const birthProfile = loadAstroBirthProfile();
         
@@ -116,8 +146,13 @@ export function AstroRealAppPreview() {
         const weeklyVM = buildWeeklyTimingViewModel(birthProfile);
         setWeeklyData(weeklyVM);
         setWeeklyFallbackNote(null);
+
+        // Calculate Monthly Timing
+        const monthlyVM = buildMonthlyReflectionViewModel(birthProfile, loadedHistory);
+        setMonthlyData(monthlyVM);
+        setMonthlyFallbackNote(null);
       } catch (err) {
-        console.error("Failed to calculate today/weekly timing engine output on mount:", err);
+        console.error("Failed to calculate today/weekly/monthly timing engine output on mount:", err);
         setTodayData(MOCK_TODAY_DATA);
         setTodayMetadata(undefined);
         setCalculationFallbackNote("ระบบเกิดข้อผิดพลาดในการคำนวณจังหวะดาราศาสตร์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
@@ -127,6 +162,11 @@ export function AstroRealAppPreview() {
         const weeklyFallbackVM = buildWeeklyTimingViewModel(defaultProfile, undefined, true);
         setWeeklyData(weeklyFallbackVM);
         setWeeklyFallbackNote("ระบบเกิดข้อผิดพลาดในการประมวลผลดาราศาสตร์รายสัปดาห์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
+
+        // Fallback Monthly calculation
+        const monthlyFallbackVM = buildMonthlyReflectionViewModel(defaultProfile, loadedHistory, true);
+        setMonthlyData(monthlyFallbackVM);
+        setMonthlyFallbackNote("ระบบเกิดข้อผิดพลาดในการประมวลผลดาราศาสตร์รายเดือน จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
       }
 
       setIsHydrated(true);
@@ -134,11 +174,11 @@ export function AstroRealAppPreview() {
     loadData();
   }, []);
 
-  // Recalculate today and weekly timing whenever today or weekly tab is activated to capture new birth profile settings immediately
+  // Recalculate today, weekly, and monthly timing whenever today, weekly, or monthly tab is activated to capture new birth profile settings immediately
   React.useEffect(() => {
     if (!isHydrated) return;
 
-    if (activeTab === "today" || activeTab === "weekly") {
+    if (activeTab === "today" || activeTab === "weekly" || activeTab === "monthly") {
       try {
         const birthProfile = loadAstroBirthProfile();
         
@@ -160,6 +200,11 @@ export function AstroRealAppPreview() {
         const weeklyVM = buildWeeklyTimingViewModel(birthProfile);
         setWeeklyData(weeklyVM);
         setWeeklyFallbackNote(null);
+
+        // Calculate Monthly Timing
+        const monthlyVM = buildMonthlyReflectionViewModel(birthProfile, historyLogs);
+        setMonthlyData(monthlyVM);
+        setMonthlyFallbackNote(null);
       } catch (err) {
         console.error("Failed to calculate timing engine output on tab active:", err);
         setTodayData(MOCK_TODAY_DATA);
@@ -171,9 +216,14 @@ export function AstroRealAppPreview() {
         const weeklyFallbackVM = buildWeeklyTimingViewModel(defaultProfile, undefined, true);
         setWeeklyData(weeklyFallbackVM);
         setWeeklyFallbackNote("ระบบเกิดข้อผิดพลาดในการประมวลผลดาราศาสตร์รายสัปดาห์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
+
+        // Fallback Monthly calculation
+        const monthlyFallbackVM = buildMonthlyReflectionViewModel(defaultProfile, historyLogs, true);
+        setMonthlyData(monthlyFallbackVM);
+        setMonthlyFallbackNote("ระบบเกิดข้อผิดพลาดในการประมวลผลดาราศาสตร์รายเดือน จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
       }
     }
-  }, [activeTab, isHydrated]);
+  }, [activeTab, isHydrated, historyLogs]);
 
   // Handler to save new reflection history entry
   const handleSubmitReflection = async (data: {
@@ -337,6 +387,10 @@ export function AstroRealAppPreview() {
       }
       setWeeklyData(buildWeeklyTimingViewModel(defaultProfile));
       setWeeklyFallbackNote(null);
+
+      // Recalculate Monthly Timing (using MOCK_HISTORY_LOGS as it has just been set)
+      setMonthlyData(buildMonthlyReflectionViewModel(defaultProfile, MOCK_HISTORY_LOGS));
+      setMonthlyFallbackNote(null);
     } catch (err) {
       console.error("Failed to recalculate timing on data reset:", err);
     }
@@ -436,6 +490,35 @@ export function AstroRealAppPreview() {
                 disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น"
               }}
               fallbackNote={isHydrated ? weeklyFallbackNote : null}
+            />
+          )}
+          {activeTab === "monthly" && (
+            <AstroMonthlyPanel
+              monthlyData={isHydrated ? monthlyData : {
+                monthLabel: "กำลังโหลดข้อมูล...",
+                primaryMode: "Focus & Deliver",
+                secondaryMode: "Stabilize & Structure",
+                monthlyTheme: "กำลังโหลดข้อมูล...",
+                strategicFocus: "กำลังโหลดข้อมูล...",
+                recommendedFocusAreas: [],
+                riskWatch: [],
+                recoveryAnchors: [],
+                reflectionPatternSummary: "กำลังโหลดข้อมูล...",
+                totalLogsThisMonth: 0,
+                topLoggedMode: "—",
+                topLoggedEnergy: "—",
+                source: "engine",
+                confidence: 0.0,
+                generatedAt: "",
+                disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น",
+                metadata: {
+                  calculationMode: "rule-based",
+                  confidenceScore: 0.0,
+                  sourceEngine: "ArborDesk Monthly Strategy Engine v0.1",
+                  disclaimer: "สำหรับใช้วางแผนส่วนบุคคลและสะท้อนจังหวะชีวิตเท่านั้น"
+                }
+              }}
+              fallbackNote={isHydrated ? monthlyFallbackNote : null}
             />
           )}
           {activeTab === "reflection" && (
