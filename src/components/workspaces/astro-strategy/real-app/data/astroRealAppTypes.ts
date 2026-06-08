@@ -319,6 +319,41 @@ export interface AstroOnboardingStorageEnvelope {
   isDismissed: boolean;
 }
 
+export interface AstroDataExportMetadata {
+  appName: string;
+  exportVersion: number;
+  exportedAt: string;
+  routeContext: string;
+  source: string;
+  schemaVersions: Record<string, number>;
+  includedKeys: string[];
+}
+
+export interface AstroDataExportPayload {
+  [key: string]: unknown;
+}
+
+export interface AstroDataExportEnvelope {
+  $schema: string;
+  metadata: AstroDataExportMetadata;
+  data: AstroDataExportPayload;
+}
+
+export interface AstroDataExportKeyStatus {
+  key: string;
+  exists: boolean;
+  bytes: number;
+  status: "available" | "missing" | "malformed";
+  notes?: string;
+}
+
+export interface AstroDataExportResult {
+  success: boolean;
+  fileName?: string;
+  bytes?: number;
+  error?: string;
+}
+
 
 
 

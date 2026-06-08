@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Database, Trash2, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw, Play, Info } from "lucide-react";
+import { Database, Trash2, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw, Play, Info, Download } from "lucide-react";
 import { buildLegacyMigrationDryRunReport, migrateReadyLegacyKeysWithConfirmation } from "../data/astroRealAppMigrationDryRunAdapter";
 import { MigrationDryRunReport, MigrationExecutionResult } from "../data/astroRealAppTypes";
-import { resetAstroBirthProfileToDefault } from "../data/astroRealAppBirthProfileStorageAdapter";
+import { resetAstroBirthProfileToDefault, loadAstroBirthProfile } from "../data/astroRealAppBirthProfileStorageAdapter";
+import { buildAstroDataExportEnvelope, buildAstroDataExportFileName, downloadAstroDataExportJson } from "../data/astroRealAppExportBackupAdapter";
 
 export type AstroPreviewDataToolsPanelProps = {
   onResetHistory: () => void;
@@ -41,6 +42,7 @@ export function AstroPreviewDataToolsPanel({
     updatedAt?: string;
   } | null>(null);
   const [statusMessage, setStatusMessage] = React.useState("");
+  const [exportMessage, setExportMessage] = React.useState("");
   const [report, setReport] = React.useState<MigrationDryRunReport | null>(null);
   const [confirmed, setConfirmed] = React.useState(false);
   const [execResult, setExecResult] = React.useState<MigrationExecutionResult | null>(null);
@@ -119,6 +121,29 @@ export function AstroPreviewDataToolsPanel({
     const updatedReport = buildLegacyMigrationDryRunReport();
     setReport(updatedReport);
     showFeedback(`โอนย้ายสำเร็จ คัดลอกแล้ว ${result.copiedCount} รายการ`);
+  };
+
+  const handleExportBackup = () => {
+    try {
+      const bp = loadAstroBirthProfile();
+      const displayName = bp?.displayName || "user";
+      
+      const envelope = buildAstroDataExportEnvelope("preview");
+      const fileName = buildAstroDataExportFileName(displayName);
+      const res = downloadAstroDataExportJson(envelope, fileName);
+      
+      if (res.success) {
+        setExportMessage(`ดาวน์โหลดไฟล์สำรองข้อมูลสำเร็จ (${(res.bytes ?? 0)} Bytes)`);
+        setTimeout(() => setExportMessage(""), 5000);
+      } else {
+        setExportMessage(`ดาวน์โหลดล้มเหลว: ${res.error}`);
+        setTimeout(() => setExportMessage(""), 5000);
+      }
+    } catch (error) {
+      const err = error as Error;
+      setExportMessage(`เกิดข้อผิดพลาดในการส่งออก: ${err.message || String(error)}`);
+      setTimeout(() => setExportMessage(""), 5000);
+    }
   };
 
   return (
@@ -490,6 +515,46 @@ export function AstroPreviewDataToolsPanel({
             </div>
           );
         })()}
+      </div>
+
+      {/* Export / Backup Section */}
+      <div className="border-t border-slate-700/60 pt-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <Download className="w-4 h-4 text-violet-400" /> สำรองข้อมูลยุทธศาสตร์ส่วนบุคคล (Export & Backup Data)
+            </h4>
+            <p className="text-xs text-slate-300">
+              ดาวน์โหลดประวัติสะสม โน้ตแผนกลยุทธ์ และข้อมูลวันเกิดทั้งหมดของคุณเก็บไว้บนคอมพิวเตอร์อย่างปลอดภัย
+            </p>
+          </div>
+          <button
+            onClick={handleExportBackup}
+            className="py-2.5 px-4 bg-violet-950/60 hover:bg-violet-900/60 text-violet-200 border border-violet-750 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
+            type="button"
+          >
+            <Download className="w-3.5 h-3.5" /> ดาวน์โหลดไฟล์สำรองข้อมูล
+          </button>
+        </div>
+
+        {/* Privacy Warning Callout */}
+        <div className="bg-amber-950/20 border border-amber-500/20 p-4 rounded-xl flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-1 text-xs text-amber-200">
+            <p className="font-semibold text-[13px]">ข้อพิจารณาความปลอดภัยและความเป็นส่วนตัว</p>
+            <p className="leading-relaxed">
+              ไฟล์สำรองอาจมีข้อมูลวันเกิด เวลาเกิด บันทึกสะท้อนคิด และแผนส่วนตัว โปรดเก็บไฟล์ไว้ในพื้นที่ปลอดภัย 
+              และไม่แชร์ไฟล์นี้กับบุคคลอื่นเพื่อรักษาความเป็นส่วนตัวสูงสุดของคุณ
+            </p>
+          </div>
+        </div>
+
+        {exportMessage && (
+          <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl flex items-center gap-2 text-xs text-emerald-400 animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{exportMessage}</span>
+          </div>
+        )}
       </div>
 
       {/* Global Actions */}
