@@ -85,6 +85,9 @@ export default function PromptStudioClient() {
     
     // Test Input Values state
     const [testValues, setTestValues] = useState<Record<string, string>>({});
+
+    // Tab view state: compiled (default) or template structure
+    const [previewTab, setPreviewTab] = useState<"compiled" | "template">("compiled");
     
     // Load Templates
     const fetchTemplates = useCallback(async () => {
@@ -172,11 +175,42 @@ export default function PromptStudioClient() {
         });
     }, [templates, searchTerm, categoryFilter, statusFilter]);
 
-    // Live Compile Prompt
-    const compiledPrompt = useMemo(() => {
+    // Safe parsed input fields for rendering test fields
+    const currentInputFields = useMemo(() => {
+        return safeParseInputFields(editorFields.input_fields || null);
+    }, [editorFields.input_fields]);
+
+    // 1. Template Structure (Raw prompt with placeholders like {{topic}}, no [USER INPUT] block)
+    const templateStructurePrompt = useMemo(() => {
         const blocks: string[] = [];
         
-        // Use values from editor state if editing, otherwise fallback to template
+        const name = editorFields.name || activeTemplate?.name || "";
+        const role = editorFields.role || activeTemplate?.role || "";
+        const purpose = editorFields.purpose || activeTemplate?.purpose || "";
+        const context = editorFields.context || activeTemplate?.context || "";
+        const instructions = editorFields.instructions || activeTemplate?.instructions || "";
+        const constraints = editorFields.constraints || activeTemplate?.constraints || "";
+        const outputFormat = editorFields.output_format || activeTemplate?.output_format || "";
+        const reviewChecklist = editorFields.review_checklist || activeTemplate?.review_checklist || "";
+        const notes = editorFields.notes || activeTemplate?.notes || "";
+
+        if (name) blocks.push(`# PROMPT TEMPLATE: ${name}`);
+        if (role) blocks.push(`[ROLE]\n${role}`);
+        if (purpose) blocks.push(`[PURPOSE]\n${purpose}`);
+        if (context) blocks.push(`[CONTEXT]\n${context}`);
+        if (instructions) blocks.push(`[INSTRUCTIONS]\n${instructions}`);
+        if (constraints) blocks.push(`[CONSTRAINTS]\n${constraints}`);
+        if (outputFormat) blocks.push(`[OUTPUT FORMAT]\n${outputFormat}`);
+        if (reviewChecklist) blocks.push(`[REVIEW CHECKLIST]\n${reviewChecklist}`);
+        if (notes) blocks.push(`[NOTES]\n${notes}`);
+
+        return blocks.join("\n\n");
+    }, [editorFields, activeTemplate]);
+
+    // 2. Compiled Prompt (Substituted placeholders & appended [USER INPUT] block)
+    const compiledActivePrompt = useMemo(() => {
+        const blocks: string[] = [];
+        
         const name = editorFields.name || activeTemplate?.name || "";
         const role = editorFields.role || activeTemplate?.role || "";
         const purpose = editorFields.purpose || activeTemplate?.purpose || "";
@@ -197,26 +231,36 @@ export default function PromptStudioClient() {
         if (reviewChecklist) blocks.push(`[REVIEW CHECKLIST]\n${reviewChecklist}`);
         if (notes) blocks.push(`[NOTES]\n${notes}`);
 
+        // Construct [USER INPUT] section dynamically if variables exist
+        if (currentInputFields.length > 0) {
+            const userInputLines = currentInputFields.map(field => {
+                const val = testValues[field.name] || "";
+                return `${field.label || field.name}: ${val}`;
+            });
+            blocks.push(`[USER INPUT]\n${userInputLines.join("\n")}`);
+        }
+
         let result = blocks.join("\n\n");
 
-        // Substitute test values dynamically
+        // Substitute placeholders (e.g. {{topic}} -> topic value)
         for (const [key, val] of Object.entries(testValues)) {
             const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
-            result = result.replace(regex, val || `[ค่าว่างของ ${key}]`);
+            // If empty, substitute with blank string instead of placeholder to avoid breaking execution
+            result = result.replace(regex, val || "");
         }
 
         return result;
-    }, [editorFields, activeTemplate, testValues]);
+    }, [editorFields, activeTemplate, testValues, currentInputFields]);
 
-    // Safe parsed input fields for rendering test fields
-    const currentInputFields = useMemo(() => {
-        return safeParseInputFields(editorFields.input_fields || null);
-    }, [editorFields.input_fields]);
+    // Get active prompt value based on current tab selection
+    const activePreviewText = useMemo(() => {
+        return previewTab === "compiled" ? compiledActivePrompt : templateStructurePrompt;
+    }, [previewTab, compiledActivePrompt, templateStructurePrompt]);
 
     // Copy to clipboard with success feedback
     const handleCopy = () => {
-        if (!compiledPrompt) return;
-        navigator.clipboard.writeText(compiledPrompt);
+        if (!activePreviewText) return;
+        navigator.clipboard.writeText(activePreviewText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -244,6 +288,7 @@ export default function PromptStudioClient() {
         setSelectedId("new-template");
         setTestValues({});
         setJsonValidationError(null);
+        setPreviewTab("compiled"); // Reset to default tab
     };
 
     // Save Template (POST or PATCH)
@@ -705,31 +750,64 @@ export default function PromptStudioClient() {
                         )}
                     </div>
 
+                    {/* Tab Navigation for Preview Area */}
+                    <div className="flex border-b border-zinc-800 bg-zinc-900/40 p-2 gap-1 flex-shrink-0">
+                        <button
+                            onClick={() => setPreviewTab("compiled")}
+                            className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
+                                previewTab === "compiled"
+                                    ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
+                                    : "text-zinc-400 hover:bg-zinc-800/40"
+                            }`}
+                        >
+                            Compiled Prompt (พร้อมใช้)
+                        </button>
+                        <button
+                            onClick={() => setPreviewTab("template")}
+                            className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
+                                previewTab === "template"
+                                    ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
+                                    : "text-zinc-400 hover:bg-zinc-800/40"
+                            }`}
+                        >
+                            Template Structure (โครงสร้าง)
+                        </button>
+                    </div>
+
                     {/* Compile Preview Area */}
                     <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
-                        <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/10">
+                        <div className="p-3 border-b border-zinc-850 flex justify-between items-center bg-zinc-900/10">
                             <div className="flex items-center gap-2">
-                                <Eye className="w-4 h-4 text-indigo-400" />
-                                <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Live Prompt Preview</h2>
+                                <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                                <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                                    {previewTab === "compiled" ? "Compiled Result" : "Template Spec"}
+                                </h2>
                             </div>
                             <button
                                 onClick={handleCopy}
-                                disabled={!compiledPrompt}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                disabled={!activePreviewText}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
                                     copied 
                                         ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
-                                        : "bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-900 text-zinc-300"
+                                        : "bg-zinc-850 hover:bg-zinc-800 active:bg-zinc-900 text-zinc-300 border border-zinc-800"
                                 }`}
                             >
-                                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                <span>{copied ? "คัดลอกแล้ว!" : "คัดลอก"}</span>
+                                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                <span>
+                                    {copied 
+                                        ? "คัดลอกสำเร็จ!" 
+                                        : previewTab === "compiled" 
+                                            ? "คัดลอก Prompt พร้อมใช้" 
+                                            : "คัดลอกโครงสร้างเทมเพลต"
+                                    }
+                                </span>
                             </button>
                         </div>
 
                         {/* Prompt rendering panel */}
-                        <div className="flex-1 p-4 overflow-y-auto bg-zinc-950 font-mono text-[11px] text-zinc-300 select-text whitespace-pre-wrap leading-relaxed">
-                            {compiledPrompt ? (
-                                compiledPrompt
+                        <div className="flex-1 p-4 overflow-y-auto bg-zinc-950 font-mono text-[11px] text-zinc-300 select-text whitespace-pre-wrap leading-relaxed custom-scrollbar">
+                            {activePreviewText ? (
+                                activePreviewText
                             ) : (
                                 <p className="text-zinc-600 italic">กรอกบทบาท ขั้นตอนการทำงาน หรือหัวข้อบทความ เพื่อเริ่มสร้าง Prompt...</p>
                             )}
