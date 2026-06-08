@@ -160,7 +160,7 @@ export function AstroMonthlyPanel({
           <span>•</span>
           <span>ระบบคำนวณ: {metadata.sourceEngine}</span>
           <span>•</span>
-          <span>ความน่าเชื่อถือ: {(metadata.confidenceScore * 100).toFixed(0)}%</span>
+          <span>ระดับความสอดคล้องเชิงสัญลักษณ์: {(metadata.confidenceScore * 100).toFixed(0)}%</span>
         </div>
         <p className="leading-relaxed text-slate-400 text-[10px]">
           *คำเตือนทางจริยธรรมข้อมูล: {metadata.disclaimer || "ข้อมูลนี้ใช้เพื่อการสะท้อนและวางแผนเชิงกลยุทธ์ส่วนบุคคลเท่านั้น ไม่ใช่คำทำนายตายตัวหรือคำแนะนำทางการแพทย์"}
