@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function AstroStrategyPage() {
-    return <AstroRealAppPreview />;
+    return <AstroRealAppPreview variant="production" />;
 }

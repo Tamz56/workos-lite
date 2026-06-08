@@ -51,8 +51,21 @@ const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
 // Component
 // ---------------------------------------------------------------------------
 
-export function AstroRealAppPreview() {
+export function AstroRealAppPreview({ variant = "preview" }: { variant?: "production" | "preview" }) {
   const [activeTab, setActiveTab] = React.useState<PreviewTab>("today");
+
+  const visibleTabs = React.useMemo(() => {
+    if (variant === "production") {
+      return TAB_ITEMS.filter(item => item.id !== "tools");
+    }
+    return TAB_ITEMS;
+  }, [variant]);
+
+  React.useEffect(() => {
+    if (variant === "production" && activeTab === "tools") {
+      setActiveTab("today");
+    }
+  }, [activeTab, variant]);
 
   // Client states with fallback to mock data before hydration
   const [historyLogs, setHistoryLogs] = React.useState<ReflectionHistoryItem[]>(MOCK_HISTORY_LOGS);
@@ -396,6 +409,8 @@ export function AstroRealAppPreview() {
     }
   };
 
+
+
   return (
     <AstroStrategyAppShell>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -409,18 +424,25 @@ export function AstroRealAppPreview() {
             </div>
             <div className="space-y-0.5">
               <h1 className="text-xl sm:text-2xl font-bold text-slate-100 tracking-tight">
-                Astro Strategy Lab — Real App Preview
+                {variant === "production" ? "Astro Strategy Lab" : "Astro Strategy Lab — Real App Preview"}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 font-medium">
-                ตัวอย่างการประกอบคอมโพเนนต์แอปจริง (Composition Preview) — บันทึกข้อมูลจำลองลงเครื่องจริงได้แล้ว
+                {variant === "production"
+                  ? "ระบบวิเคราะห์จังหวะชีวิตเชิงกลยุทธ์ส่วนบุคคล — เพื่อการจดจ่อและการวางแผนงานที่มีประสิทธิภาพ"
+                  : "ตัวอย่างการประกอบคอมโพเนนต์แอปจริง (Composition Preview) — บันทึกข้อมูลจำลองลงเครื่องจริงได้แล้ว"
+                }
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-slate-300">
-            <span className="px-2 py-0.5 rounded bg-violet-950/50 text-violet-300 border border-violet-400/20 font-bold">
-              PREVIEW MODE
-            </span>
-            <span>•</span>
+            {variant !== "production" && (
+              <>
+                <span className="px-2 py-0.5 rounded bg-violet-950/50 text-violet-300 border border-violet-400/20 font-bold">
+                  PREVIEW MODE
+                </span>
+                <span>•</span>
+              </>
+            )}
             <span>
               {!isHydrated 
                 ? "กำลังเตรียมโหลดข้อมูลจากเครื่อง..." 
@@ -434,7 +456,7 @@ export function AstroRealAppPreview() {
         {/* Tab Navigation                                                  */}
         {/* ---------------------------------------------------------------- */}
         <div className="bg-slate-900/70 border border-slate-700/80 rounded-xl p-1.5 flex flex-wrap gap-1">
-          {TAB_ITEMS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"

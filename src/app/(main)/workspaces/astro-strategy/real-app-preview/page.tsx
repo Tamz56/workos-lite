@@ -3,9 +3,9 @@ import { AstroRealAppPreview } from "@/components/workspaces/astro-strategy/real
 
 export const metadata = {
     title: "Astro Strategy Lab — Real App Preview | ArborDesk",
-    description: "Internal composition preview for the Astro Strategy real app components.",
+    description: "Internal composition composition preview for the Astro Strategy real app components.",
 };
 
 export default function AstroRealAppPreviewPage() {
-    return <AstroRealAppPreview />;
+    return <AstroRealAppPreview variant="preview" />;
 }
