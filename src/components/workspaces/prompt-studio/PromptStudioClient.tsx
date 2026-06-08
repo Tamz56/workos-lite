@@ -14,13 +14,22 @@ import {
     Edit, 
     BookOpen, 
     Save, 
-    HelpCircle
+    ArrowUp,
+    ArrowDown,
+    Trash2,
+    Edit2,
+    Code,
+    ChevronDown,
+    ChevronUp
 } from "lucide-react";
 
-interface InputField {
+interface PromptInputField {
     name: string;
     label: string;
     value: string;
+    placeholder?: string;
+    helperText?: string;
+    required?: boolean;
 }
 
 interface PromptTemplate {
@@ -46,7 +55,12 @@ interface PromptTemplate {
 const CATEGORIES = ["Writing", "Review", "Marketing", "Coding", "General"];
 const STATUSES = ["draft", "testing", "active", "archived"];
 
-function safeParseInputFields(jsonStr: string | null): InputField[] {
+// Consistent styling for dark inputs with high contrast caret and text
+const INPUT_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all text-xs";
+const TEXTAREA_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all text-xs font-mono";
+const SELECT_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 transition-all text-xs";
+
+function safeParseInputFields(jsonStr: string | null): PromptInputField[] {
     if (!jsonStr) return [];
     try {
         const parsed = JSON.parse(jsonStr);
@@ -56,7 +70,10 @@ function safeParseInputFields(jsonStr: string | null): InputField[] {
                 return {
                     name: String(typedItem.name || ""),
                     label: String(typedItem.label || typedItem.name || ""),
-                    value: String(typedItem.value || "")
+                    value: String(typedItem.value || ""),
+                    placeholder: typedItem.placeholder !== undefined ? String(typedItem.placeholder) : undefined,
+                    helperText: typedItem.helperText !== undefined ? String(typedItem.helperText) : undefined,
+                    required: typedItem.required === true
                 };
             }).filter(item => item.name !== "");
         }
@@ -88,6 +105,21 @@ export default function PromptStudioClient() {
 
     // Tab view state: compiled (default) or template structure
     const [previewTab, setPreviewTab] = useState<"compiled" | "template">("compiled");
+
+    // Collapsible status for raw JSON editor
+    const [showAdvancedJson, setShowAdvancedJson] = useState(false);
+
+    // Field Builder form states
+    const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
+    const [fieldForm, setFieldForm] = useState<Partial<PromptInputField>>({
+        name: "",
+        label: "",
+        value: "",
+        placeholder: "",
+        helperText: "",
+        required: false
+    });
+    const [fieldValidationError, setFieldValidationError] = useState<string | null>(null);
     
     // Load Templates
     const fetchTemplates = useCallback(async () => {
@@ -128,11 +160,60 @@ export default function PromptStudioClient() {
             });
             setTestValues(initialValues);
             setJsonValidationError(null);
+            
+            // Reset field form
+            setEditingFieldIndex(null);
+            setFieldForm({
+                name: "",
+                label: "",
+                value: "",
+                placeholder: "",
+                helperText: "",
+                required: false
+            });
+            setFieldValidationError(null);
         }
         return temp;
     }, [selectedId, templates]);
 
-    // Validate JSON string on the fly safely without crashing UI
+    // Parse input fields list safely for rendering list in Field Builder
+    const currentInputFields = useMemo(() => {
+        return safeParseInputFields(editorFields.input_fields || null);
+    }, [editorFields.input_fields]);
+
+    // Validate Field Name Rules live
+    const validateFieldNameLive = (name: string, index: number | null): string | null => {
+        if (!name.trim()) {
+            return "Field Name ห้ามว่าง";
+        }
+        const nameRegex = /^[a-zA-Z0-9_]+$/;
+        if (!nameRegex.test(name)) {
+            return "Field Name ต้องใช้ภาษาอังกฤษ ตัวเลข และเครื่องหมาย _ เท่านั้น (ห้ามเว้นวรรคหรือมีภาษาไทย)";
+        }
+        const isDuplicate = currentInputFields.some((f, idx) => f.name === name && idx !== index);
+        if (isDuplicate) {
+            return `ชื่อตัวแปร "${name}" มีการใช้งานซ้ำใน Prompt นี้แล้ว`;
+        }
+        return null;
+    };
+
+    // Synchronize currentFields back to editorFields.input_fields JSON
+    const updateInputFieldsList = (newFields: PromptInputField[]) => {
+        const jsonStr = JSON.stringify(newFields);
+        setEditorFields(prev => ({ ...prev, input_fields: jsonStr }));
+        setJsonValidationError(null);
+
+        // Sync test values to match new fields config immediately
+        setTestValues(prev => {
+            const updated: Record<string, string> = {};
+            newFields.forEach(f => {
+                updated[f.name] = prev[f.name] !== undefined ? prev[f.name] : f.value;
+            });
+            return updated;
+        });
+    };
+
+    // Handle JSON changes inside raw collapsible text-area safely
     const handleJsonChange = (val: string) => {
         setEditorFields(prev => ({ ...prev, input_fields: val }));
         if (!val.trim()) {
@@ -145,7 +226,7 @@ export default function PromptStudioClient() {
                 setJsonValidationError("รูปแบบ JSON ต้องเป็น Array: [ { 'name': '...', 'label': '...', 'value': '...' } ]");
             } else {
                 setJsonValidationError(null);
-                // Update test values inputs live based on valid input_fields modification
+                // Sync values
                 const initialValues: Record<string, string> = {};
                 parsed.forEach((f: unknown) => {
                     const typedF = f as Record<string, unknown>;
@@ -174,11 +255,6 @@ export default function PromptStudioClient() {
             return matchesSearch && matchesCategory && matchesStatus;
         });
     }, [templates, searchTerm, categoryFilter, statusFilter]);
-
-    // Safe parsed input fields for rendering test fields
-    const currentInputFields = useMemo(() => {
-        return safeParseInputFields(editorFields.input_fields || null);
-    }, [editorFields.input_fields]);
 
     // 1. Template Structure (Raw prompt with placeholders like {{topic}}, no [USER INPUT] block)
     const templateStructurePrompt = useMemo(() => {
@@ -245,7 +321,6 @@ export default function PromptStudioClient() {
         // Substitute placeholders (e.g. {{topic}} -> topic value)
         for (const [key, val] of Object.entries(testValues)) {
             const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
-            // If empty, substitute with blank string instead of placeholder to avoid breaking execution
             result = result.replace(regex, val || "");
         }
 
@@ -288,7 +363,17 @@ export default function PromptStudioClient() {
         setSelectedId("new-template");
         setTestValues({});
         setJsonValidationError(null);
-        setPreviewTab("compiled"); // Reset to default tab
+        setPreviewTab("compiled"); 
+        setEditingFieldIndex(null);
+        setFieldForm({
+            name: "",
+            label: "",
+            value: "",
+            placeholder: "",
+            helperText: "",
+            required: false
+        });
+        setFieldValidationError(null);
     };
 
     // Save Template (POST or PATCH)
@@ -366,11 +451,127 @@ export default function PromptStudioClient() {
         }
     };
 
+    // Builder GUI Actions
+    const handleFieldFormChange = (key: keyof PromptInputField, val: string | boolean) => {
+        setFieldForm(prev => {
+            const updated = { ...prev, [key]: val };
+            if (key === "name") {
+                const err = validateFieldNameLive(String(val), editingFieldIndex);
+                setFieldValidationError(err);
+            }
+            return updated;
+        });
+    };
+
+    // Submit Field (Add or Edit)
+    const handleSubmitField = () => {
+        const name = fieldForm.name?.trim() || "";
+        const err = validateFieldNameLive(name, editingFieldIndex);
+        if (err) {
+            setFieldValidationError(err);
+            return;
+        }
+
+        const newField: PromptInputField = {
+            name,
+            label: fieldForm.label?.trim() || name,
+            value: fieldForm.value || "",
+            placeholder: fieldForm.placeholder?.trim() || undefined,
+            helperText: fieldForm.helperText?.trim() || undefined,
+            required: fieldForm.required === true
+        };
+
+        const fields = [...currentInputFields];
+        if (editingFieldIndex !== null) {
+            // Update
+            fields[editingFieldIndex] = newField;
+        } else {
+            // Add
+            fields.push(newField);
+        }
+
+        updateInputFieldsList(fields);
+
+        // Reset form
+        setEditingFieldIndex(null);
+        setFieldForm({
+            name: "",
+            label: "",
+            value: "",
+            placeholder: "",
+            helperText: "",
+            required: false
+        });
+        setFieldValidationError(null);
+    };
+
+    // Edit Field (Load into form)
+    const handleEditField = (index: number) => {
+        const target = currentInputFields[index];
+        setEditingFieldIndex(index);
+        setFieldForm({ ...target });
+        setFieldValidationError(null);
+    };
+
+    // Delete Field
+    const handleDeleteField = (index: number) => {
+        if (!confirm("คุณต้องการที่จะลบตัวแปรนี้ออกใช่หรือไม่? (การลบจะลบการเชื่อมต่ออินพุตของตัวแปรนี้ออกด้วย)")) return;
+        const fields = currentInputFields.filter((_, idx) => idx !== index);
+        updateInputFieldsList(fields);
+        if (editingFieldIndex === index) {
+            setEditingFieldIndex(null);
+            setFieldForm({
+                name: "",
+                label: "",
+                value: "",
+                placeholder: "",
+                helperText: "",
+                required: false
+            });
+            setFieldValidationError(null);
+        }
+    };
+
+    // Reorder Fields (Move Up / Down)
+    const handleMoveField = (index: number, direction: "up" | "down") => {
+        const fields = [...currentInputFields];
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= fields.length) return;
+
+        // Swap
+        const temp = fields[index];
+        fields[index] = fields[targetIndex];
+        fields[targetIndex] = temp;
+
+        updateInputFieldsList(fields);
+
+        // Shift editing index if currently editing the swapped fields
+        if (editingFieldIndex === index) {
+            setEditingFieldIndex(targetIndex);
+        } else if (editingFieldIndex === targetIndex) {
+            setEditingFieldIndex(index);
+        }
+    };
+
+    // Cancel edit state
+    const handleCancelEdit = () => {
+        setEditingFieldIndex(null);
+        setFieldForm({
+            name: "",
+            label: "",
+            value: "",
+            placeholder: "",
+            helperText: "",
+            required: false
+        });
+        setFieldValidationError(null);
+    };
+
     return (
         <div className="flex flex-col h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
             {/* Header Alert area for API Errors */}
             {apiError && (
-                <div className="bg-red-950/60 border-b border-red-800 text-red-200 px-4 py-3 flex items-center justify-between text-sm animate-fadeIn">
+                <div className="bg-red-950/60 border-b border-red-800 text-red-200 px-4 py-3 flex items-center justify-between text-sm animate-fadeIn flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
                         <span>{apiError}</span>
@@ -387,9 +588,9 @@ export default function PromptStudioClient() {
             {/* Layout container */}
             <div className="flex flex-1 overflow-hidden">
                 {/* 1. Left Column: Prompt Library */}
-                <div className="w-80 border-r border-zinc-800 flex flex-col bg-zinc-900/50">
+                <div className="w-80 border-r border-zinc-800 flex flex-col bg-zinc-900/50 flex-shrink-0">
                     {/* Filters & Actions */}
-                    <div className="p-4 border-b border-zinc-800 space-y-3">
+                    <div className="p-4 border-b border-zinc-800 space-y-3 flex-shrink-0">
                         <div className="flex justify-between items-center">
                             <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
                                 <BookOpen className="w-4 h-4" /> Prompt Library
@@ -410,7 +611,7 @@ export default function PromptStudioClient() {
                                 placeholder="ค้นหาชื่อ, สรรพคุณ..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 text-xs rounded-md focus:outline-none focus:border-zinc-700 transition"
+                                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 text-xs rounded-md text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all"
                             />
                         </div>
 
@@ -419,11 +620,11 @@ export default function PromptStudioClient() {
                             <select
                                 value={categoryFilter}
                                 onChange={(e) => setCategoryFilter(e.target.value)}
-                                className="w-1/2 bg-zinc-900 border border-zinc-800 text-xs py-1 px-1.5 rounded-md focus:outline-none focus:border-zinc-700 text-zinc-300"
+                                className={SELECT_CLASS}
                             >
-                                <option value="All">หมวดหมู่ทั้งหมด</option>
+                                <option className="bg-zinc-900 text-slate-100" value="All">หมวดหมู่ทั้งหมด</option>
                                 {CATEGORIES.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
+                                    <option className="bg-zinc-900 text-slate-100" key={cat} value={cat}>{cat}</option>
                                 ))}
                             </select>
 
@@ -431,13 +632,13 @@ export default function PromptStudioClient() {
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                className="w-1/2 bg-zinc-900 border border-zinc-800 text-xs py-1 px-1.5 rounded-md focus:outline-none focus:border-zinc-700 text-zinc-300"
+                                className={SELECT_CLASS}
                             >
-                                <option value="All">สถานะทั้งหมด</option>
-                                <option value="active">Active</option>
-                                <option value="draft">Draft</option>
-                                <option value="testing">Testing</option>
-                                <option value="archived">Archived</option>
+                                <option className="bg-zinc-900 text-slate-100" value="All">สถานะทั้งหมด</option>
+                                <option className="bg-zinc-900 text-slate-100" value="active">Active</option>
+                                <option className="bg-zinc-900 text-slate-100" value="draft">Draft</option>
+                                <option className="bg-zinc-900 text-slate-100" value="testing">Testing</option>
+                                <option className="bg-zinc-900 text-slate-100" value="archived">Archived</option>
                             </select>
                         </div>
                     </div>
@@ -494,7 +695,7 @@ export default function PromptStudioClient() {
                 {/* 2. Center Column: Prompt Editor */}
                 <div className="flex-1 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden">
                     {/* Editor Toolbar */}
-                    <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/30">
+                    <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/30 flex-shrink-0">
                         <div className="flex items-center gap-2">
                             <Edit className="w-4 h-4 text-indigo-400" />
                             <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
@@ -525,42 +726,42 @@ export default function PromptStudioClient() {
                     </div>
 
                     {/* Form Fields */}
-                    <div className="flex-1 p-5 overflow-y-auto space-y-4 text-xs">
+                    <div className="flex-1 p-5 overflow-y-auto space-y-5 text-xs">
                         {/* Meta Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">ชื่อ Prompt *</label>
+                                <label className="block text-zinc-400 font-bold mb-1">ชื่อ Prompt *</label>
                                 <input
                                     type="text"
                                     value={editorFields.name || ""}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, name: e.target.value }))}
                                     placeholder="เช่น Green Fineness Content Writer"
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white"
+                                    className={INPUT_CLASS}
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">หมวดหมู่ *</label>
+                                <label className="block text-zinc-400 font-bold mb-1">หมวดหมู่ *</label>
                                 <select
                                     value={editorFields.category || ""}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, category: e.target.value }))}
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white"
+                                    className={SELECT_CLASS}
                                 >
                                     {CATEGORIES.map(cat => (
-                                        <option key={cat} value={cat}>{cat}</option>
+                                        <option className="bg-zinc-900 text-slate-100" key={cat} value={cat}>{cat}</option>
                                     ))}
                                 </select>
                             </div>
 
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">สถานะ</label>
+                                <label className="block text-zinc-400 font-bold mb-1">สถานะ</label>
                                 <select
                                     value={editorFields.status || "draft"}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, status: e.target.value as PromptTemplate["status"] }))}
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white"
+                                    className={SELECT_CLASS}
                                 >
                                     {STATUSES.map(st => (
-                                        <option key={st} value={st}>{st}</option>
+                                        <option className="bg-zinc-900 text-slate-100" key={st} value={st}>{st}</option>
                                     ))}
                                 </select>
                             </div>
@@ -569,157 +770,384 @@ export default function PromptStudioClient() {
                         {/* Version & Notes */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">เวอร์ชัน</label>
+                                <label className="block text-zinc-400 font-bold mb-1">เวอร์ชัน</label>
                                 <input
                                     type="text"
                                     value={editorFields.version || "1.0.0"}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, version: e.target.value }))}
                                     placeholder="1.0.0"
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white font-mono"
+                                    className={INPUT_CLASS + " font-mono"}
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">บันทึกเวอร์ชัน (Version Notes)</label>
+                                <label className="block text-zinc-400 font-bold mb-1">บันทึกเวอร์ชัน (Version Notes)</label>
                                 <input
                                     type="text"
                                     value={editorFields.version_notes || ""}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, version_notes: e.target.value }))}
                                     placeholder="เช่น เริ่มต้นเทมเพลต หรือ แก้ไข instructions เพิ่มเติม"
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white"
+                                    className={INPUT_CLASS}
                                 />
                             </div>
                         </div>
 
                         {/* Purpose */}
                         <div>
-                            <label className="block text-zinc-500 font-bold mb-1">วัตถุประสงค์ (Purpose)</label>
+                            <label className="block text-zinc-400 font-bold mb-1">วัตถุประสงค์ (Purpose)</label>
                             <input
                                 type="text"
                                 value={editorFields.purpose || ""}
                                 onChange={(e) => setEditorFields(prev => ({ ...prev, purpose: e.target.value }))}
                                 placeholder="จุดประสงค์หลักในการรัน Prompt นี้"
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white"
+                                className={INPUT_CLASS}
                             />
+                        </div>
+
+                        {/* Input Fields Section (HUMAN-FRIENDLY BUILDER + COLLAPSIBLE JSON) */}
+                        <div className="border border-zinc-800 rounded-lg bg-zinc-900/10 overflow-hidden">
+                            {/* Builder Header */}
+                            <div className="bg-zinc-900/30 p-3 border-b border-zinc-800 flex justify-between items-center">
+                                <span className="font-bold text-zinc-300 flex items-center gap-1.5 font-sans text-xs">
+                                    <Sliders className="w-4 h-4 text-indigo-400" />
+                                    <span>Input Fields Builder</span>
+                                </span>
+                                <span className="text-[10px] text-zinc-500 font-mono">
+                                    {currentInputFields.length} ฟิลด์ตัวแปร
+                                </span>
+                            </div>
+
+                            <div className="p-4 space-y-4">
+                                {/* List of Configured Fields */}
+                                {currentInputFields.length === 0 ? (
+                                    <p className="text-zinc-500 text-xs italic text-center py-4 bg-zinc-900/20 rounded-md border border-dashed border-zinc-800">
+                                        ยังไม่มีตัวแปรอินพุตใด ๆ กดสร้างที่แผงควบคุมด้านล่างเพื่อผูกตัวแปร
+                                    </p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {currentInputFields.map((field, idx) => (
+                                            <div 
+                                                key={field.name + "-" + idx}
+                                                className={`flex items-center justify-between p-3 rounded-lg border text-xs bg-zinc-900/40 hover:bg-zinc-900/60 transition ${
+                                                    editingFieldIndex === idx ? "border-emerald-500" : "border-zinc-800"
+                                                }`}
+                                            >
+                                                <div className="space-y-0.5 max-w-[70%]">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-zinc-200">{field.label}</span>
+                                                        <span className="font-mono text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
+                                                            &#123;&#123;{field.name}&#125;&#125;
+                                                        </span>
+                                                        {field.required && (
+                                                            <span className="text-[9px] text-red-400 bg-red-950/40 px-1 py-0.2 rounded font-semibold border border-red-900/50">
+                                                                Required
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {field.value && (
+                                                        <p className="text-[10px] text-zinc-400 truncate">
+                                                            <span className="text-zinc-600">Default:</span> {field.value}
+                                                        </p>
+                                                    )}
+                                                    {field.placeholder && (
+                                                        <p className="text-[10px] text-zinc-500 truncate">
+                                                            <span className="text-zinc-600">Placeholder:</span> {field.placeholder}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* Reorder and Edit Actions */}
+                                                <div className="flex items-center gap-1.5">
+                                                    {/* Move Up */}
+                                                    <button
+                                                        onClick={() => handleMoveField(idx, "up")}
+                                                        disabled={idx === 0}
+                                                        title="เลื่อนขึ้น"
+                                                        className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 disabled:hover:text-zinc-500 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                    >
+                                                        <ArrowUp className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {/* Move Down */}
+                                                    <button
+                                                        onClick={() => handleMoveField(idx, "down")}
+                                                        disabled={idx === currentInputFields.length - 1}
+                                                        title="เลื่อนลง"
+                                                        className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 disabled:hover:text-zinc-500 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                    >
+                                                        <ArrowDown className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {/* Edit */}
+                                                    <button
+                                                        onClick={() => handleEditField(idx)}
+                                                        title="แก้ไขตัวแปร"
+                                                        className="p-1 text-zinc-400 hover:text-indigo-400 rounded hover:bg-zinc-800 transition cursor-pointer ml-1"
+                                                    >
+                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {/* Delete */}
+                                                    <button
+                                                        onClick={() => handleDeleteField(idx)}
+                                                        title="ลบตัวแปร"
+                                                        className="p-1 text-zinc-500 hover:text-red-400 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Field Editor Form */}
+                                <div className="border border-zinc-800 rounded-lg p-3.5 bg-zinc-950/40 space-y-3 animate-fadeIn">
+                                    <span className="font-semibold text-zinc-300 text-xs block border-b border-zinc-850 pb-1.5">
+                                        {editingFieldIndex !== null ? "แก้ไขข้อมูลฟิลด์ตัวแปร" : "เพิ่มตัวแปรนำเข้าใหม่"}
+                                    </span>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {/* Field Name */}
+                                        <div>
+                                            <label className="block text-zinc-400 font-bold mb-1">
+                                                Field Name (ตัวคีย์ในโค้ด) *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={fieldForm.name || ""}
+                                                onChange={(e) => handleFieldFormChange("name", e.target.value)}
+                                                placeholder="เช่น target_audience"
+                                                className={`w-full bg-zinc-900 border rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:ring-2 selection:bg-emerald-400/30 selection:text-white transition-all text-xs font-mono ${
+                                                    fieldValidationError 
+                                                        ? "border-red-800 focus:border-red-700 focus:ring-red-500/20" 
+                                                        : "border-zinc-800 focus:border-emerald-400 focus:ring-emerald-400/30"
+                                                }`}
+                                            />
+                                            {fieldValidationError && (
+                                                <p className="text-red-400 text-[9px] mt-1 font-mono flex items-center gap-1">
+                                                    <AlertCircle className="w-2.5 h-2.5 flex-shrink-0" />
+                                                    {fieldValidationError}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Label */}
+                                        <div>
+                                            <label className="block text-zinc-400 font-bold mb-1">
+                                                Label (ป้ายแสดงภาษาไทย) *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={fieldForm.label || ""}
+                                                onChange={(e) => handleFieldFormChange("label", e.target.value)}
+                                                placeholder="เช่น กลุ่มเป้าหมายบทความ"
+                                                className={INPUT_CLASS}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {/* Default Value */}
+                                        <div>
+                                            <label className="block text-zinc-400 font-bold mb-1">ค่าเริ่มต้น (Default)</label>
+                                            <input
+                                                type="text"
+                                                value={fieldForm.value || ""}
+                                                onChange={(e) => handleFieldFormChange("value", e.target.value)}
+                                                placeholder="ใส่ค่าเริ่มต้น (ถ้ามี)"
+                                                className={INPUT_CLASS}
+                                            />
+                                        </div>
+
+                                        {/* Placeholder */}
+                                        <div>
+                                            <label className="block text-zinc-400 font-bold mb-1">คำแนะนำไกด์ (Placeholder)</label>
+                                            <input
+                                                type="text"
+                                                value={fieldForm.placeholder || ""}
+                                                onChange={(e) => handleFieldFormChange("placeholder", e.target.value)}
+                                                placeholder="คำจางๆ แสดงในช่องกรอก"
+                                                className={INPUT_CLASS}
+                                            />
+                                        </div>
+
+                                        {/* Helper Text */}
+                                        <div>
+                                            <label className="block text-zinc-400 font-bold mb-1">ข้อความอธิบายเพิ่ม (Helper)</label>
+                                            <input
+                                                type="text"
+                                                value={fieldForm.helperText || ""}
+                                                onChange={(e) => handleFieldFormChange("helperText", e.target.value)}
+                                                placeholder="แสดงใต้ช่องป้อนข้อความ"
+                                                className={INPUT_CLASS}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Required */}
+                                    <div className="flex items-center gap-2 py-1">
+                                        <input
+                                            type="checkbox"
+                                            id="field-form-required"
+                                            checked={fieldForm.required || false}
+                                            onChange={(e) => handleFieldFormChange("required", e.target.checked)}
+                                            className="w-3.5 h-3.5 accent-emerald-500 rounded bg-zinc-900 border-zinc-800 focus:ring-emerald-400/30"
+                                        />
+                                        <label htmlFor="field-form-required" className="text-zinc-400 text-xs font-semibold cursor-pointer">
+                                            กำหนดเป็นฟิลด์จำเป็นที่ผู้ใช้ต้องกรอก (Required Field)
+                                        </label>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex justify-end gap-2 pt-1 border-t border-zinc-900">
+                                        {editingFieldIndex !== null && (
+                                            <button
+                                                onClick={handleCancelEdit}
+                                                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded font-semibold text-xs transition cursor-pointer"
+                                            >
+                                                ยกเลิก
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={handleSubmitField}
+                                            disabled={!!fieldValidationError || !fieldForm.name}
+                                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded font-bold text-xs transition cursor-pointer"
+                                        >
+                                            {editingFieldIndex !== null ? "บันทึกการแก้ไข" : "เพิ่มตัวแปร"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* COLLAPSIBLE RAW JSON (Advanced Mode) */}
+                            <div className="border-t border-zinc-800">
+                                <button
+                                    onClick={() => setShowAdvancedJson(!showAdvancedJson)}
+                                    className="w-full p-3 bg-zinc-900/20 hover:bg-zinc-900/40 transition flex justify-between items-center text-xs font-semibold text-zinc-400"
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        <Code className="w-3.5 h-3.5 text-zinc-500" />
+                                        <span>Advanced JSON Editor (สำหรับผู้พัฒนา)</span>
+                                    </span>
+                                    {showAdvancedJson ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+                                </button>
+
+                                {showAdvancedJson && (
+                                    <div className="p-4 bg-zinc-950/60 border-t border-zinc-800 space-y-2 animate-slideDown">
+                                        <textarea
+                                            rows={4}
+                                            value={editorFields.input_fields || "[]"}
+                                            onChange={(e) => handleJsonChange(e.target.value)}
+                                            className={`w-full bg-zinc-900 border rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:ring-2 selection:bg-emerald-400/30 selection:text-white transition-all text-xs font-mono ${
+                                                jsonValidationError 
+                                                    ? "border-red-800 focus:border-red-700 focus:ring-red-500/20" 
+                                                    : "border-zinc-800 focus:border-emerald-400 focus:ring-emerald-400/30"
+                                            }`}
+                                        />
+                                        {jsonValidationError ? (
+                                            <p className="text-red-400 text-[10px] flex items-center gap-1 font-mono">
+                                                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                                                {jsonValidationError}
+                                            </p>
+                                        ) : (
+                                            <p className="text-zinc-500 text-[9px]">
+                                                * การแก้ไขข้อความตรงนี้จะซิงค์กลับไปหา Field Builder ด้านบนโดยอัตโนมัติหากโครงสร้างถูกต้อง
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Role & Context */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">บทบาท (Role / Persona)</label>
+                                <label className="block text-zinc-400 font-bold mb-1">บทบาท (Role / Persona)</label>
                                 <textarea
                                     rows={4}
                                     value={editorFields.role || ""}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, role: e.target.value }))}
                                     placeholder="เช่น คุณคือบรรณาธิการตรวจทานบทความวิชาการสมุนไพร..."
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white font-mono"
+                                    className={TEXTAREA_CLASS}
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">บริบท (Context)</label>
+                                <label className="block text-zinc-400 font-bold mb-1">บริบท (Context)</label>
                                 <textarea
                                     rows={4}
                                     value={editorFields.context || ""}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, context: e.target.value }))}
                                     placeholder="บริบทโดยรอบ ข้อมูลพื้นฐาน องค์กร หรือกลุ่มเป้าหมาย..."
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white font-mono"
+                                    className={TEXTAREA_CLASS}
                                 />
                             </div>
                         </div>
 
-                        {/* Structured Input Fields JSON with Live Validation Check */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <label className="block text-zinc-500 font-bold">ตัวแปรอินพุต (Input Fields JSON)</label>
-                                <div className="text-[10px] text-zinc-500 flex items-center gap-1">
-                                    <HelpCircle className="w-3 h-3" />
-                                    <span>ต้องเป็น JSON Array ของวัตถุ</span>
-                                </div>
-                            </div>
-                            <textarea
-                                rows={3}
-                                value={editorFields.input_fields || "[]"}
-                                onChange={(e) => handleJsonChange(e.target.value)}
-                                placeholder={`[{"name": "topic", "label": "หัวข้อบทความ", "value": ""}]`}
-                                className={`w-full bg-zinc-900 border rounded p-2 focus:outline-none text-white font-mono ${
-                                    jsonValidationError ? "border-red-700 focus:border-red-600" : "border-zinc-800 focus:border-zinc-700"
-                                }`}
-                            />
-                            {jsonValidationError && (
-                                <p className="text-red-400 text-[10px] mt-1 flex items-center gap-1 font-mono">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {jsonValidationError}
-                                </p>
-                            )}
-                        </div>
-
                         {/* Instructions & Constraints */}
                         <div>
-                            <label className="block text-zinc-500 font-bold mb-1">ขั้นตอนดำเนินงาน (Instructions)</label>
+                            <label className="block text-zinc-400 font-bold mb-1">ขั้นตอนดำเนินงาน (Instructions)</label>
                             <textarea
                                 rows={5}
                                 value={editorFields.instructions || ""}
                                 onChange={(e) => setEditorFields(prev => ({ ...prev, instructions: e.target.value }))}
                                 placeholder="ขั้นตอนการทำงาน 1, 2, 3 ทีละสเตป..."
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white font-mono"
+                                className={TEXTAREA_CLASS}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-zinc-500 font-bold mb-1">ข้อจำกัด / กฎเกณฑ์ (Constraints)</label>
+                            <label className="block text-zinc-400 font-bold mb-1">ข้อจำกัด / กฎเกณฑ์ (Constraints)</label>
                             <textarea
                                 rows={3}
                                 value={editorFields.constraints || ""}
                                 onChange={(e) => setEditorFields(prev => ({ ...prev, constraints: e.target.value }))}
                                 placeholder="สิ่งที่ห้ามทำเด็ดขาด เช่น ห้ามใช้สารเคมี, ห้ามใช้สัญลักษณ์นี้..."
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white font-mono"
+                                className={TEXTAREA_CLASS}
                             />
                         </div>
 
                         {/* Output & Checklist */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">รูปแบบผลลัพธ์ (Output Format)</label>
+                                <label className="block text-zinc-400 font-bold mb-1">รูปแบบผลลัพธ์ (Output Format)</label>
                                 <textarea
                                     rows={4}
                                     value={editorFields.output_format || ""}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, output_format: e.target.value }))}
                                     placeholder="จัดรูปแบบคำตอบ เช่น แสดงเป็น Markdown Table หรือ JSON..."
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white font-mono"
+                                    className={TEXTAREA_CLASS}
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-zinc-500 font-bold mb-1">รายการเช็คตรวจสอบก่อนส่ง (Review Checklist)</label>
+                                <label className="block text-zinc-400 font-bold mb-1">รายการเช็คตรวจสอบก่อนส่ง (Review Checklist)</label>
                                 <textarea
                                     rows={4}
                                     value={editorFields.review_checklist || ""}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, review_checklist: e.target.value }))}
                                     placeholder="การประเมินคุณภาพด้วยตนเองก่อนสรุปผล..."
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white font-mono"
+                                    className={TEXTAREA_CLASS}
                                 />
                             </div>
                         </div>
 
                         {/* Notes */}
                         <div>
-                            <label className="block text-zinc-500 font-bold mb-1">บันทึกเพิ่มเติม (Notes)</label>
+                            <label className="block text-zinc-400 font-bold mb-1">บันทึกเพิ่มเติม (Notes)</label>
                             <textarea
                                 rows={2}
                                 value={editorFields.notes || ""}
                                 onChange={(e) => setEditorFields(prev => ({ ...prev, notes: e.target.value }))}
                                 placeholder="บันทึกข้อความภายในที่ไม่ได้ Compile ไปยัง Prompt"
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white"
+                                className={INPUT_CLASS}
                             />
                         </div>
                     </div>
                 </div>
 
                 {/* 3. Right Column: Preview & Test Input Area */}
-                <div className="w-[420px] flex flex-col bg-zinc-900/30 overflow-hidden">
+                <div className="w-[420px] flex flex-col bg-zinc-900/30 overflow-hidden flex-shrink-0">
                     {/* Test Variables Area */}
-                    <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col">
+                    <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col flex-shrink-0">
                         <div className="flex items-center gap-2 mb-3">
                             <Sliders className="w-4 h-4 text-indigo-400" />
                             <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Test Input Area</h2>
@@ -727,23 +1155,31 @@ export default function PromptStudioClient() {
                         
                         {currentInputFields.length === 0 ? (
                             <p className="text-[11px] text-zinc-500 italic">
-                                {"ไม่มีตัวแปรที่กำหนดไว้ในเทมเพลตนี้ (สามารถเพิ่มตัวแปรในช่อง Input Fields JSON ด้านข้าง เช่น [{\"name\": \"topic\", \"label\": \"หัวข้อ\"}])"}
+                                {"ไม่มีตัวแปรที่กำหนดไว้ในเทมเพลตนี้ (สามารถเพิ่มตัวแปรในช่อง Input Fields Builder ด้านข้าง)"}
                             </p>
                         ) : (
-                            <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                            <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                                 {currentInputFields.map(field => (
                                     <div key={field.name} className="flex flex-col text-xs">
-                                        <label className="text-zinc-400 font-semibold mb-1 flex justify-between items-center">
-                                            <span>{field.label}</span>
+                                        <label className="text-zinc-400 font-semibold mb-0.5 flex justify-between items-center">
+                                            <span className="flex items-center gap-1">
+                                                <span>{field.label}</span>
+                                                {field.required && <span className="text-red-400 text-[10px] font-bold">*</span>}
+                                            </span>
                                             <span className="text-[10px] text-zinc-600 font-mono">&#123;&#123;{field.name}&#125;&#125;</span>
                                         </label>
                                         <input
                                             type="text"
                                             value={testValues[field.name] || ""}
+                                            placeholder={field.placeholder || `กรอกค่าของ ${field.label}...`}
                                             onChange={(e) => setTestValues(prev => ({ ...prev, [field.name]: e.target.value }))}
-                                            placeholder={`กรอกค่าของ ${field.label}...`}
-                                            className="bg-zinc-950 border border-zinc-800 rounded p-2 focus:outline-none focus:border-zinc-700 text-white text-xs"
+                                            className={INPUT_CLASS}
                                         />
+                                        {field.helperText && (
+                                            <span className="text-[9px] text-zinc-500 mt-0.5 font-medium">
+                                                {field.helperText}
+                                            </span>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -776,7 +1212,7 @@ export default function PromptStudioClient() {
 
                     {/* Compile Preview Area */}
                     <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
-                        <div className="p-3 border-b border-zinc-850 flex justify-between items-center bg-zinc-900/10">
+                        <div className="p-3 border-b border-zinc-850 flex justify-between items-center bg-zinc-900/10 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <Eye className="w-3.5 h-3.5 text-indigo-400" />
                                 <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
