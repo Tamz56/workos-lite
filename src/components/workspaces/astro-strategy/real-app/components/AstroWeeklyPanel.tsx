@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, Compass, CheckCircle, ShieldAlert, Activity, Info, Zap } from "lucide-react";
+import { Calendar, Compass, CheckCircle, ShieldAlert, Activity, Zap } from "lucide-react";
 import { AstroWeeklyTimingViewModel } from "../data/astroRealAppTypes";
 import { formatThaiDateLabel } from "../data/astroRealAppWeeklyTimingViewModel";
 
@@ -65,7 +65,7 @@ export function AstroWeeklyPanel({
 
       {/* 7-Day Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {days.map((day, idx) => {
+        {days.map((day) => {
           const dateLabel = formatThaiDateLabel(day.date);
           const isBirthDay = day.isBirthWeekdayCycle;
 
