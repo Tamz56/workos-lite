@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Database, Trash2, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw, Play, Info, Download } from "lucide-react";
+import { Database, Trash2, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw, Play, Info, Download, Upload } from "lucide-react";
 import { buildLegacyMigrationDryRunReport, migrateReadyLegacyKeysWithConfirmation } from "../data/astroRealAppMigrationDryRunAdapter";
-import { MigrationDryRunReport, MigrationExecutionResult } from "../data/astroRealAppTypes";
+import { MigrationDryRunReport, MigrationExecutionResult, AstroDataImportDryRunReport, AstroDataRestoreMode, AstroDataRestoreResult, AstroDataExportEnvelope } from "../data/astroRealAppTypes";
 import { resetAstroBirthProfileToDefault, loadAstroBirthProfile } from "../data/astroRealAppBirthProfileStorageAdapter";
 import { buildAstroDataExportEnvelope, buildAstroDataExportFileName, downloadAstroDataExportJson } from "../data/astroRealAppExportBackupAdapter";
+import { buildAstroDataImportDryRunReport, restoreAstroDataFromImport } from "../data/astroRealAppImportRestoreAdapter";
 
 export type AstroPreviewDataToolsPanelProps = {
   onResetHistory: () => void;
@@ -46,6 +47,14 @@ export function AstroPreviewDataToolsPanel({
   const [report, setReport] = React.useState<MigrationDryRunReport | null>(null);
   const [confirmed, setConfirmed] = React.useState(false);
   const [execResult, setExecResult] = React.useState<MigrationExecutionResult | null>(null);
+
+  const [importFileName, setImportFileName] = React.useState("");
+  const [importReport, setImportReport] = React.useState<AstroDataImportDryRunReport | null>(null);
+  const [restoreMode, setRestoreMode] = React.useState<AstroDataRestoreMode>("merge-safe");
+  const [replaceConfirmed, setReplaceConfirmed] = React.useState(false);
+  const [restoreResult, setRestoreResult] = React.useState<AstroDataRestoreResult | null>(null);
+  const [importError, setImportError] = React.useState("");
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const updateStatuses = React.useCallback(() => {
     if (typeof window !== "undefined") {
@@ -143,6 +152,83 @@ export function AstroPreviewDataToolsPanel({
       const err = error as Error;
       setExportMessage(`เกิดข้อผิดพลาดในการส่งออก: ${err.message || String(error)}`);
       setTimeout(() => setExportMessage(""), 5000);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    setImportReport(null);
+    setRestoreResult(null);
+    setImportError("");
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const r = buildAstroDataImportDryRunReport(text);
+      setImportReport(r);
+      if (!r.isValid) {
+        const firstError = r.validationIssues.find(issue => issue.severity === "error");
+        setImportError(firstError ? firstError.message : "โครงสร้างไฟล์ข้อมูลไม่ถูกต้องตามสกีมา");
+      }
+    };
+    reader.onerror = () => {
+      setImportError("ไม่สามารถอ่านไฟล์ข้อมูลได้");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteRestore = async () => {
+    if (!importReport || !importReport.isValid || !importReport.data) {
+      alert("กรุณาเลือกและตรวจสอบโครงสร้างไฟล์สำรองที่ถูกต้องก่อน");
+      return;
+    }
+
+    if (restoreMode === "replace" && !replaceConfirmed) {
+      alert("กรุณากดกล่องยืนยันยินยอมความเสี่ยงเขียนทับข้อมูลทั้งหมด");
+      return;
+    }
+
+    const isConfirmed = window.confirm(
+      restoreMode === "replace"
+        ? "คำเตือนขั้นสูงสุด: คุณแน่ใจจริงๆ หรือไม่ว่าต้องการเขียนทับข้อมูลทั้งหมดในเบราว์เซอร์ปัจจุบัน? การกระทำนี้ไม่สามารถเรียกคืนได้"
+        : "คุณต้องการกู้คืนประวัติและแผนในโหมดผสานข้อมูล (Merge-Safe) ใช่หรือไม่?"
+    );
+
+    if (!isConfirmed) return;
+
+    try {
+      const envelope: AstroDataExportEnvelope = {
+        $schema: "https://arbor-desk.com/schemas/astro-strategy-backup-v1.json",
+        metadata: importReport.metadata!,
+        data: importReport.data!
+      };
+
+      const result = await restoreAstroDataFromImport(envelope, restoreMode);
+      setRestoreResult(result);
+      updateStatuses();
+
+      if (result.success) {
+        showFeedback(`กู้คืนสำเร็จ: โอนย้ายสำเร็จ ${result.restoredCount} รายการ, ข้าม ${result.skippedCount} รายการ`);
+      } else {
+        showFeedback(`กู้คืนล้มเหลว: ${result.error || "เกิดข้อผิดพลาดไม่ทราบสาเหตุ"}`);
+      }
+    } catch (err) {
+      const error = err as Error;
+      setImportError(`เกิดข้อผิดพลาดในการนำเข้าข้อมูล: ${error.message || String(err)}`);
+    }
+  };
+
+  const handleClearImport = () => {
+    setImportFileName("");
+    setImportReport(null);
+    setRestoreResult(null);
+    setImportError("");
+    setReplaceConfirmed(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -553,6 +639,280 @@ export function AstroPreviewDataToolsPanel({
           <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl flex items-center gap-2 text-xs text-emerald-400 animate-fadeIn">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{exportMessage}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Import / Restore Section */}
+      <div className="border-t border-slate-700/60 pt-6 space-y-4">
+        <div className="space-y-1">
+          <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <Upload className="w-4 h-4 text-emerald-400" /> นำเข้าและกู้คืนข้อมูลสำรอง (Import & Restore Data)
+          </h4>
+          <p className="text-xs text-slate-350">
+            อัปโหลดไฟล์สำรองข้อมูล JSON เพื่อกู้คืนข้อมูลประวัติและค่าการคำนวณทั้งหมด
+          </p>
+        </div>
+
+        {/* Warning Callout */}
+        <div className="bg-rose-950/20 border border-rose-500/20 p-4 rounded-xl flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-rose-450 shrink-0 mt-0.5" />
+          <div className="space-y-1 text-xs text-rose-200">
+            <p className="font-semibold text-[13px]">คำแนะนำที่สำคัญและคำเตือนก่อนการกู้คืนข้อมูล</p>
+            <p className="leading-relaxed">
+              การกู้คืนข้อมูลประเภทเขียนทับ (Write) มีความเสี่ยงต่อการทำให้ข้อมูลปัจจุบันในเครื่องสูญหาย 
+              <strong>กรุณากด &quot;ดาวน์โหลดไฟล์สำรองข้อมูล&quot; ปัจจุบันของคุณเก็บไว้ก่อนกู้คืนข้อมูลใหม่เสมอ</strong> 
+              เพื่อป้องกันข้อมูลสูญหายโดยไม่ตั้งใจ
+            </p>
+          </div>
+        </div>
+
+        {/* File Upload Inputs */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <input
+            type="file"
+            accept=".json"
+            onChange={handleFileChange}
+            ref={fileInputRef}
+            className="hidden"
+            id="astro-import-file-input"
+          />
+          <label
+            htmlFor="astro-import-file-input"
+            className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-750 rounded-xl text-xs font-bold text-slate-200 cursor-pointer transition-all flex items-center justify-center gap-2 w-max"
+          >
+            <Upload className="w-3.5 h-3.5" /> เลือกไฟล์สำรอง (.json)
+          </label>
+          
+          {importFileName && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-950/50 border border-slate-800 rounded-xl text-xs text-slate-300">
+              <span className="font-mono truncate max-w-xs">{importFileName}</span>
+              <button
+                type="button"
+                onClick={handleClearImport}
+                className="text-[10px] text-rose-400 hover:text-rose-350 font-bold ml-1 transition-all"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Dry-run report display */}
+        {importReport && (
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Database className="w-3.5 h-3.5 text-indigo-400" /> ผลการวิเคราะห์ไฟล์สำรองข้อมูล (Dry Run Report)
+              </span>
+              <span className={`px-2 py-0.5 border rounded-full text-[10px] font-semibold ${
+                importReport.isValid 
+                  ? "bg-emerald-950/30 text-emerald-300 border-emerald-800/40" 
+                  : "bg-rose-950/30 text-rose-300 border-rose-800/40"
+              }`}>
+                {importReport.isValid ? "โครงสร้างผ่านการตรวจสอบ (Valid)" : "โครงสร้างชำรุด (Invalid)"}
+              </span>
+            </div>
+
+            {/* Metadata Detail */}
+            {importReport.metadata && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] text-slate-350 font-mono">
+                <div>แอปต้นทาง: {importReport.metadata.appName} (v{importReport.metadata.exportVersion})</div>
+                <div>วันเวลาส่งออก: {importReport.exportedAt ? new Date(importReport.exportedAt).toLocaleString("th-TH") : "ไม่ระบุ"}</div>
+              </div>
+            )}
+
+            {/* Validation Issues */}
+            {importReport.validationIssues.length > 0 && (
+              <div className="space-y-1.5 bg-slate-900/40 border border-slate-850 p-3 rounded-lg text-xs leading-relaxed">
+                <p className="font-semibold text-slate-300">รายละเอียดข้อบกพร่อง / คำเตือน:</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-400">
+                  {importReport.validationIssues.map((issue, idx) => (
+                    <li key={idx} className={issue.severity === "error" ? "text-rose-400" : "text-amber-400"}>
+                      [{issue.severity.toUpperCase()}] {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Key compare list */}
+            {importReport.keyStatuses.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-300">ตารางเปรียบเทียบข้อมูล (Storage Key Comparison):</p>
+                <div className="overflow-x-auto border border-slate-800/60 rounded-lg">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900/50 border-b border-slate-800 text-slate-400 font-medium">
+                        <th className="p-2.5">คีย์เป้าหมาย (Key)</th>
+                        <th className="p-2.5">ขนาดในไฟล์</th>
+                        <th className="p-2.5">ขนาดในเครื่อง</th>
+                        <th className="p-2.5">สถานะ / การดำเนินการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                      {importReport.keyStatuses.map((kStatus, idx) => {
+                        let badgeStyle = "text-slate-400 bg-slate-900 border-slate-800";
+                        if (kStatus.status === "new") badgeStyle = "text-emerald-400 bg-emerald-950/20 border-emerald-900/30";
+                        if (kStatus.status === "match") badgeStyle = "text-indigo-400 bg-indigo-950/20 border-indigo-900/30";
+                        if (kStatus.status === "diff") badgeStyle = "text-amber-400 bg-amber-950/20 border-amber-900/30";
+                        if (kStatus.status === "missing_in_backup") badgeStyle = "text-rose-400 bg-rose-950/20 border-rose-900/30";
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-900/20 transition-colors">
+                            <td className="p-2.5 font-mono text-[10px] break-all">{kStatus.key}</td>
+                            <td className="p-2.5 font-mono text-[11px]">{kStatus.existsInBackup ? `${kStatus.backupBytes} B` : "ไม่มี"}</td>
+                            <td className="p-2.5 font-mono text-[11px]">{kStatus.existsInCurrentStorage ? `${kStatus.currentBytes} B` : "ไม่มี"}</td>
+                            <td className="p-2.5">
+                              <div className="flex flex-col gap-0.5">
+                                <span className={`inline-block px-1.5 py-0.5 text-[9px] font-semibold border rounded-full w-max ${badgeStyle}`}>
+                                  {kStatus.status}
+                                </span>
+                                <span className="text-[10px] text-slate-450 leading-tight block">{kStatus.notes}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Restore Mode Selector & Confirmations */}
+            {importReport.isValid && (
+              <div className="border-t border-slate-800 pt-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Mode Selector */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-350 block">เลือกโหมดกู้คืนข้อมูล (Restore Mode):</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRestoreMode("merge-safe")}
+                        className={`flex-1 py-2 px-3 border rounded-xl text-xs font-bold transition-all ${
+                          restoreMode === "merge-safe"
+                            ? "bg-indigo-600 border-indigo-500 text-white"
+                            : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850"
+                        }`}
+                      >
+                        Merge-Safe (ผสานประวัติ)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRestoreMode("replace")}
+                        className={`flex-1 py-2 px-3 border rounded-xl text-xs font-bold transition-all ${
+                          restoreMode === "replace"
+                            ? "bg-rose-950/40 border-rose-900/60 text-rose-200 hover:bg-rose-900/30"
+                            : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850"
+                        }`}
+                      >
+                        Replace (เขียนทับทั้งหมด)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mode explanation */}
+                  <div className="text-[11px] text-slate-400 bg-slate-900/40 p-3 border border-slate-850 rounded-xl leading-relaxed flex items-center font-normal">
+                    {restoreMode === "merge-safe" ? (
+                      <span>
+                        <strong>โหมดผสานปลอดภัย</strong>: รวบประวัติสะท้อนคิดที่มีอยู่กับประวัติใหม่ รายการซ้ำกันจะไม่เขียนทับ 
+                        และข้อมูลดราฟต์หรือข้อมูลโปรไฟล์ดวงเกิดจะไม่ถูกแทนที่หากระบบปัจจุบันมีค่าข้อมูลเดิมอยู่แล้ว
+                      </span>
+                    ) : (
+                      <span className="text-rose-200">
+                        <strong>โหมดเขียนทับทั้งหมด</strong>: ลบข้อมูลของแอปเดิมในเครื่องท้องถิ่นออก 
+                        และทำการเขียนทับด้วยข้อมูลจากไฟล์สำรองข้อมูล JSON ทุกประการ
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Explicit confirmation checkbox if replace mode is selected */}
+                {restoreMode === "replace" && (
+                  <label className="flex items-start gap-2.5 text-xs text-rose-350 bg-rose-950/10 border border-rose-900/20 p-3 rounded-lg max-w-full select-none cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={replaceConfirmed}
+                      onChange={(e) => setReplaceConfirmed(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-700 bg-slate-900 text-rose-600 focus:ring-rose-500 focus:ring-offset-slate-900"
+                    />
+                    <span>ฉันยอมรับความเสี่ยงที่จะเขียนข้อมูลโปรไฟล์และประวัติการสะท้อนคิดเดิมทับทั้งหมด และรับทราบว่าระบบเดิมจะถูกแทนที่ทันที</span>
+                  </label>
+                )}
+
+                {/* Action button */}
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleExecuteRestore}
+                    disabled={restoreMode === "replace" && !replaceConfirmed}
+                    className={`py-2 px-5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      restoreMode === "replace"
+                        ? (replaceConfirmed 
+                            ? "bg-rose-600 hover:bg-rose-500 text-white cursor-pointer shadow-sm" 
+                            : "bg-slate-850 text-slate-500 border border-slate-800/60 cursor-not-allowed")
+                        : "bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-sm"
+                    }`}
+                  >
+                    <Upload className="w-3.5 h-3.5" /> ยืนยันการดำเนินการกู้คืนข้อมูล
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Restore Result Report */}
+        {restoreResult && (
+          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-xs font-bold text-slate-200">ผลการทำรายการกู้คืนข้อมูล (Restore Results)</span>
+              <span className={`px-2 py-0.5 border rounded-full text-[10px] font-semibold ${
+                restoreResult.success 
+                  ? "bg-emerald-950/30 text-emerald-300 border-emerald-800/40" 
+                  : "bg-rose-950/30 text-rose-300 border-rose-800/40"
+              }`}>
+                {restoreResult.success ? "กู้คืนสำเร็จ" : "กู้คืนไม่สำเร็จ"}
+              </span>
+            </div>
+
+            <div className="flex gap-4 text-xs font-semibold">
+              <span className="text-emerald-400">กู้คืน/เขียนแล้ว: {restoreResult.restoredCount} รายการ</span>
+              <span className="text-slate-400">ข้าม: {restoreResult.skippedCount} รายการ</span>
+              {restoreResult.failedCount > 0 && <span className="text-rose-450">ล้มเหลว: {restoreResult.failedCount} รายการ</span>}
+            </div>
+
+            <div className="max-h-48 overflow-y-auto divide-y divide-slate-800/40 text-[11px] font-mono space-y-1 pt-1">
+              {restoreResult.keyResults.map((kr, idx) => {
+                let statusColor = "text-slate-400";
+                if (kr.status === "restored") statusColor = "text-emerald-400 font-bold";
+                if (kr.status === "merged") statusColor = "text-indigo-400 font-bold";
+                if (kr.status.startsWith("skipped-")) statusColor = "text-slate-500";
+                if (kr.status === "failed") statusColor = "text-rose-400 font-bold";
+
+                return (
+                  <div key={idx} className="py-1 flex justify-between gap-2">
+                    <span className="text-slate-400 select-all truncate max-w-sm">{kr.key}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={statusColor}>{kr.status}</span>
+                      {kr.bytesWritten > 0 && (
+                        <span className="text-slate-600 text-[10px]">({kr.bytesWritten} B)</span>
+                      )}
+                      {kr.error && <span className="text-rose-500 text-[10px]" title={kr.error}>{kr.error}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {importError && (
+          <div className="bg-rose-950/20 border border-rose-500/20 p-3 rounded-xl flex items-center gap-2 text-xs text-rose-400 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{importError}</span>
           </div>
         )}
       </div>

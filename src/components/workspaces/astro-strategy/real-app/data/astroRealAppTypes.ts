@@ -354,6 +354,52 @@ export interface AstroDataExportResult {
   error?: string;
 }
 
+export interface AstroDataImportValidationIssue {
+  severity: "error" | "warning";
+  key?: string;
+  message: string;
+}
+
+export interface AstroDataImportKeyStatus {
+  key: string;
+  existsInBackup: boolean;
+  existsInCurrentStorage: boolean;
+  backupBytes: number;
+  currentBytes: number;
+  status: "match" | "new" | "diff" | "missing_in_backup" | "malformed";
+  notes?: string;
+}
+
+export interface AstroDataImportDryRunReport {
+  isValid: boolean;
+  exportedAt?: string;
+  routeContext?: string;
+  validationIssues: AstroDataImportValidationIssue[];
+  keyStatuses: AstroDataImportKeyStatus[];
+  metadata?: AstroDataExportMetadata;
+  data?: AstroDataExportPayload;
+}
+
+export type AstroDataRestoreMode = "merge-safe" | "replace";
+
+export interface AstroDataRestoreKeyResult {
+  key: string;
+  status: "restored" | "merged" | "skipped-exists" | "skipped-empty" | "failed";
+  bytesWritten: number;
+  error?: string;
+}
+
+export interface AstroDataRestoreResult {
+  success: boolean;
+  mode: AstroDataRestoreMode;
+  restoredCount: number;
+  skippedCount: number;
+  failedCount: number;
+  keyResults: AstroDataRestoreKeyResult[];
+  error?: string;
+}
+
+
 
 
 
