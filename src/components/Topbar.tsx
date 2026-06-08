@@ -23,6 +23,7 @@ export default function Topbar() {
         if (pathname.startsWith("/workspaces/content/article-studio")) return "Article Studio";
         if (pathname.startsWith("/workspaces/content/writing-lab")) return "Writing Lab";
         if (pathname.startsWith("/workspaces/astro-strategy")) return "Astro Strategy Lab";
+        if (pathname.startsWith("/workspaces/prompt-studio")) return "Prompt Studio";
         
         if (pathname.startsWith("/workspaces")) return "Areas";
         if (pathname.startsWith("/settings")) return "Settings";

@@ -474,3 +474,36 @@ CREATE TABLE IF NOT EXISTS gf_article_relationships (
   FOREIGN KEY(source_id) REFERENCES gf_episodes(id) ON DELETE CASCADE,
   FOREIGN KEY(target_id) REFERENCES gf_episodes(id) ON DELETE CASCADE
 );
+
+-- Prompt Studio Templates (SQLite)
+CREATE TABLE IF NOT EXISTS prompt_templates (
+  id               TEXT PRIMARY KEY,
+  name             TEXT NOT NULL,
+  category         TEXT NOT NULL,
+  purpose          TEXT NULL,
+  role             TEXT NULL,
+  context          TEXT NULL,
+  input_fields     TEXT NULL, -- JSON array of input variables: [{"name": "topic", "label": "หัวข้อ", "value": ""}]
+  instructions     TEXT NULL,
+  constraints      TEXT NULL,
+  output_format    TEXT NULL,
+  review_checklist TEXT NULL,
+  notes            TEXT NULL,
+  status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','testing','active','archived')),
+  version          TEXT NOT NULL DEFAULT '1.0.0',
+  version_notes    TEXT NULL,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_status ON prompt_templates(status);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_category ON prompt_templates(category);
+
+CREATE TRIGGER IF NOT EXISTS trg_prompt_templates_updated_at
+AFTER UPDATE ON prompt_templates
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE prompt_templates SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+

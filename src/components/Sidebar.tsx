@@ -181,6 +181,13 @@ export function Sidebar() {
                         active={pathname.startsWith("/workspaces/content/writing-lab")}
                         isCollapsed={isCollapsed}
                     />
+                    <NavItem
+                        href="/workspaces/prompt-studio"
+                        label="Prompt Studio"
+                        icon={<SparklesIcon className="w-5 h-5" />}
+                        active={pathname.startsWith("/workspaces/prompt-studio")}
+                        isCollapsed={isCollapsed}
+                    />
                 </div>
 
                 {/* 3) Advanced / System */}

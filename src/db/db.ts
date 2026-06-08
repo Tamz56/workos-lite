@@ -1248,14 +1248,120 @@ function ensureWritingDeskTables() {
     }
 }
 
+function ensurePromptTemplates() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS prompt_templates (
+          id               TEXT PRIMARY KEY,
+          name             TEXT NOT NULL,
+          category         TEXT NOT NULL,
+          purpose          TEXT NULL,
+          role             TEXT NULL,
+          context          TEXT NULL,
+          input_fields     TEXT NULL,
+          instructions     TEXT NULL,
+          constraints      TEXT NULL,
+          output_format    TEXT NULL,
+          review_checklist TEXT NULL,
+          notes            TEXT NULL,
+          status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','testing','active','archived')),
+          version          TEXT NOT NULL DEFAULT '1.0.0',
+          version_notes    TEXT NULL,
+          created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_prompt_templates_status ON prompt_templates(status);
+        CREATE INDEX IF NOT EXISTS idx_prompt_templates_category ON prompt_templates(category);
+    `);
+
+    const seedPrompts = [
+        {
+            id: "seed-gf-article-outline",
+            name: "Green Fineness Article Outline Assistant",
+            category: "Writing",
+            purpose: "ช่วยร่างโครงร่างบทความ (Outline) สำหรับเนื้อหาเกี่ยวกับการเกษตรอินทรีย์ ดิน และสมุนไพร",
+            role: "เป็นผู้เชี่ยวชาญด้านการวางโครงสร้างบทความ SEO และครูสอนเกษตรอินทรีย์ที่เน้นการถ่ายทอดเนื้อหาให้เข้าใจง่ายและเป็นขั้นเป็นตอน",
+            context: "การทำ outline สำหรับบทความยาวที่จะเผยแพร่บนเว็บบล็อกของ Green Fineness และนำไปขยายผลเป็นโพสต์โซเชียลมีเดียต่อไป",
+            input_fields: JSON.stringify([
+                { name: "topic", label: "หัวข้อบทความ", value: "การปรุงดินสำหรับปลูกผักสลัดอินทรีย์" },
+                { name: "target_audience", label: "กลุ่มเป้าหมาย", value: "คนเมืองที่ต้องการปลูกผักทานเองหลังบ้าน" }
+            ]),
+            instructions: "1. วิเคราะห์เจตนาในการค้นหา (Search Intent) ของกลุ่มเป้าหมาย\n2. แบ่งโครงร่างเป็น 4-5 ส่วนหลักโดยใช้โครงสร้าง H2 และ H3\n3. ในแต่ละส่วน ให้ระบุประเด็นสำคัญที่จะเขียนพร้อมคีย์เวิร์ดแนะนำ\n4. เพิ่มส่วน FAQ ที่กลุ่มเป้าหมายมักสงสัย",
+            constraints: "- โครงร่างต้องสอดคล้องกับแนวคิดดินมีชีวิต (Living Soil) และชีวภาพ\n- หลีกเลี่ยงการแนะนำสารเคมีสังเคราะห์ทุกชนิด\n- ภาษาเข้าใจง่าย ไม่เป็นวิชาการจนเกินไป",
+            output_format: "เสนอเป็น Markdown Outline ที่พร้อมนำไปเขียนต่อในบทความจริง",
+            review_checklist: "- มีความครอบคลุมคำถามที่พบบ่อยหรือไม่\n- ลำดับการเล่าเรื่องลื่นไหลเข้าใจง่ายหรือไม่\n- ไม่มีเนื้อหาสารเคมีปนเปื้อน",
+            notes: "สามารถปรับปรุงโครงสร้างตามฤดูกาลและประเภทพืชได้",
+            status: "active",
+            version: "1.0.0",
+            version_notes: "Initial version"
+        },
+        {
+            id: "seed-claim-risk-reviewer",
+            name: "Claim Risk Reviewer",
+            category: "Review",
+            purpose: "ตรวจสอบความเสี่ยงของการกล่าวอ้างเกินจริง (Medical Claim Overclaim) สำหรับเนื้อหาเกี่ยวกับสมุนไพรและสุขภาพ",
+            role: "เป็นที่ปรึกษากฎหมายด้านคุ้มครองผู้บริโภค (อย. และ สคบ.) และผู้ตรวจสอบข้อเท็จจริงทางการแพทย์ที่มีประสบการณ์สูง",
+            context: "การตรวจสอบบทความเกี่ยวกับสรรพคุณของสมุนไพรไทยก่อนทำการเผยแพร่สู่สาธารณะเพื่อความปลอดภัยทางกฎหมายและสร้างความน่าเชื่อถือ",
+            input_fields: JSON.stringify([
+                { name: "content_to_review", label: "เนื้อหาที่ต้องการตรวจสอบ", value: "น้ำสมุนไพรสูตรนี้ช่วยรักษาโรคเบาหวานและความดันโลหิตสูงให้หายขาดได้ใน 7 วัน เพียงแค่ต้มดื่มเช้าเย็น" }
+            ]),
+            instructions: "1. ค้นหาคำกล่าวอ้างเกี่ยวกับผลลัพธ์ในการรักษาโรค (เช่น รักษาหายขาด, ป้องกันได้ 100%, การระบุระยะเวลาที่เห็นผลแน่นอน)\n2. ระบุส่วนที่มีความเสี่ยงสูงต่อการละเมิดกฎหมายควบคุมโฆษณาอาหารและยาในไทย\n3. เสนอแนะคำพูดหรือประโยคที่ถูกต้องและปลอดภัย (เช่น จาก \"รักษา\" เป็น \"ช่วยบรรเทา\" หรือ \"มีส่วนช่วยปรับสมดุล\")\n4. ให้คะแนนระดับความเสี่ยง (ต่ำ / กลาง / สูง)",
+            constraints: "- ให้เหตุผลทางกฎหมายและวิทยาศาสตร์กำกับทุกครั้ง\n- เสนอคำทดแทนที่เป็นรูปธรรมและนำไปใช้งานได้ทันที",
+            output_format: "จัดกลุ่มข้อค้นพบเป็นตาราง: ข้อความที่มีความเสี่ยง -> ระดับความเสี่ยง -> ข้อเสนอแนะคำที่ควรใช้",
+            review_checklist: "- ชี้เป้าคำว่า \"หายขาด\" หรือ \"รักษาโรค\" หรือไม่\n- ให้ประโยคใหม่ที่นำไปใช้แทนได้จริงหรือไม่",
+            notes: "ครอบคลุมกฎเกณฑ์ของ อย. ประเทศไทยฉบับล่าสุด",
+            status: "active",
+            version: "1.0.0",
+            version_notes: "Initial version"
+        },
+        {
+            id: "seed-gf-tone-reviewer",
+            name: "Green Fineness Tone Reviewer",
+            category: "Review",
+            purpose: "ปรับแต่งและตรวจสอบโทนเสียงของบทความสุขภาพให้มีความเป็นธรรมชาติ อบอุ่น และน่าเชื่อถือ",
+            role: "เป็นบรรณาธิการอาวุโส (Tone and Voice Specialist) ของนิตยสารสุขภาพระดับพรีเมียม",
+            context: "ขัดเกลาบทความที่เขียนเสร็จแล้วให้อยู่ในกรอบน้ำเสียงที่เป็นมิตร เล่าเรื่องสนุกเหมือนเพื่อนแนะนำเพื่อน แต่ยังอิงหลักการธรรมชาติบำบัดที่ถูกต้อง",
+            input_fields: JSON.stringify([
+                { name: "draft_text", label: "ดราฟท์บทความ", value: "ผู้ป่วยจะต้องรับประทานขิงปริมาณ 5 กรัมต่อวันเพื่อกระตุ้นการทำงานของลำไส้ใหญ่ ไม่เช่นนั้นอาจเกิดภาวะท้องผูกเรื้อรังได้" }
+            ]),
+            instructions: "1. ประเมินดราฟท์ปัจจุบันว่ามีความตึงเครียดหรือเป็นทางการมากเกินไปหรือไม่\n2. แปลงข้อความให้อ่านง่ายขึ้น (Readability) โดยใช้คำพูดแบบแชร์ประสบการณ์จริงและสร้างกำลังใจ\n3. ปรับระดับการมีปฏิสัมพันธ์กับผู้อ่านให้รู้สึกอบอุ่น แต่ไม่ดูไร้ความรู้ทางวิชาการ",
+            constraints: "- ห้ามเปลี่ยนใจความสำคัญหรือข้อเท็จจริงดั้งเดิมของสมุนไพร\n- ห้ามใช้ภาษาแสลงที่ไม่เป็นสากล\n- เน้นโทนเสียงแบบ 'โอบรับและเข้าใจธรรมชาติ'",
+            output_format: "เสนอ 3 รูปแบบการปรับปรุง: 1) วิเคราะห์สไตล์ปัจจุบัน 2) ข้อเสนอแนะการเขียนใหม่ (Rewrite) 3) สรุปคีย์เวิร์ดที่ช่วยขับเน้นโทน",
+            review_checklist: "- บทความอ่านง่ายขึ้นและผ่อนคลายขึ้นหรือไม่\n- รักษาข้อเท็จจริงถูกต้องหรือไม่",
+            notes: "มีประโยชน์มากเมื่อนำมาขัดเกลางานจากนักเขียนหลายๆ คนให้มีเอกภาพเดียวกัน",
+            status: "active",
+            version: "1.0.0",
+            version_notes: "Initial version"
+        }
+    ];
+
+    const stmt = db.prepare(`
+        INSERT INTO prompt_templates (
+            id, name, category, purpose, role, context, input_fields,
+            instructions, constraints, output_format, review_checklist, notes, status, version, version_notes
+        ) VALUES (
+            @id, @name, @category, @purpose, @role, @context, @input_fields,
+            @instructions, @constraints, @output_format, @review_checklist, @notes, @status, @version, @version_notes
+        ) ON CONFLICT(id) DO NOTHING
+    `);
+
+    const tx = db.transaction(() => {
+        for (const prompt of seedPrompts) {
+            stmt.run(prompt);
+        }
+    });
+    tx();
+}
+
 ensureNotes();
 ensureAppMeta();
 cleanupLegacyAvaDemoDataOnce();
 ensureGreenFinenessModel();
 ensureArborWritingLab();
 ensureWritingDeskTables();
+ensurePromptTemplates();
 
 if (!shouldSkipSeed) {
     ensureSeedProjects();
 }
+
 
