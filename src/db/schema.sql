@@ -516,6 +516,8 @@ CREATE TABLE IF NOT EXISTS prompt_run_logs (
   output_notes              TEXT NULL,
   rating                    INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
   next_revision_notes       TEXT NULL,
+  summary                   TEXT DEFAULT '',
+  run_status                TEXT DEFAULT 'needs_revision',
   created_at                TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY(prompt_template_id) REFERENCES prompt_templates(id) ON DELETE CASCADE

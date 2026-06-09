@@ -1362,6 +1362,8 @@ function ensurePromptRunLogs() {
           output_notes              TEXT NULL,
           rating                    INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
           next_revision_notes       TEXT NULL,
+          summary                   TEXT DEFAULT '',
+          run_status                TEXT DEFAULT 'needs_revision',
           created_at                TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at                TEXT NOT NULL DEFAULT (datetime('now')),
           FOREIGN KEY(prompt_template_id) REFERENCES prompt_templates(id) ON DELETE CASCADE
@@ -1376,6 +1378,17 @@ function ensurePromptRunLogs() {
           UPDATE prompt_run_logs SET updated_at = datetime('now') WHERE id = NEW.id;
         END;
     `);
+
+    // Idempotent column check and migration
+    const columns = db.prepare("PRAGMA table_info(prompt_run_logs)").all() as { name: string }[];
+    const colNames = columns.map(c => c.name);
+
+    if (!colNames.includes("summary")) {
+        db.exec("ALTER TABLE prompt_run_logs ADD COLUMN summary TEXT DEFAULT ''");
+    }
+    if (!colNames.includes("run_status")) {
+        db.exec("ALTER TABLE prompt_run_logs ADD COLUMN run_status TEXT DEFAULT 'needs_revision'");
+    }
 }
 
 ensureNotes();

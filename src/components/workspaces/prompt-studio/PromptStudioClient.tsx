@@ -60,6 +60,8 @@ interface PromptRunLog {
     outputNotes: string;
     rating: number;
     nextRevisionNotes: string;
+    summary: string;
+    runStatus: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -139,11 +141,17 @@ export default function PromptStudioClient() {
     const [logForm, setLogForm] = useState({
         rating: 5,
         outputNotes: "",
-        nextRevisionNotes: ""
+        nextRevisionNotes: "",
+        summary: "",
+        runStatus: "needs_revision"
     });
     const [isSavingLog, setIsSavingLog] = useState(false);
     const [rightPanelTab, setRightPanelTab] = useState<"playground" | "history">("playground");
     const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+    // Filters for Run History
+    const [logStatusFilter, setLogStatusFilter] = useState<string>("active");
+    const [logRatingFilter, setLogRatingFilter] = useState<string>("all");
     
     // Load Templates
     const fetchTemplates = useCallback(async () => {
@@ -170,14 +178,14 @@ export default function PromptStudioClient() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const fetchRunLogs = useCallback(async (templateId: string) => {
-        if (!templateId || templateId === "new-template") {
+    const fetchRunLogs = useCallback(async () => {
+        if (!selectedId || selectedId === "new-template") {
             setRunLogs([]);
             return;
         }
         setIsLoadingLogs(true);
         try {
-            const res = await fetch(`/api/prompt-run-logs?promptTemplateId=${templateId}`);
+            const res = await fetch(`/api/prompt-run-logs?promptTemplateId=${selectedId}&runStatus=${logStatusFilter}&ratingFilter=${logRatingFilter}`);
             if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูลประวัติการทดสอบได้");
             const data = await res.json() as PromptRunLog[];
             setRunLogs(data);
@@ -186,7 +194,11 @@ export default function PromptStudioClient() {
         } finally {
             setIsLoadingLogs(false);
         }
-    }, []);
+    }, [selectedId, logStatusFilter, logRatingFilter]);
+
+    useEffect(() => {
+        fetchRunLogs();
+    }, [fetchRunLogs]);
 
     const handleSaveRunLog = async () => {
         if (!selectedId || selectedId === "new-template") return;
@@ -205,7 +217,9 @@ export default function PromptStudioClient() {
                     compiledPromptSnapshot: compiledActivePrompt,
                     outputNotes: logForm.outputNotes,
                     rating: logForm.rating,
-                    nextRevisionNotes: logForm.nextRevisionNotes
+                    nextRevisionNotes: logForm.nextRevisionNotes,
+                    summary: logForm.summary,
+                    runStatus: logForm.runStatus
                 })
             });
 
@@ -217,10 +231,12 @@ export default function PromptStudioClient() {
             setLogForm({
                 rating: 5,
                 outputNotes: "",
-                nextRevisionNotes: ""
+                nextRevisionNotes: "",
+                summary: "",
+                runStatus: "needs_revision"
             });
 
-            fetchRunLogs(selectedId);
+            fetchRunLogs();
         } catch (err: unknown) {
             const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึกประวัติ";
             setApiError(errMsg);
@@ -229,19 +245,49 @@ export default function PromptStudioClient() {
         }
     };
 
-    useEffect(() => {
-        if (selectedId && selectedId !== "new-template") {
-            fetchRunLogs(selectedId);
-        } else {
-            setRunLogs([]);
+    const handleUpdateRunLog = async (logId: string, updates: Partial<PromptRunLog>) => {
+        setApiError(null);
+        try {
+            const res = await fetch("/api/prompt-run-logs", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: logId,
+                    summary: updates.summary,
+                    runStatus: updates.runStatus,
+                    outputNotes: updates.outputNotes,
+                    rating: updates.rating,
+                    nextRevisionNotes: updates.nextRevisionNotes
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json() as { error?: string };
+                throw new Error(errData.error || "ไม่สามารถอัปเดตประวัติการทดสอบได้");
+            }
+
+            fetchRunLogs();
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการอัปเดตข้อมูล";
+            setApiError(errMsg);
         }
+    };
+
+    const handleArchiveRunLog = async (logId: string) => {
+        if (!confirm("คุณต้องการจัดเก็บ (Archive) ประวัติการรันนี้ใช่หรือไม่? (ประวัตินี้จะถูกซ่อนจากมุมมองหลัก)")) return;
+        await handleUpdateRunLog(logId, { runStatus: "archived" });
+    };
+
+    useEffect(() => {
         setLogForm({
             rating: 5,
             outputNotes: "",
-            nextRevisionNotes: ""
+            nextRevisionNotes: "",
+            summary: "",
+            runStatus: "needs_revision"
         });
         setExpandedLogId(null);
-    }, [selectedId, fetchRunLogs]);
+    }, [selectedId]);
 
     // Set editor fields when template is selected
     const activeTemplate = useMemo(() => {
@@ -1399,6 +1445,31 @@ export default function PromptStudioClient() {
                                             <span className="font-bold text-zinc-300 text-xs uppercase tracking-wider">บันทึกผลการทดสอบ (Record Test Run)</span>
                                         </div>
                                         
+                                        {/* Summary */}
+                                        <div className="flex flex-col text-xs">
+                                            <label className="text-zinc-400 font-semibold mb-1">สรุปการทดสอบ (Summary)</label>
+                                            <input
+                                                type="text"
+                                                value={logForm.summary}
+                                                onChange={(e) => setLogForm(prev => ({ ...prev, summary: e.target.value }))}
+                                                placeholder="เช่น Outline ดี แต่ claim ยังแรง..."
+                                                className={INPUT_CLASS}
+                                            />
+                                        </div>
+
+                                        {/* Run Status Selector */}
+                                        <div className="flex flex-col text-xs">
+                                            <label className="text-zinc-400 font-semibold mb-1">สถานะผลการรัน (Run Status)</label>
+                                            <select
+                                                value={logForm.runStatus}
+                                                onChange={(e) => setLogForm(prev => ({ ...prev, runStatus: e.target.value }))}
+                                                className={SELECT_CLASS}
+                                            >
+                                                <option className="bg-zinc-900 text-slate-100" value="needs_revision">⚠️ Needs Revision (ต้องปรับปรุง)</option>
+                                                <option className="bg-zinc-900 text-slate-100" value="useful">✅ Useful (พร้อมใช้งาน)</option>
+                                            </select>
+                                        </div>
+
                                         {/* Rating Selector */}
                                         <div className="flex flex-col text-xs">
                                             <label className="text-zinc-400 font-semibold mb-1">ระดับคะแนน (Rating)</label>
@@ -1454,6 +1525,35 @@ export default function PromptStudioClient() {
                                         <div className="p-3 border-b border-zinc-850 bg-zinc-900/10 flex items-center justify-between flex-shrink-0">
                                             <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">ประวัติการทดสอบ ({runLogs.length})</h3>
                                         </div>
+
+                                        {/* Filters Bar */}
+                                        <div className="p-2 border-b border-zinc-850 bg-zinc-900/20 flex gap-2 flex-shrink-0 text-[10px]">
+                                            <div className="flex-1 col-span-1">
+                                                <select
+                                                    value={logStatusFilter}
+                                                    onChange={(e) => setLogStatusFilter(e.target.value)}
+                                                    className={SELECT_CLASS + " !p-1"}
+                                                >
+                                                    <option className="bg-zinc-900 text-slate-100" value="active">Active (ซ่อนจัดเก็บ)</option>
+                                                    <option className="bg-zinc-900 text-slate-100" value="useful">Useful (พร้อมใช้งาน)</option>
+                                                    <option className="bg-zinc-900 text-slate-100" value="needs_revision">Needs Revision (ต้องแก้ไข)</option>
+                                                    <option className="bg-zinc-900 text-slate-100" value="archived">Archived (จัดเก็บแล้ว)</option>
+                                                    <option className="bg-zinc-900 text-slate-100" value="all">สถานะทั้งหมด</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex-1 col-span-1">
+                                                <select
+                                                    value={logRatingFilter}
+                                                    onChange={(e) => setLogRatingFilter(e.target.value)}
+                                                    className={SELECT_CLASS + " !p-1"}
+                                                >
+                                                    <option className="bg-zinc-900 text-slate-100" value="all">คะแนนทั้งหมด</option>
+                                                    <option className="bg-zinc-900 text-slate-100" value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                                                    <option className="bg-zinc-900 text-slate-100" value="4plus">⭐⭐⭐⭐+ (4+/5)</option>
+                                                    <option className="bg-zinc-900 text-slate-100" value="3minus">⭐⭐⭐ หรือน้อยกว่า</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                         
                                         <div className="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
                                             {isLoadingLogs ? (
@@ -1473,12 +1573,28 @@ export default function PromptStudioClient() {
 
                                                     return (
                                                         <div key={log.id} className="border border-zinc-800 rounded-lg p-3 bg-zinc-900/20 space-y-2 text-xs">
-                                                            <div className="flex justify-between items-start">
-                                                                <span className="text-[10px] text-zinc-500 font-mono">{formattedDate}</span>
-                                                                <span className="text-amber-400 font-bold">
+                                                            <div className="flex justify-between items-start gap-1">
+                                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                                    <span className="text-[10px] text-zinc-500 font-mono">{formattedDate}</span>
+                                                                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold border ${
+                                                                        log.runStatus === "useful" ? "bg-emerald-950/80 text-emerald-300 border-emerald-800" :
+                                                                        log.runStatus === "archived" ? "bg-zinc-900 text-zinc-500 border-zinc-800" :
+                                                                        "bg-amber-950/80 text-amber-300 border-amber-800"
+                                                                    }`}>
+                                                                        {log.runStatus === "useful" ? "Useful" :
+                                                                         log.runStatus === "archived" ? "Archived" : "Needs Revision"}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="text-amber-400 font-bold flex-shrink-0">
                                                                     {"⭐".repeat(log.rating)} ({log.rating}/5)
                                                                 </span>
                                                             </div>
+
+                                                            {log.summary && (
+                                                                <h4 className="font-bold text-zinc-200 border-l-2 border-indigo-500 pl-1.5 py-0.5">
+                                                                    {log.summary}
+                                                                </h4>
+                                                            )}
 
                                                             {log.outputNotes && (
                                                                 <div>
@@ -1494,8 +1610,34 @@ export default function PromptStudioClient() {
                                                                 </div>
                                                             )}
 
+                                                            {/* Actions Row */}
+                                                            <div className="flex items-center justify-between gap-2 border-t border-zinc-850/40 pt-2 mt-1">
+                                                                <div className="flex gap-1.5">
+                                                                    {log.nextRevisionNotes && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                navigator.clipboard.writeText(log.nextRevisionNotes);
+                                                                                alert("คัดลอกบันทึกปรับปรุงเรียบร้อย!");
+                                                                            }}
+                                                                            className="px-2 py-1 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                        >
+                                                                            คัดลอก Notes
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                
+                                                                {log.runStatus !== "archived" && (
+                                                                    <button
+                                                                        onClick={() => handleArchiveRunLog(log.id)}
+                                                                        className="px-2 py-1 bg-red-950/40 hover:bg-red-900/40 text-red-300 border border-red-900/50 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                    >
+                                                                        Archive
+                                                                    </button>
+                                                                )}
+                                                            </div>
+
                                                             {/* Collapsible snapshot */}
-                                                            <div className="border-t border-zinc-850 pt-2 mt-2">
+                                                            <div className="border-t border-zinc-850 pt-2 mt-1">
                                                                 <button
                                                                     onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
                                                                     className="w-full text-left text-[10px] text-zinc-500 hover:text-zinc-300 font-semibold flex justify-between items-center cursor-pointer"
