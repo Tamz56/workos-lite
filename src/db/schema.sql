@@ -507,3 +507,28 @@ BEGIN
   UPDATE prompt_templates SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
+-- Prompt Run Logs
+CREATE TABLE IF NOT EXISTS prompt_run_logs (
+  id                        TEXT PRIMARY KEY,
+  prompt_template_id        TEXT NOT NULL,
+  input_snapshot            TEXT NOT NULL, -- JSON string representation
+  compiled_prompt_snapshot  TEXT NOT NULL,
+  output_notes              TEXT NULL,
+  rating                    INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  next_revision_notes       TEXT NULL,
+  created_at                TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at                TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(prompt_template_id) REFERENCES prompt_templates(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_run_logs_template_id ON prompt_run_logs(prompt_template_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_prompt_run_logs_updated_at
+AFTER UPDATE ON prompt_run_logs
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE prompt_run_logs SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+

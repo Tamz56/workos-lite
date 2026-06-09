@@ -52,13 +52,25 @@ interface PromptTemplate {
     updated_at: string;
 }
 
+interface PromptRunLog {
+    id: string;
+    promptTemplateId: string;
+    inputSnapshot: PromptInputField[];
+    compiledPromptSnapshot: string;
+    outputNotes: string;
+    rating: number;
+    nextRevisionNotes: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 const CATEGORIES = ["Writing", "Review", "Marketing", "Coding", "General"];
 const STATUSES = ["draft", "testing", "active", "archived"];
 
 // Consistent styling for dark inputs with high contrast caret and text
 const INPUT_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all text-xs";
 const TEXTAREA_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all text-xs font-mono";
-const SELECT_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 transition-all text-xs";
+const SELECT_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all text-xs";
 
 function safeParseInputFields(jsonStr: string | null): PromptInputField[] {
     if (!jsonStr) return [];
@@ -120,6 +132,18 @@ export default function PromptStudioClient() {
         required: false
     });
     const [fieldValidationError, setFieldValidationError] = useState<string | null>(null);
+
+    // Run Log / History State
+    const [runLogs, setRunLogs] = useState<PromptRunLog[]>([]);
+    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+    const [logForm, setLogForm] = useState({
+        rating: 5,
+        outputNotes: "",
+        nextRevisionNotes: ""
+    });
+    const [isSavingLog, setIsSavingLog] = useState(false);
+    const [rightPanelTab, setRightPanelTab] = useState<"playground" | "history">("playground");
+    const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
     
     // Load Templates
     const fetchTemplates = useCallback(async () => {
@@ -145,6 +169,79 @@ export default function PromptStudioClient() {
         fetchTemplates();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const fetchRunLogs = useCallback(async (templateId: string) => {
+        if (!templateId || templateId === "new-template") {
+            setRunLogs([]);
+            return;
+        }
+        setIsLoadingLogs(true);
+        try {
+            const res = await fetch(`/api/prompt-run-logs?promptTemplateId=${templateId}`);
+            if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูลประวัติการทดสอบได้");
+            const data = await res.json() as PromptRunLog[];
+            setRunLogs(data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoadingLogs(false);
+        }
+    }, []);
+
+    const handleSaveRunLog = async () => {
+        if (!selectedId || selectedId === "new-template") return;
+        setIsSavingLog(true);
+        setApiError(null);
+        try {
+            const res = await fetch("/api/prompt-run-logs", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    promptTemplateId: selectedId,
+                    inputSnapshot: currentInputFields.map(f => ({
+                        ...f,
+                        value: testValues[f.name] || ""
+                    })),
+                    compiledPromptSnapshot: compiledActivePrompt,
+                    outputNotes: logForm.outputNotes,
+                    rating: logForm.rating,
+                    nextRevisionNotes: logForm.nextRevisionNotes
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json() as { error?: string };
+                throw new Error(errData.error || "ไม่สามารถบันทึกประวัติการทดสอบได้");
+            }
+
+            setLogForm({
+                rating: 5,
+                outputNotes: "",
+                nextRevisionNotes: ""
+            });
+
+            fetchRunLogs(selectedId);
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึกประวัติ";
+            setApiError(errMsg);
+        } finally {
+            setIsSavingLog(false);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedId && selectedId !== "new-template") {
+            fetchRunLogs(selectedId);
+        } else {
+            setRunLogs([]);
+        }
+        setLogForm({
+            rating: 5,
+            outputNotes: "",
+            nextRevisionNotes: ""
+        });
+        setExpandedLogId(null);
+    }, [selectedId, fetchRunLogs]);
 
     // Set editor fields when template is selected
     const activeTemplate = useMemo(() => {
@@ -1138,7 +1235,7 @@ export default function PromptStudioClient() {
                                 value={editorFields.notes || ""}
                                 onChange={(e) => setEditorFields(prev => ({ ...prev, notes: e.target.value }))}
                                 placeholder="บันทึกข้อความภายในที่ไม่ได้ Compile ไปยัง Prompt"
-                                className={INPUT_CLASS}
+                                className={TEXTAREA_CLASS}
                             />
                         </div>
                     </div>
@@ -1146,109 +1243,300 @@ export default function PromptStudioClient() {
 
                 {/* 3. Right Column: Preview & Test Input Area */}
                 <div className="w-[420px] flex flex-col bg-zinc-900/30 overflow-hidden flex-shrink-0">
-                    {/* Test Variables Area */}
-                    <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col flex-shrink-0">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Sliders className="w-4 h-4 text-indigo-400" />
-                            <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Test Input Area</h2>
-                        </div>
-                        
-                        {currentInputFields.length === 0 ? (
-                            <p className="text-[11px] text-zinc-500 italic">
-                                {"ไม่มีตัวแปรที่กำหนดไว้ในเทมเพลตนี้ (สามารถเพิ่มตัวแปรในช่อง Input Fields Builder ด้านข้าง)"}
-                            </p>
-                        ) : (
-                            <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-                                {currentInputFields.map(field => (
-                                    <div key={field.name} className="flex flex-col text-xs">
-                                        <label className="text-zinc-400 font-semibold mb-0.5 flex justify-between items-center">
-                                            <span className="flex items-center gap-1">
-                                                <span>{field.label}</span>
-                                                {field.required && <span className="text-red-400 text-[10px] font-bold">*</span>}
-                                            </span>
-                                            <span className="text-[10px] text-zinc-600 font-mono">&#123;&#123;{field.name}&#125;&#125;</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={testValues[field.name] || ""}
-                                            placeholder={field.placeholder || `กรอกค่าของ ${field.label}...`}
-                                            onChange={(e) => setTestValues(prev => ({ ...prev, [field.name]: e.target.value }))}
-                                            className={INPUT_CLASS}
-                                        />
-                                        {field.helperText && (
-                                            <span className="text-[9px] text-zinc-500 mt-0.5 font-medium">
-                                                {field.helperText}
-                                            </span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Tab Navigation for Preview Area */}
+                    {/* Main Tab selector for Playground vs History */}
                     <div className="flex border-b border-zinc-800 bg-zinc-900/40 p-2 gap-1 flex-shrink-0">
                         <button
-                            onClick={() => setPreviewTab("compiled")}
+                            onClick={() => setRightPanelTab("playground")}
                             className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
-                                previewTab === "compiled"
+                                rightPanelTab === "playground"
                                     ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
                                     : "text-zinc-400 hover:bg-zinc-800/40"
                             }`}
                         >
-                            Compiled Prompt (พร้อมใช้)
+                            Playground & Test
                         </button>
                         <button
-                            onClick={() => setPreviewTab("template")}
+                            onClick={() => setRightPanelTab("history")}
                             className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
-                                previewTab === "template"
+                                rightPanelTab === "history"
                                     ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
                                     : "text-zinc-400 hover:bg-zinc-800/40"
                             }`}
                         >
-                            Template Structure (โครงสร้าง)
+                            Test History / Run Log
                         </button>
                     </div>
 
-                    {/* Compile Preview Area */}
-                    <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
-                        <div className="p-3 border-b border-zinc-850 flex justify-between items-center bg-zinc-900/10 flex-shrink-0">
-                            <div className="flex items-center gap-2">
-                                <Eye className="w-3.5 h-3.5 text-indigo-400" />
-                                <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                    {previewTab === "compiled" ? "Compiled Result" : "Template Spec"}
-                                </h2>
+                    {rightPanelTab === "playground" ? (
+                        <>
+                            {/* Test Variables Area */}
+                            <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col flex-shrink-0">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Sliders className="w-4 h-4 text-indigo-400" />
+                                    <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Test Input Area</h2>
+                                </div>
+                                
+                                {currentInputFields.length === 0 ? (
+                                    <p className="text-[11px] text-zinc-500 italic">
+                                        {"ไม่มีตัวแปรที่กำหนดไว้ในเทมเพลตนี้ (สามารถเพิ่มตัวแปรในช่อง Input Fields Builder ด้านข้าง)"}
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                                        {currentInputFields.map(field => (
+                                            <div key={field.name} className="flex flex-col text-xs">
+                                                <label className="text-zinc-400 font-semibold mb-0.5 flex justify-between items-center">
+                                                    <span className="flex items-center gap-1">
+                                                        <span>{field.label}</span>
+                                                        {field.required && <span className="text-red-400 text-[10px] font-bold">*</span>}
+                                                    </span>
+                                                    <span className="text-[10px] text-zinc-600 font-mono">&#123;&#123;{field.name}&#125;&#125;</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={testValues[field.name] || ""}
+                                                    placeholder={field.placeholder || `กรอกค่าของ ${field.label}...`}
+                                                    onChange={(e) => setTestValues(prev => ({ ...prev, [field.name]: e.target.value }))}
+                                                    className={INPUT_CLASS}
+                                                />
+                                                {field.helperText && (
+                                                    <span className="text-[9px] text-zinc-500 mt-0.5 font-medium">
+                                                        {field.helperText}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            <button
-                                onClick={handleCopy}
-                                disabled={!activePreviewText}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                                    copied 
-                                        ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
-                                        : "bg-zinc-850 hover:bg-zinc-800 active:bg-zinc-900 text-zinc-300 border border-zinc-800"
-                                }`}
-                            >
-                                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                <span>
-                                    {copied 
-                                        ? "คัดลอกสำเร็จ!" 
-                                        : previewTab === "compiled" 
-                                            ? "คัดลอก Prompt พร้อมใช้" 
-                                            : "คัดลอกโครงสร้างเทมเพลต"
-                                    }
-                                </span>
-                            </button>
-                        </div>
 
-                        {/* Prompt rendering panel */}
-                        <div className="flex-1 p-4 overflow-y-auto bg-zinc-950 font-mono text-[11px] text-zinc-300 select-text whitespace-pre-wrap leading-relaxed custom-scrollbar">
-                            {activePreviewText ? (
-                                activePreviewText
+                            {/* Tab Navigation for Preview Area */}
+                            <div className="flex border-b border-zinc-800 bg-zinc-900/40 p-2 gap-1 flex-shrink-0">
+                                <button
+                                    onClick={() => setPreviewTab("compiled")}
+                                    className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
+                                        previewTab === "compiled"
+                                            ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
+                                            : "text-zinc-400 hover:bg-zinc-800/40"
+                                    }`}
+                                >
+                                    Compiled Prompt (พร้อมใช้)
+                                </button>
+                                <button
+                                    onClick={() => setPreviewTab("template")}
+                                    className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
+                                        previewTab === "template"
+                                            ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
+                                            : "text-zinc-400 hover:bg-zinc-800/40"
+                                    }`}
+                                >
+                                    Template Structure (โครงสร้าง)
+                                </button>
+                            </div>
+
+                            {/* Compile Preview Area */}
+                            <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
+                                <div className="p-3 border-b border-zinc-850 flex justify-between items-center bg-zinc-900/10 flex-shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                                        <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                                            {previewTab === "compiled" ? "Compiled Result" : "Template Spec"}
+                                        </h2>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {previewTab === "compiled" && selectedId && selectedId !== "new-template" && (
+                                            <button
+                                                onClick={() => setRightPanelTab("history")}
+                                                className="flex items-center gap-1 bg-zinc-850 hover:bg-zinc-800 active:bg-zinc-900 text-zinc-300 border border-zinc-800 px-2.5 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer"
+                                            >
+                                                <Sliders className="w-3 h-3 text-indigo-400" />
+                                                <span>บันทึกประวัติการทดสอบ</span>
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={handleCopy}
+                                            disabled={!activePreviewText}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                                                copied 
+                                                    ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
+                                                    : "bg-zinc-850 hover:bg-zinc-800 active:bg-zinc-900 text-zinc-300 border border-zinc-800"
+                                            }`}
+                                        >
+                                            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                            <span>
+                                                {copied 
+                                                    ? "คัดลอกสำเร็จ!" 
+                                                    : previewTab === "compiled" 
+                                                        ? "คัดลอก Prompt พร้อมใช้" 
+                                                        : "คัดลอกโครงสร้างเทมเพลต"
+                                                }
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Prompt rendering panel */}
+                                <div className="flex-1 p-4 overflow-y-auto bg-zinc-950 font-mono text-[11px] text-zinc-300 select-text whitespace-pre-wrap leading-relaxed custom-scrollbar">
+                                    {activePreviewText ? (
+                                        activePreviewText
+                                    ) : (
+                                        <p className="text-zinc-600 italic">กรอกบทบาท ขั้นตอนการทำงาน หรือหัวข้อบทความ เพื่อเริ่มสร้าง Prompt...</p>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Run History and Save Log Section */}
+                            {!selectedId || selectedId === "new-template" ? (
+                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-zinc-500 italic">
+                                    กรุณาบันทึกเทมเพลตนี้ก่อนเพื่อเริ่มเก็บประวัติการทดสอบ
+                                </div>
                             ) : (
-                                <p className="text-zinc-600 italic">กรอกบทบาท ขั้นตอนการทำงาน หรือหัวข้อบทความ เพื่อเริ่มสร้าง Prompt...</p>
+                                <>
+                                    {/* Save Test Run form */}
+                                    <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col flex-shrink-0 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-bold text-zinc-300 text-xs uppercase tracking-wider">บันทึกผลการทดสอบ (Record Test Run)</span>
+                                        </div>
+                                        
+                                        {/* Rating Selector */}
+                                        <div className="flex flex-col text-xs">
+                                            <label className="text-zinc-400 font-semibold mb-1">ระดับคะแนน (Rating)</label>
+                                            <select
+                                                value={logForm.rating}
+                                                onChange={(e) => setLogForm(prev => ({ ...prev, rating: Number(e.target.value) }))}
+                                                className={SELECT_CLASS}
+                                            >
+                                                <option className="bg-zinc-900 text-slate-100" value={5}>⭐⭐⭐⭐⭐ (5/5)</option>
+                                                <option className="bg-zinc-900 text-slate-100" value={4}>⭐⭐⭐⭐ (4/5)</option>
+                                                <option className="bg-zinc-900 text-slate-100" value={3}>⭐⭐⭐ (3/5)</option>
+                                                <option className="bg-zinc-900 text-slate-100" value={2}>⭐⭐ (2/5)</option>
+                                                <option className="bg-zinc-900 text-slate-100" value={1}>⭐ (1/5)</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Output Notes */}
+                                        <div className="flex flex-col text-xs">
+                                            <label className="text-zinc-400 font-semibold mb-1">บันทึกผลลัพธ์ (Output Notes)</label>
+                                            <textarea
+                                                rows={2}
+                                                value={logForm.outputNotes}
+                                                onChange={(e) => setLogForm(prev => ({ ...prev, outputNotes: e.target.value }))}
+                                                placeholder="เช่น ตอบคำถามได้ดี, ภาษาค่อนข้างทางการเกินไปนิด..."
+                                                className={TEXTAREA_CLASS}
+                                            />
+                                        </div>
+
+                                        {/* Next Revision Notes */}
+                                        <div className="flex flex-col text-xs">
+                                            <label className="text-zinc-400 font-semibold mb-1">สิ่งที่ควรปรับปรุงในเวอร์ชันหน้า (Next Revision Notes)</label>
+                                            <textarea
+                                                rows={2}
+                                                value={logForm.nextRevisionNotes}
+                                                onChange={(e) => setLogForm(prev => ({ ...prev, nextRevisionNotes: e.target.value }))}
+                                                placeholder="เช่น ปรับ tone ให้กระชับขึ้น หรือห้ามใช้ภาษาคำย่อ..."
+                                                className={TEXTAREA_CLASS}
+                                            />
+                                        </div>
+
+                                        {/* Save Button */}
+                                        <button
+                                            onClick={handleSaveRunLog}
+                                            disabled={isSavingLog}
+                                            className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded text-xs font-bold transition cursor-pointer"
+                                        >
+                                            {isSavingLog ? "กำลังบันทึก..." : "บันทึกผลการทดสอบ (Save Run Log)"}
+                                        </button>
+                                    </div>
+
+                                    {/* History List */}
+                                    <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
+                                        <div className="p-3 border-b border-zinc-850 bg-zinc-900/10 flex items-center justify-between flex-shrink-0">
+                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">ประวัติการทดสอบ ({runLogs.length})</h3>
+                                        </div>
+                                        
+                                        <div className="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
+                                            {isLoadingLogs ? (
+                                                <div className="text-center text-zinc-500 text-xs py-8">กำลังโหลดประวัติ...</div>
+                                            ) : runLogs.length === 0 ? (
+                                                <p className="text-zinc-500 text-xs italic text-center py-8">ยังไม่มีประวัติการทดสอบสำหรับเทมเพลตนี้</p>
+                                            ) : (
+                                                runLogs.map(log => {
+                                                    const isExpanded = expandedLogId === log.id;
+                                                    const formattedDate = new Date(log.createdAt).toLocaleString("th-TH", {
+                                                        year: "numeric",
+                                                        month: "short",
+                                                        day: "numeric",
+                                                        hour: "2-digit",
+                                                        minute: "2-digit"
+                                                    });
+
+                                                    return (
+                                                        <div key={log.id} className="border border-zinc-800 rounded-lg p-3 bg-zinc-900/20 space-y-2 text-xs">
+                                                            <div className="flex justify-between items-start">
+                                                                <span className="text-[10px] text-zinc-500 font-mono">{formattedDate}</span>
+                                                                <span className="text-amber-400 font-bold">
+                                                                    {"⭐".repeat(log.rating)} ({log.rating}/5)
+                                                                </span>
+                                                            </div>
+
+                                                            {log.outputNotes && (
+                                                                <div>
+                                                                    <span className="text-[10px] text-zinc-500 block font-bold">ผลทดสอบ:</span>
+                                                                    <p className="text-zinc-300">{log.outputNotes}</p>
+                                                                </div>
+                                                            )}
+
+                                                            {log.nextRevisionNotes && (
+                                                                <div>
+                                                                    <span className="text-[10px] text-zinc-500 block font-bold">บันทึกปรับปรุงในรุ่นถัดไป:</span>
+                                                                    <p className="text-zinc-400 italic bg-zinc-950/40 p-1.5 rounded border border-zinc-850/50">{log.nextRevisionNotes}</p>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Collapsible snapshot */}
+                                                            <div className="border-t border-zinc-850 pt-2 mt-2">
+                                                                <button
+                                                                    onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                                                                    className="w-full text-left text-[10px] text-zinc-500 hover:text-zinc-300 font-semibold flex justify-between items-center cursor-pointer"
+                                                                >
+                                                                    <span>{isExpanded ? "ซ่อนรายละเอียด Prompt Snapshot" : "ดูรายละเอียด Prompt Snapshot"}</span>
+                                                                    <span>{isExpanded ? "▲" : "▼"}</span>
+                                                                </button>
+
+                                                                {isExpanded && (
+                                                                    <div className="mt-2 space-y-2 animate-fadeIn">
+                                                                        {/* Variables */}
+                                                                        {log.inputSnapshot && log.inputSnapshot.length > 0 && (
+                                                                            <div className="bg-zinc-950/80 p-2 rounded border border-zinc-850">
+                                                                                <span className="text-[9px] text-zinc-500 font-bold block mb-1">ตัวแปรอินพุต:</span>
+                                                                                <div className="space-y-1 text-[9px] font-mono">
+                                                                                    {log.inputSnapshot.map((varItem: PromptInputField) => (
+                                                                                        <div key={varItem.name} className="truncate">
+                                                                                            <span className="text-zinc-650">{varItem.label || varItem.name}:</span> <span className="text-zinc-300">{varItem.value}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Prompt */}
+                                                                        <div className="bg-zinc-950/80 p-2 rounded border border-zinc-850 font-mono text-[9px] text-zinc-400 whitespace-pre-wrap select-text leading-normal max-h-40 overflow-y-auto custom-scrollbar">
+                                                                            {log.compiledPromptSnapshot}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
                             )}
-                        </div>
-                    </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
