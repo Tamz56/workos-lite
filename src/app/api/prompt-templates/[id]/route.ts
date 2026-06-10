@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
 
         const updates: string[] = [];
-        const values: any[] = [];
+        const values: unknown[] = [];
 
         const fields = [
             "name",
@@ -43,7 +43,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             "notes",
             "status",
             "version",
-            "version_notes"
+            "version_notes",
+            "guardrail_preset_ids"
         ];
 
         for (const field of fields) {
@@ -52,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                     // Validate input_fields JSON format
                     try {
                         JSON.parse(body[field]);
-                    } catch (err) {
+                    } catch {
                         return NextResponse.json({ error: "Invalid input_fields JSON format" }, { status: 400 });
                     }
                 }

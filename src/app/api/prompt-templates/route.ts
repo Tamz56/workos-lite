@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
         const q = searchParams.get("q");
 
         let query = "SELECT * FROM prompt_templates WHERE 1=1";
-        const params: any[] = [];
+        const params: string[] = [];
 
         if (category) {
             query += " AND category = ?";
@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
             notes,
             status,
             version,
-            version_notes
+            version_notes,
+            guardrail_preset_ids
         } = body;
 
         if (!name || !category) {
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
         if (input_fields) {
             try {
                 JSON.parse(input_fields);
-            } catch (err) {
+            } catch {
                 return NextResponse.json({ error: "Invalid input_fields format. Must be a JSON array string." }, { status: 400 });
             }
         }
@@ -75,8 +76,8 @@ export async function POST(req: NextRequest) {
             INSERT INTO prompt_templates (
                 id, name, category, purpose, role, context, input_fields,
                 instructions, constraints, output_format, review_checklist, notes,
-                status, version, version_notes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                status, version, version_notes, guardrail_preset_ids, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         insertStmt.run(
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
             status || "draft",
             version || "1.0.0",
             version_notes || null,
+            guardrail_preset_ids || "[]",
             now,
             now
         );

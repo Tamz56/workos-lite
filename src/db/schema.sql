@@ -492,6 +492,7 @@ CREATE TABLE IF NOT EXISTS prompt_templates (
   status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','testing','active','archived')),
   version          TEXT NOT NULL DEFAULT '1.0.0',
   version_notes    TEXT NULL,
+  guardrail_preset_ids TEXT DEFAULT '[]',
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -532,5 +533,19 @@ WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
 BEGIN
   UPDATE prompt_run_logs SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
+
+-- Prompt Guardrail Presets
+CREATE TABLE IF NOT EXISTS guardrail_presets (
+  id           TEXT PRIMARY KEY,
+  name         TEXT NOT NULL,
+  category     TEXT NOT NULL CHECK (category IN ('tone', 'claims', 'sales', 'review', 'custom')),
+  description  TEXT NOT NULL,
+  content      TEXT NOT NULL,
+  risk_words   TEXT NULL, -- JSON array of: [{"word": "...", "suggestedAlternatives": [...]}]
+  is_active    INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 
 

@@ -1266,6 +1266,7 @@ function ensurePromptTemplates() {
           status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','testing','active','archived')),
           version          TEXT NOT NULL DEFAULT '1.0.0',
           version_notes    TEXT NULL,
+          guardrail_preset_ids TEXT DEFAULT '[]',
           created_at       TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -1350,6 +1351,105 @@ function ensurePromptTemplates() {
         }
     });
     tx();
+
+    // Idempotent column check and migration for guardrail_preset_ids
+    const columns = db.prepare("PRAGMA table_info(prompt_templates)").all() as { name: string }[];
+    const colNames = columns.map(c => c.name);
+    if (!colNames.includes("guardrail_preset_ids")) {
+        db.exec("ALTER TABLE prompt_templates ADD COLUMN guardrail_preset_ids TEXT DEFAULT '[]'");
+    }
+}
+
+function ensureGuardrailPresets() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS guardrail_presets (
+          id           TEXT PRIMARY KEY,
+          name         TEXT NOT NULL,
+          category     TEXT NOT NULL CHECK (category IN ('tone', 'claims', 'sales', 'review', 'custom')),
+          description  TEXT NOT NULL,
+          content      TEXT NOT NULL,
+          risk_words   TEXT NULL, -- JSON array
+          is_active    INTEGER NOT NULL DEFAULT 1,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+    `);
+
+    const seedPresets = [
+        {
+            id: "preset-gf-core-tone",
+            name: "Green Fineness Core Tone",
+            category: "tone",
+            description: "ใช้ภาษาไทยที่สงบ ชัด อ่านง่าย มีบริบท ไม่เร่งเร้า ไม่ขายแรง และไม่ใช้ถ้อยคำที่ฟังดูเกินจริง",
+            content: "ใช้ภาษาไทยที่สงบ ชัด อ่านง่าย มีบริบท ไม่เร่งเร้า ไม่ขายแรง และไม่ใช้ถ้อยคำที่ฟังดูเกินจริง",
+            risk_words: JSON.stringify([])
+        },
+        {
+            id: "preset-scientific-claim-caution",
+            name: "Scientific Claim Caution",
+            category: "claims",
+            description: "เมื่อกล่าวถึงผลลัพธ์ทางพืช ดิน จุลินทรีย์ ปุ๋ย ธาตุอาหาร การเจริญเติบโต ผลผลิต คาร์บอน หรือสิ่งแวดล้อม ให้ใช้ถ้อยคำระมัดระวัง และหลีกเลี่ยงการสรุปผลแบบแน่นอนหากไม่มีหลักฐานเฉพาะเจาะจง",
+            content: "เมื่อกล่าวถึงผลลัพธ์ทางพืช ดิน จุลินทรีย์ ปุ๋ย ธาตุอาหาร การเจริญเติบโต ผลผลิต คาร์บอน หรือสิ่งแวดล้อม ให้ใช้ถ้อยคำระมัดระวัง และหลีกเลี่ยงการสรุปผลแบบแน่นอนหากไม่มีหลักฐานเฉพาะเจาะจง",
+            risk_words: JSON.stringify([
+                { word: "เห็นผลแน่นอน", suggestedAlternatives: ["อาจช่วยสนับสนุน", "ในบางบริบท"] },
+                { word: "ปลอดภัย 100%", suggestedAlternatives: ["ควรพิจารณาร่วมกับปัจจัยอื่น"] },
+                { word: "แก้ปัญหาได้ทันที", suggestedAlternatives: ["ในบางบริบท", "ควรพิจารณาร่วมกับปัจจัยอื่น"] }
+            ])
+        },
+        {
+            id: "preset-soil-microbe-fertilizer",
+            name: "Soil / Microbe / Fertilizer Claim Guardrail",
+            category: "claims",
+            description: "หลีกเลี่ยงการกล่าวว่าจุลินทรีย์ ปุ๋ย หรือสารบำรุง “ทำให้” พืชโต ดินฟื้น หรือผลผลิตเพิ่มแบบตรงตัวและแน่นอน ให้ใช้ภาษาที่สะท้อนความเกี่ยวข้องภายใต้บริบท เช่น “อาจช่วยสนับสนุน”, “มีส่วนเกี่ยวข้องกับ”, “ภายใต้การจัดการที่เหมาะสม”",
+            content: "หลีกเลี่ยงการกล่าวว่าจุลินทรีย์ ปุ๋ย หรือสารบำรุง “ทำให้” พืชโต ดินฟื้น หรือผลผลิตเพิ่มแบบตรงตัวและแน่นอน ให้ใช้ภาษาที่สะท้อนความเกี่ยวข้องภายใต้บริบท เช่น “อาจช่วยสนับสนุน”, “มีส่วนเกี่ยวข้องกับ”, “ภายใต้การจัดการที่เหมาะสม”",
+            risk_words: JSON.stringify([
+                { word: "เพิ่มผลผลิตแน่นอน", suggestedAlternatives: ["อาจช่วยสนับสนุน", "ควรพิจารณาร่วมกับปัจจัยอื่น"] },
+                { word: "ฟื้นฟูดิน", suggestedAlternatives: ["อาจช่วยสนับสนุน", "ภายใต้การจัดการที่เหมาะสม"] },
+                { word: "เร่งโต", suggestedAlternatives: ["อาจช่วยสนับสนุน"] },
+                { word: "ดินดีขึ้นทันที", suggestedAlternatives: ["อาจช่วยสนับสนุน", "ภายใต้การจัดการที่เหมาะสม"] },
+                { word: "จุลินทรีย์ทำให้...", suggestedAlternatives: ["มีส่วนเกี่ยวข้องกับ", "อาจเป็นหนึ่งในปัจจัยที่เกี่ยวข้อง"] }
+            ])
+        },
+        {
+            id: "preset-non-salesy-edu",
+            name: "Non-salesy Educational Content",
+            category: "sales",
+            description: "หลีกเลี่ยง CTA แบบเร่งเร้า คำโฆษณาเกินจริง หรือการพูดเหมือนขายนำ ให้เน้นการอธิบายความเข้าใจ เหตุผล บริบท และการนำไปพิจารณาใช้อย่างเหมาะสม",
+            content: "หลีกเลี่ยง CTA แบบเร่งเร้า คำโฆษณาเกินจริง หรือการพูดเหมือนขายนำ ให้เน้นการอธิบายความเข้าใจ เหตุผล บริบท และการนำไปพิจารณาใช้อย่างเหมาะสม",
+            risk_words: JSON.stringify([
+                { word: "ดีที่สุด", suggestedAlternatives: ["ภายใต้เงื่อนไขที่เหมาะสม", "ภายใต้การจัดการที่เหมาะสม"] },
+                { word: "ใช้ได้ทุกพืช", suggestedAlternatives: ["ในบางบริบท"] }
+            ])
+        },
+        {
+            id: "preset-gf-review-checklist",
+            name: "Green Fineness Review Checklist",
+            category: "review",
+            description: "ก่อนส่งออกผลลัพธ์ ให้ตรวจความสงบ ความโปร่งใส ชัดเจน และความถูกต้องระมัดระวังตามหลักเกณฑ์",
+            content: "ก่อนส่งออกผลลัพธ์ ให้ตรวจว่า:\n- ข้อความชัดและอ่านเข้าใจง่ายหรือไม่\n- มีคำกล่าวอ้างแรงเกินไปหรือไม่\n- น้ำเสียงยังสงบ ไม่ขายแรงหรือไม่\n- มีบริบทเพียงพอหรือไม่\n- ถ้ามี claim เชิงวิทยาศาสตร์ ใช้ถ้อยคำระมัดระวังแล้วหรือไม่",
+            risk_words: JSON.stringify([])
+        }
+    ];
+
+    const stmt = db.prepare(`
+        INSERT INTO guardrail_presets (
+            id, name, category, description, content, risk_words
+        ) VALUES (
+            @id, @name, @category, @description, @content, @risk_words
+        ) ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            category = excluded.category,
+            description = excluded.description,
+            content = excluded.content,
+            risk_words = excluded.risk_words
+    `);
+
+    const tx = db.transaction(() => {
+        for (const preset of seedPresets) {
+            stmt.run(preset);
+        }
+    });
+    tx();
 }
 
 function ensurePromptRunLogs() {
@@ -1398,6 +1498,7 @@ ensureGreenFinenessModel();
 ensureArborWritingLab();
 ensureWritingDeskTables();
 ensurePromptTemplates();
+ensureGuardrailPresets();
 ensurePromptRunLogs();
 
 if (!shouldSkipSeed) {

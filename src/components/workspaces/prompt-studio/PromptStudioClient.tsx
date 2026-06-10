@@ -32,6 +32,18 @@ interface PromptInputField {
     required?: boolean;
 }
 
+interface GuardrailPreset {
+    id: string;
+    name: string;
+    category: string;
+    description: string;
+    content: string;
+    risk_words: string | null;
+    is_active: number;
+    created_at: string;
+    updated_at: string;
+}
+
 interface PromptTemplate {
     id: string;
     name: string;
@@ -48,6 +60,7 @@ interface PromptTemplate {
     status: "draft" | "testing" | "active" | "archived";
     version: string;
     version_notes: string | null;
+    guardrail_preset_ids: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -152,6 +165,9 @@ export default function PromptStudioClient() {
     // Filters for Run History
     const [logStatusFilter, setLogStatusFilter] = useState<string>("active");
     const [logRatingFilter, setLogRatingFilter] = useState<string>("all");
+
+    // Guardrail Presets State
+    const [guardrailPresets, setGuardrailPresets] = useState<GuardrailPreset[]>([]);
     
     // Load Templates
     const fetchTemplates = useCallback(async () => {
@@ -173,10 +189,48 @@ export default function PromptStudioClient() {
         }
     }, [selectedId]);
 
+    const fetchGuardrailPresets = useCallback(async () => {
+        try {
+            const res = await fetch("/api/prompt-guardrail-presets");
+            if (res.ok) {
+                const data = await res.json() as GuardrailPreset[];
+                setGuardrailPresets(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch guardrail presets:", err);
+        }
+    }, []);
+
     useEffect(() => {
         fetchTemplates();
+        fetchGuardrailPresets();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const parseGuardrailIds = (jsonStr: string | null | undefined): string[] => {
+        if (!jsonStr) return [];
+        try {
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.error("Failed to parse guardrail_preset_ids:", e);
+            return [];
+        }
+    };
+
+    const handleToggleGuardrail = (presetId: string) => {
+        const currentIds = parseGuardrailIds(editorFields.guardrail_preset_ids);
+        let newIds: string[];
+        if (currentIds.includes(presetId)) {
+            newIds = currentIds.filter(id => id !== presetId);
+        } else {
+            newIds = [...currentIds, presetId];
+        }
+        
+        setEditorFields(prev => ({
+            ...prev,
+            guardrail_preset_ids: JSON.stringify(newIds)
+        }));
+    };
 
     const fetchRunLogs = useCallback(async () => {
         if (!selectedId || selectedId === "new-template") {
@@ -421,10 +475,22 @@ export default function PromptStudioClient() {
         if (constraints) blocks.push(`[CONSTRAINTS]\n${constraints}`);
         if (outputFormat) blocks.push(`[OUTPUT FORMAT]\n${outputFormat}`);
         if (reviewChecklist) blocks.push(`[REVIEW CHECKLIST]\n${reviewChecklist}`);
+
+        // Construct [GUARDRAILS] section if presets are applied
+        const appliedPresetIds = parseGuardrailIds(editorFields.guardrail_preset_ids || activeTemplate?.guardrail_preset_ids);
+        const appliedPresets = appliedPresetIds
+            .map(id => guardrailPresets.find(p => p.id === id))
+            .filter(Boolean) as GuardrailPreset[];
+
+        if (appliedPresets.length > 0) {
+            const guardrailLines = appliedPresets.map(preset => `- ${preset.name}: ${preset.content}`);
+            blocks.push(`[GUARDRAILS]\n${guardrailLines.join("\n")}`);
+        }
+
         if (notes) blocks.push(`[NOTES]\n${notes}`);
 
         return blocks.join("\n\n");
-    }, [editorFields, activeTemplate]);
+    }, [editorFields, activeTemplate, guardrailPresets]);
 
     // 2. Compiled Prompt (Substituted placeholders & appended [USER INPUT] block)
     const compiledActivePrompt = useMemo(() => {
@@ -448,6 +514,18 @@ export default function PromptStudioClient() {
         if (constraints) blocks.push(`[CONSTRAINTS]\n${constraints}`);
         if (outputFormat) blocks.push(`[OUTPUT FORMAT]\n${outputFormat}`);
         if (reviewChecklist) blocks.push(`[REVIEW CHECKLIST]\n${reviewChecklist}`);
+
+        // Construct [GUARDRAILS] section if presets are applied
+        const appliedPresetIds = parseGuardrailIds(editorFields.guardrail_preset_ids || activeTemplate?.guardrail_preset_ids);
+        const appliedPresets = appliedPresetIds
+            .map(id => guardrailPresets.find(p => p.id === id))
+            .filter(Boolean) as GuardrailPreset[];
+
+        if (appliedPresets.length > 0) {
+            const guardrailLines = appliedPresets.map(preset => `- ${preset.name}: ${preset.content}`);
+            blocks.push(`[GUARDRAILS]\n${guardrailLines.join("\n")}`);
+        }
+
         if (notes) blocks.push(`[NOTES]\n${notes}`);
 
         // Construct [USER INPUT] section dynamically if variables exist
@@ -468,7 +546,7 @@ export default function PromptStudioClient() {
         }
 
         return result;
-    }, [editorFields, activeTemplate, testValues, currentInputFields]);
+    }, [editorFields, activeTemplate, testValues, currentInputFields, guardrailPresets]);
 
     // Get active prompt value based on current tab selection
     const activePreviewText = useMemo(() => {
@@ -1246,6 +1324,86 @@ export default function PromptStudioClient() {
                                 placeholder="สิ่งที่ห้ามทำเด็ดขาด เช่น ห้ามใช้สารเคมี, ห้ามใช้สัญลักษณ์นี้..."
                                 className={TEXTAREA_CLASS}
                             />
+                        </div>
+
+                        {/* Green Fineness Guardrails Preset Selection Panel */}
+                        <div className="border border-zinc-800 rounded-lg p-3 bg-zinc-900/20">
+                            <label className="block text-zinc-300 font-bold mb-1 text-xs uppercase tracking-wider">Green Fineness Guardrails (แนวทางความปลอดภัยของแบรนด์)</label>
+                            <span className="text-[10px] text-zinc-500 block mb-3">
+                                ติ๊กเลือกแนวทางควบคุมโทนเสียง คำเตือนความปลอดภัยทางวิชาการ (Scientific Claims) และข้อจำกัดทางกฎหมายเพื่อสอดแทรกเข้าไปใน Prompt อัตโนมัติ
+                            </span>
+                            
+                            {guardrailPresets.length === 0 ? (
+                                <p className="text-zinc-500 text-[10px] italic">กำลังโหลดข้อมูล Presets หรือไม่พบข้อมูลในระบบ...</p>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    {guardrailPresets.map((preset) => {
+                                        const appliedIds = parseGuardrailIds(editorFields.guardrail_preset_ids);
+                                        const isApplied = appliedIds.includes(preset.id);
+                                        
+                                        // Safe parse risk words
+                                        let parsedRiskWords: { word: string; suggestedAlternatives: string[] }[] = [];
+                                        if (preset.risk_words) {
+                                            try {
+                                                parsedRiskWords = JSON.parse(preset.risk_words);
+                                            } catch (e) {
+                                                console.error("Failed to parse risk words", e);
+                                            }
+                                        }
+
+                                        return (
+                                            <div
+                                                key={preset.id}
+                                                onClick={() => handleToggleGuardrail(preset.id)}
+                                                className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between select-none ${
+                                                    isApplied
+                                                        ? "bg-indigo-950/30 border-indigo-700 hover:bg-indigo-950/40 text-slate-100 ring-1 ring-indigo-700/50"
+                                                        : "bg-zinc-950/30 border-zinc-850 hover:bg-zinc-900/30 text-slate-300"
+                                                }`}
+                                            >
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-start gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isApplied}
+                                                            onChange={() => {}} // handled by onClick on container
+                                                            className="mt-0.5 accent-indigo-500 cursor-pointer w-3.5 h-3.5 flex-shrink-0"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-bold text-[11px] text-zinc-200 truncate">{preset.name}</span>
+                                                                <span className={`text-[8px] px-1 py-0.2 rounded font-semibold border uppercase tracking-wider ${
+                                                                    preset.category === "tone" ? "bg-cyan-950/80 text-cyan-300 border-cyan-800" :
+                                                                    preset.category === "claims" ? "bg-amber-950/80 text-amber-300 border-amber-800" :
+                                                                    preset.category === "sales" ? "bg-purple-950/80 text-purple-300 border-purple-800" :
+                                                                    preset.category === "review" ? "bg-emerald-950/80 text-emerald-300 border-emerald-800" :
+                                                                    "bg-zinc-900 text-zinc-400 border-zinc-700"
+                                                                }`}>
+                                                                    {preset.category}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-[10px] text-zinc-400 block mt-1 leading-normal">{preset.description}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {parsedRiskWords.length > 0 && (
+                                                    <div className="mt-2.5 pt-2 border-t border-zinc-800/60 text-[9px] text-zinc-500 leading-normal">
+                                                        <span className="text-amber-400/70 font-semibold block mb-0.5">Risk Word Bank & Alternatives:</span>
+                                                        <ul className="space-y-0.5 pl-1.5 list-disc list-inside">
+                                                            {parsedRiskWords.map((rw, index) => (
+                                                                <li key={index} className="truncate">
+                                                                    <strong className="text-red-400/80 font-mono">&quot;{rw.word}&quot;</strong> ➔ <span className="text-zinc-400">{rw.suggestedAlternatives.join(", ")}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
                         {/* Output & Checklist */}
