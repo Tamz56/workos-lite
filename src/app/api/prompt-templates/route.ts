@@ -9,24 +9,29 @@ export async function GET(req: NextRequest) {
         const status = searchParams.get("status");
         const q = searchParams.get("q");
 
-        let query = "SELECT * FROM prompt_templates WHERE 1=1";
+        let query = `
+            SELECT t.*, 
+                   (SELECT version FROM prompt_versions WHERE prompt_template_id = t.id AND is_active = 1) AS active_version
+            FROM prompt_templates t 
+            WHERE 1=1
+        `;
         const params: string[] = [];
 
         if (category) {
-            query += " AND category = ?";
+            query += " AND t.category = ?";
             params.push(category);
         }
         if (status) {
-            query += " AND status = ?";
+            query += " AND t.status = ?";
             params.push(status);
         }
         if (q) {
-            query += " AND (name LIKE ? ESCAPE '\\' OR purpose LIKE ? ESCAPE '\\' OR role LIKE ? ESCAPE '\\')";
+            query += " AND (t.name LIKE ? ESCAPE '\\' OR t.purpose LIKE ? ESCAPE '\\' OR t.role LIKE ? ESCAPE '\\')";
             const escapedQ = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
             params.push(escapedQ, escapedQ, escapedQ);
         }
 
-        query += " ORDER BY updated_at DESC";
+        query += " ORDER BY t.updated_at DESC";
         const templates = db.prepare(query).all(...params);
         return NextResponse.json(templates);
     } catch (e) {
@@ -77,7 +82,7 @@ export async function POST(req: NextRequest) {
                 id, name, category, purpose, role, context, input_fields,
                 instructions, constraints, output_format, review_checklist, notes,
                 status, version, version_notes, guardrail_preset_ids, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         insertStmt.run(

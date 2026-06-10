@@ -4,7 +4,12 @@ import { db } from "@/db/db";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
-        const template = db.prepare("SELECT * FROM prompt_templates WHERE id = ?").get(id);
+        const template = db.prepare(`
+            SELECT t.*, 
+                   (SELECT version FROM prompt_versions WHERE prompt_template_id = t.id AND is_active = 1) AS active_version
+            FROM prompt_templates t
+            WHERE t.id = ?
+        `).get(id);
         if (!template) {
             return NextResponse.json({ error: "Prompt template not found" }, { status: 404 });
         }
@@ -70,7 +75,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             db.prepare(query).run(...values, id);
         }
 
-        const updatedTemplate = db.prepare("SELECT * FROM prompt_templates WHERE id = ?").get(id);
+        const updatedTemplate = db.prepare(`
+            SELECT t.*, 
+                   (SELECT version FROM prompt_versions WHERE prompt_template_id = t.id AND is_active = 1) AS active_version
+            FROM prompt_templates t
+            WHERE t.id = ?
+        `).get(id);
         return NextResponse.json(updatedTemplate);
     } catch (e) {
         console.error("PATCH /api/prompt-templates/[id] failed:", e);

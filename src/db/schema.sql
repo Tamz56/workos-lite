@@ -547,5 +547,41 @@ CREATE TABLE IF NOT EXISTS guardrail_presets (
   updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Prompt Template Version History (Lightweight Versioning)
+CREATE TABLE IF NOT EXISTS prompt_versions (
+  id                        TEXT PRIMARY KEY,
+  prompt_template_id        TEXT NOT NULL,
+  version                   TEXT NOT NULL, -- e.g. '1.0.0'
+  revision_notes            TEXT NULL,
+  created_from_run_log_id   TEXT NULL,
+  is_active                 INTEGER NOT NULL DEFAULT 0,
+  -- Snapshots:
+  purpose                   TEXT NULL,
+  role                      TEXT NULL,
+  context                   TEXT NULL,
+  input_fields              TEXT NULL, -- JSON array string
+  instructions              TEXT NULL,
+  constraints               TEXT NULL,
+  output_format             TEXT NULL,
+  review_checklist          TEXT NULL,
+  notes                     TEXT NULL,
+  guardrail_preset_ids      TEXT DEFAULT '[]', -- JSON array string
+  created_at                TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at                TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(prompt_template_id) REFERENCES prompt_templates(id) ON DELETE CASCADE,
+  FOREIGN KEY(created_from_run_log_id) REFERENCES prompt_run_logs(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_versions_template_id ON prompt_versions(prompt_template_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_prompt_versions_updated_at
+AFTER UPDATE ON prompt_versions
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE prompt_versions SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+
 
 

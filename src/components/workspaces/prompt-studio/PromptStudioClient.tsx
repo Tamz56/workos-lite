@@ -63,6 +63,28 @@ interface PromptTemplate {
     guardrail_preset_ids: string | null;
     created_at: string;
     updated_at: string;
+    active_version?: string | null;
+}
+
+interface PromptVersion {
+    id: string;
+    prompt_template_id: string;
+    version: string;
+    revision_notes: string | null;
+    created_from_run_log_id: string | null;
+    is_active: number;
+    purpose: string | null;
+    role: string | null;
+    context: string | null;
+    input_fields: string | null;
+    instructions: string | null;
+    constraints: string | null;
+    output_format: string | null;
+    review_checklist: string | null;
+    notes: string | null;
+    guardrail_preset_ids: string;
+    created_at: string;
+    updated_at: string;
 }
 
 interface PromptRunLog {
@@ -159,12 +181,20 @@ export default function PromptStudioClient() {
         runStatus: "needs_revision"
     });
     const [isSavingLog, setIsSavingLog] = useState(false);
-    const [rightPanelTab, setRightPanelTab] = useState<"playground" | "history">("playground");
+    const [rightPanelTab, setRightPanelTab] = useState<"playground" | "history" | "versions">("playground");
     const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
     // Filters for Run History
     const [logStatusFilter, setLogStatusFilter] = useState<string>("active");
     const [logRatingFilter, setLogRatingFilter] = useState<string>("all");
+
+    // Versions State
+    const [versions, setVersions] = useState<PromptVersion[]>([]);
+    const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+    const [newVersionForm, setNewVersionForm] = useState({ version: "", revisionNotes: "" });
+    const [isSavingVersion, setIsSavingVersion] = useState(false);
+    const [logVersionFormOpenId, setLogVersionFormOpenId] = useState<string | null>(null);
+    const [logVersionInputs, setLogVersionInputs] = useState<Record<string, { version: string; notes: string }>>({});
 
     // Guardrail Presets State
     const [guardrailPresets, setGuardrailPresets] = useState<GuardrailPreset[]>([]);
@@ -254,6 +284,29 @@ export default function PromptStudioClient() {
         fetchRunLogs();
     }, [fetchRunLogs]);
 
+    const fetchVersions = useCallback(async () => {
+        if (!selectedId || selectedId === "new-template") {
+            setVersions([]);
+            return;
+        }
+        setIsLoadingVersions(true);
+        try {
+            const res = await fetch(`/api/prompt-templates/${selectedId}/versions`);
+            if (res.ok) {
+                const data = await res.json() as PromptVersion[];
+                setVersions(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch versions:", err);
+        } finally {
+            setIsLoadingVersions(false);
+        }
+    }, [selectedId]);
+
+    useEffect(() => {
+        fetchVersions();
+    }, [fetchVersions]);
+
     const handleSaveRunLog = async () => {
         if (!selectedId || selectedId === "new-template") return;
         setIsSavingLog(true);
@@ -332,6 +385,104 @@ export default function PromptStudioClient() {
         await handleUpdateRunLog(logId, { runStatus: "archived" });
     };
 
+    const handleCreateVersion = async (vString: string, notesString: string, runLogId: string | null = null) => {
+        if (!selectedId || selectedId === "new-template") return;
+        if (!vString.trim()) {
+            alert("กรุณากรอกเลขเวอร์ชัน");
+            return;
+        }
+        setIsSavingVersion(true);
+        try {
+            const res = await fetch(`/api/prompt-templates/${selectedId}/versions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    version: vString.trim(),
+                    revision_notes: notesString.trim() || null,
+                    created_from_run_log_id: runLogId
+                })
+            });
+            if (!res.ok) {
+                const errData = await res.json() as { error?: string };
+                throw new Error(errData.error || "ไม่สามารถสร้างเวอร์ชันได้");
+            }
+            await fetchVersions();
+            await fetchTemplates();
+            alert("บันทึกเวอร์ชันสำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึกเวอร์ชัน";
+            alert(errMsg);
+        } finally {
+            setIsSavingVersion(false);
+        }
+    };
+
+    const handleMarkVersionActive = async (versionId: string) => {
+        if (!selectedId) return;
+        try {
+            const res = await fetch(`/api/prompt-templates/${selectedId}/versions/${versionId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: true })
+            });
+            if (!res.ok) {
+                const errData = await res.json() as { error?: string };
+                throw new Error(errData.error || "ไม่สามารถตั้งค่าเวอร์ชัน Active ได้");
+            }
+            await fetchVersions();
+            await fetchTemplates();
+            alert("ตั้งเป็นเวอร์ชัน Active สำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    };
+
+    const handleRestoreVersion = async (version: PromptVersion) => {
+        if (!selectedId) return;
+        if (!confirm(`คุณต้องการกู้คืนเนื้อหาเทมเพลตนี้กลับเป็นรุ่น ${version.version} ใช่หรือไม่?\nการดำเนินการนี้จะเปลี่ยนฟิลด์ในห้องแก้ไขปัจจุบันทั้งหมด (ประวัติเวอร์ชันเดิมและรันล็อกจะยังอยู่ครบ)`)) {
+            return;
+        }
+        try {
+            const res = await fetch(`/api/prompt-templates/${selectedId}/versions/${version.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ restore: true })
+            });
+            if (!res.ok) {
+                const errData = await res.json() as { error?: string };
+                throw new Error(errData.error || "ไม่สามารถกู้คืนเวอร์ชันได้");
+            }
+            await fetchTemplates();
+            await fetchVersions();
+            alert("กู้คืนรุ่นสำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    };
+
+    const handleDeleteVersion = async (versionId: string) => {
+        if (!selectedId) return;
+        if (!confirm("คุณต้องการลบประวัติเวอร์ชันนี้ใช่หรือไม่? (การดำเนินการนี้ไม่สามารถกู้คืนได้)")) {
+            return;
+        }
+        try {
+            const res = await fetch(`/api/prompt-templates/${selectedId}/versions/${versionId}`, {
+                method: "DELETE"
+            });
+            if (!res.ok) {
+                const errData = await res.json() as { error?: string };
+                throw new Error(errData.error || "ไม่สามารถลบเวอร์ชันได้");
+            }
+            await fetchVersions();
+            alert("ลบประวัติเวอร์ชันสำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    };
+
     useEffect(() => {
         setLogForm({
             rating: 5,
@@ -341,6 +492,9 @@ export default function PromptStudioClient() {
             runStatus: "needs_revision"
         });
         setExpandedLogId(null);
+        setNewVersionForm({ version: "", revisionNotes: "" });
+        setLogVersionFormOpenId(null);
+        setLogVersionInputs({});
     }, [selectedId]);
 
     // Set editor fields when template is selected
@@ -904,7 +1058,13 @@ export default function PromptStudioClient() {
                                         
                                         <div className="flex justify-between items-center mt-2 text-[9px] text-zinc-600">
                                             <span>{t.category}</span>
-                                            <span>v{t.version}</span>
+                                            <span>
+                                                {t.active_version ? (
+                                                    <span className="text-emerald-400 font-bold">Active: {t.active_version}</span>
+                                                ) : (
+                                                    `v${t.version}`
+                                                )}
+                                            </span>
                                         </div>
                                     </div>
                                 );
@@ -917,11 +1077,16 @@ export default function PromptStudioClient() {
                 <div className="flex-1 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden">
                     {/* Editor Toolbar */}
                     <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/30 flex-shrink-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2.5">
                             <Edit className="w-4 h-4 text-indigo-400" />
                             <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                                 {selectedId === "new-template" ? "สร้างเทมเพลตใหม่" : "แก้ไข Prompt Template"}
                             </h2>
+                            {selectedId && selectedId !== "new-template" && activeTemplate?.active_version && (
+                                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    Active: {activeTemplate.active_version}
+                                </span>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -1451,27 +1616,37 @@ export default function PromptStudioClient() {
                     <div className="flex border-b border-zinc-800 bg-zinc-900/40 p-2 gap-1 flex-shrink-0">
                         <button
                             onClick={() => setRightPanelTab("playground")}
-                            className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
+                            className={`flex-1 text-center py-1.5 rounded text-[10px] font-bold transition ${
                                 rightPanelTab === "playground"
                                     ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
                                     : "text-zinc-400 hover:bg-zinc-800/40"
                             }`}
                         >
-                            Playground & Test
+                            Playground
                         </button>
                         <button
                             onClick={() => setRightPanelTab("history")}
-                            className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
+                            className={`flex-1 text-center py-1.5 rounded text-[10px] font-bold transition ${
                                 rightPanelTab === "history"
                                     ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
                                     : "text-zinc-400 hover:bg-zinc-800/40"
                             }`}
                         >
-                            Test History / Run Log
+                            Test History
+                        </button>
+                        <button
+                            onClick={() => setRightPanelTab("versions")}
+                            className={`flex-1 text-center py-1.5 rounded text-[10px] font-bold transition ${
+                                rightPanelTab === "versions"
+                                    ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
+                                    : "text-zinc-400 hover:bg-zinc-800/40"
+                            }`}
+                        >
+                            Versions
                         </button>
                     </div>
 
-                    {rightPanelTab === "playground" ? (
+                    {rightPanelTab === "playground" && (
                         <>
                             {/* Test Variables Area */}
                             <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col flex-shrink-0">
@@ -1588,9 +1763,10 @@ export default function PromptStudioClient() {
                                 </div>
                             </div>
                         </>
-                    ) : (
-                        <>
-                            {/* Run History and Save Log Section */}
+                    )}
+
+                    {rightPanelTab === "history" && (
+                        <div className="flex-1 flex flex-col overflow-hidden">
                             {!selectedId || selectedId === "new-template" ? (
                                 <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-zinc-500 italic">
                                     กรุณาบันทึกเทมเพลตนี้ก่อนเพื่อเริ่มเก็บประวัติการทดสอบ
@@ -1782,6 +1958,20 @@ export default function PromptStudioClient() {
                                                                             คัดลอก Notes
                                                                         </button>
                                                                     )}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setLogVersionFormOpenId(logVersionFormOpenId === log.id ? null : log.id);
+                                                                            if (!logVersionInputs[log.id]) {
+                                                                                setLogVersionInputs(prev => ({
+                                                                                    ...prev,
+                                                                                    [log.id]: { version: "", notes: log.nextRevisionNotes || "" }
+                                                                                }));
+                                                                            }
+                                                                        }}
+                                                                        className="px-2 py-1 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded border border-zinc-800 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                    >
+                                                                        {logVersionFormOpenId === log.id ? "ยกเลิก" : "บันทึกเป็นเวอร์ชัน"}
+                                                                    </button>
                                                                 </div>
                                                                 
                                                                 {log.runStatus !== "archived" && (
@@ -1835,7 +2025,138 @@ export default function PromptStudioClient() {
                                     </div>
                                 </>
                             )}
-                        </>
+                        </div>
+                    )}
+
+                    {rightPanelTab === "versions" && (
+                        <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
+                            {!selectedId || selectedId === "new-template" ? (
+                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-zinc-500 italic">
+                                    กรุณาบันทึกเทมเพลตนี้ก่อนเพื่อเริ่มเก็บประวัติเวอร์ชัน
+                                </div>
+                            ) : (
+                                <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
+                                    {/* Save Current as Version Form */}
+                                    <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 space-y-3 flex-shrink-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Save className="w-3.5 h-3.5 text-indigo-400" />
+                                            <span className="font-bold text-zinc-300 text-xs uppercase tracking-wider">บันทึกเวอร์ชันใหม่จากหน้าแก้ไข</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="col-span-1">
+                                                <input
+                                                    type="text"
+                                                    value={newVersionForm.version}
+                                                    onChange={(e) => setNewVersionForm(prev => ({ ...prev, version: e.target.value }))}
+                                                    placeholder="เช่น 1.0.0"
+                                                    className={INPUT_CLASS + " font-mono"}
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <input
+                                                    type="text"
+                                                    value={newVersionForm.revisionNotes}
+                                                    onChange={(e) => setNewVersionForm(prev => ({ ...prev, revisionNotes: e.target.value }))}
+                                                    placeholder="บันทึกการแก้ไขในรุ่นนี้..."
+                                                    className={INPUT_CLASS}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => {
+                                                handleCreateVersion(newVersionForm.version, newVersionForm.revisionNotes);
+                                                setNewVersionForm({ version: "", revisionNotes: "" });
+                                            }}
+                                            disabled={isSavingVersion}
+                                            className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded text-xs font-bold transition cursor-pointer"
+                                        >
+                                            {isSavingVersion ? "กำลังบันทึก..." : "บันทึกเวอร์ชัน (Save Version)"}
+                                        </button>
+                                    </div>
+
+                                    {/* Versions List */}
+                                    <div className="p-3 border-b border-zinc-850 bg-zinc-900/10 flex items-center justify-between flex-shrink-0">
+                                        <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">ประวัติเวอร์ชัน ({versions.length})</h3>
+                                    </div>
+
+                                    <div className="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
+                                        {isLoadingVersions ? (
+                                            <div className="text-center text-zinc-500 text-xs py-8">กำลังโหลดรายการเวอร์ชัน...</div>
+                                        ) : versions.length === 0 ? (
+                                            <p className="text-zinc-500 text-xs italic text-center py-8">ยังไม่มีเวอร์ชันบันทึกไว้สำหรับเทมเพลตนี้</p>
+                                        ) : (
+                                            versions.map(v => {
+                                                const formattedDate = new Date(v.created_at).toLocaleString("th-TH", {
+                                                    year: "numeric",
+                                                    month: "short",
+                                                    day: "numeric",
+                                                    hour: "2-digit",
+                                                    minute: "2-digit"
+                                                });
+
+                                                return (
+                                                    <div key={v.id} className="border border-zinc-800 rounded-lg p-3 bg-zinc-900/20 space-y-2.5 text-xs">
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-bold text-zinc-200 font-mono text-xs">v{v.version}</span>
+                                                                {v.is_active === 1 && (
+                                                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded text-[9px] font-bold">
+                                                                        Active
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[10px] text-zinc-500 font-mono">{formattedDate}</span>
+                                                        </div>
+
+                                                        {v.revision_notes && (
+                                                            <p className="text-zinc-300 bg-zinc-950/40 p-2 rounded border border-zinc-850/50 leading-relaxed">
+                                                                {v.revision_notes}
+                                                            </p>
+                                                        )}
+
+                                                        {v.created_from_run_log_id && (
+                                                            <div className="text-[9px] text-zinc-500 flex items-center gap-1 font-semibold">
+                                                                <span>⚡ สร้างเชื่อมโยงจากประวัติการรัน</span>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex items-center justify-between gap-2 border-t border-zinc-850/40 pt-2 mt-1">
+                                                            <div className="flex gap-1.5">
+                                                                {v.is_active !== 1 && (
+                                                                    <button
+                                                                        onClick={() => handleMarkVersionActive(v.id)}
+                                                                        className="px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-700/50 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                    >
+                                                                        เปิดใช้งาน (Active)
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleRestoreVersion(v)}
+                                                                    className="px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/10 text-indigo-300 border border-indigo-700/50 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                >
+                                                                    คืนค่านี้ (Restore)
+                                                                </button>
+                                                            </div>
+
+                                                            <button
+                                                                onClick={() => handleDeleteVersion(v.id)}
+                                                                className="px-2 py-1 text-zinc-500 hover:text-red-400 hover:bg-red-950/20 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                disabled={v.is_active === 1}
+                                                                title={v.is_active === 1 ? "ไม่สามารถลบเวอร์ชันที่ใช้งานอยู่ได้" : "ลบเวอร์ชัน"}
+                                                            >
+                                                                ลบ
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
