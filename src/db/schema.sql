@@ -582,6 +582,46 @@ BEGIN
   UPDATE prompt_versions SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
+-- Workflow Prompt Sets (Lightweight Organizer)
+CREATE TABLE IF NOT EXISTS prompt_workflows (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  description TEXT NULL,
+  status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
+CREATE INDEX IF NOT EXISTS idx_prompt_workflows_status ON prompt_workflows(status);
 
+CREATE TRIGGER IF NOT EXISTS trg_prompt_workflows_updated_at
+AFTER UPDATE ON prompt_workflows
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE prompt_workflows SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
 
+CREATE TABLE IF NOT EXISTS prompt_workflow_steps (
+  id                 TEXT PRIMARY KEY,
+  workflow_id        TEXT NOT NULL,
+  prompt_template_id TEXT NOT NULL,
+  step_name          TEXT NOT NULL,
+  step_description   TEXT NULL,
+  step_instruction   TEXT NULL,
+  sort_order         INTEGER NOT NULL,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(workflow_id) REFERENCES prompt_workflows(id) ON DELETE CASCADE,
+  FOREIGN KEY(prompt_template_id) REFERENCES prompt_templates(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_workflow_steps_workflow ON prompt_workflow_steps(workflow_id, sort_order);
+
+CREATE TRIGGER IF NOT EXISTS trg_prompt_workflow_steps_updated_at
+AFTER UPDATE ON prompt_workflow_steps
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE prompt_workflow_steps SET updated_at = datetime('now') WHERE id = NEW.id;
+END;

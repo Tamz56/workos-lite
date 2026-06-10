@@ -101,6 +101,33 @@ interface PromptRunLog {
     updatedAt: string;
 }
 
+interface PromptWorkflow {
+    id: string;
+    name: string;
+    description: string | null;
+    status: "active" | "archived";
+    created_at: string;
+    updated_at: string;
+    step_count?: number;
+    steps?: PromptWorkflowStep[];
+}
+
+interface PromptWorkflowStep {
+    id: string;
+    workflow_id: string;
+    prompt_template_id: string;
+    step_name: string;
+    step_description: string | null;
+    step_instruction: string | null;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+    template_name?: string;
+    template_category?: string;
+    template_status?: string;
+    active_version?: string | null;
+}
+
 const CATEGORIES = ["Writing", "Review", "Marketing", "Coding", "General"];
 const STATUSES = ["draft", "testing", "active", "archived"];
 
@@ -195,6 +222,23 @@ export default function PromptStudioClient() {
     const [isSavingVersion, setIsSavingVersion] = useState(false);
     const [logVersionFormOpenId, setLogVersionFormOpenId] = useState<string | null>(null);
     const [logVersionInputs, setLogVersionInputs] = useState<Record<string, { version: string; notes: string }>>({});
+
+    // Workflows States
+    const [sidebarTab, setSidebarTab] = useState<"templates" | "workflows">("templates");
+    const [workflows, setWorkflows] = useState<PromptWorkflow[]>([]);
+    const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+    const [selectedWorkflow, setSelectedWorkflow] = useState<PromptWorkflow | null>(null);
+    const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
+    const [isSavingWorkflow, setIsSavingWorkflow] = useState(false);
+    const [workflowForm, setWorkflowForm] = useState({ name: "", description: "" });
+    const [isEditingWorkflowMeta, setIsEditingWorkflowMeta] = useState(false);
+    const [workflowMetaForm, setWorkflowMetaForm] = useState({ name: "", description: "" });
+
+    // Step states
+    const [stepForm, setStepForm] = useState({ promptTemplateId: "", stepName: "", stepDescription: "", stepInstruction: "" });
+    const [isAddingStep, setIsAddingStep] = useState(false);
+    const [editingStepId, setEditingStepId] = useState<string | null>(null);
+    const [editingStepForm, setEditingStepForm] = useState({ step_name: "", step_description: "", step_instruction: "" });
 
     // Guardrail Presets State
     const [guardrailPresets, setGuardrailPresets] = useState<GuardrailPreset[]>([]);
@@ -306,6 +350,224 @@ export default function PromptStudioClient() {
     useEffect(() => {
         fetchVersions();
     }, [fetchVersions]);
+
+    const fetchWorkflows = useCallback(async () => {
+        setIsLoadingWorkflows(true);
+        try {
+            const res = await fetch("/api/prompt-workflows");
+            if (res.ok) {
+                const data = await res.json() as PromptWorkflow[];
+                setWorkflows(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch workflows:", err);
+        } finally {
+            setIsLoadingWorkflows(false);
+        }
+    }, []);
+
+    const fetchWorkflowDetails = useCallback(async () => {
+        if (!selectedWorkflowId) {
+            setSelectedWorkflow(null);
+            return;
+        }
+        setIsLoadingWorkflows(true);
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}`);
+            if (res.ok) {
+                const data = await res.json() as PromptWorkflow;
+                setSelectedWorkflow(data);
+                setWorkflowMetaForm({
+                    name: data.name,
+                    description: data.description || ""
+                });
+            }
+        } catch (err) {
+            console.error("Failed to fetch workflow details:", err);
+        } finally {
+            setIsLoadingWorkflows(false);
+        }
+    }, [selectedWorkflowId]);
+
+    useEffect(() => {
+        fetchWorkflows();
+    }, [fetchWorkflows]);
+
+    useEffect(() => {
+        fetchWorkflowDetails();
+    }, [fetchWorkflowDetails]);
+
+    const handleCreateWorkflow = async () => {
+        if (!workflowForm.name.trim()) {
+            alert("กรุณากรอกชื่อเวิร์กโฟลว์");
+            return;
+        }
+        setIsSavingWorkflow(true);
+        try {
+            const res = await fetch("/api/prompt-workflows", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: workflowForm.name.trim(),
+                    description: workflowForm.description.trim() || null
+                })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถสร้างเวิร์กโฟลว์ได้");
+            const newWf = await res.json() as PromptWorkflow;
+            await fetchWorkflows();
+            setSelectedWorkflowId(newWf.id);
+            setWorkflowForm({ name: "", description: "" });
+            alert("สร้างเวิร์กโฟลว์สำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึก";
+            alert(errMsg);
+        } finally {
+            setIsSavingWorkflow(false);
+        }
+    };
+
+    const handleUpdateWorkflowMeta = async () => {
+        if (!selectedWorkflowId) return;
+        if (!workflowMetaForm.name.trim()) {
+            alert("กรุณากรอกชื่อเวิร์กโฟลว์");
+            return;
+        }
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: workflowMetaForm.name.trim(),
+                    description: workflowMetaForm.description.trim() || null
+                })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถอัปเดตเวิร์กโฟลว์ได้");
+            await fetchWorkflowDetails();
+            await fetchWorkflows();
+            setIsEditingWorkflowMeta(false);
+            alert("อัปเดตข้อมูลเวิร์กโฟลว์สำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    };
+
+    const handleArchiveWorkflow = async () => {
+        if (!selectedWorkflowId) return;
+        if (!confirm("คุณต้องการเก็บถาวร (Archive) เวิร์กโฟลว์นี้ใช่หรือไม่? ขั้นตอนทั้งหมดในเวิร์กโฟลว์จะยังคงอยู่แต่อยู่ในหมวดเก็บถาวร")) return;
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "archived" })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถเก็บถาวรเวิร์กโฟลว์ได้");
+            setSelectedWorkflowId(null);
+            await fetchWorkflows();
+            alert("เก็บถาวรเวิร์กโฟลว์สำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    };
+
+    const handleAddStep = async () => {
+        if (!selectedWorkflowId) return;
+        if (!stepForm.promptTemplateId) {
+            alert("กรุณาเลือกเทมเพลต Prompt");
+            return;
+        }
+        setIsAddingStep(true);
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}/steps`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    prompt_template_id: stepForm.promptTemplateId,
+                    step_name: stepForm.stepName.trim() || null,
+                    step_description: stepForm.stepDescription.trim() || null,
+                    step_instruction: stepForm.stepInstruction.trim() || null
+                })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถเพิ่มขั้นตอนได้");
+            await fetchWorkflowDetails();
+            setStepForm({ promptTemplateId: "", stepName: "", stepDescription: "", stepInstruction: "" });
+            alert("เพิ่มขั้นตอนในเวิร์กโฟลว์สำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        } finally {
+            setIsAddingStep(false);
+        }
+    };
+
+    const handleMoveStep = async (stepId: string, direction: "up" | "down") => {
+        if (!selectedWorkflowId) return;
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}/steps/${stepId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ direction })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถเปลี่ยนลำดับได้");
+            await fetchWorkflowDetails();
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    };
+
+    const handleDeleteStep = async (stepId: string) => {
+        if (!selectedWorkflowId) return;
+        if (!confirm("คุณต้องการลบขั้นตอนนี้ออกจากเวิร์กโฟลว์ใช่หรือไม่? (การดำเนินการนี้จะไม่ส่งผลต่อ Prompt Template หลัก)")) return;
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}/steps/${stepId}`, {
+                method: "DELETE"
+            });
+            if (!res.ok) throw new Error("ไม่สามารถลบขั้นตอนได้");
+            await fetchWorkflowDetails();
+            alert("ลบขั้นตอนออกจากเวิร์กโฟลว์สำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    };
+
+    const handleStartEditStep = (step: PromptWorkflowStep) => {
+        setEditingStepId(step.id);
+        setEditingStepForm({
+            step_name: step.step_name,
+            step_description: step.step_description || "",
+            step_instruction: step.step_instruction || ""
+        });
+    };
+
+    const handleUpdateStepDetails = async (stepId: string) => {
+        if (!selectedWorkflowId) return;
+        if (!editingStepForm.step_name.trim()) {
+            alert("กรุณากรอกชื่อขั้นตอน");
+            return;
+        }
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}/steps/${stepId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    step_name: editingStepForm.step_name.trim(),
+                    step_description: editingStepForm.step_description.trim() || null,
+                    step_instruction: editingStepForm.step_instruction.trim() || null
+                })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถอัปเดตข้อมูลขั้นตอนได้");
+            await fetchWorkflowDetails();
+            setEditingStepId(null);
+            alert("อัปเดตข้อมูลขั้นตอนสำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    };
+
 
     const handleSaveRunLog = async () => {
         if (!selectedId || selectedId === "new-template") return;
@@ -962,119 +1224,235 @@ export default function PromptStudioClient() {
 
             {/* Layout container */}
             <div className="flex flex-1 overflow-hidden">
-                {/* 1. Left Column: Prompt Library */}
+                {/* 1. Left Column: Prompt Library & Workflows */}
                 <div className="w-80 border-r border-zinc-800 flex flex-col bg-zinc-900/50 flex-shrink-0">
-                    {/* Filters & Actions */}
-                    <div className="p-4 border-b border-zinc-800 space-y-3 flex-shrink-0">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                                <BookOpen className="w-4 h-4" /> Prompt Library
-                            </h2>
-                            <button
-                                onClick={handleCreateNew}
-                                className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-md font-semibold transition-all shadow-md cursor-pointer"
-                            >
-                                <Plus className="w-3.5 h-3.5" /> สร้างใหม่
-                            </button>
-                        </div>
-
-                        {/* Search input */}
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
-                            <input
-                                type="text"
-                                placeholder="ค้นหาชื่อ, สรรพคุณ..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 text-xs rounded-md text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all"
-                            />
-                        </div>
-
-                        {/* Category filter */}
-                        <div className="flex gap-2">
-                            <select
-                                value={categoryFilter}
-                                onChange={(e) => setCategoryFilter(e.target.value)}
-                                className={SELECT_CLASS}
-                            >
-                                <option className="bg-zinc-900 text-slate-100" value="All">หมวดหมู่ทั้งหมด</option>
-                                {CATEGORIES.map(cat => (
-                                    <option className="bg-zinc-900 text-slate-100" key={cat} value={cat}>{cat}</option>
-                                ))}
-                            </select>
-
-                            {/* Status filter */}
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className={SELECT_CLASS}
-                            >
-                                <option className="bg-zinc-900 text-slate-100" value="All">สถานะทั้งหมด</option>
-                                <option className="bg-zinc-900 text-slate-100" value="active">Active</option>
-                                <option className="bg-zinc-900 text-slate-100" value="draft">Draft</option>
-                                <option className="bg-zinc-900 text-slate-100" value="testing">Testing</option>
-                                <option className="bg-zinc-900 text-slate-100" value="archived">Archived</option>
-                            </select>
-                        </div>
+                    {/* Tab Switcher */}
+                    <div className="flex border-b border-zinc-800 bg-zinc-950 flex-shrink-0">
+                        <button
+                            onClick={() => {
+                                setSidebarTab("templates");
+                                setSelectedWorkflowId(null);
+                                if (templates.length > 0 && !selectedId) {
+                                    setSelectedId(templates[0].id);
+                                }
+                            }}
+                            className={`flex-1 text-center py-2.5 text-[11px] font-bold transition-all cursor-pointer border-b-2 ${
+                                sidebarTab === "templates"
+                                    ? "text-indigo-400 border-indigo-500 bg-zinc-900/30"
+                                    : "text-zinc-500 border-transparent hover:text-zinc-300"
+                            }`}
+                        >
+                            Templates ({templates.filter(t => t.status !== "archived").length})
+                        </button>
+                        <button
+                            onClick={() => {
+                                setSidebarTab("workflows");
+                                setSelectedId(null);
+                                fetchWorkflows();
+                            }}
+                            className={`flex-1 text-center py-2.5 text-[11px] font-bold transition-all cursor-pointer border-b-2 ${
+                                sidebarTab === "workflows"
+                                    ? "text-indigo-400 border-indigo-500 bg-zinc-900/30"
+                                    : "text-zinc-500 border-transparent hover:text-zinc-300"
+                            }`}
+                        >
+                            Workflows ({workflows.length})
+                        </button>
                     </div>
 
-                    {/* Template List */}
-                    <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40">
-                        {isLoading ? (
-                            <div className="p-8 text-center text-zinc-500 text-xs flex flex-col items-center justify-center gap-2">
-                                <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
-                                <span>กำลังโหลดข้อมูล...</span>
-                            </div>
-                        ) : filteredTemplates.length === 0 ? (
-                            <div className="p-8 text-center text-zinc-500 text-xs">
-                                ไม่พบเทมเพลตที่ตรงกับเงื่อนไข
-                            </div>
-                        ) : (
-                            filteredTemplates.map(t => {
-                                const isActive = t.id === selectedId;
-                                
-                                return (
-                                    <div
-                                        key={t.id}
-                                        onClick={() => setSelectedId(t.id)}
-                                        className={`p-3 text-left cursor-pointer transition-all ${
-                                            isActive 
-                                                ? "bg-zinc-800 text-white border-l-2 border-indigo-500" 
-                                                : "hover:bg-zinc-800/40 text-zinc-300"
-                                        }`}
+                    {sidebarTab === "templates" ? (
+                        <>
+                            {/* Filters & Actions */}
+                            <div className="p-4 border-b border-zinc-800 space-y-3 flex-shrink-0">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <BookOpen className="w-4 h-4" /> Prompt Library
+                                    </h2>
+                                    <button
+                                        onClick={handleCreateNew}
+                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-md font-semibold transition-all shadow-md cursor-pointer"
                                     >
-                                        <div className="flex items-start justify-between gap-1.5">
-                                            <h3 className="font-semibold text-xs truncate max-w-[180px]">{t.name}</h3>
-                                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-medium ${
-                                                t.status === "active" ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800" :
-                                                t.status === "testing" ? "bg-amber-950/80 text-amber-300 border border-amber-800" :
-                                                t.status === "archived" ? "bg-zinc-900 text-zinc-500 border border-zinc-800" :
-                                                "bg-zinc-800 text-zinc-400 border border-zinc-700"
-                                            }`}>
-                                                {t.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-[10px] text-zinc-500 line-clamp-1 mt-1">{t.purpose || "ไม่มีคำอธิบาย"}</p>
-                                        
-                                        <div className="flex justify-between items-center mt-2 text-[9px] text-zinc-600">
-                                            <span>{t.category}</span>
-                                            <span>
-                                                {t.active_version ? (
-                                                    <span className="text-emerald-400 font-bold">Active: {t.active_version}</span>
-                                                ) : (
-                                                    `v${t.version}`
-                                                )}
-                                            </span>
-                                        </div>
+                                        <Plus className="w-3.5 h-3.5" /> สร้างใหม่
+                                    </button>
+                                </div>
+
+                                {/* Search input */}
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+                                    <input
+                                        type="text"
+                                        placeholder="ค้นหาชื่อ, สรรพคุณ..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 text-xs rounded-md text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all"
+                                    />
+                                </div>
+
+                                {/* Category filter */}
+                                <div className="flex gap-2">
+                                    <select
+                                        value={categoryFilter}
+                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                        className={SELECT_CLASS}
+                                    >
+                                        <option className="bg-zinc-900 text-slate-100" value="All">หมวดหมู่ทั้งหมด</option>
+                                        {CATEGORIES.map(cat => (
+                                            <option className="bg-zinc-900 text-slate-100" key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+
+                                    {/* Status filter */}
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className={SELECT_CLASS}
+                                    >
+                                        <option className="bg-zinc-900 text-slate-100" value="All">สถานะทั้งหมด</option>
+                                        <option className="bg-zinc-900 text-slate-100" value="active">Active</option>
+                                        <option className="bg-zinc-900 text-slate-100" value="draft">Draft</option>
+                                        <option className="bg-zinc-900 text-slate-100" value="testing">Testing</option>
+                                        <option className="bg-zinc-900 text-slate-100" value="archived">Archived</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Template List */}
+                            <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40">
+                                {isLoading ? (
+                                    <div className="p-8 text-center text-zinc-500 text-xs flex flex-col items-center justify-center gap-2">
+                                        <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
+                                        <span>กำลังโหลดข้อมูล...</span>
                                     </div>
-                                );
-                            })
-                        )}
-                    </div>
+                                ) : filteredTemplates.length === 0 ? (
+                                    <div className="p-8 text-center text-zinc-500 text-xs">
+                                        ไม่พบเทมเพลตที่ตรงกับเงื่อนไข
+                                    </div>
+                                ) : (
+                                    filteredTemplates.map(t => {
+                                        const isActive = t.id === selectedId;
+                                        
+                                        return (
+                                            <div
+                                                key={t.id}
+                                                onClick={() => setSelectedId(t.id)}
+                                                className={`p-3 text-left cursor-pointer transition-all ${
+                                                    isActive 
+                                                        ? "bg-zinc-800 text-white border-l-2 border-indigo-500" 
+                                                        : "hover:bg-zinc-800/40 text-zinc-300"
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-1.5">
+                                                    <h3 className="font-semibold text-xs truncate max-w-[180px]">{t.name}</h3>
+                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-medium ${
+                                                        t.status === "active" ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800" :
+                                                        t.status === "testing" ? "bg-amber-950/80 text-amber-300 border border-amber-800" :
+                                                        t.status === "archived" ? "bg-zinc-900 text-zinc-500 border border-zinc-800" :
+                                                        "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                                                    }`}>
+                                                        {t.status}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-zinc-500 line-clamp-1 mt-1">{t.purpose || "ไม่มีคำอธิบาย"}</p>
+                                                
+                                                <div className="flex justify-between items-center mt-2 text-[9px] text-zinc-600">
+                                                    <span>{t.category}</span>
+                                                    <span>
+                                                        {t.active_version ? (
+                                                            <span className="text-emerald-400 font-bold">Active: {t.active_version}</span>
+                                                        ) : (
+                                                            `v${t.version}`
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Workflow Actions */}
+                            <div className="p-4 border-b border-zinc-800 space-y-3 flex-shrink-0">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <Sliders className="w-4 h-4" /> Workflows
+                                    </h2>
+                                </div>
+
+                                {/* Create Workflow Form (inline) */}
+                                <div className="bg-zinc-950 p-3 rounded border border-zinc-800 space-y-2">
+                                    <span className="text-[9px] text-zinc-400 font-bold block uppercase tracking-wider">สร้างเซ็ตเวิร์กโฟลว์ใหม่</span>
+                                    <input
+                                        type="text"
+                                        placeholder="ชื่อเวิร์กโฟลว์..."
+                                        value={workflowForm.name}
+                                        onChange={(e) => setWorkflowForm(prev => ({ ...prev, name: e.target.value }))}
+                                        className={INPUT_CLASS}
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="คำอธิบาย (ไม่บังคับ)..."
+                                        value={workflowForm.description}
+                                        onChange={(e) => setWorkflowForm(prev => ({ ...prev, description: e.target.value }))}
+                                        className={INPUT_CLASS}
+                                    />
+                                    <button
+                                        onClick={handleCreateWorkflow}
+                                        disabled={isSavingWorkflow}
+                                        className="w-full py-1.5 text-center text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded cursor-pointer transition disabled:opacity-50"
+                                    >
+                                        {isSavingWorkflow ? "กำลังบันทึก..." : "สร้าง"}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Workflow List */}
+                            <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40">
+                                {isLoadingWorkflows ? (
+                                    <div className="p-8 text-center text-zinc-500 text-xs flex flex-col items-center justify-center gap-2">
+                                        <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
+                                        <span>กำลังโหลด...</span>
+                                    </div>
+                                ) : workflows.length === 0 ? (
+                                    <div className="p-8 text-center text-zinc-500 text-xs italic">
+                                        ยังไม่มีเวิร์กโฟลว์ (สามารถสร้างใหม่ด้านบน)
+                                    </div>
+                                ) : (
+                                    workflows.map(wf => {
+                                        const isActive = wf.id === selectedWorkflowId;
+                                        return (
+                                            <div
+                                                key={wf.id}
+                                                onClick={() => {
+                                                    setSelectedWorkflowId(wf.id);
+                                                    setSelectedId(null);
+                                                }}
+                                                className={`p-3 text-left cursor-pointer transition-all ${
+                                                    isActive 
+                                                        ? "bg-zinc-800 text-white border-l-2 border-indigo-500" 
+                                                        : "hover:bg-zinc-800/40 text-zinc-300"
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-1.5">
+                                                    <h3 className="font-semibold text-xs truncate max-w-[170px]">{wf.name}</h3>
+                                                    <span className="text-[9px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-bold font-mono border border-zinc-700">
+                                                        {wf.step_count || 0} ขั้น
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-zinc-500 line-clamp-1 mt-1">{wf.description || "ไม่มีคำอธิบาย"}</p>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
 
-                {/* 2. Center Column: Prompt Editor */}
-                <div className="flex-1 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden">
+                {/* 2. Center Column: Prompt Editor or Workflow Editor */}
+                {sidebarTab === "templates" ? (
+                    <div className="flex-1 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden">
                     {/* Editor Toolbar */}
                     <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/30 flex-shrink-0">
                         <div className="flex items-center gap-2.5">
@@ -1609,9 +1987,351 @@ export default function PromptStudioClient() {
                         </div>
                     </div>
                 </div>
+                ) : (
+                    /* Workflow Editor Workspace */
+                    <div className="flex-1 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden">
+                        {selectedWorkflowId && selectedWorkflow ? (
+                            <>
+                                {/* Editor Toolbar */}
+                                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/30 flex-shrink-0">
+                                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                        <Sliders className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                                        {isEditingWorkflowMeta ? (
+                                            <div className="flex items-center gap-2 flex-1 max-w-md">
+                                                <input
+                                                    type="text"
+                                                    value={workflowMetaForm.name}
+                                                    onChange={(e) => setWorkflowMetaForm(prev => ({ ...prev, name: e.target.value }))}
+                                                    className={INPUT_CLASS}
+                                                    placeholder="ชื่อเวิร์กโฟลว์"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={workflowMetaForm.description}
+                                                    onChange={(e) => setWorkflowMetaForm(prev => ({ ...prev, description: e.target.value }))}
+                                                    className={INPUT_CLASS}
+                                                    placeholder="คำอธิบาย"
+                                                />
+                                                <button
+                                                    onClick={handleUpdateWorkflowMeta}
+                                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold cursor-pointer transition"
+                                                >
+                                                    บันทึก
+                                                </button>
+                                                <button
+                                                    onClick={() => setIsEditingWorkflowMeta(false)}
+                                                    className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] font-bold cursor-pointer transition"
+                                                >
+                                                    ยกเลิก
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider truncate">
+                                                        {selectedWorkflow.name}
+                                                    </h2>
+                                                    <button
+                                                        onClick={() => {
+                                                            setWorkflowMetaForm({
+                                                                name: selectedWorkflow.name,
+                                                                description: selectedWorkflow.description || ""
+                                                            });
+                                                            setIsEditingWorkflowMeta(true);
+                                                        }}
+                                                        className="p-1 text-zinc-500 hover:text-zinc-300 rounded cursor-pointer transition"
+                                                        title="แก้ไขชื่อและรายละเอียด"
+                                                    >
+                                                        <Edit2 className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                                {selectedWorkflow.description && (
+                                                    <p className="text-[10px] text-zinc-500 truncate mt-0.5">{selectedWorkflow.description}</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        <button
+                                            onClick={handleArchiveWorkflow}
+                                            title="เก็บถาวรเวิร์กโฟลว์"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-950/30 border border-zinc-800 hover:border-red-900/50 rounded-md transition cursor-pointer text-xs font-semibold"
+                                        >
+                                            <Archive className="w-3.5 h-3.5" />
+                                            <span>Archive</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Main Steps & Setup Panel */}
+                                <div className="flex-1 p-5 overflow-y-auto space-y-6 text-xs custom-scrollbar">
+                                    {/* Workflow Steps List */}
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
+                                            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">ขั้นตอนการทำงาน ({selectedWorkflow.steps?.length || 0})</h3>
+                                            <span className="text-[10px] text-zinc-500">เรียงตามลำดับก่อนหลัง</span>
+                                        </div>
+
+                                        {!selectedWorkflow.steps || selectedWorkflow.steps.length === 0 ? (
+                                            <div className="border border-dashed border-zinc-800 rounded-lg p-8 text-center text-zinc-500 italic">
+                                                ยังไม่มีขั้นตอนในเวิร์กโฟลว์นี้ เริ่มเพิ่มขั้นตอนแรกของคุณโดยกรอกฟอร์มด้านล่าง
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {selectedWorkflow.steps.map((step, index) => {
+                                                    const isEditing = editingStepId === step.id;
+                                                    return (
+                                                        <div key={step.id} className="border border-zinc-800 rounded-lg bg-zinc-900/20 p-4 space-y-3 transition hover:border-zinc-700">
+                                                            <div className="flex justify-between items-start gap-4">
+                                                                <div className="flex items-start gap-3 min-w-0">
+                                                                    <div className="w-5 h-5 rounded bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-mono font-bold text-[10px] flex-shrink-0 mt-0.5">
+                                                                        {index + 1}
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <h4 className="font-bold text-zinc-200 text-xs truncate">{step.step_name}</h4>
+                                                                        {step.step_description && (
+                                                                            <p className="text-zinc-500 text-[10px] mt-0.5 leading-relaxed">{step.step_description}</p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Step Control Buttons */}
+                                                                <div className="flex items-center gap-1 flex-shrink-0">
+                                                                    <button
+                                                                        onClick={() => handleMoveStep(step.id, "up")}
+                                                                        disabled={index === 0}
+                                                                        className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 disabled:hover:text-zinc-500 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                                        title="เลื่อนขึ้น"
+                                                                    >
+                                                                        <ArrowUp className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleMoveStep(step.id, "down")}
+                                                                        disabled={index === (selectedWorkflow.steps?.length || 1) - 1}
+                                                                        className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 disabled:hover:text-zinc-500 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                                        title="เลื่อนลง"
+                                                                    >
+                                                                        <ArrowDown className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleStartEditStep(step)}
+                                                                        className="p-1 text-zinc-500 hover:text-indigo-400 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                                        title="แก้ไขขั้นตอน"
+                                                                    >
+                                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteStep(step.id)}
+                                                                        className="p-1 text-zinc-500 hover:text-red-400 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                                        title="ลบขั้นตอนออกจากเวิร์กโฟลว์"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Step Inline Edit Form */}
+                                                            {isEditing && (
+                                                                <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800 space-y-2 mt-2">
+                                                                    <div>
+                                                                        <label className="block text-[10px] text-zinc-400 font-bold mb-1">ชื่อขั้นตอน *</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingStepForm.step_name}
+                                                                            onChange={(e) => setEditingStepForm(prev => ({ ...prev, step_name: e.target.value }))}
+                                                                            className={INPUT_CLASS}
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-[10px] text-zinc-400 font-bold mb-1">คำอธิบาย</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingStepForm.step_description}
+                                                                            onChange={(e) => setEditingStepForm(prev => ({ ...prev, step_description: e.target.value }))}
+                                                                            className={INPUT_CLASS}
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-[10px] text-zinc-400 font-bold mb-1">คำแนะนำ/คำสั่งการรันเฉพาะ (Instruction Override)</label>
+                                                                        <textarea
+                                                                            rows={3}
+                                                                            value={editingStepForm.step_instruction}
+                                                                            onChange={(e) => setEditingStepForm(prev => ({ ...prev, step_instruction: e.target.value }))}
+                                                                            className={TEXTAREA_CLASS}
+                                                                            placeholder="เขียนกำกับว่าขั้นตอนนี้ควรป้อนข้อมูลหรือรัน Prompt อย่างไร..."
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex gap-2 justify-end pt-1">
+                                                                        <button
+                                                                            onClick={() => handleUpdateStepDetails(step.id)}
+                                                                            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold cursor-pointer transition"
+                                                                        >
+                                                                            บันทึกการแก้ไข
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setEditingStepId(null)}
+                                                                            className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] font-bold cursor-pointer transition"
+                                                                        >
+                                                                            ยกเลิก
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Linked Prompt Template Details */}
+                                                            <div className="bg-zinc-950/40 border border-zinc-850/60 rounded p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] font-bold text-zinc-400">เทมเพลต:</span>
+                                                                        <span className="text-zinc-300 font-semibold">{step.template_name}</span>
+                                                                        <span className="bg-zinc-850 text-zinc-400 text-[8px] px-1 py-0.2 rounded font-mono border border-zinc-800">
+                                                                            {step.template_category}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] text-zinc-500">Active Version:</span>
+                                                                        {step.active_version ? (
+                                                                            <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-800 text-[9px] px-1.5 py-0.2 rounded font-bold">
+                                                                                v{step.active_version}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-zinc-500 text-[10px] italic">ไม่มี (ใช้เวอร์ชันล่าสุด)</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSidebarTab("templates");
+                                                                        setSelectedId(step.prompt_template_id);
+                                                                    }}
+                                                                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-zinc-850 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded border border-zinc-800 transition cursor-pointer font-medium"
+                                                                >
+                                                                    <BookOpen className="w-3 h-3 text-indigo-400" />
+                                                                    <span>เปิดแก้ไขเทมเพลต</span>
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Step Instruction Display */}
+                                                            {step.step_instruction && !isEditing && (
+                                                                <div className="bg-zinc-950/20 border border-zinc-850/40 rounded-md p-2.5">
+                                                                    <span className="text-[9px] text-zinc-500 font-bold block uppercase tracking-wider mb-1">คำสั่งการใช้งานเฉพาะขั้นตอนนี้:</span>
+                                                                    <p className="text-zinc-300 text-[10px] font-mono whitespace-pre-wrap leading-relaxed">{step.step_instruction}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Add Step Form */}
+                                    <div className="border border-zinc-800 rounded-lg p-4 bg-zinc-900/10 space-y-4">
+                                        <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                                            <Plus className="w-3.5 h-3.5 text-indigo-400" /> เพิ่มขั้นตอนใหม่
+                                        </h3>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-zinc-400 font-bold mb-1">เลือก Prompt Template *</label>
+                                                <select
+                                                    value={stepForm.promptTemplateId}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        const matchedTpl = templates.find(t => t.id === val);
+                                                        setStepForm(prev => ({
+                                                            ...prev,
+                                                            promptTemplateId: val,
+                                                            stepName: matchedTpl ? matchedTpl.name : ""
+                                                        }));
+                                                    }}
+                                                    className={SELECT_CLASS}
+                                                >
+                                                    <option className="bg-zinc-900 text-zinc-500" value="">-- เลือกเทมเพลต --</option>
+                                                    {templates
+                                                        .filter(t => t.status !== "archived")
+                                                        .map(t => (
+                                                            <option className="bg-zinc-900 text-slate-100" key={t.id} value={t.id}>
+                                                                {t.name} ({t.category}) {t.active_version ? `[v${t.active_version}]` : `[v${t.version}]`}
+                                                            </option>
+                                                        ))
+                                                    }
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-zinc-400 font-bold mb-1">ชื่อขั้นตอน (ว่างไว้เพื่อใช้ชื่อเทมเพลต)</label>
+                                                <input
+                                                    type="text"
+                                                    value={stepForm.stepName}
+                                                    onChange={(e) => setStepForm(prev => ({ ...prev, stepName: e.target.value }))}
+                                                    placeholder="เช่น สร้างร่างบทความเกริ่นนำ"
+                                                    className={INPUT_CLASS}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-zinc-400 font-bold mb-1">คำอธิบายขั้นตอน</label>
+                                                <input
+                                                    type="text"
+                                                    value={stepForm.stepDescription}
+                                                    onChange={(e) => setStepForm(prev => ({ ...prev, stepDescription: e.target.value }))}
+                                                    placeholder="วัตถุประสงค์ของขั้นตอนนี้..."
+                                                    className={INPUT_CLASS}
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-zinc-400 font-bold mb-1">คำแนะนำสั่งงานเฉพาะขั้นตอน (Instruction Override)</label>
+                                                <textarea
+                                                    rows={2}
+                                                    value={stepForm.stepInstruction}
+                                                    onChange={(e) => setStepForm(prev => ({ ...prev, stepInstruction: e.target.value }))}
+                                                    placeholder="เขียนระบุเฉพาะขั้นตอนนี้ เช่น ให้นำเนื้อหาจากขั้นตอนที่ 1 มาวิเคราะห์ต่อ..."
+                                                    className={TEXTAREA_CLASS}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end pt-1">
+                                            <button
+                                                onClick={handleAddStep}
+                                                disabled={isAddingStep || !stepForm.promptTemplateId}
+                                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded font-bold cursor-pointer transition flex items-center gap-1.5"
+                                            >
+                                                {isAddingStep ? (
+                                                    <>
+                                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                                        <span>กำลังเพิ่ม...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Plus className="w-3.5 h-3.5" />
+                                                        <span>เพิ่มขั้นตอน</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 p-8">
+                                <Sliders className="w-12 h-12 text-zinc-700 mb-3" />
+                                <p className="text-sm font-semibold">เลือกหรือสร้างเวิร์กโฟลว์ใหม่จากแถบซ้าย</p>
+                                <p className="text-xs text-zinc-650 mt-1">จัดกลุ่มและเรียงลำดับขั้นตอนการรันเทมเพลต Prompt</p>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* 3. Right Column: Preview & Test Input Area */}
-                <div className="w-[420px] flex flex-col bg-zinc-900/30 overflow-hidden flex-shrink-0">
+                {sidebarTab === "templates" && (
+                    <div className="w-[420px] flex flex-col bg-zinc-900/30 overflow-hidden flex-shrink-0">
                     {/* Main Tab selector for Playground vs History */}
                     <div className="flex border-b border-zinc-800 bg-zinc-900/40 p-2 gap-1 flex-shrink-0">
                         <button
@@ -2159,6 +2879,7 @@ export default function PromptStudioClient() {
                         </div>
                     )}
                 </div>
+                )}
             </div>
         </div>
     );
