@@ -2516,12 +2516,12 @@ export default function PromptStudioClient() {
                         {/* Green Fineness Guardrails Preset Selection Panel */}
                         <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
                             <label className="block text-slate-800 font-bold mb-1 text-xs uppercase tracking-wider">Green Fineness Guardrails (แนวทางความปลอดภัยของแบรนด์)</label>
-                            <span className="text-[10px] text-slate-500 block mb-3 leading-normal">
+                            <span className="text-xs text-slate-500 block mb-3 leading-relaxed">
                                 Guardrails คือกฎการควบคุมความเสี่ยงและการใช้ภาษา ซึ่งจะถูกรวมเข้าไปใน Compiled Prompt เพื่อช่วยรักษาโทนเสียง การกล่าวอ้างสรรพคุณ (Claims) และคุณภาพของผลลัพธ์ให้สอดคล้องตามเกณฑ์มาตรฐานความปลอดภัยของ Green Fineness อยู่เสมอ
                             </span>
                             
                             {guardrailPresets.length === 0 ? (
-                                <p className="text-slate-400 text-[10px] italic">กำลังโหลดข้อมูล Presets หรือไม่พบข้อมูลในระบบ...</p>
+                                <p className="text-slate-400 text-xs italic">กำลังโหลดข้อมูล Presets หรือไม่พบข้อมูลในระบบ...</p>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                     {guardrailPresets.map((preset) => {
@@ -2542,24 +2542,24 @@ export default function PromptStudioClient() {
                                             <div
                                                 key={preset.id}
                                                 onClick={() => handleToggleGuardrail(preset.id)}
-                                                className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between select-none ${
+                                                className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between select-none ${
                                                     isApplied
                                                         ? "bg-blue-50 border-blue-300 hover:bg-blue-100/70 text-slate-900 ring-1 ring-blue-400/20 shadow-sm"
                                                         : "bg-white border-slate-200 hover:bg-slate-50/70 text-slate-700 shadow-sm"
                                                 }`}
                                             >
-                                                <div className="space-y-1.5">
-                                                    <div className="flex items-start gap-2">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-start gap-2.5">
                                                         <input
                                                             type="checkbox"
                                                             checked={isApplied}
                                                             onChange={() => {}} // handled by onClick on container
-                                                            className="mt-0.5 accent-blue-600 cursor-pointer w-3.5 h-3.5 flex-shrink-0"
+                                                            className="mt-1 accent-blue-600 cursor-pointer w-4 h-4 flex-shrink-0"
                                                         />
                                                         <div className="min-w-0">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="font-extrabold text-[11px] text-slate-800 truncate">{preset.name}</span>
-                                                                <span className={`text-[8px] px-1.5 py-0.2 rounded font-bold border uppercase tracking-wider ${
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="font-extrabold text-xs text-slate-800 truncate">{preset.name}</span>
+                                                                <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold border uppercase tracking-wider ${
                                                                     preset.category === "tone" ? "bg-cyan-50 text-cyan-600 border-cyan-200" :
                                                                     preset.category === "claims" ? "bg-amber-50 text-amber-600 border-amber-200" :
                                                                     preset.category === "sales" ? "bg-purple-50 text-purple-600 border-purple-200" :
@@ -2569,18 +2569,18 @@ export default function PromptStudioClient() {
                                                                     {preset.category}
                                                                 </span>
                                                             </div>
-                                                            <span className="text-[10px] text-slate-500 block mt-1 leading-normal">{preset.description}</span>
+                                                            <span className="text-xs text-slate-500 block mt-1.5 leading-5">{preset.description}</span>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 {parsedRiskWords.length > 0 && (
-                                                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 text-[9px] text-slate-400 leading-normal">
-                                                        <span className="text-amber-600 font-semibold block mb-0.5">Risk Word Bank & Alternatives:</span>
-                                                        <ul className="space-y-0.5 pl-1.5 list-disc list-inside">
+                                                    <div className="mt-3 pt-3 border-t border-slate-200/60 text-xs text-slate-400 leading-normal">
+                                                        <span className="text-amber-600 font-semibold block mb-1">Risk Word Bank & Alternatives:</span>
+                                                        <ul className="space-y-1 pl-1.5 list-disc list-inside">
                                                             {parsedRiskWords.map((rw, index) => (
-                                                                <li key={index} className="truncate">
-                                                                    <strong className="text-red-600 font-mono">&quot;{rw.word}&quot;</strong> ➔ <span className="text-slate-600">{rw.suggestedAlternatives.join(", ")}</span>
+                                                                <li key={index} className="truncate text-slate-600">
+                                                                    <strong className="text-red-600 font-mono">&quot;{rw.word}&quot;</strong> ➔ <span>{rw.suggestedAlternatives.join(", ")}</span>
                                                                 </li>
                                                             ))}
                                                         </ul>
@@ -3132,7 +3132,7 @@ export default function PromptStudioClient() {
                             <div className="bg-slate-200/50 p-1 rounded-lg flex gap-1 mx-3 my-2 border border-slate-200/40 flex-shrink-0">
                                 <button
                                     onClick={() => setPreviewTab("compiled")}
-                                    className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
+                                    className={`flex-1 text-center py-1.5 rounded text-xs font-semibold transition cursor-pointer ${
                                         previewTab === "compiled"
                                             ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
                                             : "text-slate-600 hover:bg-slate-200/40"
@@ -3142,7 +3142,7 @@ export default function PromptStudioClient() {
                                 </button>
                                 <button
                                     onClick={() => setPreviewTab("template")}
-                                    className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
+                                    className={`flex-1 text-center py-1.5 rounded text-xs font-semibold transition cursor-pointer ${
                                         previewTab === "template"
                                             ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
                                             : "text-slate-600 hover:bg-slate-200/40"
@@ -3158,11 +3158,11 @@ export default function PromptStudioClient() {
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2">
                                             <Eye className="w-3.5 h-3.5 text-blue-500" />
-                                            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                                                 {previewTab === "compiled" ? "Compiled Result" : "Template Spec"}
                                             </h2>
                                         </div>
-                                        <span className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                                        <span className="text-[11px] text-slate-400 mt-0.5 leading-normal">
                                             {previewTab === "compiled" 
                                                 ? "ข้อความคำสั่งที่แทนที่ค่าตัวแปรทดสอบแล้ว (พร้อมก๊อปปี้ไปป้อน AI)" 
                                                 : "โครงสร้างโครงร่างพารามิเตอร์และตัวแปรแบบ Raw Spec"
@@ -3173,7 +3173,7 @@ export default function PromptStudioClient() {
                                         {previewTab === "compiled" && selectedId && selectedId !== "new-template" && (
                                             <button
                                                 onClick={() => setRightPanelTab("history")}
-                                                className="flex items-center gap-1 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer shadow-sm"
+                                                className="flex items-center gap-1 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm"
                                             >
                                                 <Sliders className="w-3 h-3 text-blue-500" />
                                                 <span>บันทึกประวัติการทดสอบ</span>
@@ -3182,7 +3182,7 @@ export default function PromptStudioClient() {
                                         <button
                                             onClick={handleCopy}
                                             disabled={!activePreviewText}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer shadow-sm ${
+                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm ${
                                                 copied 
                                                     ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
                                                     : "bg-blue-600 hover:bg-blue-500 text-white border-transparent"
@@ -3202,14 +3202,14 @@ export default function PromptStudioClient() {
                                 </div>
 
                                 {/* Prompt rendering panel */}
-                                <div className="flex-1 m-3 p-4 overflow-y-auto bg-white border border-slate-200/60 rounded-xl shadow-inner font-mono text-[11px] text-slate-800 select-text whitespace-pre-wrap leading-relaxed custom-scrollbar">
+                                <div className="flex-1 m-3 p-4 overflow-y-auto bg-white border border-slate-200/60 rounded-xl shadow-inner font-mono text-sm text-slate-800 select-text whitespace-pre-wrap leading-6 custom-scrollbar">
                                     {activePreviewText ? (
                                         activePreviewText
                                     ) : (
                                         <div className="flex flex-col items-center justify-center text-center py-10 space-y-2.5 max-w-[280px] mx-auto h-full">
                                             <Eye className="w-8 h-8 text-slate-300" />
                                             <p className="text-slate-700 font-semibold text-xs">พรีวิว Compiled Prompt</p>
-                                            <p className="text-slate-400 text-[10px] leading-relaxed">
+                                            <p className="text-slate-400 text-xs leading-relaxed">
                                                 กรอกร่างคำสั่งหลักในหน้าต่างตรงกลาง และป้อนตัวแปรจำลองที่ช่องกรอกทดสอบ &quot;Test Input Area&quot; เพื่อเรนเดอร์ดูข้อความ Prompt สำเร็จรูปที่พร้อมใช้ป้อน AI ได้ที่นี่ครับ
                                             </p>
                                         </div>
