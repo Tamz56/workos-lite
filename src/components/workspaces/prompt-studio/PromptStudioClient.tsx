@@ -131,10 +131,10 @@ interface PromptWorkflowStep {
 const CATEGORIES = ["Writing", "Review", "Marketing", "Coding", "General"];
 const STATUSES = ["draft", "testing", "active", "archived"];
 
-// Consistent styling for dark inputs with high contrast caret and text
-const INPUT_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all text-xs";
-const TEXTAREA_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all text-xs font-mono";
-const SELECT_CLASS = "w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all text-xs";
+// Consistent styling for light inputs with high contrast text and focus styles
+const INPUT_CLASS = "w-full bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 selection:bg-blue-500/10 transition-all text-xs shadow-sm";
+const TEXTAREA_CLASS = "w-full bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 selection:bg-blue-500/10 transition-all text-xs font-mono leading-relaxed shadow-sm";
+const SELECT_CLASS = "w-full bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all text-xs shadow-sm";
 
 function safeParseInputFields(jsonStr: string | null): PromptInputField[] {
     if (!jsonStr) return [];
@@ -1205,12 +1205,12 @@ export default function PromptStudioClient() {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
+        <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50 text-slate-800 overflow-hidden font-sans">
             {/* Header Alert area for API Errors */}
             {apiError && (
-                <div className="bg-red-950/60 border-b border-red-800 text-red-200 px-4 py-3 flex items-center justify-between text-sm animate-fadeIn flex-shrink-0">
+                <div className="bg-red-50 border-b border-red-200 text-red-700 px-4 py-3 flex items-center justify-between text-sm animate-fadeIn flex-shrink-0">
                     <div className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                         <span>{apiError}</span>
                     </div>
                     <button 
@@ -1225,9 +1225,9 @@ export default function PromptStudioClient() {
             {/* Layout container */}
             <div className="flex flex-1 overflow-hidden">
                 {/* 1. Left Column: Prompt Library & Workflows */}
-                <div className="w-80 border-r border-zinc-800 flex flex-col bg-zinc-900/50 flex-shrink-0">
+                <div className="w-80 border-r border-slate-200 flex flex-col bg-slate-100/60 flex-shrink-0">
                     {/* Tab Switcher */}
-                    <div className="flex border-b border-zinc-800 bg-zinc-950 flex-shrink-0">
+                    <div className="bg-slate-200/50 p-1 rounded-lg flex gap-1 mx-3 my-2.5 border border-slate-200/40 flex-shrink-0">
                         <button
                             onClick={() => {
                                 setSidebarTab("templates");
@@ -1236,10 +1236,10 @@ export default function PromptStudioClient() {
                                     setSelectedId(templates[0].id);
                                 }
                             }}
-                            className={`flex-1 text-center py-2.5 text-[11px] font-bold transition-all cursor-pointer border-b-2 ${
+                            className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
                                 sidebarTab === "templates"
-                                    ? "text-indigo-400 border-indigo-500 bg-zinc-900/30"
-                                    : "text-zinc-500 border-transparent hover:text-zinc-300"
+                                    ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
+                                    : "text-slate-600 hover:bg-slate-200/40"
                             }`}
                         >
                             Templates ({templates.filter(t => t.status !== "archived").length})
@@ -1250,10 +1250,10 @@ export default function PromptStudioClient() {
                                 setSelectedId(null);
                                 fetchWorkflows();
                             }}
-                            className={`flex-1 text-center py-2.5 text-[11px] font-bold transition-all cursor-pointer border-b-2 ${
+                            className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
                                 sidebarTab === "workflows"
-                                    ? "text-indigo-400 border-indigo-500 bg-zinc-900/30"
-                                    : "text-zinc-500 border-transparent hover:text-zinc-300"
+                                    ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
+                                    : "text-slate-600 hover:bg-slate-200/40"
                             }`}
                         >
                             Workflows ({workflows.length})
@@ -1263,14 +1263,14 @@ export default function PromptStudioClient() {
                     {sidebarTab === "templates" ? (
                         <>
                             {/* Filters & Actions */}
-                            <div className="p-4 border-b border-zinc-800 space-y-3 flex-shrink-0">
+                            <div className="p-4 border-b border-slate-200 bg-white/45 space-y-3 flex-shrink-0">
                                 <div className="flex justify-between items-center">
-                                    <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                                        <BookOpen className="w-4 h-4" /> Prompt Library
+                                    <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                        <BookOpen className="w-3.5 h-3.5 text-slate-500" /> Prompt Library
                                     </h2>
                                     <button
                                         onClick={handleCreateNew}
-                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-md font-semibold transition-all shadow-md cursor-pointer"
+                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg font-semibold transition-all shadow-sm cursor-pointer"
                                     >
                                         <Plus className="w-3.5 h-3.5" /> สร้างใหม่
                                     </button>
@@ -1278,13 +1278,13 @@ export default function PromptStudioClient() {
 
                                 {/* Search input */}
                                 <div className="relative">
-                                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+                                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
                                     <input
                                         type="text"
                                         placeholder="ค้นหาชื่อ, สรรพคุณ..."
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 text-xs rounded-md text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 selection:bg-emerald-400/30 selection:text-white transition-all"
+                                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 text-xs rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 selection:bg-blue-500/10 transition-all shadow-sm"
                                     />
                                 </div>
 
@@ -1295,9 +1295,9 @@ export default function PromptStudioClient() {
                                         onChange={(e) => setCategoryFilter(e.target.value)}
                                         className={SELECT_CLASS}
                                     >
-                                        <option className="bg-zinc-900 text-slate-100" value="All">หมวดหมู่ทั้งหมด</option>
+                                        <option className="text-slate-800" value="All">หมวดหมู่ทั้งหมด</option>
                                         {CATEGORIES.map(cat => (
-                                            <option className="bg-zinc-900 text-slate-100" key={cat} value={cat}>{cat}</option>
+                                            <option className="text-slate-800" key={cat} value={cat}>{cat}</option>
                                         ))}
                                     </select>
 
@@ -1307,24 +1307,24 @@ export default function PromptStudioClient() {
                                         onChange={(e) => setStatusFilter(e.target.value)}
                                         className={SELECT_CLASS}
                                     >
-                                        <option className="bg-zinc-900 text-slate-100" value="All">สถานะทั้งหมด</option>
-                                        <option className="bg-zinc-900 text-slate-100" value="active">Active</option>
-                                        <option className="bg-zinc-900 text-slate-100" value="draft">Draft</option>
-                                        <option className="bg-zinc-900 text-slate-100" value="testing">Testing</option>
-                                        <option className="bg-zinc-900 text-slate-100" value="archived">Archived</option>
+                                        <option className="text-slate-800" value="All">สถานะทั้งหมด</option>
+                                        <option className="text-slate-800" value="active">Active</option>
+                                        <option className="text-slate-800" value="draft">Draft</option>
+                                        <option className="text-slate-800" value="testing">Testing</option>
+                                        <option className="text-slate-800" value="archived">Archived</option>
                                     </select>
                                 </div>
                             </div>
 
                             {/* Template List */}
-                            <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40">
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
                                 {isLoading ? (
-                                    <div className="p-8 text-center text-zinc-500 text-xs flex flex-col items-center justify-center gap-2">
-                                        <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
+                                    <div className="p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center gap-2">
+                                        <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
                                         <span>กำลังโหลดข้อมูล...</span>
                                     </div>
                                 ) : filteredTemplates.length === 0 ? (
-                                    <div className="p-8 text-center text-zinc-500 text-xs">
+                                    <div className="p-8 text-center text-slate-500 text-xs">
                                         ไม่พบเทมเพลตที่ตรงกับเงื่อนไข
                                     </div>
                                 ) : (
@@ -1335,30 +1335,30 @@ export default function PromptStudioClient() {
                                             <div
                                                 key={t.id}
                                                 onClick={() => setSelectedId(t.id)}
-                                                className={`p-3 text-left cursor-pointer transition-all ${
+                                                className={`p-3 text-left cursor-pointer transition-all rounded-xl border ${
                                                     isActive 
-                                                        ? "bg-zinc-800 text-white border-l-2 border-indigo-500" 
-                                                        : "hover:bg-zinc-800/40 text-zinc-300"
+                                                        ? "bg-white text-slate-900 border-slate-200 border-l-4 border-l-blue-500 shadow-sm font-semibold" 
+                                                        : "hover:bg-slate-200/50 text-slate-600 border-transparent"
                                                 }`}
                                             >
                                                 <div className="flex items-start justify-between gap-1.5">
-                                                    <h3 className="font-semibold text-xs truncate max-w-[180px]">{t.name}</h3>
-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-medium ${
-                                                        t.status === "active" ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800" :
-                                                        t.status === "testing" ? "bg-amber-950/80 text-amber-300 border border-amber-800" :
-                                                        t.status === "archived" ? "bg-zinc-900 text-zinc-500 border border-zinc-800" :
-                                                        "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                                                    <h3 className={`font-semibold text-xs truncate max-w-[180px] ${isActive ? "text-slate-900" : "text-slate-700"}`}>{t.name}</h3>
+                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-mono font-medium border ${
+                                                        t.status === "active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                                                        t.status === "testing" ? "bg-amber-50 text-amber-600 border-amber-200" :
+                                                        t.status === "archived" ? "bg-slate-100 text-slate-500 border-slate-200" :
+                                                        "bg-slate-100 text-slate-500 border-slate-200"
                                                     }`}>
                                                         {t.status}
                                                     </span>
                                                 </div>
-                                                <p className="text-[10px] text-zinc-500 line-clamp-1 mt-1">{t.purpose || "ไม่มีคำอธิบาย"}</p>
+                                                <p className="text-[10px] text-slate-400 line-clamp-1 mt-1">{t.purpose || "ไม่มีคำอธิบาย"}</p>
                                                 
-                                                <div className="flex justify-between items-center mt-2 text-[9px] text-zinc-600">
+                                                <div className="flex justify-between items-center mt-2 text-[9px] text-slate-500">
                                                     <span>{t.category}</span>
                                                     <span>
                                                         {t.active_version ? (
-                                                            <span className="text-emerald-400 font-bold">Active: {t.active_version}</span>
+                                                            <span className="text-emerald-600 font-bold">Active: {t.active_version}</span>
                                                         ) : (
                                                             `v${t.version}`
                                                         )}
@@ -1373,16 +1373,16 @@ export default function PromptStudioClient() {
                     ) : (
                         <>
                             {/* Workflow Actions */}
-                            <div className="p-4 border-b border-zinc-800 space-y-3 flex-shrink-0">
+                            <div className="p-4 border-b border-slate-200 bg-white/45 space-y-3 flex-shrink-0">
                                 <div className="flex justify-between items-center">
-                                    <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                                        <Sliders className="w-4 h-4" /> Workflows
+                                    <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                        <Sliders className="w-3.5 h-3.5 text-slate-500" /> Workflows
                                     </h2>
                                 </div>
 
                                 {/* Create Workflow Form (inline) */}
-                                <div className="bg-zinc-950 p-3 rounded border border-zinc-800 space-y-2">
-                                    <span className="text-[9px] text-zinc-400 font-bold block uppercase tracking-wider">สร้างเซ็ตเวิร์กโฟลว์ใหม่</span>
+                                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2.5 shadow-sm">
+                                    <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">สร้างเซ็ตเวิร์กโฟลว์ใหม่</span>
                                     <input
                                         type="text"
                                         placeholder="ชื่อเวิร์กโฟลว์..."
@@ -1400,7 +1400,7 @@ export default function PromptStudioClient() {
                                     <button
                                         onClick={handleCreateWorkflow}
                                         disabled={isSavingWorkflow}
-                                        className="w-full py-1.5 text-center text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded cursor-pointer transition disabled:opacity-50"
+                                        className="w-full py-2 text-center text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg cursor-pointer transition shadow-sm disabled:opacity-50"
                                     >
                                         {isSavingWorkflow ? "กำลังบันทึก..." : "สร้าง"}
                                     </button>
@@ -1408,14 +1408,14 @@ export default function PromptStudioClient() {
                             </div>
 
                             {/* Workflow List */}
-                            <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40">
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
                                 {isLoadingWorkflows ? (
-                                    <div className="p-8 text-center text-zinc-500 text-xs flex flex-col items-center justify-center gap-2">
-                                        <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" />
+                                    <div className="p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center gap-2">
+                                        <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
                                         <span>กำลังโหลด...</span>
                                     </div>
                                 ) : workflows.length === 0 ? (
-                                    <div className="p-8 text-center text-zinc-500 text-xs italic">
+                                    <div className="p-8 text-center text-slate-500 text-xs italic">
                                         ยังไม่มีเวิร์กโฟลว์ (สามารถสร้างใหม่ด้านบน)
                                     </div>
                                 ) : (
@@ -1428,19 +1428,19 @@ export default function PromptStudioClient() {
                                                     setSelectedWorkflowId(wf.id);
                                                     setSelectedId(null);
                                                 }}
-                                                className={`p-3 text-left cursor-pointer transition-all ${
+                                                className={`p-3 text-left cursor-pointer transition-all rounded-xl border ${
                                                     isActive 
-                                                        ? "bg-zinc-800 text-white border-l-2 border-indigo-500" 
-                                                        : "hover:bg-zinc-800/40 text-zinc-300"
+                                                        ? "bg-white text-slate-900 border-slate-200 border-l-4 border-l-blue-500 shadow-sm font-semibold" 
+                                                        : "hover:bg-slate-200/50 text-slate-600 border-transparent"
                                                 }`}
                                             >
                                                 <div className="flex items-start justify-between gap-1.5">
-                                                    <h3 className="font-semibold text-xs truncate max-w-[170px]">{wf.name}</h3>
-                                                    <span className="text-[9px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-bold font-mono border border-zinc-700">
+                                                    <h3 className={`font-semibold text-xs truncate max-w-[170px] ${isActive ? "text-slate-900" : "text-slate-700"}`}>{wf.name}</h3>
+                                                    <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md font-semibold font-mono border border-slate-200">
                                                         {wf.step_count || 0} ขั้น
                                                     </span>
                                                 </div>
-                                                <p className="text-[10px] text-zinc-500 line-clamp-1 mt-1">{wf.description || "ไม่มีคำอธิบาย"}</p>
+                                                <p className="text-[10px] text-slate-500 line-clamp-1 mt-1">{wf.description || "ไม่มีคำอธิบาย"}</p>
                                             </div>
                                         );
                                     })
@@ -1452,16 +1452,16 @@ export default function PromptStudioClient() {
 
                 {/* 2. Center Column: Prompt Editor or Workflow Editor */}
                 {sidebarTab === "templates" ? (
-                    <div className="flex-1 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden">
+                    <div className="flex-1 border-r border-slate-200 flex flex-col bg-slate-50 overflow-hidden">
                     {/* Editor Toolbar */}
-                    <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/30 flex-shrink-0">
+                    <div className="p-4 border-b border-slate-200/80 flex justify-between items-center bg-white flex-shrink-0 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                         <div className="flex items-center gap-2.5">
-                            <Edit className="w-4 h-4 text-indigo-400" />
-                            <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                            <Edit className="w-4 h-4 text-blue-600" />
+                            <h2 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                                 {selectedId === "new-template" ? "สร้างเทมเพลตใหม่" : "แก้ไข Prompt Template"}
                             </h2>
                             {selectedId && selectedId !== "new-template" && activeTemplate?.active_version && (
-                                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
+                                <span className="bg-emerald-50 text-emerald-600 border border-emerald-250 px-2 py-0.5 rounded text-[10px] font-extrabold">
                                     Active: {activeTemplate.active_version}
                                 </span>
                             )}
@@ -1473,7 +1473,7 @@ export default function PromptStudioClient() {
                                     onClick={handleArchive}
                                     disabled={isSaving || editorFields.status === "archived"}
                                     title="ย้ายไปยัง Archived"
-                                    className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-950/30 border border-zinc-800 hover:border-red-900/50 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 >
                                     <Archive className="w-3.5 h-3.5" />
                                 </button>
@@ -1481,7 +1481,7 @@ export default function PromptStudioClient() {
                             <button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:bg-zinc-800 text-white text-xs font-semibold rounded-md transition cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-md transition shadow-sm cursor-pointer"
                             >
                                 <Save className="w-3.5 h-3.5" />
                                 <span>{isSaving ? "กำลังบันทึก..." : "บันทึก"}</span>
@@ -1490,93 +1490,99 @@ export default function PromptStudioClient() {
                     </div>
 
                     {/* Form Fields */}
-                    <div className="flex-1 p-5 overflow-y-auto space-y-5 text-xs">
-                        {/* Meta Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex-1 p-6 overflow-y-auto space-y-6 text-xs custom-scrollbar">
+                        {/* Meta Grid Card */}
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-5">
+                            <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 pb-2 border-b border-slate-100">
+                                ข้อมูลทั่วไป (Metadata)
+                            </h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">ชื่อ Prompt *</label>
+                                    <input
+                                        type="text"
+                                        value={editorFields.name || ""}
+                                        onChange={(e) => setEditorFields(prev => ({ ...prev, name: e.target.value }))}
+                                        placeholder="เช่น Green Fineness Content Writer"
+                                        className={INPUT_CLASS}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">หมวดหมู่ *</label>
+                                    <select
+                                        value={editorFields.category || ""}
+                                        onChange={(e) => setEditorFields(prev => ({ ...prev, category: e.target.value }))}
+                                        className={SELECT_CLASS}
+                                    >
+                                        {CATEGORIES.map(cat => (
+                                            <option className="bg-white text-slate-800" key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">สถานะ</label>
+                                    <select
+                                        value={editorFields.status || "draft"}
+                                        onChange={(e) => setEditorFields(prev => ({ ...prev, status: e.target.value as PromptTemplate["status"] }))}
+                                        className={SELECT_CLASS}
+                                    >
+                                        {STATUSES.map(st => (
+                                            <option className="bg-white text-slate-800" key={st} value={st}>{st}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Version & Notes */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">เวอร์ชัน</label>
+                                    <input
+                                        type="text"
+                                        value={editorFields.version || "1.0.0"}
+                                        onChange={(e) => setEditorFields(prev => ({ ...prev, version: e.target.value }))}
+                                        placeholder="1.0.0"
+                                        className={INPUT_CLASS + " font-mono"}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">บันทึกเวอร์ชัน (Version Notes)</label>
+                                    <input
+                                        type="text"
+                                        value={editorFields.version_notes || ""}
+                                        onChange={(e) => setEditorFields(prev => ({ ...prev, version_notes: e.target.value }))}
+                                        placeholder="เช่น เริ่มต้นเทมเพลต หรือ แก้ไข instructions เพิ่มเติม"
+                                        className={INPUT_CLASS}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Purpose */}
                             <div>
-                                <label className="block text-zinc-400 font-bold mb-1">ชื่อ Prompt *</label>
+                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">วัตถุประสงค์ (Purpose)</label>
                                 <input
                                     type="text"
-                                    value={editorFields.name || ""}
-                                    onChange={(e) => setEditorFields(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="เช่น Green Fineness Content Writer"
+                                    value={editorFields.purpose || ""}
+                                    onChange={(e) => setEditorFields(prev => ({ ...prev, purpose: e.target.value }))}
+                                    placeholder="จุดประสงค์หลักในการรัน Prompt นี้"
                                     className={INPUT_CLASS}
                                 />
                             </div>
-
-                            <div>
-                                <label className="block text-zinc-400 font-bold mb-1">หมวดหมู่ *</label>
-                                <select
-                                    value={editorFields.category || ""}
-                                    onChange={(e) => setEditorFields(prev => ({ ...prev, category: e.target.value }))}
-                                    className={SELECT_CLASS}
-                                >
-                                    {CATEGORIES.map(cat => (
-                                        <option className="bg-zinc-900 text-slate-100" key={cat} value={cat}>{cat}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-zinc-400 font-bold mb-1">สถานะ</label>
-                                <select
-                                    value={editorFields.status || "draft"}
-                                    onChange={(e) => setEditorFields(prev => ({ ...prev, status: e.target.value as PromptTemplate["status"] }))}
-                                    className={SELECT_CLASS}
-                                >
-                                    {STATUSES.map(st => (
-                                        <option className="bg-zinc-900 text-slate-100" key={st} value={st}>{st}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Version & Notes */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-zinc-400 font-bold mb-1">เวอร์ชัน</label>
-                                <input
-                                    type="text"
-                                    value={editorFields.version || "1.0.0"}
-                                    onChange={(e) => setEditorFields(prev => ({ ...prev, version: e.target.value }))}
-                                    placeholder="1.0.0"
-                                    className={INPUT_CLASS + " font-mono"}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-zinc-400 font-bold mb-1">บันทึกเวอร์ชัน (Version Notes)</label>
-                                <input
-                                    type="text"
-                                    value={editorFields.version_notes || ""}
-                                    onChange={(e) => setEditorFields(prev => ({ ...prev, version_notes: e.target.value }))}
-                                    placeholder="เช่น เริ่มต้นเทมเพลต หรือ แก้ไข instructions เพิ่มเติม"
-                                    className={INPUT_CLASS}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Purpose */}
-                        <div>
-                            <label className="block text-zinc-400 font-bold mb-1">วัตถุประสงค์ (Purpose)</label>
-                            <input
-                                type="text"
-                                value={editorFields.purpose || ""}
-                                onChange={(e) => setEditorFields(prev => ({ ...prev, purpose: e.target.value }))}
-                                placeholder="จุดประสงค์หลักในการรัน Prompt นี้"
-                                className={INPUT_CLASS}
-                            />
                         </div>
 
                         {/* Input Fields Section (HUMAN-FRIENDLY BUILDER + COLLAPSIBLE JSON) */}
-                        <div className="border border-zinc-800 rounded-lg bg-zinc-900/10 overflow-hidden">
+                        <div className="border border-slate-200 rounded-xl bg-slate-50/50 overflow-hidden shadow-sm">
                             {/* Builder Header */}
-                            <div className="bg-zinc-900/30 p-3 border-b border-zinc-800 flex justify-between items-center">
-                                <span className="font-bold text-zinc-300 flex items-center gap-1.5 font-sans text-xs">
-                                    <Sliders className="w-4 h-4 text-indigo-400" />
+                            <div className="bg-slate-100/80 p-3 border-b border-slate-200 flex justify-between items-center">
+                                <span className="font-extrabold text-slate-800 flex items-center gap-1.5 font-sans text-xs">
+                                    <Sliders className="w-4 h-4 text-blue-600" />
                                     <span>Input Fields Builder</span>
                                 </span>
-                                <span className="text-[10px] text-zinc-500 font-mono">
+                                <span className="text-[10px] text-slate-500 font-mono">
                                     {currentInputFields.length} ฟิลด์ตัวแปร
                                 </span>
                             </div>
@@ -1584,7 +1590,7 @@ export default function PromptStudioClient() {
                             <div className="p-4 space-y-4">
                                 {/* List of Configured Fields */}
                                 {currentInputFields.length === 0 ? (
-                                    <p className="text-zinc-500 text-xs italic text-center py-4 bg-zinc-900/20 rounded-md border border-dashed border-zinc-800">
+                                    <p className="text-slate-500 text-xs italic text-center py-4 bg-white rounded-md border border-dashed border-slate-200">
                                         ยังไม่มีตัวแปรอินพุตใด ๆ กดสร้างที่แผงควบคุมด้านล่างเพื่อผูกตัวแปร
                                     </p>
                                 ) : (
@@ -1592,30 +1598,30 @@ export default function PromptStudioClient() {
                                         {currentInputFields.map((field, idx) => (
                                             <div 
                                                 key={field.name + "-" + idx}
-                                                className={`flex items-center justify-between p-3 rounded-lg border text-xs bg-zinc-900/40 hover:bg-zinc-900/60 transition ${
-                                                    editingFieldIndex === idx ? "border-emerald-500" : "border-zinc-800"
+                                                className={`flex items-center justify-between p-3 rounded-lg border text-xs bg-white transition ${
+                                                    editingFieldIndex === idx ? "border-blue-500 ring-2 ring-blue-500/10" : "border-slate-200"
                                                 }`}
                                             >
                                                 <div className="space-y-0.5 max-w-[70%]">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-zinc-200">{field.label}</span>
-                                                        <span className="font-mono text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
+                                                        <span className="font-bold text-slate-800">{field.label}</span>
+                                                        <span className="font-mono text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/50">
                                                             &#123;&#123;{field.name}&#125;&#125;
                                                         </span>
                                                         {field.required && (
-                                                            <span className="text-[9px] text-red-400 bg-red-950/40 px-1 py-0.2 rounded font-semibold border border-red-900/50">
+                                                            <span className="text-[9px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded font-bold border border-red-200/50">
                                                                 Required
                                                             </span>
                                                         )}
                                                     </div>
                                                     {field.value && (
-                                                        <p className="text-[10px] text-zinc-400 truncate">
-                                                            <span className="text-zinc-600">Default:</span> {field.value}
+                                                        <p className="text-[10px] text-slate-600 truncate">
+                                                            <span className="text-slate-400">Default:</span> {field.value}
                                                         </p>
                                                     )}
                                                     {field.placeholder && (
-                                                        <p className="text-[10px] text-zinc-500 truncate">
-                                                            <span className="text-zinc-600">Placeholder:</span> {field.placeholder}
+                                                        <p className="text-[10px] text-slate-500 truncate">
+                                                            <span className="text-slate-400">Placeholder:</span> {field.placeholder}
                                                         </p>
                                                     )}
                                                 </div>
@@ -1627,7 +1633,7 @@ export default function PromptStudioClient() {
                                                         onClick={() => handleMoveField(idx, "up")}
                                                         disabled={idx === 0}
                                                         title="เลื่อนขึ้น"
-                                                        className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 disabled:hover:text-zinc-500 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-35 disabled:hover:text-slate-400 rounded hover:bg-slate-100 transition cursor-pointer"
                                                     >
                                                         <ArrowUp className="w-3.5 h-3.5" />
                                                     </button>
@@ -1636,7 +1642,7 @@ export default function PromptStudioClient() {
                                                         onClick={() => handleMoveField(idx, "down")}
                                                         disabled={idx === currentInputFields.length - 1}
                                                         title="เลื่อนลง"
-                                                        className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 disabled:hover:text-zinc-500 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-35 disabled:hover:text-slate-400 rounded hover:bg-slate-100 transition cursor-pointer"
                                                     >
                                                         <ArrowDown className="w-3.5 h-3.5" />
                                                     </button>
@@ -1644,7 +1650,7 @@ export default function PromptStudioClient() {
                                                     <button
                                                         onClick={() => handleEditField(idx)}
                                                         title="แก้ไขตัวแปร"
-                                                        className="p-1 text-zinc-400 hover:text-indigo-400 rounded hover:bg-zinc-800 transition cursor-pointer ml-1"
+                                                        className="p-1 text-slate-500 hover:text-blue-600 rounded hover:bg-slate-100 transition cursor-pointer ml-1"
                                                     >
                                                         <Edit2 className="w-3.5 h-3.5" />
                                                     </button>
@@ -1652,7 +1658,7 @@ export default function PromptStudioClient() {
                                                     <button
                                                         onClick={() => handleDeleteField(idx)}
                                                         title="ลบตัวแปร"
-                                                        className="p-1 text-zinc-500 hover:text-red-400 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                        className="p-1 text-slate-400 hover:text-red-650 rounded hover:bg-red-50 transition cursor-pointer"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
@@ -1663,15 +1669,15 @@ export default function PromptStudioClient() {
                                 )}
 
                                 {/* Field Editor Form */}
-                                <div className="border border-zinc-800 rounded-lg p-3.5 bg-zinc-950/40 space-y-3 animate-fadeIn">
-                                    <span className="font-semibold text-zinc-300 text-xs block border-b border-zinc-850 pb-1.5">
+                                <div className="border border-slate-200 rounded-lg p-3.5 bg-white space-y-3 shadow-sm animate-fadeIn">
+                                    <span className="font-bold text-slate-700 text-xs block border-b border-slate-100 pb-1.5">
                                         {editingFieldIndex !== null ? "แก้ไขข้อมูลฟิลด์ตัวแปร" : "เพิ่มตัวแปรนำเข้าใหม่"}
                                     </span>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {/* Field Name */}
                                         <div>
-                                            <label className="block text-zinc-400 font-bold mb-1">
+                                            <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">
                                                 Field Name (ตัวคีย์ในโค้ด) *
                                             </label>
                                             <input
@@ -1679,14 +1685,14 @@ export default function PromptStudioClient() {
                                                 value={fieldForm.name || ""}
                                                 onChange={(e) => handleFieldFormChange("name", e.target.value)}
                                                 placeholder="เช่น target_audience"
-                                                className={`w-full bg-zinc-900 border rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:ring-2 selection:bg-emerald-400/30 selection:text-white transition-all text-xs font-mono ${
+                                                className={`w-full bg-white border rounded p-2 text-slate-800 caret-blue-500 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 selection:bg-blue-500/10 transition-all text-xs font-mono ${
                                                     fieldValidationError 
-                                                        ? "border-red-800 focus:border-red-700 focus:ring-red-500/20" 
-                                                        : "border-zinc-800 focus:border-emerald-400 focus:ring-emerald-400/30"
+                                                        ? "border-red-400 focus:border-red-500 focus:ring-red-500/15" 
+                                                        : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/15"
                                                 }`}
                                             />
                                             {fieldValidationError && (
-                                                <p className="text-red-400 text-[9px] mt-1 font-mono flex items-center gap-1">
+                                                <p className="text-red-600 text-[9px] mt-1 font-mono flex items-center gap-1">
                                                     <AlertCircle className="w-2.5 h-2.5 flex-shrink-0" />
                                                     {fieldValidationError}
                                                 </p>
@@ -1695,7 +1701,7 @@ export default function PromptStudioClient() {
 
                                         {/* Label */}
                                         <div>
-                                            <label className="block text-zinc-400 font-bold mb-1">
+                                            <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">
                                                 Label (ป้ายแสดงภาษาไทย) *
                                             </label>
                                             <input
@@ -1711,7 +1717,7 @@ export default function PromptStudioClient() {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         {/* Default Value */}
                                         <div>
-                                            <label className="block text-zinc-400 font-bold mb-1">ค่าเริ่มต้น (Default)</label>
+                                            <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">ค่าเริ่มต้น (Default)</label>
                                             <input
                                                 type="text"
                                                 value={fieldForm.value || ""}
@@ -1723,7 +1729,7 @@ export default function PromptStudioClient() {
 
                                         {/* Placeholder */}
                                         <div>
-                                            <label className="block text-zinc-400 font-bold mb-1">คำแนะนำไกด์ (Placeholder)</label>
+                                            <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">คำแนะนำไกด์ (Placeholder)</label>
                                             <input
                                                 type="text"
                                                 value={fieldForm.placeholder || ""}
@@ -1735,7 +1741,7 @@ export default function PromptStudioClient() {
 
                                         {/* Helper Text */}
                                         <div>
-                                            <label className="block text-zinc-400 font-bold mb-1">ข้อความอธิบายเพิ่ม (Helper)</label>
+                                            <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">ข้อความอธิบายเพิ่ม (Helper)</label>
                                             <input
                                                 type="text"
                                                 value={fieldForm.helperText || ""}
@@ -1753,19 +1759,19 @@ export default function PromptStudioClient() {
                                             id="field-form-required"
                                             checked={fieldForm.required || false}
                                             onChange={(e) => handleFieldFormChange("required", e.target.checked)}
-                                            className="w-3.5 h-3.5 accent-emerald-500 rounded bg-zinc-900 border-zinc-800 focus:ring-emerald-400/30"
+                                            className="w-3.5 h-3.5 accent-blue-600 rounded bg-white border-slate-300 focus:ring-blue-500/20"
                                         />
-                                        <label htmlFor="field-form-required" className="text-zinc-400 text-xs font-semibold cursor-pointer">
+                                        <label htmlFor="field-form-required" className="text-slate-600 text-xs font-semibold cursor-pointer select-none">
                                             กำหนดเป็นฟิลด์จำเป็นที่ผู้ใช้ต้องกรอก (Required Field)
                                         </label>
                                     </div>
 
                                     {/* Action Buttons */}
-                                    <div className="flex justify-end gap-2 pt-1 border-t border-zinc-900">
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                                         {editingFieldIndex !== null && (
                                             <button
                                                 onClick={handleCancelEdit}
-                                                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded font-semibold text-xs transition cursor-pointer"
+                                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md font-semibold text-xs border border-slate-200 transition cursor-pointer"
                                             >
                                                 ยกเลิก
                                             </button>
@@ -1773,7 +1779,7 @@ export default function PromptStudioClient() {
                                         <button
                                             onClick={handleSubmitField}
                                             disabled={!!fieldValidationError || !fieldForm.name}
-                                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded font-bold text-xs transition cursor-pointer"
+                                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 text-white rounded-md font-bold text-xs transition cursor-pointer"
                                         >
                                             {editingFieldIndex !== null ? "บันทึกการแก้ไข" : "เพิ่มตัวแปร"}
                                         </button>
@@ -1782,37 +1788,37 @@ export default function PromptStudioClient() {
                             </div>
 
                             {/* COLLAPSIBLE RAW JSON (Advanced Mode) */}
-                            <div className="border-t border-zinc-800">
+                            <div className="border-t border-slate-200">
                                 <button
                                     onClick={() => setShowAdvancedJson(!showAdvancedJson)}
-                                    className="w-full p-3 bg-zinc-900/20 hover:bg-zinc-900/40 transition flex justify-between items-center text-xs font-semibold text-zinc-400"
+                                    className="w-full p-3 bg-slate-100/50 hover:bg-slate-100/80 transition flex justify-between items-center text-xs font-semibold text-slate-600 border-t border-transparent"
                                 >
                                     <span className="flex items-center gap-1.5">
-                                        <Code className="w-3.5 h-3.5 text-zinc-500" />
+                                        <Code className="w-3.5 h-3.5 text-slate-500" />
                                         <span>Advanced JSON Editor (สำหรับผู้พัฒนา)</span>
                                     </span>
-                                    {showAdvancedJson ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
+                                    {showAdvancedJson ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
                                 </button>
 
                                 {showAdvancedJson && (
-                                    <div className="p-4 bg-zinc-950/60 border-t border-zinc-800 space-y-2 animate-slideDown">
+                                    <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-2 animate-slideDown">
                                         <textarea
                                             rows={4}
                                             value={editorFields.input_fields || "[]"}
                                             onChange={(e) => handleJsonChange(e.target.value)}
-                                            className={`w-full bg-zinc-900 border rounded p-2 text-slate-100 caret-emerald-300 placeholder-slate-500 focus:outline-none focus:ring-2 selection:bg-emerald-400/30 selection:text-white transition-all text-xs font-mono ${
+                                            className={`w-full bg-white border rounded p-2.5 text-slate-800 caret-blue-500 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all text-xs font-mono ${
                                                 jsonValidationError 
-                                                    ? "border-red-800 focus:border-red-700 focus:ring-red-500/20" 
-                                                    : "border-zinc-800 focus:border-emerald-400 focus:ring-emerald-400/30"
+                                                    ? "border-red-400 focus:border-red-500 focus:ring-red-500/15" 
+                                                    : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/15"
                                             }`}
                                         />
                                         {jsonValidationError ? (
-                                            <p className="text-red-400 text-[10px] flex items-center gap-1 font-mono">
+                                            <p className="text-red-600 text-[10px] flex items-center gap-1 font-mono">
                                                 <AlertCircle className="w-3 h-3 flex-shrink-0" />
                                                 {jsonValidationError}
                                             </p>
                                         ) : (
-                                            <p className="text-zinc-500 text-[9px]">
+                                            <p className="text-slate-500 text-[9px]">
                                                 * การแก้ไขข้อความตรงนี้จะซิงค์กลับไปหา Field Builder ด้านบนโดยอัตโนมัติหากโครงสร้างถูกต้อง
                                             </p>
                                         )}
@@ -1824,7 +1830,7 @@ export default function PromptStudioClient() {
                         {/* Role & Context */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-zinc-400 font-bold mb-1">บทบาท (Role / Persona)</label>
+                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">บทบาท (Role / Persona)</label>
                                 <textarea
                                     rows={4}
                                     value={editorFields.role || ""}
@@ -1835,7 +1841,7 @@ export default function PromptStudioClient() {
                             </div>
 
                             <div>
-                                <label className="block text-zinc-400 font-bold mb-1">บริบท (Context)</label>
+                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">บริบท (Context)</label>
                                 <textarea
                                     rows={4}
                                     value={editorFields.context || ""}
@@ -1848,7 +1854,7 @@ export default function PromptStudioClient() {
 
                         {/* Instructions & Constraints */}
                         <div>
-                            <label className="block text-zinc-400 font-bold mb-1">ขั้นตอนดำเนินงาน (Instructions)</label>
+                            <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">ขั้นตอนดำเนินงาน (Instructions)</label>
                             <textarea
                                 rows={5}
                                 value={editorFields.instructions || ""}
@@ -1859,7 +1865,7 @@ export default function PromptStudioClient() {
                         </div>
 
                         <div>
-                            <label className="block text-zinc-400 font-bold mb-1">ข้อจำกัด / กฎเกณฑ์ (Constraints)</label>
+                            <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">ข้อจำกัด / กฎเกณฑ์ (Constraints)</label>
                             <textarea
                                 rows={3}
                                 value={editorFields.constraints || ""}
@@ -1870,14 +1876,14 @@ export default function PromptStudioClient() {
                         </div>
 
                         {/* Green Fineness Guardrails Preset Selection Panel */}
-                        <div className="border border-zinc-800 rounded-lg p-3 bg-zinc-900/20">
-                            <label className="block text-zinc-300 font-bold mb-1 text-xs uppercase tracking-wider">Green Fineness Guardrails (แนวทางความปลอดภัยของแบรนด์)</label>
-                            <span className="text-[10px] text-zinc-500 block mb-3">
+                        <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                            <label className="block text-slate-800 font-bold mb-1 text-xs uppercase tracking-wider">Green Fineness Guardrails (แนวทางความปลอดภัยของแบรนด์)</label>
+                            <span className="text-[10px] text-slate-500 block mb-3">
                                 ติ๊กเลือกแนวทางควบคุมโทนเสียง คำเตือนความปลอดภัยทางวิชาการ (Scientific Claims) และข้อจำกัดทางกฎหมายเพื่อสอดแทรกเข้าไปใน Prompt อัตโนมัติ
                             </span>
                             
                             {guardrailPresets.length === 0 ? (
-                                <p className="text-zinc-500 text-[10px] italic">กำลังโหลดข้อมูล Presets หรือไม่พบข้อมูลในระบบ...</p>
+                                <p className="text-slate-400 text-[10px] italic">กำลังโหลดข้อมูล Presets หรือไม่พบข้อมูลในระบบ...</p>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                     {guardrailPresets.map((preset) => {
@@ -1900,8 +1906,8 @@ export default function PromptStudioClient() {
                                                 onClick={() => handleToggleGuardrail(preset.id)}
                                                 className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between select-none ${
                                                     isApplied
-                                                        ? "bg-indigo-950/30 border-indigo-700 hover:bg-indigo-950/40 text-slate-100 ring-1 ring-indigo-700/50"
-                                                        : "bg-zinc-950/30 border-zinc-850 hover:bg-zinc-900/30 text-slate-300"
+                                                        ? "bg-blue-50 border-blue-300 hover:bg-blue-100/70 text-slate-900 ring-1 ring-blue-400/20 shadow-sm"
+                                                        : "bg-white border-slate-200 hover:bg-slate-50/70 text-slate-700 shadow-sm"
                                                 }`}
                                             >
                                                 <div className="space-y-1.5">
@@ -1910,33 +1916,33 @@ export default function PromptStudioClient() {
                                                             type="checkbox"
                                                             checked={isApplied}
                                                             onChange={() => {}} // handled by onClick on container
-                                                            className="mt-0.5 accent-indigo-500 cursor-pointer w-3.5 h-3.5 flex-shrink-0"
+                                                            className="mt-0.5 accent-blue-600 cursor-pointer w-3.5 h-3.5 flex-shrink-0"
                                                         />
                                                         <div className="min-w-0">
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="font-bold text-[11px] text-zinc-200 truncate">{preset.name}</span>
-                                                                <span className={`text-[8px] px-1 py-0.2 rounded font-semibold border uppercase tracking-wider ${
-                                                                    preset.category === "tone" ? "bg-cyan-950/80 text-cyan-300 border-cyan-800" :
-                                                                    preset.category === "claims" ? "bg-amber-950/80 text-amber-300 border-amber-800" :
-                                                                    preset.category === "sales" ? "bg-purple-950/80 text-purple-300 border-purple-800" :
-                                                                    preset.category === "review" ? "bg-emerald-950/80 text-emerald-300 border-emerald-800" :
-                                                                    "bg-zinc-900 text-zinc-400 border-zinc-700"
+                                                                <span className="font-extrabold text-[11px] text-slate-800 truncate">{preset.name}</span>
+                                                                <span className={`text-[8px] px-1.5 py-0.2 rounded font-bold border uppercase tracking-wider ${
+                                                                    preset.category === "tone" ? "bg-cyan-50 text-cyan-600 border-cyan-200" :
+                                                                    preset.category === "claims" ? "bg-amber-50 text-amber-600 border-amber-200" :
+                                                                    preset.category === "sales" ? "bg-purple-50 text-purple-600 border-purple-200" :
+                                                                    preset.category === "review" ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                                                                    "bg-slate-100 text-slate-500 border-slate-200"
                                                                 }`}>
                                                                     {preset.category}
                                                                 </span>
                                                             </div>
-                                                            <span className="text-[10px] text-zinc-400 block mt-1 leading-normal">{preset.description}</span>
+                                                            <span className="text-[10px] text-slate-500 block mt-1 leading-normal">{preset.description}</span>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 {parsedRiskWords.length > 0 && (
-                                                    <div className="mt-2.5 pt-2 border-t border-zinc-800/60 text-[9px] text-zinc-500 leading-normal">
-                                                        <span className="text-amber-400/70 font-semibold block mb-0.5">Risk Word Bank & Alternatives:</span>
+                                                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 text-[9px] text-slate-400 leading-normal">
+                                                        <span className="text-amber-600 font-semibold block mb-0.5">Risk Word Bank & Alternatives:</span>
                                                         <ul className="space-y-0.5 pl-1.5 list-disc list-inside">
                                                             {parsedRiskWords.map((rw, index) => (
                                                                 <li key={index} className="truncate">
-                                                                    <strong className="text-red-400/80 font-mono">&quot;{rw.word}&quot;</strong> ➔ <span className="text-zinc-400">{rw.suggestedAlternatives.join(", ")}</span>
+                                                                    <strong className="text-red-600 font-mono">&quot;{rw.word}&quot;</strong> ➔ <span className="text-slate-600">{rw.suggestedAlternatives.join(", ")}</span>
                                                                 </li>
                                                             ))}
                                                         </ul>
@@ -1952,7 +1958,7 @@ export default function PromptStudioClient() {
                         {/* Output & Checklist */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-zinc-400 font-bold mb-1">รูปแบบผลลัพธ์ (Output Format)</label>
+                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">รูปแบบผลลัพธ์ (Output Format)</label>
                                 <textarea
                                     rows={4}
                                     value={editorFields.output_format || ""}
@@ -1963,7 +1969,7 @@ export default function PromptStudioClient() {
                             </div>
 
                             <div>
-                                <label className="block text-zinc-400 font-bold mb-1">รายการเช็คตรวจสอบก่อนส่ง (Review Checklist)</label>
+                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">รายการเช็คตรวจสอบก่อนส่ง (Review Checklist)</label>
                                 <textarea
                                     rows={4}
                                     value={editorFields.review_checklist || ""}
@@ -1976,7 +1982,7 @@ export default function PromptStudioClient() {
 
                         {/* Notes */}
                         <div>
-                            <label className="block text-zinc-400 font-bold mb-1">บันทึกเพิ่มเติม (Notes)</label>
+                            <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">บันทึกเพิ่มเติม (Notes)</label>
                             <textarea
                                 rows={2}
                                 value={editorFields.notes || ""}
@@ -1989,13 +1995,13 @@ export default function PromptStudioClient() {
                 </div>
                 ) : (
                     /* Workflow Editor Workspace */
-                    <div className="flex-1 border-r border-zinc-800 flex flex-col bg-zinc-950 overflow-hidden">
+                    <div className="flex-1 border-r border-slate-200 flex flex-col bg-slate-50 overflow-hidden">
                         {selectedWorkflowId && selectedWorkflow ? (
                             <>
                                 {/* Editor Toolbar */}
-                                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/30 flex-shrink-0">
+                                <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white/80 sticky top-0 backdrop-blur-md z-10 flex-shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                                     <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                                        <Sliders className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                                        <Sliders className="w-4 h-4 text-blue-500 flex-shrink-0" />
                                         {isEditingWorkflowMeta ? (
                                             <div className="flex items-center gap-2 flex-1 max-w-md">
                                                 <input
@@ -2014,13 +2020,13 @@ export default function PromptStudioClient() {
                                                 />
                                                 <button
                                                     onClick={handleUpdateWorkflowMeta}
-                                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold cursor-pointer transition"
+                                                    className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-semibold cursor-pointer transition shadow-sm flex-shrink-0"
                                                 >
                                                     บันทึก
                                                 </button>
                                                 <button
                                                     onClick={() => setIsEditingWorkflowMeta(false)}
-                                                    className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] font-bold cursor-pointer transition"
+                                                    className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[10px] font-semibold cursor-pointer transition shadow-sm flex-shrink-0"
                                                 >
                                                     ยกเลิก
                                                 </button>
@@ -2028,7 +2034,7 @@ export default function PromptStudioClient() {
                                         ) : (
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider truncate">
+                                                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider truncate">
                                                         {selectedWorkflow.name}
                                                     </h2>
                                                     <button
@@ -2039,14 +2045,14 @@ export default function PromptStudioClient() {
                                                             });
                                                             setIsEditingWorkflowMeta(true);
                                                         }}
-                                                        className="p-1 text-zinc-500 hover:text-zinc-300 rounded cursor-pointer transition"
+                                                        className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer transition"
                                                         title="แก้ไขชื่อและรายละเอียด"
                                                     >
                                                         <Edit2 className="w-3 h-3" />
                                                     </button>
                                                 </div>
                                                 {selectedWorkflow.description && (
-                                                    <p className="text-[10px] text-zinc-500 truncate mt-0.5">{selectedWorkflow.description}</p>
+                                                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{selectedWorkflow.description}</p>
                                                 )}
                                             </div>
                                         )}
@@ -2056,7 +2062,7 @@ export default function PromptStudioClient() {
                                         <button
                                             onClick={handleArchiveWorkflow}
                                             title="เก็บถาวรเวิร์กโฟลว์"
-                                            className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-950/30 border border-zinc-800 hover:border-red-900/50 rounded-md transition cursor-pointer text-xs font-semibold"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-lg transition cursor-pointer text-xs font-semibold bg-white shadow-sm"
                                         >
                                             <Archive className="w-3.5 h-3.5" />
                                             <span>Archive</span>
@@ -2068,13 +2074,13 @@ export default function PromptStudioClient() {
                                 <div className="flex-1 p-5 overflow-y-auto space-y-6 text-xs custom-scrollbar">
                                     {/* Workflow Steps List */}
                                     <div className="space-y-4">
-                                        <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-                                            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">ขั้นตอนการทำงาน ({selectedWorkflow.steps?.length || 0})</h3>
-                                            <span className="text-[10px] text-zinc-500">เรียงตามลำดับก่อนหลัง</span>
+                                        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                                            <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">ขั้นตอนการทำงาน ({selectedWorkflow.steps?.length || 0})</h3>
+                                            <span className="text-[10px] text-slate-400">เรียงตามลำดับก่อนหลัง</span>
                                         </div>
 
                                         {!selectedWorkflow.steps || selectedWorkflow.steps.length === 0 ? (
-                                            <div className="border border-dashed border-zinc-800 rounded-lg p-8 text-center text-zinc-500 italic">
+                                            <div className="border border-dashed border-slate-200 bg-slate-100/30 rounded-xl p-8 text-center text-slate-500 italic">
                                                 ยังไม่มีขั้นตอนในเวิร์กโฟลว์นี้ เริ่มเพิ่มขั้นตอนแรกของคุณโดยกรอกฟอร์มด้านล่าง
                                             </div>
                                         ) : (
@@ -2082,16 +2088,16 @@ export default function PromptStudioClient() {
                                                 {selectedWorkflow.steps.map((step, index) => {
                                                     const isEditing = editingStepId === step.id;
                                                     return (
-                                                        <div key={step.id} className="border border-zinc-800 rounded-lg bg-zinc-900/20 p-4 space-y-3 transition hover:border-zinc-700">
+                                                        <div key={step.id} className="border border-slate-200/80 rounded-xl bg-white p-4 space-y-3 shadow-sm hover:border-slate-300 transition-all">
                                                             <div className="flex justify-between items-start gap-4">
                                                                 <div className="flex items-start gap-3 min-w-0">
-                                                                    <div className="w-5 h-5 rounded bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-mono font-bold text-[10px] flex-shrink-0 mt-0.5">
+                                                                    <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 border border-blue-200/80 flex items-center justify-center font-mono font-bold text-[10px] flex-shrink-0 mt-0.5 shadow-sm">
                                                                         {index + 1}
                                                                     </div>
                                                                     <div className="min-w-0">
-                                                                        <h4 className="font-bold text-zinc-200 text-xs truncate">{step.step_name}</h4>
+                                                                        <h4 className="font-bold text-slate-800 text-xs truncate">{step.step_name}</h4>
                                                                         {step.step_description && (
-                                                                            <p className="text-zinc-500 text-[10px] mt-0.5 leading-relaxed">{step.step_description}</p>
+                                                                            <p className="text-slate-500 text-[10px] mt-0.5 leading-relaxed">{step.step_description}</p>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -2101,7 +2107,7 @@ export default function PromptStudioClient() {
                                                                     <button
                                                                         onClick={() => handleMoveStep(step.id, "up")}
                                                                         disabled={index === 0}
-                                                                        className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 disabled:hover:text-zinc-500 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:hover:text-slate-400 rounded hover:bg-slate-100 transition cursor-pointer"
                                                                         title="เลื่อนขึ้น"
                                                                     >
                                                                         <ArrowUp className="w-3.5 h-3.5" />
@@ -2109,21 +2115,21 @@ export default function PromptStudioClient() {
                                                                     <button
                                                                         onClick={() => handleMoveStep(step.id, "down")}
                                                                         disabled={index === (selectedWorkflow.steps?.length || 1) - 1}
-                                                                        className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 disabled:hover:text-zinc-500 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:hover:text-slate-400 rounded hover:bg-slate-100 transition cursor-pointer"
                                                                         title="เลื่อนลง"
                                                                     >
                                                                         <ArrowDown className="w-3.5 h-3.5" />
                                                                     </button>
                                                                     <button
                                                                         onClick={() => handleStartEditStep(step)}
-                                                                        className="p-1 text-zinc-500 hover:text-indigo-400 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                                        className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100 transition cursor-pointer"
                                                                         title="แก้ไขขั้นตอน"
                                                                     >
                                                                         <Edit2 className="w-3.5 h-3.5" />
                                                                     </button>
                                                                     <button
                                                                         onClick={() => handleDeleteStep(step.id)}
-                                                                        className="p-1 text-zinc-500 hover:text-red-400 rounded hover:bg-zinc-800 transition cursor-pointer"
+                                                                        className="p-1 text-slate-400 hover:text-red-650 rounded hover:bg-slate-100 transition cursor-pointer"
                                                                         title="ลบขั้นตอนออกจากเวิร์กโฟลว์"
                                                                     >
                                                                         <Trash2 className="w-3.5 h-3.5" />
@@ -2133,9 +2139,9 @@ export default function PromptStudioClient() {
 
                                                             {/* Step Inline Edit Form */}
                                                             {isEditing && (
-                                                                <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800 space-y-2 mt-2">
+                                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/80 space-y-2 mt-2 shadow-inner">
                                                                     <div>
-                                                                        <label className="block text-[10px] text-zinc-400 font-bold mb-1">ชื่อขั้นตอน *</label>
+                                                                        <label className="block text-[10px] text-slate-500 font-bold mb-1">ชื่อขั้นตอน *</label>
                                                                         <input
                                                                             type="text"
                                                                             value={editingStepForm.step_name}
@@ -2144,7 +2150,7 @@ export default function PromptStudioClient() {
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="block text-[10px] text-zinc-400 font-bold mb-1">คำอธิบาย</label>
+                                                                        <label className="block text-[10px] text-slate-500 font-bold mb-1">คำอธิบาย</label>
                                                                         <input
                                                                             type="text"
                                                                             value={editingStepForm.step_description}
@@ -2153,7 +2159,7 @@ export default function PromptStudioClient() {
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="block text-[10px] text-zinc-400 font-bold mb-1">คำแนะนำ/คำสั่งการรันเฉพาะ (Instruction Override)</label>
+                                                                        <label className="block text-[10px] text-slate-500 font-bold mb-1">คำแนะนำ/คำสั่งการรันเฉพาะ (Instruction Override)</label>
                                                                         <textarea
                                                                             rows={3}
                                                                             value={editingStepForm.step_instruction}
@@ -2165,13 +2171,13 @@ export default function PromptStudioClient() {
                                                                     <div className="flex gap-2 justify-end pt-1">
                                                                         <button
                                                                             onClick={() => handleUpdateStepDetails(step.id)}
-                                                                            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold cursor-pointer transition"
+                                                                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-semibold cursor-pointer transition shadow-sm"
                                                                         >
                                                                             บันทึกการแก้ไข
                                                                         </button>
                                                                         <button
                                                                             onClick={() => setEditingStepId(null)}
-                                                                            className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-[10px] font-bold cursor-pointer transition"
+                                                                            className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[10px] font-semibold cursor-pointer transition shadow-sm"
                                                                         >
                                                                             ยกเลิก
                                                                         </button>
@@ -2180,23 +2186,23 @@ export default function PromptStudioClient() {
                                                             )}
 
                                                             {/* Linked Prompt Template Details */}
-                                                            <div className="bg-zinc-950/40 border border-zinc-850/60 rounded p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                                                            <div className="bg-slate-50 border border-slate-200/60 rounded-lg p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shadow-sm">
                                                                 <div className="space-y-1">
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="text-[10px] font-bold text-zinc-400">เทมเพลต:</span>
-                                                                        <span className="text-zinc-300 font-semibold">{step.template_name}</span>
-                                                                        <span className="bg-zinc-850 text-zinc-400 text-[8px] px-1 py-0.2 rounded font-mono border border-zinc-800">
+                                                                        <span className="text-[10px] font-bold text-slate-500">เทมเพลต:</span>
+                                                                        <span className="text-slate-755 font-semibold">{step.template_name}</span>
+                                                                        <span className="bg-slate-100 text-slate-600 text-[8px] px-1.5 py-0.5 rounded font-mono border border-slate-200">
                                                                             {step.template_category}
                                                                         </span>
                                                                     </div>
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="text-[10px] text-zinc-500">Active Version:</span>
+                                                                        <span className="text-[10px] text-slate-500">Active Version:</span>
                                                                         {step.active_version ? (
-                                                                            <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-800 text-[9px] px-1.5 py-0.2 rounded font-bold">
+                                                                            <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[9px] px-1.5 py-0.2 rounded font-bold">
                                                                                 v{step.active_version}
                                                                             </span>
                                                                         ) : (
-                                                                            <span className="text-zinc-500 text-[10px] italic">ไม่มี (ใช้เวอร์ชันล่าสุด)</span>
+                                                                            <span className="text-slate-400 text-[10px] italic">ไม่มี (ใช้เวอร์ชันล่าสุด)</span>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -2206,18 +2212,18 @@ export default function PromptStudioClient() {
                                                                         setSidebarTab("templates");
                                                                         setSelectedId(step.prompt_template_id);
                                                                     }}
-                                                                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-zinc-850 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded border border-zinc-800 transition cursor-pointer font-medium"
+                                                                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-lg border border-slate-200 hover:border-slate-300 transition cursor-pointer font-semibold shadow-sm"
                                                                 >
-                                                                    <BookOpen className="w-3 h-3 text-indigo-400" />
+                                                                    <BookOpen className="w-3 h-3 text-blue-500" />
                                                                     <span>เปิดแก้ไขเทมเพลต</span>
                                                                 </button>
                                                             </div>
 
                                                             {/* Step Instruction Display */}
                                                             {step.step_instruction && !isEditing && (
-                                                                <div className="bg-zinc-950/20 border border-zinc-850/40 rounded-md p-2.5">
-                                                                    <span className="text-[9px] text-zinc-500 font-bold block uppercase tracking-wider mb-1">คำสั่งการใช้งานเฉพาะขั้นตอนนี้:</span>
-                                                                    <p className="text-zinc-300 text-[10px] font-mono whitespace-pre-wrap leading-relaxed">{step.step_instruction}</p>
+                                                                <div className="bg-slate-50 border border-slate-200/50 rounded-lg p-2.5 shadow-sm">
+                                                                    <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider mb-1">คำสั่งการใช้งานเฉพาะขั้นตอนนี้:</span>
+                                                                    <p className="text-slate-700 text-[10px] font-mono whitespace-pre-wrap leading-relaxed">{step.step_instruction}</p>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -2228,14 +2234,14 @@ export default function PromptStudioClient() {
                                     </div>
 
                                     {/* Add Step Form */}
-                                    <div className="border border-zinc-800 rounded-lg p-4 bg-zinc-900/10 space-y-4">
-                                        <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                                            <Plus className="w-3.5 h-3.5 text-indigo-400" /> เพิ่มขั้นตอนใหม่
+                                    <div className="border border-slate-200/80 rounded-xl p-4 bg-white shadow-sm space-y-4">
+                                        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                            <Plus className="w-3.5 h-3.5 text-blue-500" /> เพิ่มขั้นตอนใหม่
                                         </h3>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-zinc-400 font-bold mb-1">เลือก Prompt Template *</label>
+                                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">เลือก Prompt Template *</label>
                                                 <select
                                                     value={stepForm.promptTemplateId}
                                                     onChange={(e) => {
@@ -2249,11 +2255,11 @@ export default function PromptStudioClient() {
                                                     }}
                                                     className={SELECT_CLASS}
                                                 >
-                                                    <option className="bg-zinc-900 text-zinc-500" value="">-- เลือกเทมเพลต --</option>
+                                                    <option className="text-slate-400" value="">-- เลือกเทมเพลต --</option>
                                                     {templates
                                                         .filter(t => t.status !== "archived")
                                                         .map(t => (
-                                                            <option className="bg-zinc-900 text-slate-100" key={t.id} value={t.id}>
+                                                            <option className="text-slate-800" key={t.id} value={t.id}>
                                                                 {t.name} ({t.category}) {t.active_version ? `[v${t.active_version}]` : `[v${t.version}]`}
                                                             </option>
                                                         ))
@@ -2262,7 +2268,7 @@ export default function PromptStudioClient() {
                                             </div>
 
                                             <div>
-                                                <label className="block text-zinc-400 font-bold mb-1">ชื่อขั้นตอน (ว่างไว้เพื่อใช้ชื่อเทมเพลต)</label>
+                                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">ชื่อขั้นตอน (ว่างไว้เพื่อใช้ชื่อเทมเพลต)</label>
                                                 <input
                                                     type="text"
                                                     value={stepForm.stepName}
@@ -2275,7 +2281,7 @@ export default function PromptStudioClient() {
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-zinc-400 font-bold mb-1">คำอธิบายขั้นตอน</label>
+                                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">คำอธิบายขั้นตอน</label>
                                                 <input
                                                     type="text"
                                                     value={stepForm.stepDescription}
@@ -2286,7 +2292,7 @@ export default function PromptStudioClient() {
                                             </div>
 
                                             <div>
-                                                <label className="block text-zinc-400 font-bold mb-1">คำแนะนำสั่งงานเฉพาะขั้นตอน (Instruction Override)</label>
+                                                <label className="block text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">คำแนะนำสั่งงานเฉพาะขั้นตอน (Instruction Override)</label>
                                                 <textarea
                                                     rows={2}
                                                     value={stepForm.stepInstruction}
@@ -2301,7 +2307,7 @@ export default function PromptStudioClient() {
                                             <button
                                                 onClick={handleAddStep}
                                                 disabled={isAddingStep || !stepForm.promptTemplateId}
-                                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded font-bold cursor-pointer transition flex items-center gap-1.5"
+                                                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-sm"
                                             >
                                                 {isAddingStep ? (
                                                     <>
@@ -2320,10 +2326,10 @@ export default function PromptStudioClient() {
                                 </div>
                             </>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 p-8">
-                                <Sliders className="w-12 h-12 text-zinc-700 mb-3" />
-                                <p className="text-sm font-semibold">เลือกหรือสร้างเวิร์กโฟลว์ใหม่จากแถบซ้าย</p>
-                                <p className="text-xs text-zinc-650 mt-1">จัดกลุ่มและเรียงลำดับขั้นตอนการรันเทมเพลต Prompt</p>
+                            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
+                                <Sliders className="w-12 h-12 text-slate-300 mb-3" />
+                                <p className="text-sm font-semibold text-slate-700">เลือกหรือสร้างเวิร์กโฟลว์ใหม่จากแถบซ้าย</p>
+                                <p className="text-xs text-slate-400 mt-1">จัดกลุ่มและเรียงลำดับขั้นตอนการรันเทมเพลต Prompt</p>
                             </div>
                         )}
                     </div>
@@ -2331,35 +2337,35 @@ export default function PromptStudioClient() {
 
                 {/* 3. Right Column: Preview & Test Input Area */}
                 {sidebarTab === "templates" && (
-                    <div className="w-[420px] flex flex-col bg-zinc-900/30 overflow-hidden flex-shrink-0">
+                    <div className="w-[420px] flex flex-col bg-slate-100/70 border-l border-slate-200 overflow-hidden flex-shrink-0">
                     {/* Main Tab selector for Playground vs History */}
-                    <div className="flex border-b border-zinc-800 bg-zinc-900/40 p-2 gap-1 flex-shrink-0">
+                    <div className="bg-slate-200/50 p-1 rounded-lg flex gap-1 mx-3 my-2.5 border border-slate-200/40 flex-shrink-0">
                         <button
                             onClick={() => setRightPanelTab("playground")}
-                            className={`flex-1 text-center py-1.5 rounded text-[10px] font-bold transition ${
+                            className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
                                 rightPanelTab === "playground"
-                                    ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
-                                    : "text-zinc-400 hover:bg-zinc-800/40"
+                                    ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
+                                    : "text-slate-600 hover:bg-slate-200/40"
                             }`}
                         >
                             Playground
                         </button>
                         <button
                             onClick={() => setRightPanelTab("history")}
-                            className={`flex-1 text-center py-1.5 rounded text-[10px] font-bold transition ${
+                            className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
                                 rightPanelTab === "history"
-                                    ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
-                                    : "text-zinc-400 hover:bg-zinc-800/40"
+                                    ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
+                                    : "text-slate-600 hover:bg-slate-200/40"
                             }`}
                         >
                             Test History
                         </button>
                         <button
                             onClick={() => setRightPanelTab("versions")}
-                            className={`flex-1 text-center py-1.5 rounded text-[10px] font-bold transition ${
+                            className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
                                 rightPanelTab === "versions"
-                                    ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
-                                    : "text-zinc-400 hover:bg-zinc-800/40"
+                                    ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
+                                    : "text-slate-600 hover:bg-slate-200/40"
                             }`}
                         >
                             Versions
@@ -2369,26 +2375,26 @@ export default function PromptStudioClient() {
                     {rightPanelTab === "playground" && (
                         <>
                             {/* Test Variables Area */}
-                            <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col flex-shrink-0">
+                            <div className="p-4 border-b border-slate-200 bg-white/40 flex flex-col flex-shrink-0">
                                 <div className="flex items-center gap-2 mb-3">
-                                    <Sliders className="w-4 h-4 text-indigo-400" />
-                                    <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Test Input Area</h2>
+                                    <Sliders className="w-4 h-4 text-blue-500" />
+                                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Test Input Area</h2>
                                 </div>
                                 
                                 {currentInputFields.length === 0 ? (
-                                    <p className="text-[11px] text-zinc-500 italic">
+                                    <p className="text-[11px] text-slate-500 italic">
                                         {"ไม่มีตัวแปรที่กำหนดไว้ในเทมเพลตนี้ (สามารถเพิ่มตัวแปรในช่อง Input Fields Builder ด้านข้าง)"}
                                     </p>
                                 ) : (
                                     <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                                         {currentInputFields.map(field => (
                                             <div key={field.name} className="flex flex-col text-xs">
-                                                <label className="text-zinc-400 font-semibold mb-0.5 flex justify-between items-center">
+                                                <label className="text-slate-600 font-semibold mb-0.5 flex justify-between items-center">
                                                     <span className="flex items-center gap-1">
                                                         <span>{field.label}</span>
-                                                        {field.required && <span className="text-red-400 text-[10px] font-bold">*</span>}
+                                                        {field.required && <span className="text-red-500 text-[10px] font-bold">*</span>}
                                                     </span>
-                                                    <span className="text-[10px] text-zinc-600 font-mono">&#123;&#123;{field.name}&#125;&#125;</span>
+                                                    <span className="text-[9px] text-slate-400 font-mono">&#123;&#123;{field.name}&#125;&#125;</span>
                                                 </label>
                                                 <input
                                                     type="text"
@@ -2398,7 +2404,7 @@ export default function PromptStudioClient() {
                                                     className={INPUT_CLASS}
                                                 />
                                                 {field.helperText && (
-                                                    <span className="text-[9px] text-zinc-500 mt-0.5 font-medium">
+                                                    <span className="text-[9px] text-slate-400 mt-0.5 font-medium">
                                                         {field.helperText}
                                                     </span>
                                                 )}
@@ -2409,23 +2415,23 @@ export default function PromptStudioClient() {
                             </div>
 
                             {/* Tab Navigation for Preview Area */}
-                            <div className="flex border-b border-zinc-800 bg-zinc-900/40 p-2 gap-1 flex-shrink-0">
+                            <div className="bg-slate-200/50 p-1 rounded-lg flex gap-1 mx-3 my-2 border border-slate-200/40 flex-shrink-0">
                                 <button
                                     onClick={() => setPreviewTab("compiled")}
-                                    className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
+                                    className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
                                         previewTab === "compiled"
-                                            ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
-                                            : "text-zinc-400 hover:bg-zinc-800/40"
+                                            ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
+                                            : "text-slate-600 hover:bg-slate-200/40"
                                     }`}
                                 >
                                     Compiled Prompt (พร้อมใช้)
                                 </button>
                                 <button
                                     onClick={() => setPreviewTab("template")}
-                                    className={`flex-1 text-center py-1.5 rounded text-[11px] font-bold transition ${
+                                    className={`flex-1 text-center py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
                                         previewTab === "template"
-                                            ? "bg-indigo-600/30 border border-indigo-700 text-indigo-200"
-                                            : "text-zinc-400 hover:bg-zinc-800/40"
+                                            ? "bg-white text-slate-800 shadow-sm border border-slate-200/10"
+                                            : "text-slate-600 hover:bg-slate-200/40"
                                     }`}
                                 >
                                     Template Structure (โครงสร้าง)
@@ -2433,11 +2439,11 @@ export default function PromptStudioClient() {
                             </div>
 
                             {/* Compile Preview Area */}
-                            <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
-                                <div className="p-3 border-b border-zinc-850 flex justify-between items-center bg-zinc-900/10 flex-shrink-0">
+                            <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+                                <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-white flex-shrink-0">
                                     <div className="flex items-center gap-2">
-                                        <Eye className="w-3.5 h-3.5 text-indigo-400" />
-                                        <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                                        <Eye className="w-3.5 h-3.5 text-blue-500" />
+                                        <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                             {previewTab === "compiled" ? "Compiled Result" : "Template Spec"}
                                         </h2>
                                     </div>
@@ -2445,19 +2451,19 @@ export default function PromptStudioClient() {
                                         {previewTab === "compiled" && selectedId && selectedId !== "new-template" && (
                                             <button
                                                 onClick={() => setRightPanelTab("history")}
-                                                className="flex items-center gap-1 bg-zinc-850 hover:bg-zinc-800 active:bg-zinc-900 text-zinc-300 border border-zinc-800 px-2.5 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer"
+                                                className="flex items-center gap-1 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer shadow-sm"
                                             >
-                                                <Sliders className="w-3 h-3 text-indigo-400" />
+                                                <Sliders className="w-3 h-3 text-blue-500" />
                                                 <span>บันทึกประวัติการทดสอบ</span>
                                             </button>
                                         )}
                                         <button
                                             onClick={handleCopy}
                                             disabled={!activePreviewText}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer shadow-sm ${
                                                 copied 
                                                     ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
-                                                    : "bg-zinc-850 hover:bg-zinc-800 active:bg-zinc-900 text-zinc-300 border border-zinc-800"
+                                                    : "bg-blue-600 hover:bg-blue-500 text-white border-transparent"
                                             }`}
                                         >
                                             {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -2474,11 +2480,11 @@ export default function PromptStudioClient() {
                                 </div>
 
                                 {/* Prompt rendering panel */}
-                                <div className="flex-1 p-4 overflow-y-auto bg-zinc-950 font-mono text-[11px] text-zinc-300 select-text whitespace-pre-wrap leading-relaxed custom-scrollbar">
+                                <div className="flex-1 m-3 p-4 overflow-y-auto bg-white border border-slate-200/60 rounded-xl shadow-inner font-mono text-[11px] text-slate-800 select-text whitespace-pre-wrap leading-relaxed custom-scrollbar">
                                     {activePreviewText ? (
                                         activePreviewText
                                     ) : (
-                                        <p className="text-zinc-600 italic">กรอกบทบาท ขั้นตอนการทำงาน หรือหัวข้อบทความ เพื่อเริ่มสร้าง Prompt...</p>
+                                        <p className="text-slate-400 italic">กรอกบทบาท ขั้นตอนการทำงาน หรือหัวข้อบทความ เพื่อเริ่มสร้าง Prompt...</p>
                                     )}
                                 </div>
                             </div>
@@ -2486,22 +2492,22 @@ export default function PromptStudioClient() {
                     )}
 
                     {rightPanelTab === "history" && (
-                        <div className="flex-1 flex flex-col overflow-hidden">
+                        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                             {!selectedId || selectedId === "new-template" ? (
-                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-zinc-500 italic">
+                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-500 italic">
                                     กรุณาบันทึกเทมเพลตนี้ก่อนเพื่อเริ่มเก็บประวัติการทดสอบ
                                 </div>
                             ) : (
                                 <>
                                     {/* Save Test Run form */}
-                                    <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col flex-shrink-0 space-y-3">
+                                    <div className="p-4 border-b border-slate-200 bg-white/40 flex flex-col flex-shrink-0 space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="font-bold text-zinc-300 text-xs uppercase tracking-wider">บันทึกผลการทดสอบ (Record Test Run)</span>
+                                            <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">บันทึกผลการทดสอบ (Record Test Run)</span>
                                         </div>
                                         
                                         {/* Summary */}
                                         <div className="flex flex-col text-xs">
-                                            <label className="text-zinc-400 font-semibold mb-1">สรุปการทดสอบ (Summary)</label>
+                                            <label className="text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">สรุปการทดสอบ (Summary)</label>
                                             <input
                                                 type="text"
                                                 value={logForm.summary}
@@ -2513,36 +2519,36 @@ export default function PromptStudioClient() {
 
                                         {/* Run Status Selector */}
                                         <div className="flex flex-col text-xs">
-                                            <label className="text-zinc-400 font-semibold mb-1">สถานะผลการรัน (Run Status)</label>
+                                            <label className="text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">สถานะผลการรัน (Run Status)</label>
                                             <select
                                                 value={logForm.runStatus}
                                                 onChange={(e) => setLogForm(prev => ({ ...prev, runStatus: e.target.value }))}
                                                 className={SELECT_CLASS}
                                             >
-                                                <option className="bg-zinc-900 text-slate-100" value="needs_revision">⚠️ Needs Revision (ต้องปรับปรุง)</option>
-                                                <option className="bg-zinc-900 text-slate-100" value="useful">✅ Useful (พร้อมใช้งาน)</option>
+                                                <option className="text-slate-800" value="needs_revision">⚠️ Needs Revision (ต้องปรับปรุง)</option>
+                                                <option className="text-slate-800" value="useful">✅ Useful (พร้อมใช้งาน)</option>
                                             </select>
                                         </div>
 
                                         {/* Rating Selector */}
                                         <div className="flex flex-col text-xs">
-                                            <label className="text-zinc-400 font-semibold mb-1">ระดับคะแนน (Rating)</label>
+                                            <label className="text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">ระดับคะแนน (Rating)</label>
                                             <select
                                                 value={logForm.rating}
                                                 onChange={(e) => setLogForm(prev => ({ ...prev, rating: Number(e.target.value) }))}
                                                 className={SELECT_CLASS}
                                             >
-                                                <option className="bg-zinc-900 text-slate-100" value={5}>⭐⭐⭐⭐⭐ (5/5)</option>
-                                                <option className="bg-zinc-900 text-slate-100" value={4}>⭐⭐⭐⭐ (4/5)</option>
-                                                <option className="bg-zinc-900 text-slate-100" value={3}>⭐⭐⭐ (3/5)</option>
-                                                <option className="bg-zinc-900 text-slate-100" value={2}>⭐⭐ (2/5)</option>
-                                                <option className="bg-zinc-900 text-slate-100" value={1}>⭐ (1/5)</option>
+                                                <option className="text-slate-800" value={5}>⭐⭐⭐⭐⭐ (5/5)</option>
+                                                <option className="text-slate-800" value={4}>⭐⭐⭐⭐ (4/5)</option>
+                                                <option className="text-slate-800" value={3}>⭐⭐⭐ (3/5)</option>
+                                                <option className="text-slate-800" value={2}>⭐⭐ (2/5)</option>
+                                                <option className="text-slate-800" value={1}>⭐ (1/5)</option>
                                             </select>
                                         </div>
 
                                         {/* Output Notes */}
                                         <div className="flex flex-col text-xs">
-                                            <label className="text-zinc-400 font-semibold mb-1">บันทึกผลลัพธ์ (Output Notes)</label>
+                                            <label className="text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">บันทึกผลลัพธ์ (Output Notes)</label>
                                             <textarea
                                                 rows={2}
                                                 value={logForm.outputNotes}
@@ -2554,7 +2560,7 @@ export default function PromptStudioClient() {
 
                                         {/* Next Revision Notes */}
                                         <div className="flex flex-col text-xs">
-                                            <label className="text-zinc-400 font-semibold mb-1">สิ่งที่ควรปรับปรุงในเวอร์ชันหน้า (Next Revision Notes)</label>
+                                            <label className="text-slate-500 font-bold mb-1 text-[10px] uppercase tracking-wider">สิ่งที่ควรปรับปรุงในเวอร์ชันหน้า (Next Revision Notes)</label>
                                             <textarea
                                                 rows={2}
                                                 value={logForm.nextRevisionNotes}
@@ -2568,31 +2574,31 @@ export default function PromptStudioClient() {
                                         <button
                                             onClick={handleSaveRunLog}
                                             disabled={isSavingLog}
-                                            className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded text-xs font-bold transition cursor-pointer"
+                                            className="w-full py-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-sm"
                                         >
                                             {isSavingLog ? "กำลังบันทึก..." : "บันทึกผลการทดสอบ (Save Run Log)"}
                                         </button>
                                     </div>
 
                                     {/* History List */}
-                                    <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
-                                        <div className="p-3 border-b border-zinc-850 bg-zinc-900/10 flex items-center justify-between flex-shrink-0">
-                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">ประวัติการทดสอบ ({runLogs.length})</h3>
+                                    <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+                                        <div className="p-3 border-b border-slate-200 bg-white flex items-center justify-between flex-shrink-0">
+                                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">ประวัติการทดสอบ ({runLogs.length})</h3>
                                         </div>
 
                                         {/* Filters Bar */}
-                                        <div className="p-2 border-b border-zinc-850 bg-zinc-900/20 flex gap-2 flex-shrink-0 text-[10px]">
+                                        <div className="p-2 border-b border-slate-200 bg-white flex gap-2 flex-shrink-0 text-[10px]">
                                             <div className="flex-1 col-span-1">
                                                 <select
                                                     value={logStatusFilter}
                                                     onChange={(e) => setLogStatusFilter(e.target.value)}
                                                     className={SELECT_CLASS + " !p-1"}
                                                 >
-                                                    <option className="bg-zinc-900 text-slate-100" value="active">Active (ซ่อนจัดเก็บ)</option>
-                                                    <option className="bg-zinc-900 text-slate-100" value="useful">Useful (พร้อมใช้งาน)</option>
-                                                    <option className="bg-zinc-900 text-slate-100" value="needs_revision">Needs Revision (ต้องแก้ไข)</option>
-                                                    <option className="bg-zinc-900 text-slate-100" value="archived">Archived (จัดเก็บแล้ว)</option>
-                                                    <option className="bg-zinc-900 text-slate-100" value="all">สถานะทั้งหมด</option>
+                                                    <option className="text-slate-800" value="active">Active (ซ่อนจัดเก็บ)</option>
+                                                    <option className="text-slate-800" value="useful">Useful (พร้อมใช้งาน)</option>
+                                                    <option className="text-slate-800" value="needs_revision">Needs Revision (ต้องแก้ไข)</option>
+                                                    <option className="text-slate-800" value="archived">Archived (จัดเก็บแล้ว)</option>
+                                                    <option className="text-slate-800" value="all">สถานะทั้งหมด</option>
                                                 </select>
                                             </div>
                                             <div className="flex-1 col-span-1">
@@ -2601,19 +2607,19 @@ export default function PromptStudioClient() {
                                                     onChange={(e) => setLogRatingFilter(e.target.value)}
                                                     className={SELECT_CLASS + " !p-1"}
                                                 >
-                                                    <option className="bg-zinc-900 text-slate-100" value="all">คะแนนทั้งหมด</option>
-                                                    <option className="bg-zinc-900 text-slate-100" value="5">⭐⭐⭐⭐⭐ (5/5)</option>
-                                                    <option className="bg-zinc-900 text-slate-100" value="4plus">⭐⭐⭐⭐+ (4+/5)</option>
-                                                    <option className="bg-zinc-900 text-slate-100" value="3minus">⭐⭐⭐ หรือน้อยกว่า</option>
+                                                    <option className="text-slate-800" value="all">คะแนนทั้งหมด</option>
+                                                    <option className="text-slate-800" value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                                                    <option className="text-slate-800" value="4plus">⭐⭐⭐⭐+ (4+/5)</option>
+                                                    <option className="text-slate-800" value="3minus">⭐⭐⭐ หรือน้อยกว่า</option>
                                                 </select>
                                             </div>
                                         </div>
                                         
                                         <div className="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
                                             {isLoadingLogs ? (
-                                                <div className="text-center text-zinc-500 text-xs py-8">กำลังโหลดประวัติ...</div>
+                                                <div className="text-center text-slate-400 text-xs py-8">กำลังโหลดประวัติ...</div>
                                             ) : runLogs.length === 0 ? (
-                                                <p className="text-zinc-500 text-xs italic text-center py-8">ยังไม่มีประวัติการทดสอบสำหรับเทมเพลตนี้</p>
+                                                <p className="text-slate-400 text-xs italic text-center py-8">ยังไม่มีประวัติการทดสอบสำหรับเทมเพลตนี้</p>
                                             ) : (
                                                 runLogs.map(log => {
                                                     const isExpanded = expandedLogId === log.id;
@@ -2626,46 +2632,46 @@ export default function PromptStudioClient() {
                                                     });
 
                                                     return (
-                                                        <div key={log.id} className="border border-zinc-800 rounded-lg p-3 bg-zinc-900/20 space-y-2 text-xs">
+                                                        <div key={log.id} className="border border-slate-200 rounded-xl p-3.5 bg-white space-y-2.5 text-xs shadow-sm hover:border-slate-300 transition-all">
                                                             <div className="flex justify-between items-start gap-1">
                                                                 <div className="flex flex-wrap items-center gap-1.5">
-                                                                    <span className="text-[10px] text-zinc-500 font-mono">{formattedDate}</span>
-                                                                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold border ${
-                                                                        log.runStatus === "useful" ? "bg-emerald-950/80 text-emerald-300 border-emerald-800" :
-                                                                        log.runStatus === "archived" ? "bg-zinc-900 text-zinc-500 border-zinc-800" :
-                                                                        "bg-amber-950/80 text-amber-300 border-amber-800"
+                                                                    <span className="text-[10px] text-slate-400 font-mono">{formattedDate}</span>
+                                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold border ${
+                                                                        log.runStatus === "useful" ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                                                                        log.runStatus === "archived" ? "bg-slate-100 text-slate-500 border-slate-200" :
+                                                                        "bg-amber-50 text-amber-600 border-amber-200"
                                                                     }`}>
                                                                         {log.runStatus === "useful" ? "Useful" :
                                                                          log.runStatus === "archived" ? "Archived" : "Needs Revision"}
                                                                     </span>
                                                                 </div>
-                                                                <span className="text-amber-400 font-bold flex-shrink-0">
+                                                                <span className="text-amber-500 font-bold flex-shrink-0">
                                                                     {"⭐".repeat(log.rating)} ({log.rating}/5)
                                                                 </span>
                                                             </div>
 
                                                             {log.summary && (
-                                                                <h4 className="font-bold text-zinc-200 border-l-2 border-indigo-500 pl-1.5 py-0.5">
+                                                                <h4 className="font-bold text-slate-800 border-l-2 border-blue-500 pl-2 py-0.5">
                                                                     {log.summary}
                                                                 </h4>
                                                             )}
 
                                                             {log.outputNotes && (
                                                                 <div>
-                                                                    <span className="text-[10px] text-zinc-500 block font-bold">ผลทดสอบ:</span>
-                                                                    <p className="text-zinc-300">{log.outputNotes}</p>
+                                                                    <span className="text-[10px] text-slate-500 block font-bold">ผลทดสอบ:</span>
+                                                                    <p className="text-slate-700 leading-relaxed">{log.outputNotes}</p>
                                                                 </div>
                                                             )}
 
                                                             {log.nextRevisionNotes && (
                                                                 <div>
-                                                                    <span className="text-[10px] text-zinc-500 block font-bold">บันทึกปรับปรุงในรุ่นถัดไป:</span>
-                                                                    <p className="text-zinc-400 italic bg-zinc-950/40 p-1.5 rounded border border-zinc-850/50">{log.nextRevisionNotes}</p>
+                                                                    <span className="text-[10px] text-slate-500 block font-bold">บันทึกปรับปรุงในรุ่นถัดไป:</span>
+                                                                    <p className="text-slate-600 italic bg-slate-50 p-2 rounded-lg border border-slate-200/60 leading-relaxed">{log.nextRevisionNotes}</p>
                                                                 </div>
                                                             )}
 
                                                             {/* Actions Row */}
-                                                            <div className="flex items-center justify-between gap-2 border-t border-zinc-850/40 pt-2 mt-1">
+                                                            <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-2.5 mt-1">
                                                                 <div className="flex gap-1.5">
                                                                     {log.nextRevisionNotes && (
                                                                         <button
@@ -2673,7 +2679,7 @@ export default function PromptStudioClient() {
                                                                                 navigator.clipboard.writeText(log.nextRevisionNotes);
                                                                                 alert("คัดลอกบันทึกปรับปรุงเรียบร้อย!");
                                                                             }}
-                                                                            className="px-2 py-1 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                            className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer shadow-sm"
                                                                         >
                                                                             คัดลอก Notes
                                                                         </button>
@@ -2688,7 +2694,7 @@ export default function PromptStudioClient() {
                                                                                 }));
                                                                             }
                                                                         }}
-                                                                        className="px-2 py-1 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded border border-zinc-800 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                        className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer shadow-sm"
                                                                     >
                                                                         {logVersionFormOpenId === log.id ? "ยกเลิก" : "บันทึกเป็นเวอร์ชัน"}
                                                                     </button>
@@ -2697,7 +2703,7 @@ export default function PromptStudioClient() {
                                                                 {log.runStatus !== "archived" && (
                                                                     <button
                                                                         onClick={() => handleArchiveRunLog(log.id)}
-                                                                        className="px-2 py-1 bg-red-950/40 hover:bg-red-900/40 text-red-300 border border-red-900/50 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                        className="px-2.5 py-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-lg text-[10px] font-semibold transition cursor-pointer shadow-sm"
                                                                     >
                                                                         Archive
                                                                     </button>
@@ -2705,10 +2711,10 @@ export default function PromptStudioClient() {
                                                             </div>
 
                                                             {/* Collapsible snapshot */}
-                                                            <div className="border-t border-zinc-850 pt-2 mt-1">
+                                                            <div className="border-t border-slate-200 pt-2.5 mt-1">
                                                                 <button
                                                                     onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                                                                    className="w-full text-left text-[10px] text-zinc-500 hover:text-zinc-300 font-semibold flex justify-between items-center cursor-pointer"
+                                                                    className="w-full text-left text-[10px] text-slate-400 hover:text-slate-700 font-semibold flex justify-between items-center cursor-pointer"
                                                                 >
                                                                     <span>{isExpanded ? "ซ่อนรายละเอียด Prompt Snapshot" : "ดูรายละเอียด Prompt Snapshot"}</span>
                                                                     <span>{isExpanded ? "▲" : "▼"}</span>
@@ -2718,12 +2724,12 @@ export default function PromptStudioClient() {
                                                                     <div className="mt-2 space-y-2 animate-fadeIn">
                                                                         {/* Variables */}
                                                                         {log.inputSnapshot && log.inputSnapshot.length > 0 && (
-                                                                            <div className="bg-zinc-950/80 p-2 rounded border border-zinc-850">
-                                                                                <span className="text-[9px] text-zinc-500 font-bold block mb-1">ตัวแปรอินพุต:</span>
+                                                                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                                                                                <span className="text-[9px] text-slate-500 font-bold block mb-1">ตัวแปรอินพุต:</span>
                                                                                 <div className="space-y-1 text-[9px] font-mono">
                                                                                     {log.inputSnapshot.map((varItem: PromptInputField) => (
                                                                                         <div key={varItem.name} className="truncate">
-                                                                                            <span className="text-zinc-650">{varItem.label || varItem.name}:</span> <span className="text-zinc-300">{varItem.value}</span>
+                                                                                            <span className="text-slate-500">{varItem.label || varItem.name}:</span> <span className="text-slate-800">{varItem.value}</span>
                                                                                         </div>
                                                                                     ))}
                                                                                 </div>
@@ -2731,7 +2737,7 @@ export default function PromptStudioClient() {
                                                                         )}
 
                                                                         {/* Prompt */}
-                                                                        <div className="bg-zinc-950/80 p-2 rounded border border-zinc-850 font-mono text-[9px] text-zinc-400 whitespace-pre-wrap select-text leading-normal max-h-40 overflow-y-auto custom-scrollbar">
+                                                                        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-mono text-[9px] text-slate-600 whitespace-pre-wrap select-text leading-normal max-h-40 overflow-y-auto custom-scrollbar shadow-inner">
                                                                             {log.compiledPromptSnapshot}
                                                                         </div>
                                                                     </div>
@@ -2749,18 +2755,18 @@ export default function PromptStudioClient() {
                     )}
 
                     {rightPanelTab === "versions" && (
-                        <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
+                        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                             {!selectedId || selectedId === "new-template" ? (
-                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-zinc-500 italic">
+                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-500 italic">
                                     กรุณาบันทึกเทมเพลตนี้ก่อนเพื่อเริ่มเก็บประวัติเวอร์ชัน
                                 </div>
                             ) : (
-                                <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
+                                <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                                     {/* Save Current as Version Form */}
-                                    <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 space-y-3 flex-shrink-0">
+                                    <div className="p-4 border-b border-slate-200 bg-white/40 space-y-3 flex-shrink-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <Save className="w-3.5 h-3.5 text-indigo-400" />
-                                            <span className="font-bold text-zinc-300 text-xs uppercase tracking-wider">บันทึกเวอร์ชันใหม่จากหน้าแก้ไข</span>
+                                            <Save className="w-3.5 h-3.5 text-blue-500" />
+                                            <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">บันทึกเวอร์ชันใหม่จากหน้าแก้ไข</span>
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-2">
@@ -2790,22 +2796,22 @@ export default function PromptStudioClient() {
                                                 setNewVersionForm({ version: "", revisionNotes: "" });
                                             }}
                                             disabled={isSavingVersion}
-                                            className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded text-xs font-bold transition cursor-pointer"
+                                            className="w-full py-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-sm"
                                         >
                                             {isSavingVersion ? "กำลังบันทึก..." : "บันทึกเวอร์ชัน (Save Version)"}
                                         </button>
                                     </div>
 
                                     {/* Versions List */}
-                                    <div className="p-3 border-b border-zinc-850 bg-zinc-900/10 flex items-center justify-between flex-shrink-0">
-                                        <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">ประวัติเวอร์ชัน ({versions.length})</h3>
+                                    <div className="p-3 border-b border-slate-200 bg-white flex items-center justify-between flex-shrink-0">
+                                        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">ประวัติเวอร์ชัน ({versions.length})</h3>
                                     </div>
 
                                     <div className="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
                                         {isLoadingVersions ? (
-                                            <div className="text-center text-zinc-500 text-xs py-8">กำลังโหลดรายการเวอร์ชัน...</div>
+                                            <div className="text-center text-slate-400 text-xs py-8">กำลังโหลดรายการเวอร์ชัน...</div>
                                         ) : versions.length === 0 ? (
-                                            <p className="text-zinc-500 text-xs italic text-center py-8">ยังไม่มีเวอร์ชันบันทึกไว้สำหรับเทมเพลตนี้</p>
+                                            <p className="text-slate-400 text-xs italic text-center py-8">ยังไม่มีเวอร์ชันบันทึกไว้สำหรับเทมเพลตนี้</p>
                                         ) : (
                                             versions.map(v => {
                                                 const formattedDate = new Date(v.created_at).toLocaleString("th-TH", {
@@ -2817,44 +2823,44 @@ export default function PromptStudioClient() {
                                                 });
 
                                                 return (
-                                                    <div key={v.id} className="border border-zinc-800 rounded-lg p-3 bg-zinc-900/20 space-y-2.5 text-xs">
+                                                    <div key={v.id} className="border border-slate-200 rounded-xl p-3.5 bg-white space-y-2.5 text-xs shadow-sm hover:border-slate-300 transition-all">
                                                         <div className="flex justify-between items-center">
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="font-bold text-zinc-200 font-mono text-xs">v{v.version}</span>
+                                                                <span className="font-bold text-slate-800 font-mono text-xs">v{v.version}</span>
                                                                 {v.is_active === 1 && (
-                                                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded text-[9px] font-bold">
+                                                                    <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-1.5 py-0.5 rounded text-[9px] font-bold">
                                                                         Active
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <span className="text-[10px] text-zinc-500 font-mono">{formattedDate}</span>
+                                                            <span className="text-[10px] text-slate-400 font-mono">{formattedDate}</span>
                                                         </div>
 
                                                         {v.revision_notes && (
-                                                            <p className="text-zinc-300 bg-zinc-950/40 p-2 rounded border border-zinc-850/50 leading-relaxed">
+                                                            <p className="text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200/60 leading-relaxed">
                                                                 {v.revision_notes}
                                                             </p>
                                                         )}
 
                                                         {v.created_from_run_log_id && (
-                                                            <div className="text-[9px] text-zinc-500 flex items-center gap-1 font-semibold">
+                                                            <div className="text-[9px] text-slate-400 flex items-center gap-1 font-semibold">
                                                                 <span>⚡ สร้างเชื่อมโยงจากประวัติการรัน</span>
                                                             </div>
                                                         )}
 
-                                                        <div className="flex items-center justify-between gap-2 border-t border-zinc-850/40 pt-2 mt-1">
+                                                        <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-2.5 mt-1">
                                                             <div className="flex gap-1.5">
                                                                 {v.is_active !== 1 && (
                                                                     <button
                                                                         onClick={() => handleMarkVersionActive(v.id)}
-                                                                        className="px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-700/50 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-lg text-[10px] font-semibold transition cursor-pointer shadow-sm"
                                                                     >
                                                                         เปิดใช้งาน (Active)
                                                                     </button>
                                                                 )}
                                                                 <button
                                                                     onClick={() => handleRestoreVersion(v)}
-                                                                    className="px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/10 text-indigo-300 border border-indigo-700/50 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                    className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-semibold transition cursor-pointer shadow-sm"
                                                                 >
                                                                     คืนค่านี้ (Restore)
                                                                 </button>
@@ -2862,7 +2868,7 @@ export default function PromptStudioClient() {
 
                                                             <button
                                                                 onClick={() => handleDeleteVersion(v.id)}
-                                                                className="px-2 py-1 text-zinc-500 hover:text-red-400 hover:bg-red-950/20 rounded text-[10px] font-semibold transition cursor-pointer"
+                                                                className="px-2.5 py-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg text-[10px] font-semibold transition cursor-pointer"
                                                                 disabled={v.is_active === 1}
                                                                 title={v.is_active === 1 ? "ไม่สามารถลบเวอร์ชันที่ใช้งานอยู่ได้" : "ลบเวอร์ชัน"}
                                                             >
