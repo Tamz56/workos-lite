@@ -20,7 +20,8 @@ import {
     Edit2,
     Code,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    HelpCircle
 } from "lucide-react";
 
 interface PromptInputField {
@@ -170,6 +171,7 @@ export default function PromptStudioClient() {
     const [isLoading, setIsLoading] = useState(true);
     const [apiError, setApiError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [showQuickGuide, setShowQuickGuide] = useState(false);
     
     // Editor State
     const [editorFields, setEditorFields] = useState<Partial<PromptTemplate>>({});
@@ -1468,6 +1470,18 @@ export default function PromptStudioClient() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowQuickGuide(!showQuickGuide)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg font-semibold transition cursor-pointer border ${
+                                    showQuickGuide 
+                                        ? "bg-blue-50 text-blue-600 border-blue-200" 
+                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                }`}
+                                title="คำแนะนำการใช้งานด่วน"
+                            >
+                                <HelpCircle className="w-3.5 h-3.5" />
+                                <span>{showQuickGuide ? "ซ่อนแนะนำ" : "คู่มือการใช้"}</span>
+                            </button>
                             {selectedId && selectedId !== "new-template" && (
                                 <button
                                     onClick={handleArchive}
@@ -1489,13 +1503,64 @@ export default function PromptStudioClient() {
                         </div>
                     </div>
 
+                    {showQuickGuide && (
+                        <div className="mx-6 mt-4 p-4.5 bg-blue-50/40 border border-blue-100 rounded-2xl animate-fadeIn space-y-3 flex-shrink-0">
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-2">
+                                    <HelpCircle className="w-4 h-4 text-blue-600" />
+                                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">คู่มือการใช้งาน Prompt Studio ด่วน (Quick Guide)</h3>
+                                </div>
+                                <button 
+                                    onClick={() => setShowQuickGuide(false)}
+                                    className="text-slate-400 hover:text-slate-650 text-xs font-semibold cursor-pointer"
+                                >
+                                    ปิดคำแนะนำ
+                                </button>
+                            </div>
+                            <p className="text-[11px] text-slate-600 leading-relaxed">
+                                <strong>Prompt Studio</strong> เป็นเครื่องมือหลักสำหรับใช้ในการสร้าง (create), ทดสอบ (test), ปรับปรุง (improve), จัดเวอร์ชัน (version) และรวบรวมคำสั่ง Prompts ให้เป็นเวิร์กโฟลว์ (workflows) เพื่อนำไปใช้งานซ้ำในขั้นตอนการผลิตเนื้อหาที่มีสไตล์และมาตรฐานคุณภาพเดียวกัน
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1 text-[11px]">
+                                <div className="space-y-1">
+                                    <h4 className="font-bold text-slate-700">✍️ 1. Prompt Templates & Inputs</h4>
+                                    <p className="text-slate-500 leading-normal">
+                                        ร่างข้อความหลัก และกำหนดตัวแปร <strong>Input Fields</strong> (เช่น หัวข้อ, กลุ่มเป้าหมาย) เพื่อปรับเปลี่ยนเนื้อหาเวลาทำคำสั่งส่งไปรันจริงได้โดยไม่ต้องแก้ไขเทมเพลตซ้ำ ๆ
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="font-bold text-slate-700">🛡️ 2. Green Fineness Guardrails</h4>
+                                    <p className="text-slate-500 leading-normal">
+                                        แนวทางควบคุมความเสี่ยงและการใช้ภาษา ช่วยให้ข้อเสนอแนะและข้อห้ามใช้ (เช่น คำเคลมการแพทย์เกินจริง) สอดแทรกเข้าไปในผลลัพธ์เพื่อรักษาคุณภาพแบรนด์และโทนเสียงให้สม่ำเสมอ
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="font-bold text-slate-700">🧪 3. Playground & Test History</h4>
+                                    <p className="text-slate-500 leading-normal">
+                                        ทดลองรันส่งข้อมูลพารามิเตอร์จำลองและบันทึกประวัติการทดสอบ (Test History) เพื่อประเมินผลลัพธ์และความพร้อมก่อนนำไปใช้งานจริง
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="font-bold text-slate-700">🔄 4. Version Management</h4>
+                                    <p className="text-slate-500 leading-normal">
+                                        ล็อกความก้าวหน้าการแก้ไขเป็นเวอร์ชันต่าง ๆ เพื่อป้องกันข้อมูลสูญหาย และสามารถกู้คืนเทมเพลตกลับไปเป็นเวอร์ชันก่อนหน้าได้ตลอดเวลา
+                                    </p>
+                                </div>
+                             </div>
+                         </div>
+                     )}
+
                     {/* Form Fields */}
                     <div className="flex-1 p-6 overflow-y-auto space-y-6 text-xs custom-scrollbar">
                         {/* Meta Grid Card */}
                         <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-5">
-                            <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 pb-2 border-b border-slate-100">
-                                ข้อมูลทั่วไป (Metadata)
-                            </h3>
+                            <div>
+                                <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1">
+                                    ข้อมูลทั่วไป (Metadata)
+                                </h3>
+                                <p className="text-[10px] text-slate-400 border-b border-slate-100 pb-2">
+                                    กำหนดชื่อและหมวดหมู่ของเทมเพลตเพื่อจัดระเบียบและเรียกใช้งานได้ง่ายในระบบคลังคำสั่ง
+                                </p>
+                            </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
@@ -1588,10 +1653,13 @@ export default function PromptStudioClient() {
                             </div>
 
                             <div className="p-4 space-y-4">
+                                <p className="text-[10px] text-slate-500 pb-2 border-b border-slate-100">
+                                    กำหนดฟิลด์ตัวแปร (เช่น topic, target_audience) เพื่อนำไปใช้อ้างอิงในเนื้อหาเทมเพลต Prompt ผ่านเครื่องหมายปีกกาคู่ <code>{"{{ชื่อตัวแปร}}"}</code> ได้โดยอัตโนมัติ
+                                </p>
                                 {/* List of Configured Fields */}
                                 {currentInputFields.length === 0 ? (
-                                    <p className="text-slate-500 text-xs italic text-center py-4 bg-white rounded-md border border-dashed border-slate-200">
-                                        ยังไม่มีตัวแปรอินพุตใด ๆ กดสร้างที่แผงควบคุมด้านล่างเพื่อผูกตัวแปร
+                                    <p className="text-slate-400 text-xs italic text-center py-5 bg-white rounded-xl border border-dashed border-slate-200 shadow-inner">
+                                        ยังไม่มีตัวแปรอินพุตใด ๆ เริ่มเพิ่มตัวแปรที่ต้องการในแบบฟอร์ม &quot;เพิ่มตัวแปรนำเข้าใหม่&quot; ด้านล่างนี้เพื่อนำไปเรียกใช้ในร่างคำสั่งหลัก
                                     </p>
                                 ) : (
                                     <div className="space-y-2">
@@ -1878,8 +1946,8 @@ export default function PromptStudioClient() {
                         {/* Green Fineness Guardrails Preset Selection Panel */}
                         <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
                             <label className="block text-slate-800 font-bold mb-1 text-xs uppercase tracking-wider">Green Fineness Guardrails (แนวทางความปลอดภัยของแบรนด์)</label>
-                            <span className="text-[10px] text-slate-500 block mb-3">
-                                ติ๊กเลือกแนวทางควบคุมโทนเสียง คำเตือนความปลอดภัยทางวิชาการ (Scientific Claims) และข้อจำกัดทางกฎหมายเพื่อสอดแทรกเข้าไปใน Prompt อัตโนมัติ
+                            <span className="text-[10px] text-slate-500 block mb-3 leading-normal">
+                                Guardrails คือกฎการควบคุมความเสี่ยงและการใช้ภาษา ซึ่งจะถูกรวมเข้าไปใน Compiled Prompt เพื่อช่วยรักษาโทนเสียง การกล่าวอ้างสรรพคุณ (Claims) และคุณภาพของผลลัพธ์ให้สอดคล้องตามเกณฑ์มาตรฐานความปลอดภัยของ Green Fineness อยู่เสมอ
                             </span>
                             
                             {guardrailPresets.length === 0 ? (
@@ -2326,10 +2394,86 @@ export default function PromptStudioClient() {
                                 </div>
                             </>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
-                                <Sliders className="w-12 h-12 text-slate-300 mb-3" />
-                                <p className="text-sm font-semibold text-slate-700">เลือกหรือสร้างเวิร์กโฟลว์ใหม่จากแถบซ้าย</p>
-                                <p className="text-xs text-slate-400 mt-1">จัดกลุ่มและเรียงลำดับขั้นตอนการรันเทมเพลต Prompt</p>
+                            <div className="flex-1 flex flex-col p-6 overflow-y-auto space-y-6 max-w-2xl mx-auto text-slate-600 custom-scrollbar justify-center">
+                                <div className="text-center space-y-2">
+                                    <Sliders className="w-10 h-10 text-blue-500 mx-auto mb-1 animate-pulse" />
+                                    <h2 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">คู่มือระบบเวิร์กโฟลว์ (Workflow Guide)</h2>
+                                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                                        เรียงร้อยหลายคำสั่ง Prompt Templates เข้าด้วยกันเป็นขั้นตอนตามลำดับ เพื่อการผลิตเนื้อหาที่มีคุณภาพและเป็นระบบระเบียบ
+                                    </p>
+                                </div>
+
+                                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                                        🚀 วิธีเริ่มต้นใช้งานเวิร์กโฟลว์
+                                    </h3>
+                                    <ol className="list-decimal list-inside space-y-2.5 text-xs text-slate-600">
+                                        <li>สร้างเซ็ตเวิร์กโฟลว์ใหม่ที่แถบเมนูด้านซ้าย (แท็บ <strong className="text-blue-600 font-semibold">Workflows</strong>)</li>
+                                        <li>คลิกเลือกเวิร์กโฟลว์ที่ต้องการเปิดขึ้นมาเพื่อจัดการโครงสร้าง</li>
+                                        <li>ผูกขั้นตอนการทำงานโดยกรอกชื่อ เลือกเทมเพลต Prompt ที่เกี่ยวข้อง และบันทึกทีละขั้นตอน</li>
+                                        <li>จัดลำดับขั้นตอนต่าง ๆ ให้สอดคล้องกันเพื่อใช้ในการผลิตผลงาน</li>
+                                    </ol>
+                                </div>
+
+                                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                                        💡 กรณีศึกษาเวิร์กโฟลว์: Green Fineness Article Production
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                                        ระบบงานการเขียนบทความ Green Fineness ที่เชื่อมโยง 7 ขั้นตอนตามมาตรฐานของแบรนด์:
+                                    </p>
+                                    <div className="space-y-3 pt-1 text-[11px]">
+                                        <div className="flex gap-2.5">
+                                            <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold font-mono text-[9px] flex-shrink-0">1</span>
+                                            <div>
+                                                <strong className="text-slate-700 block">Research Brief</strong>
+                                                <span className="text-slate-500">สรุปข้อมูลตั้งต้น บริบทของหัวข้อ และข้อเท็จจริงที่ควรใช้ในการเขียน</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2.5">
+                                            <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold font-mono text-[9px] flex-shrink-0">2</span>
+                                            <div>
+                                                <strong className="text-slate-700 block">Article Outline</strong>
+                                                <span className="text-slate-500">วางโครงสร้างบทความ H1, H2, H3 และลำดับการเล่า</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2.5">
+                                            <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold font-mono text-[9px] flex-shrink-0">3</span>
+                                            <div>
+                                                <strong className="text-slate-700 block">Claim Risk Review</strong>
+                                                <span className="text-slate-500">ตรวจคำกล่าวอ้างเรื่องดิน พืช จุลินทรีย์ ปุ๋ย ธาตุอาหาร ผลผลิต และสิ่งแวดล้อมไม่ให้ฟันธงเกินไป</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2.5">
+                                            <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold font-mono text-[9px] flex-shrink-0">4</span>
+                                            <div>
+                                                <strong className="text-slate-700 block">Article Draft</strong>
+                                                <span className="text-slate-500">ร่างเนื้อหาทั้งหมดด้วยภาษาไทยที่อ่านง่าย มีบริบท และไม่ขายแรง</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2.5">
+                                            <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold font-mono text-[9px] flex-shrink-0">5</span>
+                                            <div>
+                                                <strong className="text-slate-700 block">Green Fineness Tone Review</strong>
+                                                <span className="text-slate-500">ขัดเกลาภาษาให้สงบ ชัด และสอดคล้องกับโทน Green Fineness</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2.5">
+                                            <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold font-mono text-[9px] flex-shrink-0">6</span>
+                                            <div>
+                                                <strong className="text-slate-700 block">SEO Metadata</strong>
+                                                <span className="text-slate-500">ร่าง meta title, meta description, slug และคำสำคัญเบื้องต้น</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2.5">
+                                            <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold font-mono text-[9px] flex-shrink-0">7</span>
+                                            <div>
+                                                <strong className="text-slate-700 block">Social Caption</strong>
+                                                <span className="text-slate-500">ย่อยประเด็นจากบทความเป็นโพสต์สั้นสำหรับเผยแพร่</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -2441,11 +2585,19 @@ export default function PromptStudioClient() {
                             {/* Compile Preview Area */}
                             <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
                                 <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-white flex-shrink-0">
-                                    <div className="flex items-center gap-2">
-                                        <Eye className="w-3.5 h-3.5 text-blue-500" />
-                                        <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                            {previewTab === "compiled" ? "Compiled Result" : "Template Spec"}
-                                        </h2>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                            <Eye className="w-3.5 h-3.5 text-blue-500" />
+                                            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                                {previewTab === "compiled" ? "Compiled Result" : "Template Spec"}
+                                            </h2>
+                                        </div>
+                                        <span className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                                            {previewTab === "compiled" 
+                                                ? "ข้อความคำสั่งที่แทนที่ค่าตัวแปรทดสอบแล้ว (พร้อมก๊อปปี้ไปป้อน AI)" 
+                                                : "โครงสร้างโครงร่างพารามิเตอร์และตัวแปรแบบ Raw Spec"
+                                            }
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {previewTab === "compiled" && selectedId && selectedId !== "new-template" && (
@@ -2484,7 +2636,13 @@ export default function PromptStudioClient() {
                                     {activePreviewText ? (
                                         activePreviewText
                                     ) : (
-                                        <p className="text-slate-400 italic">กรอกบทบาท ขั้นตอนการทำงาน หรือหัวข้อบทความ เพื่อเริ่มสร้าง Prompt...</p>
+                                        <div className="flex flex-col items-center justify-center text-center py-10 space-y-2.5 max-w-[280px] mx-auto h-full">
+                                            <Eye className="w-8 h-8 text-slate-300" />
+                                            <p className="text-slate-700 font-semibold text-xs">พรีวิว Compiled Prompt</p>
+                                            <p className="text-slate-400 text-[10px] leading-relaxed">
+                                                กรอกร่างคำสั่งหลักในหน้าต่างตรงกลาง และป้อนตัวแปรจำลองที่ช่องกรอกทดสอบ &quot;Test Input Area&quot; เพื่อเรนเดอร์ดูข้อความ Prompt สำเร็จรูปที่พร้อมใช้ป้อน AI ได้ที่นี่ครับ
+                                            </p>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -2494,15 +2652,18 @@ export default function PromptStudioClient() {
                     {rightPanelTab === "history" && (
                         <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                             {!selectedId || selectedId === "new-template" ? (
-                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-500 italic">
-                                    กรุณาบันทึกเทมเพลตนี้ก่อนเพื่อเริ่มเก็บประวัติการทดสอบ
+                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-400 italic leading-relaxed">
+                                    กรุณาบันทึกเทมเพลตคำสั่งหลักนี้ก่อน เพื่อเปิดใช้ระบบประเมินคะแนนและเก็บบันทึกประวัติการทดสอบในระบบคลังคำสั่ง
                                 </div>
                             ) : (
                                 <>
                                     {/* Save Test Run form */}
                                     <div className="p-4 border-b border-slate-200 bg-white/40 flex flex-col flex-shrink-0 space-y-3">
-                                        <div className="flex items-center justify-between">
+                                        <div className="flex flex-col">
                                             <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">บันทึกผลการทดสอบ (Record Test Run)</span>
+                                            <span className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                                                ประเมินผลคำตอบของ AI ด้วยการให้คะแนนและบันทึกข้อเสนอแนะสำหรับการปรับปรุงเทมเพลตในรุ่นถัดไป
+                                            </span>
                                         </div>
                                         
                                         {/* Summary */}
@@ -2619,7 +2780,9 @@ export default function PromptStudioClient() {
                                             {isLoadingLogs ? (
                                                 <div className="text-center text-slate-400 text-xs py-8">กำลังโหลดประวัติ...</div>
                                             ) : runLogs.length === 0 ? (
-                                                <p className="text-slate-400 text-xs italic text-center py-8">ยังไม่มีประวัติการทดสอบสำหรับเทมเพลตนี้</p>
+                                                <p className="text-slate-400 text-xs italic text-center py-8 px-4 leading-relaxed">
+                                                    ยังไม่มีประวัติการบันทึกผลการรัน. เมื่อนำ Prompt ไปทดสอบกับ AI แล้ว สามารถระบุบันทึกผลการประเมินที่ฟอร์มด้านบนเพื่อเริ่มเก็บข้อมูลรอบแรกได้ครับ
+                                                </p>
                                             ) : (
                                                 runLogs.map(log => {
                                                     const isExpanded = expandedLogId === log.id;
@@ -2757,16 +2920,21 @@ export default function PromptStudioClient() {
                     {rightPanelTab === "versions" && (
                         <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                             {!selectedId || selectedId === "new-template" ? (
-                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-500 italic">
-                                    กรุณาบันทึกเทมเพลตนี้ก่อนเพื่อเริ่มเก็บประวัติเวอร์ชัน
+                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-400 italic leading-relaxed">
+                                    กรุณาบันทึกเทมเพลตนี้ก่อน เพื่อเริ่มต้นจัดเก็บและจัดการประวัติรุ่น (Versions) ของคำสั่งนี้
                                 </div>
                             ) : (
                                 <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                                     {/* Save Current as Version Form */}
                                     <div className="p-4 border-b border-slate-200 bg-white/40 space-y-3 flex-shrink-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Save className="w-3.5 h-3.5 text-blue-500" />
-                                            <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">บันทึกเวอร์ชันใหม่จากหน้าแก้ไข</span>
+                                        <div className="flex flex-col gap-0.5 mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <Save className="w-3.5 h-3.5 text-blue-500" />
+                                                <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">บันทึกเวอร์ชันใหม่จากหน้าแก้ไข</span>
+                                            </div>
+                                            <span className="text-[9px] text-slate-400 leading-normal">
+                                                ล็อกบันทึกสถานะของ Prompt ฉบับปัจจุบันนี้เก็บเป็นประวัติรุ่น (เช่น v1.0.0) เพื่อให้มั่นใจว่าสามารถคืนค่า (Restore) ย้อนกลับมาใช้ได้เสมอ
+                                            </span>
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-2">
@@ -2811,7 +2979,9 @@ export default function PromptStudioClient() {
                                         {isLoadingVersions ? (
                                             <div className="text-center text-slate-400 text-xs py-8">กำลังโหลดรายการเวอร์ชัน...</div>
                                         ) : versions.length === 0 ? (
-                                            <p className="text-slate-400 text-xs italic text-center py-8">ยังไม่มีเวอร์ชันบันทึกไว้สำหรับเทมเพลตนี้</p>
+                                            <p className="text-slate-400 text-xs italic text-center py-8 px-4 leading-relaxed">
+                                                ยังไม่มีการบันทึกรุ่นเวอร์ชันสำหรับเทมเพลตนี้. สามารถระบุเลขรุ่น (เช่น 1.0.0) และระบุบันทึกการแก้ไขที่ฟอร์มด้านบนเพื่อเริ่มบันทึกเวอร์ชันแรกได้เลยครับ
+                                            </p>
                                         ) : (
                                             versions.map(v => {
                                                 const formattedDate = new Date(v.created_at).toLocaleString("th-TH", {
