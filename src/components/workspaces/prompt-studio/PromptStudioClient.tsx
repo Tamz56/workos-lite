@@ -172,6 +172,187 @@ function cleanGreenFinenessClaims(text: string): string {
     return cleaned;
 }
 
+interface WfStepDraft {
+    step_name: string;
+    step_description: string;
+    step_instruction: string;
+    prompt_template_id: string | null;
+    missingTemplate: boolean;
+}
+
+interface WfDraft {
+    name: string;
+    description: string;
+    category: string;
+    steps: WfStepDraft[];
+}
+
+function findConfidentTemplateMatch(stepName: string, templates: PromptTemplate[]): string | null {
+    const sName = stepName.trim().toLowerCase();
+    
+    // Check template names for exact or confident match
+    for (const tpl of templates) {
+        const tName = tpl.name.trim().toLowerCase();
+        
+        // Exact match
+        if (tName === sName) {
+            return tpl.id;
+        }
+        
+        // Special case 1: Article Outline
+        if (sName === "article outline" && (tName.includes("article outline") || (tName.includes("outline") && tName.includes("article")))) {
+            return tpl.id;
+        }
+        
+        // Special case 2: Claim Risk Review
+        if (sName === "claim risk review" && (tName.includes("claim risk") || tName.includes("claim reviewer") || (tName.includes("claim") && tName.includes("reviewer")))) {
+            return tpl.id;
+        }
+
+        // Special case 3: Green Fineness Tone Review
+        if (sName === "green fineness tone review" && (tName.includes("tone reviewer") || tName.includes("tone review") || (tName.includes("tone") && tName.includes("reviewer")))) {
+            return tpl.id;
+        }
+        
+        // Special case 4: SEO Metadata
+        if (sName === "seo metadata" && tName.includes("seo")) {
+            return tpl.id;
+        }
+        
+        // Special case 5: Social Caption
+        if (sName === "social caption" && (tName.includes("social") || tName.includes("caption") || tName.includes("copywriter"))) {
+            return tpl.id;
+        }
+        
+        // Special case 6: Research Brief
+        if (sName === "research brief" && (tName.includes("research") || tName.includes("brief"))) {
+            return tpl.id;
+        }
+
+        // Special case 7: Article Draft
+        if (sName === "article draft" && (tName.includes("article draft") || tName.includes("article writer") || tName.includes("content writer"))) {
+            return tpl.id;
+        }
+    }
+    
+    return null;
+}
+
+function generateArborWorkflowDraft(inputs: {
+    brief: string;
+    type: string;
+    brandTone: string;
+    stepCount: number;
+    templates: PromptTemplate[];
+}): WfDraft {
+    const isGreenFineness = 
+        inputs.brandTone.toLowerCase().includes("green fineness") || 
+        inputs.brandTone.toLowerCase().includes("gf") ||
+        inputs.brief.toLowerCase().includes("green fineness") ||
+        inputs.brief.toLowerCase().includes("gf") ||
+        inputs.type.toLowerCase().includes("green fineness") ||
+        inputs.type.toLowerCase().includes("gf");
+
+    let name = "";
+    let description = "";
+    let category = "Writing";
+    let steps: WfStepDraft[] = [];
+
+    if (isGreenFineness || inputs.type === "Green Fineness Article Production") {
+        name = "Green Fineness Article Production";
+        description = "กระบวนการสร้างและตรวจทานบทความวิชาการด้านการเกษตรอินทรีย์ ดิน และระบบนิเวศ ตามแนวทางความปลอดภัยของ Green Fineness";
+        category = "Writing";
+        
+        const gfSteps = [
+            {
+                step_name: "Research Brief",
+                step_description: "สรุปข้อมูลตั้งต้น บริบทของหัวข้อ และข้อเท็จจริงที่ควรใช้ในการเขียน",
+                step_instruction: "รวบรวมงานวิจัยทางวิทยาศาสตร์เกี่ยวกับพืช ดิน จุลินทรีย์ และจัดระเบียบเป้าหมายบทความ"
+            },
+            {
+                step_name: "Article Outline",
+                step_description: "วางโครงสร้างบทความ H1, H2, H3 และลำดับการเล่า",
+                step_instruction: "วางหัวข้อย่อยและโครงสร้างการเล่าเรื่องให้อ่านง่ายและดึงดูดใจผู้รักธรรมชาติ"
+            },
+            {
+                step_name: "Claim Risk Review",
+                step_description: "ตรวจคำกล่าวอ้างเรื่องดิน พืช จุลินทรีย์ ปุ๋ย ธาตุอาหาร ผลผลิต คาร์บอน และสิ่งแวดล้อมไม่ให้ฟันธงเกินไป",
+                step_instruction: "ตรวจสอบคำสะกด คำเคลมเด็ดขาด (เช่น เห็นผลแน่นอน, ดีที่สุด) เพื่อแก้ไขให้เป็นถ้อยคำระมัดระวัง"
+            },
+            {
+                step_name: "Article Draft",
+                step_description: "ร่างเนื้อหาทั้งหมดด้วยภาษาไทยที่อ่านง่าย มีบริบท และไม่ขายแรง",
+                step_instruction: "เขียนรายละเอียดแต่ละหัวข้อให้ลื่นไหลสม่ำเสมอ เน้นให้ความรู้เชิงสร้างสรรค์"
+            },
+            {
+                step_name: "Green Fineness Tone Review",
+                step_description: "ขัดเกลาภาษาให้สงบ ชัด และสอดคล้องกับโทน Green Fineness",
+                step_instruction: "ปรับระดับความเป็นมิตรและภาษาธรรมชาติของบทความให้อยู่ใน Voice & Tone พรีเมียมของแบรนด์"
+            },
+            {
+                step_name: "SEO Metadata",
+                step_description: "ร่าง meta title, meta description, slug และคำสำคัญเบื้องต้น",
+                step_instruction: "จัดทำ Title Tag และ Meta Description สำหรับการค้นหาของ Google"
+            },
+            {
+                step_name: "Social Caption",
+                step_description: "ย่อยประเด็นจากบทความเป็นโพสต์สั้นสำหรับเผยแพร่",
+                step_instruction: "สรุปสาระสำคัญเป็น Hook ประโยคเด่น และแฮชแท็กชวนคุยแบบอบอุ่น"
+            }
+        ];
+
+        const count = Math.min(Math.max(inputs.stepCount || 7, 3), 7);
+        const selectedSteps = gfSteps.slice(0, count);
+
+        steps = selectedSteps.map(s => {
+            const matchedId = findConfidentTemplateMatch(s.step_name, inputs.templates);
+            return {
+                step_name: s.step_name,
+                step_description: s.step_description,
+                step_instruction: s.step_instruction,
+                prompt_template_id: matchedId,
+                missingTemplate: !matchedId
+            };
+        });
+    } else {
+        name = inputs.brief.substring(0, 30).trim() || "Workflow ทั่วไปจาก Arbor";
+        description = `เวิร์กโฟลว์แผนการรันระบบคำสั่งที่สร้างอิงตามเป้าหมาย: ${inputs.brief}`;
+        category = "Writing";
+        
+        const count = Math.min(Math.max(inputs.stepCount || 3, 2), 5);
+        for (let i = 1; i <= count; i++) {
+            let stepName = `ขั้นตอนที่ ${i}`;
+            let stepDesc = `คำอธิบายสำหรับขั้นตอนที่ ${i}`;
+            let stepInst = `คำสั่งเพิ่มเติมสำหรับการรันขั้นตอนที่ ${i}`;
+            
+            if (i === 1) {
+                stepName = "Input Analysis & Prep";
+                stepDesc = "ศึกษาความต้องการและจัดเตรียมหัวข้อนำเข้า";
+                stepInst = "ระบุข้อมูลความก้าวหน้าและจัดเรียงข้อมูลอ้างอิงให้ชัดเจน";
+            } else if (i === count) {
+                stepName = "Final Review & Output";
+                stepDesc = "ตรวจทานความถูกต้องและจัดรูปแบบเอาท์พุตสุดท้าย";
+                stepInst = "ตรวจสอบความเสถียรของคำตอบและการจัดหน้าให้อ่านง่าย";
+            } else {
+                stepName = `Core Generation Phase ${i-1}`;
+                stepDesc = `ดราฟท์ข้อมูลหลักขั้นตอนที่ ${i-1}`;
+                stepInst = `เขียนเนื้อหาและประมวลผลคำตอบหลัก`;
+            }
+
+            const matchedId = findConfidentTemplateMatch(stepName, inputs.templates);
+            steps.push({
+                step_name: stepName,
+                step_description: stepDesc,
+                step_instruction: stepInst,
+                prompt_template_id: matchedId,
+                missingTemplate: !matchedId
+            });
+        }
+    }
+
+    return { name, description, category, steps };
+}
+
 function generateArborPromptDraft(inputs: {
     brief: string;
     category: string;
@@ -446,6 +627,16 @@ export default function PromptStudioClient() {
     const [isAddingStep, setIsAddingStep] = useState(false);
     const [editingStepId, setEditingStepId] = useState<string | null>(null);
     const [editingStepForm, setEditingStepForm] = useState({ step_name: "", step_description: "", step_instruction: "" });
+
+    // Workflow Generator States
+    const [showWfGenModal, setShowWfGenModal] = useState(false);
+    const [wfGenStep, setWfGenStep] = useState<"input" | "generating" | "preview">("input");
+    const [wfGenBrief, setWfGenBrief] = useState("");
+    const [wfGenType, setWfGenType] = useState("Green Fineness Article Production");
+    const [wfGenBrandTone, setWfGenBrandTone] = useState("Green Fineness");
+    const [wfGenStepCount, setWfGenStepCount] = useState(7);
+    const [wfIsEditingDraftInModal, setWfIsEditingDraftInModal] = useState(false);
+    const [wfDraftEditFields, setWfDraftEditFields] = useState<Partial<WfDraft>>({});
 
     // Guardrail Presets State
     const [guardrailPresets, setGuardrailPresets] = useState<GuardrailPreset[]>([]);
@@ -1279,6 +1470,83 @@ export default function PromptStudioClient() {
         alert("โหลดร่างคำสั่งเข้าสู่ห้องแก้ไขเรียบร้อยแล้ว! (กรุณากด 'บันทึก' ด้านบนเพื่อเซฟลงฐานข้อมูล)");
     };
 
+    const handleTriggerWfMockGenerate = () => {
+        setWfGenStep("generating");
+        setTimeout(() => {
+            const draft = generateArborWorkflowDraft({
+                brief: wfGenBrief,
+                type: wfGenType,
+                brandTone: wfGenBrandTone,
+                stepCount: wfGenStepCount,
+                templates
+            });
+            setWfDraftEditFields(draft);
+            setWfGenStep("preview");
+        }, 1000);
+    };
+
+    const handleCreateWorkflowFromDraft = async () => {
+        if (!wfDraftEditFields.name?.trim()) {
+            alert("กรุณากรอกชื่อเวิร์กโฟลว์");
+            return;
+        }
+
+        const steps = wfDraftEditFields.steps || [];
+        const missingTemplateStep = steps.find(s => !s.prompt_template_id);
+        if (missingTemplateStep) {
+            alert("ยังมีขั้นตอนที่ไม่ได้จับคู่กับ Prompt Template กรุณาเลือก template ให้ครบก่อนสร้าง Workflow");
+            return;
+        }
+
+        if (!confirm(`คุณต้องการสร้างเวิร์กโฟลว์ "${wfDraftEditFields.name.trim()}" และเริ่มนำเข้าขั้นตอนการทำงานทั้งหมดจำนวน ${steps.length} ขั้นตอนใช่หรือไม่?`)) {
+            return;
+        }
+
+        setIsSavingWorkflow(true);
+        try {
+            // 1. Create Workflow
+            const wfRes = await fetch("/api/prompt-workflows", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: wfDraftEditFields.name.trim(),
+                    description: wfDraftEditFields.description?.trim() || null
+                })
+            });
+            if (!wfRes.ok) throw new Error("ไม่สามารถสร้างเวิร์กโฟลว์ได้");
+            const newWf = await wfRes.json() as PromptWorkflow;
+
+            // 2. Create steps sequentially
+            for (const step of steps) {
+                const stepRes = await fetch(`/api/prompt-workflows/${newWf.id}/steps`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        prompt_template_id: step.prompt_template_id,
+                        step_name: step.step_name.trim() || null,
+                        step_description: step.step_description?.trim() || null,
+                        step_instruction: step.step_instruction?.trim() || null
+                    })
+                });
+                if (!stepRes.ok) {
+                    throw new Error(`ไม่สามารถเพิ่มขั้นตอน "${step.step_name}" เข้าสู่เวิร์กโฟลว์ได้`);
+                }
+            }
+
+            // Refresh list and select the newly created workflow
+            await fetchWorkflows();
+            setSelectedWorkflowId(newWf.id);
+            setSidebarTab("workflows");
+            setShowWfGenModal(false);
+            alert("สร้างเวิร์กโฟลว์และนำเข้าขั้นตอนการทำงานสำเร็จแล้ว!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดทางเทคนิคในการสร้างเวิร์กโฟลว์";
+            alert(errMsg);
+        } finally {
+            setIsSavingWorkflow(false);
+        }
+    };
+
     // Save Template (POST or PATCH)
     const handleSave = async () => {
         if (jsonValidationError) {
@@ -1670,6 +1938,27 @@ export default function PromptStudioClient() {
                                     >
                                         {isSavingWorkflow ? "กำลังบันทึก..." : "สร้าง"}
                                     </button>
+
+                                    {/* Arbor Workflow Assistant Button */}
+                                    <div className="border-t border-slate-100 pt-2.5 mt-1.5">
+                                        <button
+                                            onClick={() => {
+                                                setWfGenBrief("");
+                                                setWfGenType("Green Fineness Article Production");
+                                                setWfGenBrandTone("Green Fineness");
+                                                setWfGenStepCount(7);
+                                                setWfGenStep("input");
+                                                setWfDraftEditFields({});
+                                                setWfIsEditingDraftInModal(false);
+                                                setShowWfGenModal(true);
+                                            }}
+                                            className="w-full py-2 text-center text-xs rounded-lg font-bold transition cursor-pointer bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-sm flex items-center justify-center gap-1.5 border border-transparent"
+                                            title="ให้ Arbor ช่วยร่างเวิร์กโฟลว์ตามโจทย์ความต้องการ"
+                                        >
+                                            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                                            <span>ให้ Arbor ช่วยร่าง Workflow</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -3690,6 +3979,349 @@ export default function PromptStudioClient() {
                                         >
                                             Use this Draft (นำไปใช้)
                                         </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI-Assisted Workflow Generator Modal */}
+            {showWfGenModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fadeIn text-xs">
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden text-slate-800">
+                        {/* Header */}
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-violet-600" />
+                                <h3 className="font-extrabold text-slate-800 text-sm">
+                                    {wfGenStep === "input" && "ให้ Arbor ช่วยร่าง Workflow"}
+                                    {wfGenStep === "generating" && "กำลังประมวลผลร่างแผนงาน..."}
+                                    {wfGenStep === "preview" && "ร่างแผนงานเวิร์กโฟลว์จาก Arbor"}
+                                </h3>
+                            </div>
+                            {wfGenStep !== "generating" && (
+                                <button
+                                    onClick={() => setShowWfGenModal(false)}
+                                    className="text-slate-400 hover:text-slate-600 text-xs font-bold px-2 py-1"
+                                >
+                                    ปิด
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {wfGenStep === "input" && (
+                                <div className="space-y-4">
+                                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                                        ระบุวัตถุประสงค์และบริบทของเวิร์กโฟลว์ที่คุณต้องการให้ระบบช่วยร่าง Arbor จะช่วยออกแบบโครงสร้างลำดับขั้นตอน ชื่อขั้นตอน คำอธิบาย และคำแนะนำการใช้งานของเวิร์กโฟลว์ให้กับคุณโดยอัตโนมัติ
+                                    </p>
+
+                                    {/* Brief / Goal */}
+                                    <div className="space-y-1">
+                                        <label className="block text-slate-600 font-bold">รายละเอียดหรือเป้าหมาย (Workflow Brief / Goal) *</label>
+                                        <textarea
+                                            rows={4}
+                                            value={wfGenBrief}
+                                            onChange={(e) => setWfGenBrief(e.target.value)}
+                                            placeholder="เช่น ช่วยร่างกระบวนการและโครงสร้างเวิร์กโฟลว์ในการผลิตบทความให้ความรู้ทางวิชาการและ SEO ของ Green Fineness..."
+                                            className={TEXTAREA_CLASS}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {/* Type */}
+                                        <div className="space-y-1">
+                                            <label className="block text-slate-600 font-bold">ประเภทเวิร์กโฟลว์ (Workflow Type)</label>
+                                            <select
+                                                value={wfGenType}
+                                                onChange={(e) => setWfGenType(e.target.value)}
+                                                className={SELECT_CLASS}
+                                            >
+                                                <option className="text-slate-800" value="Green Fineness Article Production">Green Fineness Article Production (7 ขั้นตอนหลัก)</option>
+                                                <option className="text-slate-800" value="Marketing Campaign">Marketing Campaign / Ads Workflow</option>
+                                                <option className="text-slate-800" value="General Writing">General Writing & Review Workflow</option>
+                                                <option className="text-slate-800" value="Other">อื่นๆ (General / Custom)</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Brand/Tone */}
+                                        <div className="space-y-1">
+                                            <label className="block text-slate-600 font-bold">แบรนด์ / โทนเสียง (Brand / Tone)</label>
+                                            <select
+                                                value={wfGenBrandTone}
+                                                onChange={(e) => setWfGenBrandTone(e.target.value)}
+                                                className={SELECT_CLASS}
+                                            >
+                                                <option className="text-slate-800" value="Green Fineness">Green Fineness (โทนพรีเมียม ระมัดระวัง)</option>
+                                                <option className="text-slate-800" value="Professional">Professional (เป็นทางการ)</option>
+                                                <option className="text-slate-800" value="Creative">Creative / Friendly (เป็นมิตรและสร้างสรรค์)</option>
+                                                <option className="text-slate-800" value="General">General / Neutral (ทั่วไป)</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Step Count */}
+                                        <div className="space-y-1">
+                                            <label className="block text-slate-600 font-bold">จำนวนขั้นตอนแนะนำ (Step Count)</label>
+                                            <input
+                                                type="number"
+                                                min={2}
+                                                max={10}
+                                                value={wfGenStepCount}
+                                                onChange={(e) => setWfGenStepCount(parseInt(e.target.value) || 7)}
+                                                className={INPUT_CLASS}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {wfGenStep === "generating" && (
+                                <div className="py-12 flex flex-col items-center justify-center space-y-4">
+                                    <RefreshCw className="w-8 h-8 text-violet-600 animate-spin" />
+                                    <div className="text-center space-y-1.5">
+                                        <p className="font-bold text-slate-700">Arbor กำลังวิเคราะห์และร่างเวิร์กโฟลว์...</p>
+                                        <p className="text-[10px] text-slate-400">กำหนดลำดับขั้นตอนและค้นหาแมปปิ้งกับคลังคำสั่งที่มีอยู่เดิม...</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {wfGenStep === "preview" && (
+                                <div className="space-y-4">
+                                    <div className="bg-violet-50/50 border border-violet-100 rounded-xl p-3 flex items-start gap-2.5">
+                                        <Sparkles className="w-4 h-4 text-violet-600 mt-0.5 flex-shrink-0" />
+                                        <div className="space-y-1 leading-relaxed">
+                                            <p className="font-bold text-violet-800 text-[11px]">ร่างสเปกแผนงานเวิร์กโฟลว์พร้อมให้คุณรีวิว</p>
+                                            <p className="text-slate-500 text-[10px]">
+                                                คุณสามารถเปลี่ยนหัวข้อ รายละเอียดของขั้นตอน หรือทำการจับคู่เทมเพลตคำสั่งซื้อเพิ่มเติมได้ด้วยตนเอง
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Edit or Preview Meta Fields */}
+                                    <div className="space-y-3.5 border border-slate-200 rounded-2xl bg-slate-50/30 p-4.5">
+                                        {wfIsEditingDraftInModal ? (
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div className="space-y-1">
+                                                        <label className="block text-slate-500 font-bold text-[10px] uppercase">ชื่อเวิร์กโฟลว์</label>
+                                                        <input
+                                                            type="text"
+                                                            value={wfDraftEditFields.name || ""}
+                                                            onChange={(e) => setWfDraftEditFields(prev => ({ ...prev, name: e.target.value }))}
+                                                            className={INPUT_CLASS}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="block text-slate-500 font-bold text-[10px] uppercase">หมวดหมู่</label>
+                                                        <input
+                                                            type="text"
+                                                            value={wfDraftEditFields.category || "Writing"}
+                                                            onChange={(e) => setWfDraftEditFields(prev => ({ ...prev, category: e.target.value }))}
+                                                            className={INPUT_CLASS}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="block text-slate-500 font-bold text-[10px] uppercase">คำอธิบายเวิร์กโฟลว์</label>
+                                                    <textarea
+                                                        rows={2}
+                                                        value={wfDraftEditFields.description || ""}
+                                                        onChange={(e) => setWfDraftEditFields(prev => ({ ...prev, description: e.target.value }))}
+                                                        className={TEXTAREA_CLASS}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-1 text-[11px] leading-relaxed">
+                                                <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Workflow Name / Description</strong>
+                                                <p className="text-slate-800 font-bold text-xs">{wfDraftEditFields.name} ({wfDraftEditFields.category})</p>
+                                                <p className="text-slate-600 bg-white p-2 rounded-lg border border-slate-200 mt-1">{wfDraftEditFields.description}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* List of Steps with Template Selector and Warning Badges */}
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                                            <h4 className="font-bold text-slate-700 text-xs">ลำดับขั้นตอนการรันแผนงาน ({wfDraftEditFields.steps?.length || 0})</h4>
+                                            <span className="text-[10px] text-red-500 font-semibold">* ทุกขั้นตอนต้องระบุ Prompt Template ให้ครบ</span>
+                                        </div>
+
+                                        <div className="space-y-2.5">
+                                            {wfDraftEditFields.steps?.map((step, idx) => {
+                                                const isStepMissing = !step.prompt_template_id;
+                                                return (
+                                                    <div key={idx} className="border border-slate-200 rounded-xl bg-white p-3.5 space-y-3 shadow-sm">
+                                                        <div className="flex justify-between items-start gap-3">
+                                                            <div className="flex items-start gap-2 min-w-0">
+                                                                <div className="w-5 h-5 rounded-full bg-violet-50 text-violet-600 border border-violet-200 flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">
+                                                                    {idx + 1}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    {wfIsEditingDraftInModal ? (
+                                                                        <div className="space-y-2">
+                                                                            <input
+                                                                                type="text"
+                                                                                value={step.step_name}
+                                                                                onChange={(e) => {
+                                                                                    const updatedSteps = [...(wfDraftEditFields.steps || [])];
+                                                                                    updatedSteps[idx] = { ...step, step_name: e.target.value };
+                                                                                    setWfDraftEditFields(prev => ({ ...prev, steps: updatedSteps }));
+                                                                                }}
+                                                                                className={INPUT_CLASS}
+                                                                                placeholder="ชื่อขั้นตอน..."
+                                                                            />
+                                                                            <input
+                                                                                type="text"
+                                                                                value={step.step_description}
+                                                                                onChange={(e) => {
+                                                                                    const updatedSteps = [...(wfDraftEditFields.steps || [])];
+                                                                                    updatedSteps[idx] = { ...step, step_description: e.target.value };
+                                                                                    setWfDraftEditFields(prev => ({ ...prev, steps: updatedSteps }));
+                                                                                }}
+                                                                                className={INPUT_CLASS}
+                                                                                placeholder="คำอธิบาย..."
+                                                                            />
+                                                                            <textarea
+                                                                                rows={2}
+                                                                                value={step.step_instruction}
+                                                                                onChange={(e) => {
+                                                                                    const updatedSteps = [...(wfDraftEditFields.steps || [])];
+                                                                                    updatedSteps[idx] = { ...step, step_instruction: e.target.value };
+                                                                                    setWfDraftEditFields(prev => ({ ...prev, steps: updatedSteps }));
+                                                                                }}
+                                                                                className={TEXTAREA_CLASS}
+                                                                                placeholder="คำแนะนำเพิ่มเติมสำหรับขั้นตอนนี้..."
+                                                                            />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            <h5 className="font-bold text-slate-800 text-[11px]">{step.step_name}</h5>
+                                                                            <p className="text-slate-500 text-[10px] mt-0.5 leading-relaxed">{step.step_description}</p>
+                                                                            {step.step_instruction && (
+                                                                                <div className="mt-1 bg-slate-50 p-2 border border-slate-100 rounded text-[9px] font-mono text-slate-600 whitespace-pre-wrap">
+                                                                                    {step.step_instruction}
+                                                                                </div>
+                                                                            )}
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Status Badges */}
+                                                            <div className="flex-shrink-0">
+                                                                {isStepMissing ? (
+                                                                    <span className="bg-red-50 text-red-600 border border-red-200 text-[8px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                                                        ⚠️ Missing Template
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="bg-emerald-50 text-emerald-600 border border-emerald-250 text-[8px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                                                        ✓ Matched
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Template Link Selector (Manual Linking inside Modal) */}
+                                                        <div className="bg-slate-50/50 p-2.5 rounded-lg border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-[10px]">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-bold text-slate-500">จับคู่กับ Template:</span>
+                                                                <select
+                                                                    value={step.prompt_template_id || ""}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value || null;
+                                                                        const updatedSteps = [...(wfDraftEditFields.steps || [])];
+                                                                        updatedSteps[idx] = { 
+                                                                            ...step, 
+                                                                            prompt_template_id: val,
+                                                                            missingTemplate: !val
+                                                                        };
+                                                                        setWfDraftEditFields(prev => ({ ...prev, steps: updatedSteps }));
+                                                                    }}
+                                                                    className="bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-700 font-semibold"
+                                                                >
+                                                                    <option value="">-- ยังไม่ได้ระบุ (Missing Prompt Template) --</option>
+                                                                    {templates.map(tpl => (
+                                                                        <option key={tpl.id} value={tpl.id}>
+                                                                            {tpl.name} ({tpl.category})
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center flex-shrink-0">
+                            <div>
+                                {wfGenStep === "preview" && (
+                                    <button
+                                        onClick={() => setWfIsEditingDraftInModal(!wfIsEditingDraftInModal)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                                            wfIsEditingDraftInModal 
+                                                ? "bg-slate-200 border-slate-300 text-slate-700 hover:bg-slate-300"
+                                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        {wfIsEditingDraftInModal ? "ดูตัวอย่างพรีวิว" : "แก้ไขรายละเอียดในร่าง (Edit manually)"}
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                {wfGenStep === "input" && (
+                                    <>
+                                        <button
+                                            onClick={() => setShowWfGenModal(false)}
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                            ยกเลิก
+                                        </button>
+                                        <button
+                                            onClick={handleTriggerWfMockGenerate}
+                                            disabled={!wfGenBrief.trim()}
+                                            className="px-4 py-1.5 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-lg text-xs cursor-pointer disabled:opacity-50"
+                                        >
+                                            เริ่มการร่างด้วย Arbor
+                                        </button>
+                                    </>
+                                )}
+
+                                {wfGenStep === "preview" && (
+                                    <>
+                                        <button
+                                            onClick={() => setWfGenStep("input")}
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                            ย้อนกลับ
+                                        </button>
+                                        <button
+                                            onClick={() => setShowWfGenModal(false)}
+                                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                            Discard (ทิ้งร่าง)
+                                        </button>
+                                        <div className="flex flex-col items-end">
+                                            <button
+                                                onClick={handleCreateWorkflowFromDraft}
+                                                className="px-4 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold rounded-lg text-xs cursor-pointer shadow-sm"
+                                            >
+                                                สร้าง Workflow จากร่างนี้
+                                            </button>
+                                            <span className="text-[9px] text-slate-400 mt-1 block">
+                                                * ไม่มีการบันทึกฐานข้อมูลจนกว่าจะกดปุ่มนี้
+                                            </span>
+                                        </div>
                                     </>
                                 )}
                             </div>
