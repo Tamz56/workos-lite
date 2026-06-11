@@ -21,7 +21,8 @@ import {
     Code,
     ChevronDown,
     ChevronUp,
-    HelpCircle
+    HelpCircle,
+    Sparkles
 } from "lucide-react";
 
 interface PromptInputField {
@@ -160,6 +161,200 @@ function safeParseInputFields(jsonStr: string | null): PromptInputField[] {
     return [];
 }
 
+function cleanGreenFinenessClaims(text: string): string {
+    let cleaned = text;
+    cleaned = cleaned.replace(/เห็นผลแน่นอน/g, "อาจมีส่วนช่วยปรับปรุงกระบวนการหรือฟื้นฟูภายใต้การจัดการที่เหมาะสม");
+    cleaned = cleaned.replace(/ดีที่สุด/g, "เหมาะสมภายใต้เงื่อนไขและบริบทนั้น ๆ");
+    cleaned = cleaned.replace(/เพิ่มผลผลิตแน่นอน/g, "มีส่วนเกี่ยวข้องกับความสมบูรณ์และช่วยสนับสนุนโอกาสในการเพิ่มผลผลิต");
+    cleaned = cleaned.replace(/ฟื้นฟูดินทันที/g, "อาจช่วยสนับสนุนความสมบูรณ์ของดินภายใต้เงื่อนไขและการจัดการที่เหมาะสม");
+    cleaned = cleaned.replace(/ปลอดภัย\s*100%/g, "มีความปลอดภัยสูงและเป็นมิตรต่อสิ่งแวดล้อมเมื่อนำไปใช้อย่างถูกวิธี");
+    cleaned = cleaned.replace(/รักษาโรค/g, "");
+    return cleaned;
+}
+
+function generateArborPromptDraft(inputs: {
+    brief: string;
+    category: string;
+    brandTone: string;
+    outputFormat: string;
+}): Partial<PromptTemplate> {
+    const isGreenFineness = 
+        inputs.brandTone.toLowerCase().includes("green fineness") || 
+        inputs.brandTone.toLowerCase().includes("gf") ||
+        inputs.brief.toLowerCase().includes("green fineness") ||
+        inputs.brief.toLowerCase().includes("gf");
+
+    const cleanBrief = cleanGreenFinenessClaims(inputs.brief);
+    
+    let name = "";
+    let purpose = "";
+    let role = "";
+    let context = "";
+    let inputFields: PromptInputField[] = [];
+    let instructions = "";
+    let constraints = "";
+    let outputFormat = inputs.outputFormat || "Markdown";
+    let reviewChecklist = "";
+    let notes = "";
+    let guardrailPresetIds: string[] = [];
+
+    if (isGreenFineness) {
+        guardrailPresetIds = [
+            "preset-gf-core-tone",
+            "preset-scientific-claim-caution",
+            "preset-soil-microbe-fertilizer",
+            "preset-non-salesy-edu",
+            "preset-gf-review-checklist"
+        ];
+    }
+
+    if (inputs.category === "Writing") {
+        name = isGreenFineness 
+            ? "Green Fineness Educational Content Writer" 
+            : "Content Outline and Draft Writer";
+        purpose = isGreenFineness
+            ? "สร้างสรรค์ร่างโครงร่างเนื้อหาและบทความวิชาการด้านการเกษตรอินทรีย์ ดิน และระบบนิเวศชีวภาพอย่างสร้างสรรค์และปลอดภัย"
+            : "เพื่อสร้างสรรค์บทความเนื้อหาทั่วไปให้มีคุณภาพและจัดรูปแบบอย่างสมบูรณ์";
+        role = isGreenFineness
+            ? "คุณคือผู้เชี่ยวชาญด้านนิเวศวิทยาการเกษตรและบรรณาธิการสื่อสารความรู้ของ Green Fineness ผู้เชี่ยวชาญในการแปลงวิชาการดินและจุลินทรีย์ให้เป็นภาษาสงบ ชัดเจน และย่อยง่าย"
+            : "คุณคือบรรณาธิการอาวุโสและนักเขียนเนื้อหาออนไลน์มืออาชีพที่มีความรอบรู้และจัดแต่งการเล่าเรื่องได้อย่างน่าติดตาม";
+        context = isGreenFineness
+            ? "งานเขียนสื่อสารข้อมูลเพื่อเผยแพร่บนเว็บไซต์และบล็อกความรู้ของแบรนด์ เพื่อสร้างความตระหนักรู้เรื่องคุณค่าทางธรรมชาติ ดินมีชีวิต (Living Soil) และชีวภาพของพืช"
+            : "การสร้างสรรค์เนื้อหาสำหรับบล็อกและช่องทางออนไลน์ต่างๆ ตามหัวข้อความสนใจ";
+        inputFields = [
+            { name: "topic", label: "หัวข้อบทความ", value: isGreenFineness ? "ความสัมพันธ์ของอินทรียวัตถุกับโครงสร้างดินชีวภาพ" : "การดูแลรักษาสุขภาพในชีวิตประจำวัน" },
+            { name: "target_audience", label: "กลุ่มเป้าหมาย", value: isGreenFineness ? "เกษตรกรรุ่นใหม่และผู้รักการปลูกพืชอินทรีย์" : "คนทำงานทั่วไป" }
+        ];
+        instructions = isGreenFineness
+            ? "1. ศึกษาเป้าหมายของหัวข้อ {{topic}} เพื่อวิเคราะห์ข้อมูลอ้างอิงและประเด็นสำคัญเชิงวิทยาศาสตร์\n2. วางโครงร่างบทความโดยแบ่งลำดับเรื่องเป็นหัวข้อย่อย H2, H3 ตามความต้องการของกลุ่มเป้าหมาย {{target_audience}}\n3. อธิบายหลักวิทยาศาสตร์เกี่ยวกับดิน พืช หรือจุลินทรีย์อย่างเป็นธรรมชาติ มีความน่าเชื่อถือ\n4. เชื่อมโยงบริบทธรรมชาติบำบัด โดยใช้หลักคิด Green Fineness ในการถ่ายทอดเนื้อหาที่ไม่เน้นการขายเร่งเร้า"
+            : "1. ศึกษาความต้องการของหัวข้อ {{topic}} และวิเคราะห์เป้าหมายผู้อ่าน {{target_audience}}\n2. กำหนดโครงร่างเนื้อหาด้วยการเกริ่นนำ ประเด็นหลัก และสรุปท้าย\n3. เขียนบรรยายเนื้อหาให้น่าสนใจและลื่นไหล\n4. ตรวจสอบการจัดรูปแบบตัวหนา หัวข้อ และรายการหัวข้อ";
+        constraints = isGreenFineness
+            ? "- ห้ามใช้คำกล่าวอ้างแบบเด็ดขาดหรือเกินจริง เช่น \"เห็นผลแน่นอน\" หรือ \"เพิ่มผลผลิตแน่นอน\" แต่ให้ใช้คำอธิบายที่รอบคอบ เช่น \"อาจช่วยสนับสนุนโอกาสในการเพิ่มผลผลิต\" หรือ \"ช่วยส่งเสริมตามปัจจัยแวดล้อมที่เหมาะสม\"\n- ห้ามเคลมความเร็วในการฟื้นตัวด้วยคำเช่น \"ฟื้นฟูดินทันที\" แต่ให้เปลี่ยนเป็น \"อาจช่วยสนับสนุนความสมบูรณ์ของดินภายใต้เงื่อนไขและการจัดการที่เหมาะสม\"\n- ห้ามใช้สำนวนการขายแบบเร่งเร้า (Non-salesy) หรือการการันตีความปลอดภัยแบบร้อยเปอร์เซ็นต์อย่าง \"ปลอดภัย 100%\" ให้ใช้คำว่า \"มีความปลอดภัยสูงและเป็นมิตรต่อสิ่งแวดล้อมเมื่อนำไปใช้อย่างถูกวิธี\"\n- High-risk Claim Avoidance: หลีกเลี่ยงถ้อยคำที่ทำให้เข้าใจว่าผลลัพธ์แน่นอน รวมถึงการกล่าวอ้างด้านพืช ดิน จุลินทรีย์ ปุ๋ย ธาตุอาหาร ผลผลิต คาร์บอน หรือสิ่งแวดล้อมเกินบริบทของข้อมูล"
+            : "- หลีกเลี่ยงภาษาที่เป็นทางการเกินความจำเป็น\n- ตรวจสอบคำทับศัพท์ให้ถูกต้องและใช้สำนวนสากล\n- ห้ามคัดลอกข้อมูลที่เป็นลิขสิทธิ์โดยตรง";
+        outputFormat = "บทความภาษาไทยเชิงการศึกษา (Educational Article) ความยาว 800-1200 คำ จัดรูปแบบด้วย Markdown พร้อมหัวข้อเรื่องหลักและประเด็นย่อย H2, H3";
+        reviewChecklist = isGreenFineness
+            ? "- ไม่มีคำกล่าวอ้างเรื่องพืช ผลผลิต ดิน หรือจุลินทรีย์ที่ฟันธงเกินจริง\n- มีการใช้คำที่มีความระมัดระวัง (Cautious scientific wording) ครบถ้วน\n- หลีกเลี่ยงคำโฆษณาเร่งรัดและน้ำเสียงยังคงสงบและอบอุ่น\n- ปฏิบัติตามเกณฑ์ High-risk Claim Avoidance (หลีกเลี่ยงถ้อยคำที่ทำให้เข้าใจว่าผลลัพธ์แน่นอน หรืออ้างอิงข้อมูลเกินจริง)"
+            : "- โครงสร้างเรื่องมีความเป็นระบบลื่นไหล\n- โทนเสียงสม่ำเสมอตลอดทั้งบทความ\n- จัดหน้าด้วย Markdown ครบถ้วนและสวยงาม";
+        notes = isGreenFineness
+            ? "เทมเพลตนี้ได้รับการออกแบบตามแนวทาง Green Fineness Brand Guidelines โดยใช้ระบบความปลอดภัยของ guardrail presets ทั้ง 5 รายการในการสอดส่องและควบคุมน้ำเสียง"
+            : "เหมาะสำหรับสร้างบทความสร้างชื่อเสียงให้กับเว็บบล็อกทั่วไป";
+    } else if (inputs.category === "Review") {
+        name = isGreenFineness 
+            ? "Green Fineness Claim & Tone Reviewer" 
+            : "Prompt Draft Claims Reviewer";
+        purpose = isGreenFineness
+            ? "ตรวจสอบคำเคลมเกี่ยวกับดิน ปุ๋ย และจุลินทรีย์ รวมถึงขัดเกลาสำนวนให้เข้ากับโทนเสียง Green Fineness"
+            : "ตรวจทานความถูกต้อง ความสมบูรณ์ และการใช้ภาษาในดราฟท์คำสั่ง";
+        role = isGreenFineness
+            ? "คุณคือบรรณาธิการอาวุโสและผู้ตรวจสอบความเสี่ยงด้านการสื่อสาร (Claims Compliance Auditor) ของ Green Fineness"
+            : "คุณคือผู้เชี่ยวชาญการตรวจเนื้อหาและปรับปรุงคุณภาพการเขียน";
+        context = isGreenFineness
+            ? "ทำหน้าที่คัดกรองดราฟท์ก่อนส่งออกเผยแพร่ เพื่อลดความเสี่ยงทางกฎหมายและรักษาภาพลักษณ์ของแบรนด์ในการเป็นแหล่งอ้างอิงความรู้ด้านธรรมชาติ"
+            : "ตรวจสอบและประเมินเนื้อหาก่อนทำการบันทึกหรือส่งมอบ";
+        inputFields = [
+            { name: "draft_content", label: "เนื้อหาที่ต้องการตรวจสอบ", value: isGreenFineness ? "สูตรปุ๋ยหมักชีวภาพนี้ช่วยฟื้นฟูดินทันทีและเร่งผลผลิตพืชให้เห็นผลแน่นอนร้อยเปอร์เซ็นต์" : "สเปกบทความวิชาการเรื่องการทำงานของระบบขับถ่าย" }
+        ];
+        instructions = isGreenFineness
+            ? "1. ตรวจสอบเนื้อหา {{draft_content}} เพื่อหาประโยคหรือถ้อยคำที่อ้างอิงเรื่องดิน พืช ผลผลิต หรือจุลินทรีย์ที่ฟันธงเกินไป\n2. ระบุจุดเสี่ยงและให้คำเสนอแนะในการปรับเปลี่ยนคำพูดด้วยคำที่ระมัดระวังเชิงวิทยาศาสตร์\n3. ปรับเปลี่ยนคำที่มีความเสี่ยงสูง เช่น เปลี่ยน \"เห็นผลแน่นอน\" เป็น \"อาจมีส่วนช่วยปรับปรุงกระบวนการหรือฟื้นฟูภายใต้การจัดการที่เหมาะสม\" หรือเปลี่ยน \"ฟื้นฟูดินทันที\" เป็น \"อาจช่วยสนับสนุนความสมบูรณ์ของดินภายใต้เงื่อนไขและการจัดการที่เหมาะสม\""
+            : "1. อ่านเนื้อหา {{draft_content}} อย่างละเอียด\n2. ตรวจสอบข้อผิดพลาดของไวยากรณ์ การสะกดคำ และคำซ้ำซ้อน\n3. เสนอแนะการปรับปรุงเพื่อเพิ่มประสิทธิภาพในการอ่าน";
+        constraints = isGreenFineness
+            ? "- ห้ามอนุญาตให้คำว่า \"เห็นผลแน่นอน\", \"ดีที่สุด\", \"เพิ่มผลผลิตแน่นอน\", \"ฟื้นฟูดินทันที\", หรือ \"ปลอดภัย 100%\" หลุดไปเด็ดขาด ให้ระบุเป็นคำเตือนและแนะนำคำทดแทนเสมอ\n- ปฏิบัติตามหลัก High-risk Claim Avoidance ในการคัดกรองคำกล่าวอ้างเกินจริงและการันตีผลลัพธ์\n- แนะนำการแก้ไขอย่างสร้างสรรค์และเน้นเหตุผลทางวิทยาศาสตร์เป็นเกราะป้องกันแบรนด์"
+            : "- ชี้แจงข้อบกพร่องเป็นหัวข้ออย่างสุภาพ\n- แนะนำแนวทางการปรับโครงสร้างหากประเด็นยาวเกินไป";
+        outputFormat = "ตาราง Markdown แยกตามมิติ: ข้อความที่พบปัญหา -> ข้อเสนอแนะการปรับปรุงคำพูดใหม่ -> ระดับความเสี่ยง (สูง/กลาง/ต่ำ)";
+        reviewChecklist = isGreenFineness
+            ? "- สามารถแยกแยะคำอ้างอิงพืชผลและดินปุ๋ยชีวภาพได้ถูกต้องหรือไม่\n- คำเสนอแนะตรงตามแนวทางระมัดระวังของ Green Fineness หรือไม่\n- โทนคำเตือนไม่ดูรุนแรงแต่ชัดเจน"
+            : "- ครอบคลุมข้อผิดพลาดสำคัญ\n- ให้คำแนะนำที่นำไปแก้ไขต่อได้ทันที";
+        notes = isGreenFineness
+            ? "ช่วยเสริมกำลังในการตรวจสอบของทีมบรรณาธิการก่อนการเผยแพร่ ทำงานร่วมกับ guardrail presets ทั้ง 5 รายการได้อย่างดี"
+            : "บันทึกแนวทางคำเตือนที่พบบ่อยในการเขียน";
+    } else if (inputs.category === "Marketing") {
+        name = isGreenFineness 
+            ? "Green Fineness Social Copywriter" 
+            : "Social Post & Marketing Writer";
+        purpose = isGreenFineness
+            ? "สร้างสรรค์โพสต์โซเชียลมีเดียเพื่อให้ความรู้เชิงเกษตรและธรรมชาติอย่างอบอุ่นและมีปฏิสัมพันธ์ที่ดี"
+            : "เพื่อร่างข้อความโพสต์โฆษณาประชาสัมพันธ์สินค้าและบริการทางออนไลน์";
+        role = isGreenFineness
+            ? "คุณคือผู้เชี่ยวชาญด้านการสื่อสารและการตลาดผ่านคอนเทนต์สร้างสรรค์ (Content Marketing Specialist) ของ Green Fineness"
+            : "คุณคือปี้ไรเตอร์สายการตลาดที่สร้างโพสต์ที่ดึงดูดใจและเพิ่มยอดการคลิกมีปฏิสัมพันธ์ (Engagement)";
+        context = isGreenFineness
+            ? "การแปลงหัวข้อวิชาการให้เป็นภาษาสำหรับ Facebook Page, Group หรือโปรไฟล์ส่วนตัว เพื่อชวนคุยสร้างปฏิสัมพันธ์แบบไม่ยัดเยียด"
+            : "การโปรโมตหัวข้อหรือแคมเปญให้เข้าถึงกลุ่มเป้าหมายในโซเชียลมีเดียหลัก";
+        inputFields = [
+            { name: "core_concept", label: "แนวคิดหรือข้อมูลหลัก", value: isGreenFineness ? "ความอัศจรรย์ของสิ่งมีชีวิตขนาดเล็กในดินอย่างจุลินทรีย์ไมคอร์ไรซา" : "เปิดตัวแอปพลิเคชันจัดการตารางงานใหม่ล่าสุด" },
+            { name: "channel", label: "ช่องทางที่จะโพสต์", value: "Facebook Page" }
+        ];
+        instructions = isGreenFineness
+            ? "1. นำข้อมูลจากแนวคิด {{core_concept}} มาย่อยเป็นคำอธิบายสั้นๆ ที่ชวนติดตาม\n2. ออกแบบ Hook ประโยคแรกให้น่าสนใจแบบเป็นมิตรโดยสอดคล้องกับช่องทาง {{channel}}\n3. นำเสนอประเด็นความสัมพันธ์แบบไม่เน้นการโฆษณาชวนเชื่อ (Non-salesy) อิงตามหลักวิชาการดินและพืชอย่างโปร่งใส\n4. ใส่คำกระตุ้นการมีปฏิสัมพันธ์แบบอบอุ่นและสร้างสรรค์"
+            : "1. ศึกษาความโดดเด่นของหัวข้อ {{core_concept}} และวิเคราะห์สไตล์ของช่องทาง {{channel}}\n2. เขียนข้อความเปิดตัวที่สะดุดตาพร้อมคำเชิญชวน (CTA) ที่กระชับ\n3. เพิ่มแฮชแท็กที่เกี่ยวข้องเพื่อเพิ่มความสามารถในการค้นหา";
+        constraints = isGreenFineness
+            ? "- ห้ามใช้คำโฆษณาเกินจริง เช่น ดีที่สุด, ปลอดภัย 100%, เห็นผลแน่นอน\n- ห้ามใช้ภาษาเร่งเร้า กดดันให้ซื้อทันที หรือส่อเสียดเชิงลบ\n- เขียนอิงประโยชน์ธรรมชาติและวิถีเกษตรอินทรีย์อย่างมีสติ"
+            : "- ความยาวกระชับเหมาะสมกับแต่ละช่องทาง\n- หลีกเลี่ยงข้อความที่ซับซ้อนเข้าใจยาก";
+        outputFormat = "ร่างโพสต์โซเชียลมีเดียที่มีโครงสร้าง: ประโยคเปิดหัว (Hook) -> รายละเอียดเนื้อหาความรู้ -> คำถามชวนคุย -> แฮชแท็กที่แนะนำ";
+        reviewChecklist = isGreenFineness
+            ? "- น้ำเสียงมีความสงบ อบอุ่น และชวนพูดคุยอย่างเปิดกว้างหรือไม่\n- ไม่มีการการันตีผลผลิตพืช ดิน หรือจุลินทรีย์ที่ฟันธงเกินจริงหรือไม่\n- ไม่พบคำกระตุ้นแนวขายตรงเด็ดขาด"
+            : "- ข้อความกระชับน่าสนใจ\n- มีคำเชิญชวนทำกิจกรรมชัดเจน";
+        notes = isGreenFineness
+            ? "นำไปใช้ออกแบบโพสต์รายสัปดาห์ในคลังคอนเทนต์ Green Fineness"
+            : "สามารถประยุกต์ใช้ในการส่งเสริมสินค้าต่าง ๆ ได้ง่าย";
+    } else {
+        name = isGreenFineness 
+            ? "Green Fineness Special Task Assistant" 
+            : "Arbor General Assistant";
+        purpose = isGreenFineness
+            ? "ผู้ช่วยสนับสนุนกิจกรรมต่าง ๆ ภายใต้กรอบการรักษาโทนและจรรยาบรรณของ Green Fineness"
+            : "ช่วยรันงานวิเคราะห์ คำนวณ หรือจัดทำชุดข้อมูลตามความต้องการทั่วไป";
+        role = isGreenFineness
+            ? "คุณคือที่ปรึกษาส่วนตัวและผู้ช่วยสนับสนุนภารกิจทั่วไปของ Green Fineness ที่เน้นความโปร่งใส ความถูกต้องทางวิทยาศาสตร์ และน้ำเสียงที่สุขุมอบอุ่น"
+            : "คุณคือผู้ช่วยอัจฉริยะส่วนตัวที่มีความถนัดในการจัดระบบข้อมูลและทำงานตามชุดคำสั่งของมนุษย์ได้อย่างถูกต้องแม่นยำ";
+        context = isGreenFineness
+            ? "การสนับสนุนและคิดรอบด้านเกี่ยวกับดิน เกษตรกรรม และสิ่งแวดล้อมอย่างรอบคอบและปลอดภัย"
+            : "การทำงานตามข้อมูลนำเข้าทั่วไปและวิเคราะห์ตามขั้นตอนเชิงเหตุผล";
+        inputFields = [
+            { name: "user_request", label: "ความต้องการเพิ่มเติม", value: isGreenFineness ? "อยากได้แนวทางการศึกษาความสัมพันธ์ของคาร์บอนในดินกับรากพืช" : "ช่วยจัดระเบียบข้อมูลงานวิจัยต่อไปนี้" }
+        ];
+        instructions = isGreenFineness
+            ? "1. วิเคราะห์เจตนาและความต้องการของคำสั่ง {{user_request}}\n2. ร่างข้อมูลรายละเอียดสนับสนุนเชิงวิชาการตามหลักวิทยาศาสตร์ที่ระมัดระวัง\n3. จัดแต่งข้อความและการให้คำปรึกษาให้อยู่ในโทนเสียงที่สงบ สุภาพ และไม่ให้ความหวังที่ฟันธงเกินจริง"
+            : "1. วิเคราะห์โครงสร้างความต้องการของคำสั่ง {{user_request}}\n2. แบ่งปัญหาย่อยเป็นส่วนๆ และลำดับขั้นวิธีแก้ไขอย่างชัดเจน\n3. นำเสนอผลลัพธ์พร้อมตัวอย่างที่เข้าใจได้ง่าย";
+        constraints = isGreenFineness
+            ? "- ยึดมั่นแนวทางการไม่เคลมสรรพคุณและควบคุมคำที่มีความเสี่ยงสูงอย่างเคร่งครัด\n- ห้ามนำเสนอแนวคิดหรือผลลัพธ์ที่เป็นอันตรายต่อสิ่งแวดล้อมหรือใช้สารเคมีพิษ\n- ห้ามใช้ข้อความที่ละเมิดลิขสิทธิ์ความรู้หรือการันตีผลลัพธ์การเจริญเติบโตของพืช"
+            : "- ให้ข้อมูลที่ถูกต้องแม่นยำ\n- จัดระเบียบเนื้อหาให้เป็นระบบเพื่อความเข้าใจง่าย";
+        outputFormat = "การตอบกลับอย่างมีระเบียบและรอบด้านด้วยรูปแบบ Markdown";
+        reviewChecklist = isGreenFineness
+            ? "- ปฏิบัติตามมาตรฐานการระมัดระวังและโทนเสียงของ Green Fineness ครบถ้วน\n- ใช้ถ้อยคำระมัดระวังในข้อเสนอแนะเชิงชีวภาพและดิน"
+            : "- ตอบโจทย์ความต้องการของผู้ใช้อย่างครบถ้วน\n- รูปแบบคำตอบเป็นระเบียบชัดเจน";
+        notes = isGreenFineness
+            ? "ใช้สำหรับแก้ปัญหาและสืบค้นความรู้ภายในแบรนด์"
+            : "เทมเพลตผู้ช่วยอเนกประสงค์ทั่วไป";
+    }
+
+    name = cleanGreenFinenessClaims(name);
+    purpose = cleanGreenFinenessClaims(purpose);
+    role = cleanGreenFinenessClaims(role);
+    context = cleanGreenFinenessClaims(context);
+    instructions = cleanGreenFinenessClaims(instructions);
+    constraints = cleanGreenFinenessClaims(constraints);
+    outputFormat = cleanGreenFinenessClaims(outputFormat);
+    reviewChecklist = cleanGreenFinenessClaims(reviewChecklist);
+    notes = cleanGreenFinenessClaims(notes);
+    const finalNotes = cleanBrief ? `Brief: ${cleanBrief}\n\n${notes}` : notes;
+
+    return {
+        name,
+        category: inputs.category,
+        purpose,
+        role,
+        context,
+        input_fields: JSON.stringify(inputFields),
+        instructions,
+        constraints,
+        output_format: outputFormat,
+        review_checklist: reviewChecklist,
+        notes: finalNotes,
+        guardrail_preset_ids: JSON.stringify(guardrailPresetIds)
+    };
+}
+
 export default function PromptStudioClient() {
     // State
     const [templates, setTemplates] = useState<PromptTemplate[]>([]);
@@ -172,6 +367,16 @@ export default function PromptStudioClient() {
     const [apiError, setApiError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [showQuickGuide, setShowQuickGuide] = useState(false);
+
+    // AI-Assisted Generator States
+    const [showGenModal, setShowGenModal] = useState(false);
+    const [genStep, setGenStep] = useState<"input" | "generating" | "preview">("input");
+    const [genBrief, setGenBrief] = useState("");
+    const [genCategory, setGenCategory] = useState("Writing");
+    const [genBrandTone, setGenBrandTone] = useState("Green Fineness");
+    const [genOutputFormat, setGenOutputFormat] = useState("Markdown");
+    const [isEditingDraftInModal, setIsEditingDraftInModal] = useState(false);
+    const [draftEditFields, setDraftEditFields] = useState<Partial<PromptTemplate>>({});
     
     // Editor State
     const [editorFields, setEditorFields] = useState<Partial<PromptTemplate>>({});
@@ -1015,6 +1220,65 @@ export default function PromptStudioClient() {
         setFieldValidationError(null);
     };
 
+    const handleTriggerMockGenerate = () => {
+        setGenStep("generating");
+        
+        setTimeout(() => {
+            const draft = generateArborPromptDraft({
+                brief: genBrief,
+                category: genCategory,
+                brandTone: genBrandTone,
+                outputFormat: genOutputFormat
+            });
+            setDraftEditFields(draft);
+            setGenStep("preview");
+        }, 1000);
+    };
+
+    const handleApplyDraft = () => {
+        if (draftEditFields.input_fields) {
+            try {
+                const parsed = JSON.parse(draftEditFields.input_fields);
+                if (!Array.isArray(parsed)) {
+                    alert("รูปแบบ JSON ของตัวแปรอินพุตต้องเป็นอาเรย์: [ { 'name': '...', 'label': '...', 'value': '...' } ]");
+                    return;
+                }
+            } catch (err) {
+                const errMsg = err instanceof Error ? err.message : "รูปแบบข้อความ JSON ไม่ถูกต้อง";
+                alert("รูปแบบ JSON ของตัวแปรอินพุตไม่ถูกต้อง: " + errMsg);
+                return;
+            }
+        }
+
+        setEditorFields(prev => ({
+            ...prev,
+            name: draftEditFields.name || prev.name,
+            category: draftEditFields.category || prev.category,
+            purpose: draftEditFields.purpose !== undefined ? draftEditFields.purpose : prev.purpose,
+            role: draftEditFields.role !== undefined ? draftEditFields.role : prev.role,
+            context: draftEditFields.context !== undefined ? draftEditFields.context : prev.context,
+            input_fields: draftEditFields.input_fields !== undefined ? draftEditFields.input_fields : prev.input_fields,
+            instructions: draftEditFields.instructions !== undefined ? draftEditFields.instructions : prev.instructions,
+            constraints: draftEditFields.constraints !== undefined ? draftEditFields.constraints : prev.constraints,
+            output_format: draftEditFields.output_format !== undefined ? draftEditFields.output_format : prev.output_format,
+            review_checklist: draftEditFields.review_checklist !== undefined ? draftEditFields.review_checklist : prev.review_checklist,
+            notes: draftEditFields.notes !== undefined ? draftEditFields.notes : prev.notes,
+            guardrail_preset_ids: draftEditFields.guardrail_preset_ids !== undefined ? draftEditFields.guardrail_preset_ids : prev.guardrail_preset_ids
+        }));
+
+        // Sync test values to match new fields config immediately
+        const parsedInputs = safeParseInputFields(draftEditFields.input_fields || null);
+        const initialValues: Record<string, string> = {};
+        parsedInputs.forEach(f => {
+            initialValues[f.name] = f.value;
+        });
+        setTestValues(initialValues);
+
+        setSidebarTab("templates");
+        setShowGenModal(false);
+        alert("โหลดร่างคำสั่งเข้าสู่ห้องแก้ไขเรียบร้อยแล้ว! (กรุณากด 'บันทึก' ด้านบนเพื่อเซฟลงฐานข้อมูล)");
+    };
+
     // Save Template (POST or PATCH)
     const handleSave = async () => {
         if (jsonValidationError) {
@@ -1471,6 +1735,23 @@ export default function PromptStudioClient() {
 
                         <div className="flex items-center gap-2">
                             <button
+                                onClick={() => {
+                                    setGenBrief("");
+                                    setGenCategory(editorFields.category || "Writing");
+                                    setGenBrandTone("Green Fineness");
+                                    setGenOutputFormat("Markdown");
+                                    setGenStep("input");
+                                    setDraftEditFields({});
+                                    setIsEditingDraftInModal(false);
+                                    setShowGenModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg font-semibold transition cursor-pointer bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-sm border border-transparent"
+                                title="ให้ Arbor ช่วยร่าง Prompt Template จาก Brief"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                                <span>ให้ Arbor ช่วยร่าง</span>
+                            </button>
+                            <button
                                 onClick={() => setShowQuickGuide(!showQuickGuide)}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg font-semibold transition cursor-pointer border ${
                                     showQuickGuide 
@@ -1903,7 +2184,7 @@ export default function PromptStudioClient() {
                                     rows={4}
                                     value={editorFields.role || ""}
                                     onChange={(e) => setEditorFields(prev => ({ ...prev, role: e.target.value }))}
-                                    placeholder="เช่น คุณคือบรรณาธิการตรวจทานบทความวิชาการสมุนไพร..."
+                                    placeholder="เช่น คุณคือบรรณาธิการตรวจทานบทความวิชาการเกษตรอินทรีย์..."
                                     className={TEXTAREA_CLASS}
                                 />
                             </div>
@@ -3057,6 +3338,365 @@ export default function PromptStudioClient() {
                 </div>
                 )}
             </div>
+
+            {/* AI-Assisted Generator Modal */}
+            {showGenModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fadeIn text-xs">
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden text-slate-800">
+                        {/* Header */}
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-violet-600" />
+                                <h3 className="font-extrabold text-slate-800 text-sm">
+                                    {genStep === "input" && "ให้ Arbor ช่วยร่าง Prompt Template"}
+                                    {genStep === "generating" && "กำลังประมวลผลร่าง..."}
+                                    {genStep === "preview" && "ร่างเทมเพลตจาก Arbor"}
+                                </h3>
+                            </div>
+                            {genStep !== "generating" && (
+                                <button
+                                    onClick={() => setShowGenModal(false)}
+                                    className="text-slate-400 hover:text-slate-600 text-xs font-bold px-2 py-1"
+                                >
+                                    ปิด
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {genStep === "input" && (
+                                <div className="space-y-4">
+                                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                                        ระบุวัตถุประสงค์และบริบทที่คุณต้องการให้ระบบช่วยร่าง Arbor จะช่วยออกแบบโครงสร้าง Role, Context, Instructions, Constraints และแนะนำตัวแปร Input Fields ให้กับคุณโดยอัตโนมัติ
+                                    </p>
+
+                                    {/* Brief / Goal */}
+                                    <div className="space-y-1">
+                                        <label className="block text-slate-600 font-bold">รายละเอียดหรือเป้าหมาย (Brief / Goal) *</label>
+                                        <textarea
+                                            rows={4}
+                                            value={genBrief}
+                                            onChange={(e) => setGenBrief(e.target.value)}
+                                            placeholder="เช่น ช่วยร่างพร้อมเขียนโครงร่างบทความเกี่ยวกับการแนะนำปุ๋ยชีวภาพและการเตรียมดินปลูกผักสวนครัวอินทรีย์..."
+                                            className={TEXTAREA_CLASS}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {/* Category */}
+                                        <div className="space-y-1">
+                                            <label className="block text-slate-600 font-bold">หมวดหมู่การใช้งาน (Category)</label>
+                                            <select
+                                                value={genCategory}
+                                                onChange={(e) => setGenCategory(e.target.value)}
+                                                className={SELECT_CLASS}
+                                            >
+                                                {CATEGORIES.map(cat => (
+                                                    <option className="text-slate-800" key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Brand/Tone */}
+                                        <div className="space-y-1">
+                                            <label className="block text-slate-600 font-bold">แบรนด์ / โทนเสียง (Brand / Tone)</label>
+                                            <select
+                                                value={genBrandTone}
+                                                onChange={(e) => setGenBrandTone(e.target.value)}
+                                                className={SELECT_CLASS}
+                                            >
+                                                <option className="text-slate-800" value="Green Fineness">Green Fineness (โทนพรีเมียม ระมัดระวัง)</option>
+                                                <option className="text-slate-800" value="Professional">Professional (เป็นทางการ)</option>
+                                                <option className="text-slate-800" value="Creative">Creative / Friendly (เป็นมิตรและสร้างสรรค์)</option>
+                                                <option className="text-slate-800" value="General">General / Neutral (ทั่วไป)</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Output Format */}
+                                        <div className="space-y-1">
+                                            <label className="block text-slate-600 font-bold">รูปแบบผลลัพธ์ (Output Format)</label>
+                                            <input
+                                                type="text"
+                                                value={genOutputFormat}
+                                                onChange={(e) => setGenOutputFormat(e.target.value)}
+                                                placeholder="เช่น Markdown Table, บทความ หรือ JSON"
+                                                className={INPUT_CLASS}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {genStep === "generating" && (
+                                <div className="py-12 flex flex-col items-center justify-center space-y-4">
+                                    <RefreshCw className="w-8 h-8 text-violet-600 animate-spin" />
+                                    <div className="text-center space-y-1.5">
+                                        <p className="font-bold text-slate-700">Arbor กำลังวิเคราะห์และร่างเทมเพลต...</p>
+                                        <p className="text-[10px] text-slate-400">กำหนด Persona และโครงสร้างตัวแปรอินพุต...</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {genStep === "preview" && (
+                                <div className="space-y-4">
+                                    <div className="bg-violet-50/50 border border-violet-100 rounded-xl p-3 flex items-start gap-2.5">
+                                        <Sparkles className="w-4 h-4 text-violet-600 mt-0.5 flex-shrink-0" />
+                                        <div className="space-y-1 leading-relaxed">
+                                            <p className="font-bold text-violet-800 text-[11px]">ร่างสเปกเทมเพลตพร้อมให้คุณรีวิว</p>
+                                            <p className="text-slate-500 text-[10px]">
+                                                คุณสามารถตรวจสอบข้อมูลร่าง หรือแก้ไขแต่ละช่องได้โดยคลิกปุ่ม &quot;แก้ไขรายละเอียดในร่าง (Edit manually)&quot; เมื่อพอใจแล้วให้กด &quot;นำสเปกนี้ไปใช้&quot; เพื่อเติมข้อมูลลงใน Editor ฝั่งซ้าย
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Suggested Guardrails Recommendation Notice */}
+                                    {draftEditFields.guardrail_preset_ids && 
+                                     JSON.parse(draftEditFields.guardrail_preset_ids).length > 0 && (
+                                        <div className="bg-emerald-50/60 border border-emerald-200 text-emerald-800 rounded-xl p-3 space-y-1 text-[10px] leading-relaxed">
+                                            <p className="font-bold">🛡️ แนะนำให้เปิดใช้งาน Guardrail presets ทั้ง 5 รายการ:</p>
+                                            <ul className="list-disc list-inside space-y-0.5 pl-1.5 text-emerald-700">
+                                                <li>Green Fineness Core Tone (ปรับสำนวนให้สงบ ไม่ขายแรง)</li>
+                                                <li>Scientific Claim Caution (ใช้ภาษาเชิงวิทยาศาสตร์อย่างระมัดระวัง)</li>
+                                                <li>Soil / Microbe / Fertilizer Claim Guardrail (ควบคุมการกล่าวอ้างสรรพคุณดินปุ๋ย)</li>
+                                                <li>Non-salesy Educational Content (เน้นให้ความรู้เชิงสร้างสรรค์ ไม่ขายตรง)</li>
+                                                <li>Green Fineness Review Checklist (เช็คลิสต์ตรวจสอบคุณภาพก่อนเผยแพร่)</li>
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {/* Editable or Preview Fields list */}
+                                    <div className="space-y-4 border border-slate-200 rounded-2xl bg-slate-50/30 p-4.5">
+                                        {isEditingDraftInModal ? (
+                                            /* EDITABLE FORM FIELDS */
+                                            <div className="space-y-3.5">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div className="space-y-1">
+                                                        <label className="block text-slate-500 font-bold text-[10px] uppercase">ชื่อเทมเพลต</label>
+                                                        <input
+                                                            type="text"
+                                                            value={draftEditFields.name || ""}
+                                                            onChange={(e) => setDraftEditFields(prev => ({ ...prev, name: e.target.value }))}
+                                                            className={INPUT_CLASS}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="block text-slate-500 font-bold text-[10px] uppercase">หมวดหมู่</label>
+                                                        <select
+                                                            value={draftEditFields.category || "Writing"}
+                                                            onChange={(e) => setDraftEditFields(prev => ({ ...prev, category: e.target.value }))}
+                                                            className={SELECT_CLASS}
+                                                        >
+                                                            {CATEGORIES.map(cat => (
+                                                                <option className="text-slate-800" key={cat} value={cat}>{cat}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <label className="block text-slate-500 font-bold text-[10px] uppercase">วัตถุประสงค์ (Purpose)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={draftEditFields.purpose || ""}
+                                                        onChange={(e) => setDraftEditFields(prev => ({ ...prev, purpose: e.target.value }))}
+                                                        className={INPUT_CLASS}
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div className="space-y-1">
+                                                        <label className="block text-slate-500 font-bold text-[10px] uppercase">บทบาท (Role / Persona)</label>
+                                                        <textarea
+                                                            rows={3}
+                                                            value={draftEditFields.role || ""}
+                                                            onChange={(e) => setDraftEditFields(prev => ({ ...prev, role: e.target.value }))}
+                                                            className={TEXTAREA_CLASS}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="block text-slate-500 font-bold text-[10px] uppercase">บริบท (Context)</label>
+                                                        <textarea
+                                                            rows={3}
+                                                            value={draftEditFields.context || ""}
+                                                            onChange={(e) => setDraftEditFields(prev => ({ ...prev, context: e.target.value }))}
+                                                            className={TEXTAREA_CLASS}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <label className="block text-slate-500 font-bold text-[10px] uppercase">ตัวแปรอินพุต (Input Fields JSON)</label>
+                                                    <textarea
+                                                        rows={2}
+                                                        value={draftEditFields.input_fields || "[]"}
+                                                        onChange={(e) => setDraftEditFields(prev => ({ ...prev, input_fields: e.target.value }))}
+                                                        className={TEXTAREA_CLASS + " font-mono text-[10px]"}
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <label className="block text-slate-500 font-bold text-[10px] uppercase">ขั้นตอนการดำเนินงาน (Instructions)</label>
+                                                    <textarea
+                                                        rows={3}
+                                                        value={draftEditFields.instructions || ""}
+                                                        onChange={(e) => setDraftEditFields(prev => ({ ...prev, instructions: e.target.value }))}
+                                                        className={TEXTAREA_CLASS}
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <label className="block text-slate-500 font-bold text-[10px] uppercase">ข้อจำกัด (Constraints)</label>
+                                                    <textarea
+                                                        rows={3}
+                                                        value={draftEditFields.constraints || ""}
+                                                        onChange={(e) => setDraftEditFields(prev => ({ ...prev, constraints: e.target.value }))}
+                                                        className={TEXTAREA_CLASS}
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div className="space-y-1">
+                                                        <label className="block text-slate-500 font-bold text-[10px] uppercase">รูปแบบผลลัพธ์ (Output Format)</label>
+                                                        <textarea
+                                                            rows={2}
+                                                            value={draftEditFields.output_format || ""}
+                                                            onChange={(e) => setDraftEditFields(prev => ({ ...prev, output_format: e.target.value }))}
+                                                            className={TEXTAREA_CLASS}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="block text-slate-500 font-bold text-[10px] uppercase">เช็คลิสต์ประเมิน (Review Checklist)</label>
+                                                        <textarea
+                                                            rows={2}
+                                                            value={draftEditFields.review_checklist || ""}
+                                                            onChange={(e) => setDraftEditFields(prev => ({ ...prev, review_checklist: e.target.value }))}
+                                                            className={TEXTAREA_CLASS}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* STATIC PREVIEW BLOCKS */
+                                            <div className="space-y-3 text-[11px] leading-relaxed">
+                                                <div>
+                                                    <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Template Name / Category</strong>
+                                                    <p className="text-slate-800 font-bold text-xs">{draftEditFields.name} ({draftEditFields.category})</p>
+                                                </div>
+                                                {draftEditFields.purpose && (
+                                                    <div>
+                                                        <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Purpose (วัตถุประสงค์)</strong>
+                                                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200">{draftEditFields.purpose}</p>
+                                                    </div>
+                                                )}
+                                                {draftEditFields.role && (
+                                                    <div>
+                                                        <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Role / Persona (บทบาท)</strong>
+                                                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200 font-mono whitespace-pre-wrap">{draftEditFields.role}</p>
+                                                    </div>
+                                                )}
+                                                {draftEditFields.context && (
+                                                    <div>
+                                                        <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Context (บริบท)</strong>
+                                                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200 font-mono whitespace-pre-wrap">{draftEditFields.context}</p>
+                                                    </div>
+                                                )}
+                                                {draftEditFields.instructions && (
+                                                    <div>
+                                                        <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Instructions (ขั้นตอนดำเนินงาน)</strong>
+                                                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200 font-mono whitespace-pre-wrap">{draftEditFields.instructions}</p>
+                                                    </div>
+                                                )}
+                                                {draftEditFields.constraints && (
+                                                    <div>
+                                                        <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Constraints (ข้อจำกัด)</strong>
+                                                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200 font-mono whitespace-pre-wrap text-red-700 bg-red-50/20 border-red-100">{draftEditFields.constraints}</p>
+                                                    </div>
+                                                )}
+                                                {draftEditFields.output_format && (
+                                                    <div>
+                                                        <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Output Format (รูปแบบคำตอบ)</strong>
+                                                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200 font-mono whitespace-pre-wrap">{draftEditFields.output_format}</p>
+                                                    </div>
+                                                )}
+                                                {draftEditFields.review_checklist && (
+                                                    <div>
+                                                        <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Review Checklist (เช็คลิสต์คุณภาพ)</strong>
+                                                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200 font-mono whitespace-pre-wrap">{draftEditFields.review_checklist}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center flex-shrink-0">
+                            <div>
+                                {genStep === "preview" && (
+                                    <button
+                                        onClick={() => setIsEditingDraftInModal(!isEditingDraftInModal)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                                            isEditingDraftInModal 
+                                                ? "bg-slate-200 border-slate-300 text-slate-700 hover:bg-slate-300"
+                                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        {isEditingDraftInModal ? "ดูตัวอย่างพรีวิว" : "แก้ไขรายละเอียดในร่าง (Edit manually)"}
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                {genStep === "input" && (
+                                    <>
+                                        <button
+                                            onClick={() => setShowGenModal(false)}
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                            ยกเลิก
+                                        </button>
+                                        <button
+                                            onClick={handleTriggerMockGenerate}
+                                            disabled={!genBrief.trim()}
+                                            className="px-4 py-1.5 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-lg text-xs cursor-pointer disabled:opacity-50"
+                                        >
+                                            เริ่มการร่างด้วย Arbor
+                                        </button>
+                                    </>
+                                )}
+
+                                {genStep === "preview" && (
+                                    <>
+                                        <button
+                                            onClick={() => setGenStep("input")}
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                            ย้อนกลับ
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowGenModal(false);
+                                            }}
+                                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                            Discard (ทิ้งร่าง)
+                                        </button>
+                                        <button
+                                            onClick={handleApplyDraft}
+                                            className="px-4 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold rounded-lg text-xs cursor-pointer shadow-sm"
+                                        >
+                                            Use this Draft (นำไปใช้)
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
