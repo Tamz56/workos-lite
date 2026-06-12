@@ -1685,6 +1685,9 @@ function ensurePromptWorkflows() {
           step_description   TEXT NULL,
           step_instruction   TEXT NULL,
           sort_order         INTEGER NOT NULL,
+          run_status         TEXT DEFAULT 'pending',
+          output_note        TEXT DEFAULT '',
+          last_run_at        TEXT NULL,
           created_at         TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
           FOREIGN KEY(workflow_id) REFERENCES prompt_workflows(id) ON DELETE CASCADE,
@@ -1701,6 +1704,20 @@ function ensurePromptWorkflows() {
           UPDATE prompt_workflow_steps SET updated_at = datetime('now') WHERE id = NEW.id;
         END;
     `);
+
+    // Idempotent column check and migration for manual run checklist fields
+    const columns = db.prepare("PRAGMA table_info(prompt_workflow_steps)").all() as { name: string }[];
+    const colNames = columns.map(c => c.name);
+
+    if (!colNames.includes("run_status")) {
+        db.exec("ALTER TABLE prompt_workflow_steps ADD COLUMN run_status TEXT DEFAULT 'pending'");
+    }
+    if (!colNames.includes("output_note")) {
+        db.exec("ALTER TABLE prompt_workflow_steps ADD COLUMN output_note TEXT DEFAULT ''");
+    }
+    if (!colNames.includes("last_run_at")) {
+        db.exec("ALTER TABLE prompt_workflow_steps ADD COLUMN last_run_at TEXT NULL");
+    }
 }
 
 ensureNotes();

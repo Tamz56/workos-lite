@@ -122,6 +122,9 @@ interface PromptWorkflowStep {
     step_description: string | null;
     step_instruction: string | null;
     sort_order: number;
+    run_status?: "pending" | "in_progress" | "done" | "skipped";
+    output_note?: string | null;
+    last_run_at?: string | null;
     created_at: string;
     updated_at: string;
     template_name?: string;
@@ -621,6 +624,20 @@ export default function PromptStudioClient() {
     const [workflowForm, setWorkflowForm] = useState({ name: "", description: "" });
     const [isEditingWorkflowMeta, setIsEditingWorkflowMeta] = useState(false);
     const [workflowMetaForm, setWorkflowMetaForm] = useState({ name: "", description: "" });
+    const [stepOutputNotes, setStepOutputNotes] = useState<Record<string, string>>({});
+    const [copiedStepId, setCopiedStepId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (selectedWorkflow && selectedWorkflow.steps) {
+            const notes: Record<string, string> = {};
+            selectedWorkflow.steps.forEach(step => {
+                notes[step.id] = step.output_note || "";
+            });
+            setStepOutputNotes(notes);
+        } else {
+            setStepOutputNotes({});
+        }
+    }, [selectedWorkflow]);
 
     // Step states
     const [stepForm, setStepForm] = useState({ promptTemplateId: "", stepName: "", stepDescription: "", stepInstruction: "" });
@@ -965,6 +982,117 @@ export default function PromptStudioClient() {
             alert(errMsg);
         }
     };
+
+    const compileStepPrompt = useCallback((step: PromptWorkflowStep, template: PromptTemplate | undefined) => {
+        if (!template) return "";
+        const name = step.step_name || template.name;
+        const role = template.role || "";
+        const purpose = template.purpose || "";
+        const context = template.context || "";
+        // If step has step_instruction, use it as instruction override, otherwise use template's instructions
+        const instructions = step.step_instruction?.trim() || template.instructions || "";
+        const constraints = template.constraints || "";
+        const outputFormat = template.output_format || "";
+        
+        const blocks: string[] = [];
+        blocks.push(`[WORKFLOW STEP]\nStep: ${name}`);
+        if (step.step_instruction?.trim()) {
+            blocks.push(`[STEP INSTRUCTION]\n${step.step_instruction.trim()}`);
+        }
+        blocks.push(`[LINKED TEMPLATE]\nTemplate: ${template.name}`);
+        if (purpose) blocks.push(`[PURPOSE]\n${purpose}`);
+        if (role) blocks.push(`[ROLE]\n${role}`);
+        if (context) blocks.push(`[CONTEXT]\n${context}`);
+        if (instructions) blocks.push(`[INSTRUCTIONS]\n${instructions}`);
+        if (constraints) blocks.push(`[CONSTRAINTS]\n${constraints}`);
+        if (outputFormat) blocks.push(`[OUTPUT FORMAT]\n${outputFormat}`);
+        blocks.push(`[MANUAL NOTE]\nกรุณากรอก input ที่จำเป็นเองก่อนรัน`);
+
+        return blocks.join("\n\n");
+    }, []);
+
+    const handleCopyStepPrompt = useCallback((step: PromptWorkflowStep) => {
+        const template = templates.find(t => t.id === step.prompt_template_id);
+        const promptText = compileStepPrompt(step, template);
+        if (!promptText) return;
+        navigator.clipboard.writeText(promptText);
+        setCopiedStepId(step.id);
+        setTimeout(() => setCopiedStepId(null), 2000);
+    }, [templates, compileStepPrompt]);
+
+    const handleUpdateStepRunStatus = useCallback(async (stepId: string, runStatus: "pending" | "in_progress" | "done" | "skipped") => {
+        if (!selectedWorkflowId) return;
+        
+        const now = runStatus === "done" || runStatus === "in_progress" || runStatus === "skipped" ? new Date().toISOString() : null;
+        
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}/steps/${stepId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    run_status: runStatus,
+                    last_run_at: now
+                })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถอัปเดตสถานะขั้นตอนได้");
+            await fetchWorkflowDetails();
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    }, [selectedWorkflowId, fetchWorkflowDetails]);
+
+    const handleSaveStepOutputNote = useCallback(async (stepId: string) => {
+        if (!selectedWorkflowId) return;
+        const note = stepOutputNotes[stepId] ?? "";
+        
+        try {
+            const res = await fetch(`/api/prompt-workflows/${selectedWorkflowId}/steps/${stepId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    output_note: note
+                })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถบันทึกโน้ตได้");
+            await fetchWorkflowDetails();
+            alert("บันทึกโน้ตสำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(errMsg);
+        }
+    }, [selectedWorkflowId, stepOutputNotes, fetchWorkflowDetails]);
+
+    const handleResetWorkflowProgress = useCallback(async () => {
+        if (!selectedWorkflow || !selectedWorkflow.steps || selectedWorkflow.steps.length === 0) return;
+        if (!confirm("การ Reset Progress จะล้างสถานะและ Output Notes ของทุกขั้นตอนใน Workflow นี้ ต้องการดำเนินการต่อหรือไม่?")) return;
+        
+        try {
+            const resetPromises = selectedWorkflow.steps.map(step => 
+                fetch(`/api/prompt-workflows/${selectedWorkflowId}/steps/${step.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        run_status: "pending",
+                        output_note: "",
+                        last_run_at: null
+                    })
+                })
+            );
+            
+            const responses = await Promise.all(resetPromises);
+            const failed = responses.filter(r => !r.ok);
+            if (failed.length > 0) {
+                throw new Error("บางขั้นตอนรีเซ็ตไม่สำเร็จ");
+            }
+            
+            await fetchWorkflowDetails();
+            alert("รีเซ็ตสถานะเวิร์กโฟลว์สำเร็จ!");
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการรีเซ็ต";
+            alert(errMsg);
+        }
+    }, [selectedWorkflow, selectedWorkflowId, fetchWorkflowDetails]);
 
 
     const handleSaveRunLog = async () => {
@@ -2697,6 +2825,16 @@ export default function PromptStudioClient() {
                                     </div>
 
                                     <div className="flex items-center gap-2 flex-shrink-0">
+                                        {selectedWorkflow.steps && selectedWorkflow.steps.length > 0 && (
+                                            <button
+                                                onClick={handleResetWorkflowProgress}
+                                                title="ล้างสถานะการรันและโน้ตของทุกขั้นตอนในเวิร์กโฟลว์นี้"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-blue-650 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-lg transition cursor-pointer text-xs font-semibold bg-white shadow-sm"
+                                            >
+                                                <RefreshCw className="w-3.5 h-3.5" />
+                                                <span>Reset Progress</span>
+                                            </button>
+                                        )}
                                         <button
                                             onClick={handleArchiveWorkflow}
                                             title="เก็บถาวรเวิร์กโฟลว์"
@@ -2733,7 +2871,30 @@ export default function PromptStudioClient() {
                                                                         {index + 1}
                                                                     </div>
                                                                     <div className="min-w-0">
-                                                                        <h4 className="font-bold text-slate-800 text-xs truncate">{step.step_name}</h4>
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <h4 className="font-bold text-slate-800 text-xs truncate">{step.step_name}</h4>
+                                                                            {/* Run Status Badge */}
+                                                                            {(() => {
+                                                                                const status = step.run_status || "pending";
+                                                                                let badgeClass = "bg-slate-100 text-slate-700 border-slate-200";
+                                                                                let label = "Pending";
+                                                                                if (status === "in_progress") {
+                                                                                    badgeClass = "bg-amber-50 text-amber-700 border-amber-200 animate-pulse";
+                                                                                    label = "In Progress";
+                                                                                } else if (status === "done") {
+                                                                                    badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                                                                                    label = "Done";
+                                                                                } else if (status === "skipped") {
+                                                                                    badgeClass = "bg-slate-50 text-slate-500 border-slate-200/60";
+                                                                                    label = "Skipped";
+                                                                                }
+                                                                                return (
+                                                                                    <span className={`text-[8px] px-1.5 py-0.2 rounded-full border font-bold uppercase tracking-wider ${badgeClass}`}>
+                                                                                        {label}
+                                                                                    </span>
+                                                                                );
+                                                                            })()}
+                                                                        </div>
                                                                         {step.step_description && (
                                                                             <p className="text-slate-500 text-[10px] mt-0.5 leading-relaxed">{step.step_description}</p>
                                                                         )}
@@ -2862,6 +3023,73 @@ export default function PromptStudioClient() {
                                                                 <div className="bg-slate-50 border border-slate-200/50 rounded-lg p-2.5 shadow-sm">
                                                                     <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider mb-1">คำสั่งการใช้งานเฉพาะขั้นตอนนี้:</span>
                                                                     <p className="text-slate-700 text-[10px] font-mono whitespace-pre-wrap leading-relaxed">{step.step_instruction}</p>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Manual Run Checklist Section */}
+                                                            {!isEditing && (
+                                                                <div className="border-t border-slate-100 pt-3 mt-3 space-y-3">
+                                                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                                                        {/* Status selection buttons */}
+                                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                                            <span className="text-[10px] font-bold text-slate-500 mr-1">สถานะการรัน:</span>
+                                                                            {[
+                                                                                { value: "pending", label: "Pending", bg: "bg-slate-100 text-slate-700 border-slate-200", activeBg: "bg-slate-200 text-slate-900 border-slate-400 ring-1 ring-slate-500/10 font-bold" },
+                                                                                { value: "in_progress", label: "In Progress", bg: "bg-amber-50 text-amber-700 border-amber-200", activeBg: "bg-amber-100 text-amber-900 border-amber-400 ring-1 ring-amber-500/10 font-bold" },
+                                                                                { value: "done", label: "Done", bg: "bg-emerald-50 text-emerald-700 border-emerald-200", activeBg: "bg-emerald-100 text-emerald-900 border-emerald-400 ring-1 ring-emerald-500/10 font-bold" },
+                                                                                { value: "skipped", label: "Skipped", bg: "bg-slate-50 text-slate-500 border-slate-200/60", activeBg: "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/10 font-bold" }
+                                                                            ].map(statusOpt => {
+                                                                                const isActive = (step.run_status || "pending") === statusOpt.value;
+                                                                                return (
+                                                                                    <button
+                                                                                        key={statusOpt.value}
+                                                                                        onClick={() => handleUpdateStepRunStatus(step.id, statusOpt.value as "pending" | "in_progress" | "done" | "skipped")}
+                                                                                        className={`px-2 py-0.5 text-[9px] rounded-md border transition-all cursor-pointer font-semibold ${
+                                                                                            isActive ? statusOpt.activeBg : `${statusOpt.bg} hover:brightness-95`
+                                                                                        }`}
+                                                                                    >
+                                                                                        {statusOpt.label}
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+
+                                                                        {/* Copy / Timestamp controls */}
+                                                                        <div className="flex items-center gap-2">
+                                                                            {step.last_run_at && (
+                                                                                <span className="text-[9px] text-slate-400 font-mono">
+                                                                                    รันเมื่อ: {new Date(step.last_run_at).toLocaleString("th-TH")}
+                                                                                </span>
+                                                                            )}
+                                                                            <button
+                                                                                onClick={() => handleCopyStepPrompt(step)}
+                                                                                className="flex items-center gap-1 px-2.5 py-1 text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg transition cursor-pointer font-semibold shadow-sm"
+                                                                            >
+                                                                                <Copy className="w-2.5 h-2.5" />
+                                                                                <span>{copiedStepId === step.id ? "คัดลอกแล้ว!" : "Copy Step Prompt"}</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Output Notes Textarea & Save */}
+                                                                    <div className="space-y-1.5">
+                                                                        <div className="flex justify-between items-center">
+                                                                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">ผลลัพธ์ / โน้ตเพิ่มเติม (Output Note):</label>
+                                                                            <button
+                                                                                onClick={() => handleSaveStepOutputNote(step.id)}
+                                                                                className="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-[9px] font-semibold cursor-pointer transition shadow-sm"
+                                                                            >
+                                                                                บันทึกโน้ต
+                                                                            </button>
+                                                                        </div>
+                                                                        <textarea
+                                                                            rows={2}
+                                                                            value={stepOutputNotes[step.id] ?? ""}
+                                                                            onChange={(e) => setStepOutputNotes(prev => ({ ...prev, [step.id]: e.target.value }))}
+                                                                            placeholder="บันทึกผลลัพธ์จากการรันขั้นตอนนี้ (เช่น ผลลัพธ์ที่ได้จาก LLM)..."
+                                                                            className="w-full bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 selection:bg-blue-500/10 transition-all text-[11px] leading-relaxed shadow-sm font-sans"
+                                                                        />
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                         </div>

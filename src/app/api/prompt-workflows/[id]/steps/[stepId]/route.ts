@@ -8,7 +8,7 @@ export async function PATCH(
     try {
         const { id: workflowId, stepId } = await params;
         const body = await req.json();
-        const { step_name, step_description, step_instruction, direction } = body;
+        const { step_name, step_description, step_instruction, direction, run_status, output_note, last_run_at } = body;
 
         // Check if the step exists
         const step = db.prepare("SELECT * FROM prompt_workflow_steps WHERE id = ? AND workflow_id = ?").get(stepId, workflowId) as any;
@@ -71,6 +71,24 @@ export async function PATCH(
             if (step_instruction !== undefined) {
                 updates.push("step_instruction = ?");
                 values.push(step_instruction || null);
+            }
+
+            if (run_status !== undefined) {
+                if (run_status !== null && !["pending", "in_progress", "done", "skipped"].includes(run_status)) {
+                    return NextResponse.json({ error: "Invalid run status" }, { status: 400 });
+                }
+                updates.push("run_status = ?");
+                values.push(run_status || "pending");
+            }
+
+            if (output_note !== undefined) {
+                updates.push("output_note = ?");
+                values.push(output_note !== null ? output_note : "");
+            }
+
+            if (last_run_at !== undefined) {
+                updates.push("last_run_at = ?");
+                values.push(last_run_at);
             }
 
             if (updates.length > 0) {
