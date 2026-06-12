@@ -2294,7 +2294,7 @@ export default function PromptStudioClient() {
 
                                 {/* Create Workflow Form (inline) */}
                                 <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2.5 shadow-sm">
-                                    <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wider">สร้างเซ็ตเวิร์กโฟลว์ใหม่</span>
+                                    <span className="text-[9px] text-slate-600 font-bold block uppercase tracking-wider">สร้างเซ็ตเวิร์กโฟลว์ใหม่</span>
                                     <input
                                         type="text"
                                         placeholder="ชื่อเวิร์กโฟลว์..."
@@ -2424,7 +2424,7 @@ export default function PromptStudioClient() {
                                     setImportPreview(null);
                                     setShowImportModal(true);
                                 }}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg font-semibold transition cursor-pointer bg-amber-650 hover:bg-amber-600 text-white shadow-sm border border-transparent"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg font-semibold transition cursor-pointer bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white shadow-sm border border-transparent"
                                 title="นำเข้า Prompt เต็มรูปแบบแล้วแยกส่วนลงฟิลด์อัตโนมัติ"
                             >
                                 <Plus className="w-3.5 h-3.5" />
@@ -2517,7 +2517,7 @@ export default function PromptStudioClient() {
                                 <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1">
                                     ข้อมูลทั่วไป (Metadata)
                                 </h3>
-                                <p className="text-[10px] text-slate-400 border-b border-slate-100 pb-2">
+                                <p className="text-xs text-slate-600 leading-relaxed font-medium border-b border-slate-100 pb-2">
                                     กำหนดชื่อและหมวดหมู่ของเทมเพลตเพื่อจัดระเบียบและเรียกใช้งานได้ง่ายในระบบคลังคำสั่ง
                                 </p>
                             </div>
@@ -2614,12 +2614,12 @@ export default function PromptStudioClient() {
                             </div>
 
                             <div className="p-4 space-y-4">
-                                <p className="text-[10px] text-slate-500 pb-2 border-b border-slate-100">
+                                <p className="text-xs text-slate-700 leading-relaxed font-medium pb-2 border-b border-slate-100">
                                     กำหนดฟิลด์ตัวแปร (เช่น topic, target_audience) เพื่อนำไปใช้อ้างอิงในเนื้อหาเทมเพลต Prompt ผ่านเครื่องหมายปีกกาคู่ <code>{"{{ชื่อตัวแปร}}"}</code> ได้โดยอัตโนมัติ
                                 </p>
                                 {/* List of Configured Fields */}
                                 {currentInputFields.length === 0 ? (
-                                    <p className="text-slate-400 text-xs italic text-center py-5 bg-white rounded-xl border border-dashed border-slate-200 shadow-inner">
+                                    <p className="text-slate-600 text-xs text-center py-5 bg-white rounded-xl border border-dashed border-slate-200 shadow-inner leading-relaxed font-medium">
                                         ยังไม่มีตัวแปรอินพุตใด ๆ เริ่มเพิ่มตัวแปรที่ต้องการในแบบฟอร์ม &quot;เพิ่มตัวแปรนำเข้าใหม่&quot; ด้านล่างนี้เพื่อนำไปเรียกใช้ในร่างคำสั่งหลัก
                                     </p>
                                 ) : (
@@ -2916,7 +2916,7 @@ export default function PromptStudioClient() {
                             </span>
                             
                             {guardrailPresets.length === 0 ? (
-                                <p className="text-slate-400 text-xs italic">กำลังโหลดข้อมูล Presets หรือไม่พบข้อมูลในระบบ...</p>
+                                <p className="text-slate-600 text-xs leading-relaxed font-medium">กำลังโหลดข้อมูล Presets หรือไม่พบข้อมูลในระบบ...</p>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                     {guardrailPresets.map((preset) => {
@@ -3271,7 +3271,7 @@ export default function PromptStudioClient() {
                                                                                 v{step.active_version}
                                                                             </span>
                                                                         ) : (
-                                                                            <span className="text-slate-400 text-[10px] italic">ไม่มี (ใช้เวอร์ชันล่าสุด)</span>
+                                                                            <span className="text-slate-600 text-[10px] font-medium leading-relaxed">ไม่มี (ใช้เวอร์ชันล่าสุด)</span>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -3616,7 +3616,7 @@ export default function PromptStudioClient() {
                                                     className={INPUT_CLASS}
                                                 />
                                                 {field.helperText && (
-                                                    <span className="text-[9px] text-slate-400 mt-0.5 font-medium">
+                                                    <span className="text-[10px] text-slate-600 mt-0.5 font-medium leading-relaxed">
                                                         {field.helperText}
                                                     </span>
                                                 )}
@@ -3661,11 +3661,11 @@ export default function PromptStudioClient() {
                                             </h2>
                                         </div>
                                         {previewTab === "compiled" ? (
-                                            <div className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                                            <div className="mt-0.5 text-[11px] leading-4 text-slate-700 font-medium">
                                                 <span>ⓘ [USER INPUT] ใน Compiled Result อาจมาจาก Test Input Area โดยอัตโนมัติ ไม่ต้องลบ เว้นแต่มี warning ใต้ช่อง Template หลักด้านซ้าย</span>
                                             </div>
                                         ) : (
-                                            <span className="text-[11px] text-slate-400 mt-0.5 leading-normal">
+                                            <span className="text-[11px] text-slate-600 mt-0.5 leading-normal font-medium">
                                                 โครงสร้างโครงร่างพารามิเตอร์และตัวแปรแบบ Raw Spec
                                             </span>
                                         )}
@@ -3710,7 +3710,7 @@ export default function PromptStudioClient() {
                                         <div className="flex flex-col items-center justify-center text-center py-10 space-y-2.5 max-w-[280px] mx-auto h-full">
                                             <Eye className="w-8 h-8 text-slate-300" />
                                             <p className="text-slate-700 font-semibold text-xs">พรีวิว Compiled Prompt</p>
-                                            <p className="text-slate-400 text-xs leading-relaxed">
+                                            <p className="text-slate-600 text-[11px] leading-relaxed font-medium">
                                                 กรอกร่างคำสั่งหลักในหน้าต่างตรงกลาง และป้อนตัวแปรจำลองที่ช่องกรอกทดสอบ &quot;Test Input Area&quot; เพื่อเรนเดอร์ดูข้อความ Prompt สำเร็จรูปที่พร้อมใช้ป้อน AI ได้ที่นี่ครับ
                                             </p>
                                         </div>
@@ -3723,7 +3723,7 @@ export default function PromptStudioClient() {
                     {rightPanelTab === "history" && (
                         <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                             {!selectedId || selectedId === "new-template" ? (
-                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-400 italic leading-relaxed">
+                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-600 font-medium leading-relaxed">
                                     กรุณาบันทึกเทมเพลตคำสั่งหลักนี้ก่อน เพื่อเปิดใช้ระบบประเมินคะแนนและเก็บบันทึกประวัติการทดสอบในระบบคลังคำสั่ง
                                 </div>
                             ) : (
@@ -3732,7 +3732,7 @@ export default function PromptStudioClient() {
                                     <div className="p-4 border-b border-slate-200 bg-white/40 flex flex-col flex-shrink-0 space-y-3">
                                         <div className="flex flex-col">
                                             <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">บันทึกผลการทดสอบ (Record Test Run)</span>
-                                            <span className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                                            <span className="text-[10px] text-slate-600 mt-0.5 leading-normal font-medium">
                                                 ประเมินผลคำตอบของ AI ด้วยการให้คะแนนและบันทึกข้อเสนอแนะสำหรับการปรับปรุงเทมเพลตในรุ่นถัดไป
                                             </span>
                                         </div>
@@ -3849,9 +3849,9 @@ export default function PromptStudioClient() {
                                         
                                         <div className="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
                                             {isLoadingLogs ? (
-                                                <div className="text-center text-slate-400 text-xs py-8">กำลังโหลดประวัติ...</div>
+                                                <div className="text-center text-slate-600 text-xs font-medium py-8">กำลังโหลดประวัติ...</div>
                                             ) : runLogs.length === 0 ? (
-                                                <p className="text-slate-400 text-xs italic text-center py-8 px-4 leading-relaxed">
+                                                <p className="text-slate-600 text-xs text-center py-8 px-4 leading-relaxed font-medium">
                                                     ยังไม่มีประวัติการบันทึกผลการรัน. เมื่อนำ Prompt ไปทดสอบกับ AI แล้ว สามารถระบุบันทึกผลการประเมินที่ฟอร์มด้านบนเพื่อเริ่มเก็บข้อมูลรอบแรกได้ครับ
                                                 </p>
                                             ) : (
@@ -3991,7 +3991,7 @@ export default function PromptStudioClient() {
                     {rightPanelTab === "versions" && (
                         <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                             {!selectedId || selectedId === "new-template" ? (
-                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-400 italic leading-relaxed">
+                                <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-slate-600 font-medium leading-relaxed">
                                     กรุณาบันทึกเทมเพลตนี้ก่อน เพื่อเริ่มต้นจัดเก็บและจัดการประวัติรุ่น (Versions) ของคำสั่งนี้
                                 </div>
                             ) : (
@@ -4003,7 +4003,7 @@ export default function PromptStudioClient() {
                                                 <Save className="w-3.5 h-3.5 text-blue-500" />
                                                 <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">บันทึกเวอร์ชันใหม่จากหน้าแก้ไข</span>
                                             </div>
-                                            <span className="text-[9px] text-slate-400 leading-normal">
+                                            <span className="text-[10px] text-slate-600 leading-normal font-medium">
                                                 ล็อกบันทึกสถานะของ Prompt ฉบับปัจจุบันนี้เก็บเป็นประวัติรุ่น (เช่น v1.0.0) เพื่อให้มั่นใจว่าสามารถคืนค่า (Restore) ย้อนกลับมาใช้ได้เสมอ
                                             </span>
                                         </div>
@@ -4048,9 +4048,9 @@ export default function PromptStudioClient() {
 
                                     <div className="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
                                         {isLoadingVersions ? (
-                                            <div className="text-center text-slate-400 text-xs py-8">กำลังโหลดรายการเวอร์ชัน...</div>
+                                            <div className="text-center text-slate-600 text-xs font-medium py-8">กำลังโหลดรายการเวอร์ชัน...</div>
                                         ) : versions.length === 0 ? (
-                                            <p className="text-slate-400 text-xs italic text-center py-8 px-4 leading-relaxed">
+                                            <p className="text-slate-600 text-xs text-center py-8 px-4 leading-relaxed font-medium">
                                                 ยังไม่มีการบันทึกรุ่นเวอร์ชันสำหรับเทมเพลตนี้. สามารถระบุเลขรุ่น (เช่น 1.0.0) และระบุบันทึกการแก้ไขที่ฟอร์มด้านบนเพื่อเริ่มบันทึกเวอร์ชันแรกได้เลยครับ
                                             </p>
                                         ) : (
@@ -4223,7 +4223,7 @@ export default function PromptStudioClient() {
                                     <RefreshCw className="w-8 h-8 text-violet-600 animate-spin" />
                                     <div className="text-center space-y-1.5">
                                         <p className="font-bold text-slate-700">Arbor กำลังวิเคราะห์และร่างเทมเพลต...</p>
-                                        <p className="text-[10px] text-slate-400">กำหนด Persona และโครงสร้างตัวแปรอินพุต...</p>
+                                        <p className="text-[11px] text-slate-600 font-medium">กำหนด Persona และโครงสร้างตัวแปรอินพุต...</p>
                                     </div>
                                 </div>
                             )}
@@ -4584,7 +4584,7 @@ export default function PromptStudioClient() {
                                     <RefreshCw className="w-8 h-8 text-violet-600 animate-spin" />
                                     <div className="text-center space-y-1.5">
                                         <p className="font-bold text-slate-700">Arbor กำลังวิเคราะห์และร่างเวิร์กโฟลว์...</p>
-                                        <p className="text-[10px] text-slate-400">กำหนดลำดับขั้นตอนและค้นหาแมปปิ้งกับคลังคำสั่งที่มีอยู่เดิม...</p>
+                                        <p className="text-[11px] text-slate-600 font-medium">กำหนดลำดับขั้นตอนและค้นหาแมปปิ้งกับคลังคำสั่งที่มีอยู่เดิม...</p>
                                     </div>
                                 </div>
                             )}
@@ -4819,7 +4819,7 @@ export default function PromptStudioClient() {
                                             >
                                                 สร้าง Workflow จากร่างนี้
                                             </button>
-                                            <span className="text-[9px] text-slate-400 mt-1 block">
+                                            <span className="text-[10px] text-slate-600 mt-1 block font-medium">
                                                 * ไม่มีการบันทึกฐานข้อมูลจนกว่าจะกดปุ่มนี้
                                             </span>
                                         </div>
@@ -5002,7 +5002,7 @@ export default function PromptStudioClient() {
                                         >
                                             ยืนยันนำเข้าข้อมูลลง Editor (Apply)
                                         </button>
-                                        <span className="text-[9px] text-slate-400 mt-1 block">
+                                        <span className="text-[10px] text-slate-600 mt-1 block font-medium">
                                             * จะทำการอัปเดต React State ในหน้าจอหลักเท่านั้น (ยังไม่บันทึกเข้า Database)
                                         </span>
                                     </div>
