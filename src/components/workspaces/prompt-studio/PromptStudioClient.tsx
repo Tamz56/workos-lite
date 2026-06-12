@@ -696,6 +696,211 @@ export default function PromptStudioClient() {
     const [wfIsEditingDraftInModal, setWfIsEditingDraftInModal] = useState(false);
     const [wfDraftEditFields, setWfDraftEditFields] = useState<Partial<WfDraft>>({});
 
+    // Master Prompt Import State
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importText, setImportText] = useState("");
+    const [applyUserInput, setApplyUserInput] = useState(true);
+    const [importPreview, setImportPreview] = useState<{
+        sections: Record<string, string>;
+        detectedInputs: Record<string, string>;
+        summary: Record<string, "found" | "missing">;
+        warnings: string[];
+    } | null>(null);
+
+    const handleMasterPromptImportPreview = () => {
+        if (!importText.trim()) return;
+
+        const targetTags = [
+            "[ROLE]",
+            "[PURPOSE]",
+            "[CONTEXT]",
+            "[INSTRUCTIONS]",
+            "[CONSTRAINTS]",
+            "[OUTPUT FORMAT]",
+            "[REVIEW CHECKLIST]",
+            "[GUARDRAILS]",
+            "[NOTES]",
+            "[USER INPUT]"
+        ];
+
+        // 1. หา index ของแต่ละ tag ที่เกิดขึ้นจริงในข้อความ
+        const occurrences: { tag: string; index: number }[] = [];
+        targetTags.forEach(tag => {
+            const index = importText.indexOf(tag);
+            if (index !== -1) {
+                occurrences.push({ tag, index });
+            }
+        });
+
+        // เรียงลำดับตำแหน่ง tag
+        occurrences.sort((a, b) => a.index - b.index);
+
+        const rawSections: Record<string, string> = {};
+        for (let i = 0; i < occurrences.length; i++) {
+            const current = occurrences[i];
+            const start = current.index + current.tag.length;
+            const end = (i + 1 < occurrences.length) ? occurrences[i + 1].index : importText.length;
+            
+            rawSections[current.tag] = importText.substring(start, end).trim();
+        }
+
+        const cleanContent = (content: string) => {
+            if (!content) return "";
+            let cleaned = content;
+            targetTags.forEach(tag => {
+                const regex = new RegExp(`^\\s*\\${tag}\\s*`, 'i');
+                cleaned = cleaned.replace(regex, '');
+            });
+            return cleaned.trim();
+        };
+
+        const parsedSections: Record<string, string> = {};
+        targetTags.forEach(tag => {
+            if (rawSections[tag] !== undefined) {
+                parsedSections[tag] = cleanContent(rawSections[tag]);
+            }
+        });
+
+        // สกัด USER INPUT
+        const detectedInputs: Record<string, string> = {};
+        const userInputRaw = parsedSections["[USER INPUT]"] || "";
+        if (userInputRaw) {
+            const lines = userInputRaw.split('\n');
+            const mapping: Record<string, string> = {
+                "หัวข้อบทความ": "topic_title",
+                "ชื่อตอน": "topic_title",
+                "รหัสตอน": "episode_code",
+                "เป้าหมายของงาน": "content_goal",
+                "ประเภทเนื้อหา": "content_type",
+                "ข้อมูลต้นทาง": "source_notes",
+                "draft": "source_notes",
+                "notebooklm": "source_notes",
+                "url บทความจริง ถ้ามี": "article_url",
+                "url บทความจริง": "article_url",
+                "url ภาพที่มีแล้ว": "image_urls",
+                "จำนวนภาพที่ต้องการ": "number_of_images",
+                "ขั้นตอนที่ต้องการให้ทำต่อ": "next_step"
+            };
+
+            lines.forEach(line => {
+                const colonIndex = line.indexOf(':');
+                if (colonIndex !== -1) {
+                    const label = line.substring(0, colonIndex).replace(/^[-*\s]+/, '').trim().toLowerCase();
+                    const value = line.substring(colonIndex + 1).trim();
+                    
+                    if (label && value) {
+                        for (const [key, fieldKey] of Object.entries(mapping)) {
+                            if (label.includes(key.toLowerCase())) {
+                                detectedInputs[fieldKey] = value;
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // สรุปหัวข้อที่พบ/ไม่พบ
+        const summary: Record<string, "found" | "missing"> = {};
+        targetTags.forEach(tag => {
+            const tagKey = tag.replace("[", "").replace("]", "");
+            summary[tagKey] = rawSections[tag] !== undefined ? "found" : "missing";
+        });
+
+        // ตรวจสอบเงื่อนไข Non-blocking warnings
+        const warnings: string[] = [];
+        const criticalSections = ["[ROLE]", "[PURPOSE]", "[CONTEXT]", "[INSTRUCTIONS]", "[CONSTRAINTS]"];
+        criticalSections.forEach(tag => {
+            const tagKey = tag.replace("[", "").replace("]", "");
+            if (summary[tagKey] === "missing") {
+                warnings.push(`ไม่พบหัวข้อ ${tag} ในเอกสารนำเข้า`);
+            }
+        });
+
+        setImportPreview({
+            sections: parsedSections,
+            detectedInputs,
+            summary,
+            warnings
+        });
+    };
+
+    const handleApplyImport = () => {
+        if (!importPreview) return;
+
+        const { sections, detectedInputs } = importPreview;
+
+        const newFields: Partial<PromptTemplate> = {
+            ...editorFields
+        };
+
+        if (sections["[ROLE]"] !== undefined) newFields.role = sections["[ROLE]"];
+        if (sections["[PURPOSE]"] !== undefined) newFields.purpose = sections["[PURPOSE]"];
+        if (sections["[CONTEXT]"] !== undefined) newFields.context = sections["[CONTEXT]"];
+        if (sections["[INSTRUCTIONS]"] !== undefined) newFields.instructions = sections["[INSTRUCTIONS]"];
+        if (sections["[CONSTRAINTS]"] !== undefined) newFields.constraints = sections["[CONSTRAINTS]"];
+        if (sections["[OUTPUT FORMAT]"] !== undefined) newFields.output_format = sections["[OUTPUT FORMAT]"];
+        if (sections["[REVIEW CHECKLIST]"] !== undefined) newFields.review_checklist = sections["[REVIEW CHECKLIST]"];
+
+        let finalNotes = editorFields.notes || "";
+        if (sections["[NOTES]"] !== undefined) {
+            finalNotes = sections["[NOTES]"];
+        }
+        
+        // สำหรับ [GUARDRAILS]: หากตรวจพบเนื้อหา ให้แทรกต่อท้าย Notes
+        const guardrailsContent = sections["[GUARDRAILS]"] || "";
+        if (guardrailsContent) {
+            const appendStr = `\n\nImported Guardrails:\n${guardrailsContent}`;
+            if (!finalNotes.includes("Imported Guardrails")) {
+                finalNotes = finalNotes ? (finalNotes + appendStr) : `Imported Guardrails:\n${guardrailsContent}`;
+            }
+        }
+        newFields.notes = finalNotes;
+
+        // สำหรับ [USER INPUT]: นำไปใช้กับ Test values & input_fields ถ้าติ๊ก checkbox ไว้
+        if (applyUserInput && Object.keys(detectedInputs).length > 0) {
+            // 1. อัปเดต testValues
+            setTestValues(prev => ({
+                ...prev,
+                ...detectedInputs
+            }));
+
+            // 2. อัปเดต editorFields.input_fields
+            const currentFields = safeParseInputFields(editorFields.input_fields || null);
+            const updatedFields = [...currentFields];
+            
+            const labelMap: Record<string, string> = {
+                "topic_title": "หัวข้อบทความ / ชื่อตอน",
+                "episode_code": "รหัสตอน",
+                "content_goal": "เป้าหมายของงาน",
+                "content_type": "ประเภทเนื้อหา",
+                "source_notes": "ข้อมูลต้นทาง / Draft",
+                "article_url": "URL บทความจริง",
+                "image_urls": "URL ภาพ",
+                "number_of_images": "จำนวนภาพ",
+                "next_step": "ขั้นตอนถัดไป"
+            };
+
+            Object.entries(detectedInputs).forEach(([key, val]) => {
+                if (!updatedFields.some(f => f.name === key)) {
+                    updatedFields.push({
+                        name: key,
+                        label: labelMap[key] || key,
+                        value: "",
+                        required: false
+                    });
+                }
+            });
+
+            newFields.input_fields = JSON.stringify(updatedFields);
+        }
+
+        setEditorFields(newFields);
+        setShowImportModal(false);
+        setImportText("");
+        setImportPreview(null);
+    };
+
     // Guardrail Presets State
     const [guardrailPresets, setGuardrailPresets] = useState<GuardrailPreset[]>([]);
     
@@ -2212,6 +2417,18 @@ export default function PromptStudioClient() {
                             >
                                 <Sparkles className="w-3.5 h-3.5 animate-pulse" />
                                 <span>ให้ Arbor ช่วยร่าง</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setImportText("");
+                                    setImportPreview(null);
+                                    setShowImportModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg font-semibold transition cursor-pointer bg-amber-650 hover:bg-amber-600 text-white shadow-sm border border-transparent"
+                                title="นำเข้า Prompt เต็มรูปแบบแล้วแยกส่วนลงฟิลด์อัตโนมัติ"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>นำเข้า Prompt เต็ม</span>
                             </button>
                             <button
                                 onClick={() => setShowQuickGuide(!showQuickGuide)}
@@ -4609,6 +4826,188 @@ export default function PromptStudioClient() {
                                     </>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Master Prompt Import / Section Splitter Modal */}
+            {showImportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fadeIn text-xs">
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-3xl flex flex-col max-h-[85vh] overflow-hidden text-slate-800">
+                        {/* Header */}
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                                <Plus className="w-4 h-4 text-amber-600" />
+                                <h3 className="font-extrabold text-slate-800 text-sm">
+                                    {!importPreview ? "นำเข้าและแยกส่วน Master Prompt" : "พรีวิวและตรวจสอบความถูกต้องการแยกส่วน (Preview Split)"}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowImportModal(false);
+                                    setImportText("");
+                                    setImportPreview(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600 text-xs font-bold px-2 py-1"
+                            >
+                                ปิด
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {!importPreview ? (
+                                <div className="space-y-4">
+                                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-blue-700 leading-relaxed">
+                                        💡 <strong>คำแนะนำ:</strong> ใช้เครื่องมือนี้เมื่อมี Prompt แบบเต็มที่มีหัวข้อ <code>[ROLE]</code>, <code>[PURPOSE]</code>, <code>[USER INPUT]</code> เป็นต้น เพื่อให้ระบบช่วยแยกส่วนลงฟิลด์ต่าง ๆ ให้โดยอัตโนมัติ ไม่ต้องคัดลอกแยกฟิลด์ด้วยมือ
+                                    </div>
+                                    <div className="flex flex-col space-y-1">
+                                        <label className="text-slate-600 font-bold">วาง Master Prompt ที่ต้องการนำเข้า:</label>
+                                        <textarea
+                                            value={importText}
+                                            onChange={(e) => setImportText(e.target.value)}
+                                            placeholder="ตัวอย่าง:&#13;[ROLE]&#13;คุณคือผู้เชี่ยวชาญ...&#13;&#13;[PURPOSE]&#13;เพื่อเขียนบทความ...&#13;&#13;[USER INPUT]&#13;- หัวข้อบทความ: ความสำคัญของดิน"
+                                            className="w-full h-80 bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all text-xs font-mono leading-relaxed shadow-sm"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="applyUserInputCheck"
+                                            checked={applyUserInput}
+                                            onChange={(e) => setApplyUserInput(e.target.checked)}
+                                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                                        />
+                                        <label htmlFor="applyUserInputCheck" className="text-slate-700 font-medium cursor-pointer">
+                                            Apply detected USER INPUT to Test Input Area (นำเข้าค่าตัวแปรทดสอบด้วย)
+                                        </label>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-5">
+                                    {/* Section Detection Summary */}
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 mb-2 uppercase tracking-wider text-[10px]">สรุปการตรวจพบแต่ละหัวข้อ (Section Detection Summary)</h4>
+                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                            {Object.entries(importPreview.summary).map(([tagKey, status]) => (
+                                                <div 
+                                                    key={tagKey} 
+                                                    className={`p-2 rounded-lg border text-center font-semibold transition-all ${
+                                                        status === "found" 
+                                                            ? "bg-emerald-50 border-emerald-100 text-emerald-700" 
+                                                            : "bg-slate-50 border-slate-100 text-slate-400"
+                                                    }`}
+                                                >
+                                                    <div className="text-[10px] truncate">[{tagKey}]</div>
+                                                    <div className="text-[9px] mt-0.5">{status === "found" ? "✓ พบ" : "✗ ไม่พบ"}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Warnings if any */}
+                                    {importPreview.warnings.length > 0 && (
+                                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-amber-800 space-y-1">
+                                            <div className="font-bold flex items-center gap-1.5 text-xs">
+                                                <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                                                <span>คำเตือน (ข้อเสนอแนะแบบไม่บล็อกการใช้งาน):</span>
+                                            </div>
+                                            <ul className="list-disc list-inside text-[11px] leading-relaxed pl-1">
+                                                {importPreview.warnings.map((warn, i) => (
+                                                    <li key={i}>{warn}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {/* Guardrails helper message */}
+                                    {importPreview.summary["GUARDRAILS"] === "found" && (
+                                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-blue-700 leading-normal">
+                                            ⚠️ **ตรวจพบข้อมูล [GUARDRAILS]:** ระบบจะทำการเขียนข้อมูลของ Guardrail ลงไปในส่วน **[บันทึกเพิ่มเติม (Notes)]** ภายใต้หัวข้อ <em>&quot;Imported Guardrails&quot;</em> ให้โดยอัตโนมัติ เนื่องจากสิทธิ์ของ Preset จริงในระบบจะต้องเลือกแยกอีกครั้งทางด้านล่าง
+                                        </div>
+                                    )}
+
+                                    {/* Parsed Fields Preview */}
+                                    <div className="space-y-3">
+                                        <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">รายละเอียดพรีวิวเนื้อหาฟิลด์ปลายทาง</h4>
+                                        <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-[350px] overflow-y-auto bg-slate-50 shadow-inner">
+                                            {Object.entries(importPreview.sections).map(([tag, val]) => {
+                                                if (tag === "[USER INPUT]" && !applyUserInput) return null;
+                                                return (
+                                                    <div key={tag} className="p-3 space-y-1 bg-white">
+                                                        <span className="font-bold text-slate-700 text-[10px] tracking-wide text-blue-600 uppercase">{tag}</span>
+                                                        <pre className="text-[11px] font-mono text-slate-800 leading-relaxed whitespace-pre-wrap p-2 bg-slate-50 rounded-lg border border-slate-100 max-h-[120px] overflow-y-auto">
+                                                            {val || "(ไม่มีเนื้อหา)"}
+                                                        </pre>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Parsed USER INPUT items */}
+                                    {applyUserInput && Object.keys(importPreview.detectedInputs).length > 0 && (
+                                        <div className="p-4.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl space-y-2">
+                                            <h4 className="font-bold text-emerald-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                                                <span>✓ ตรวจพบตัวแปรทดสอบจำลอง (Detected USER INPUT)</span>
+                                            </h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                                                {Object.entries(importPreview.detectedInputs).map(([key, val]) => (
+                                                    <div key={key} className="flex items-center gap-2 p-1.5 bg-white border border-emerald-100/50 rounded-lg">
+                                                        <span className="font-bold text-emerald-700">{key}:</span>
+                                                        <span className="text-slate-600 truncate" title={val}>{val}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end items-center gap-2 flex-shrink-0">
+                            {!importPreview ? (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setShowImportModal(false);
+                                            setImportText("");
+                                        }}
+                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                    <button
+                                        onClick={handleMasterPromptImportPreview}
+                                        disabled={!importText.trim()}
+                                        className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-xs cursor-pointer disabled:opacity-50"
+                                    >
+                                        แสดงตัวอย่างแยกฟิลด์ (Preview Split)
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => setImportPreview(null)}
+                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
+                                    >
+                                        ย้อนกลับไปแก้ไข
+                                    </button>
+                                    <div className="flex flex-col items-end">
+                                        <button
+                                            onClick={handleApplyImport}
+                                            className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs cursor-pointer shadow-sm"
+                                        >
+                                            ยืนยันนำเข้าข้อมูลลง Editor (Apply)
+                                        </button>
+                                        <span className="text-[9px] text-slate-400 mt-1 block">
+                                            * จะทำการอัปเดต React State ในหน้าจอหลักเท่านั้น (ยังไม่บันทึกเข้า Database)
+                                        </span>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
