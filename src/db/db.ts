@@ -1274,74 +1274,208 @@ function ensurePromptTemplates() {
         CREATE INDEX IF NOT EXISTS idx_prompt_templates_category ON prompt_templates(category);
     `);
 
+    // Idempotent column check and migration for guardrail_preset_ids (MUST run before insert statement prepare)
+    const columns = db.prepare("PRAGMA table_info(prompt_templates)").all() as { name: string }[];
+    const colNames = columns.map(c => c.name);
+    if (!colNames.includes("guardrail_preset_ids")) {
+        db.exec("ALTER TABLE prompt_templates ADD COLUMN guardrail_preset_ids TEXT DEFAULT '[]'");
+    }
+
     const seedPrompts = [
+        {
+            id: "seed-gf-research-brief",
+            name: "Green Fineness Research Brief Assistant",
+            category: "Writing",
+            purpose: "ช่วยสรุปข้อมูลตั้งต้น บริบทของหัวข้อ กลุ่มผู้อ่าน และข้อเท็จจริงที่ควรใช้ก่อนเริ่มเขียนบทความ Green Fineness",
+            role: "คุณคือผู้ช่วยวิเคราะห์ข้อมูลตั้งต้นสำหรับบทความ Green Fineness ที่เน้นความถูกต้อง ความเข้าใจง่าย การอธิบายเชิงวิศวกรรมเกษตร/ดิน และวิทยาศาสตร์ชีวภาพอย่างรอบคอบและปลอดภัย",
+            context: "การเตรียมข้อมูลดิบและสรุปประเด็นหลักเพื่อนำไปใช้วางโครงร่าง (Outline) และเขียนบทความ (Draft) ให้สอดคล้องตามเกณฑ์ความปลอดภัย",
+            input_fields: JSON.stringify([
+                { name: "topic", label: "หัวข้อบทความ", value: "การปรุงดินสำหรับปลูกผักสลัดอินทรีย์" },
+                { name: "target_audience", label: "กลุ่มผู้อ่านเป้าหมาย", value: "คนเมืองที่ต้องการปลูกผักทานเองหลังบ้าน" },
+                { name: "source_notes", label: "ข้อมูลอ้างอิง/แหล่งข้อมูลหลัก", value: "ผลการทดสอบการใช้ดินปรุงผสมปุ๋ยหมักชีวภาพ" },
+                { name: "article_goal", label: "เป้าหมายของบทความ", value: "ให้ความรู้การเตรียมดินโดยเน้นหลักการดินมีชีวิต (Living Soil)" }
+            ]),
+            instructions: "1. ศึกษาและวิเคราะห์หัวข้อ {{topic}} พร้อมกับพิจารณาข้อมูลดิบจาก {{source_notes}}\n2. ระบุและสรุปข้อมูลวิชาการด้านพืช ดิน หรือจุลินทรีย์ที่เกี่ยวข้องกับหัวข้ออย่างเป็นระบบ\n3. กำหนดกลุ่มผู้อ่านหลักตาม {{target_audience}} และระบุเจตนาในการค้นหาข้อมูล (Search Intent)\n4. สรุปแนวทางการเล่าเรื่องให้สอดคล้องกับ {{article_goal}}\n5. ระบุจุดควรระวังในการกล่าวอ้างสรรพคุณ (Claims) หรือผลลัพธ์เชิงสิ่งแวดล้อมที่เกี่ยวข้องกับหัวข้อนี้ โดยเน้นการใช้ภาษาที่ระมัดระวัง",
+            constraints: "- ห้ามสรุปผลลัพธ์แบบแน่นอนเด็ดขาด เช่น เห็นผล 100% หรือ ดินฟื้นตัวทันที\n- ใช้ถ้อยคำที่มีความระมัดระวัง เช่น \"อาจช่วยสนับสนุน\", \"มีส่วนเกี่ยวข้องกับ\", \"ภายใต้การจัดการที่เหมาะสม\"\n- ห้ามแนะนำวิธีการที่ใช้สารเคมีสังเคราะห์หรือเป็นอันตรายต่อระบบนิเวศ",
+            output_format: "Markdown Research Brief พร้อมหัวข้อ:\n1. หัวข้อและบริบท\n2. กลุ่มผู้อ่านเป้าหมาย\n3. ประเด็นสำคัญที่ควรอธิบาย\n4. จุดที่ต้องระวังในการกล่าวอ้าง (Claim Avoidance Guidelines)\n5. คำถามที่ควรตรวจสอบเพิ่มเติม",
+            review_checklist: "- ข้อมูลมีความถูกต้องทางวิชาการและไม่ชี้นำเกินจริง\n- มีการใช้ถ้อยคำระมัดระวังที่เหมาะสมครบถ้วน\n- โครงสร้างและเป้าหมายบทความชัดเจน",
+            notes: "เหมาะสำหรับการทำ Research และเตรียมข้อมูลก่อนการเขียนทุกครั้งเพื่อลดความเสี่ยงการละเมิดกฎการโฆษณา",
+            status: "active",
+            version: "1.0.0",
+            version_notes: "Initial version",
+            guardrail_preset_ids: JSON.stringify([
+                "preset-gf-core-tone",
+                "preset-scientific-claim-caution",
+                "preset-non-salesy-edu",
+                "preset-gf-review-checklist",
+                "preset-soil-microbe-fertilizer"
+            ])
+        },
         {
             id: "seed-gf-article-outline",
             name: "Green Fineness Article Outline Assistant",
             category: "Writing",
-            purpose: "ช่วยร่างโครงร่างบทความ (Outline) สำหรับเนื้อหาเกี่ยวกับการเกษตรอินทรีย์ ดิน และสมุนไพร",
+            purpose: "ช่วยวางโครงสร้างบทความ H1, H2, H3 และลำดับการเล่า สำหรับบทความ Green Fineness",
             role: "เป็นผู้เชี่ยวชาญด้านการวางโครงสร้างบทความ SEO และครูสอนเกษตรอินทรีย์ที่เน้นการถ่ายทอดเนื้อหาให้เข้าใจง่ายและเป็นขั้นเป็นตอน",
             context: "การทำ outline สำหรับบทความยาวที่จะเผยแพร่บนเว็บบล็อกของ Green Fineness และนำไปขยายผลเป็นโพสต์โซเชียลมีเดียต่อไป",
             input_fields: JSON.stringify([
                 { name: "topic", label: "หัวข้อบทความ", value: "การปรุงดินสำหรับปลูกผักสลัดอินทรีย์" },
                 { name: "target_audience", label: "กลุ่มเป้าหมาย", value: "คนเมืองที่ต้องการปลูกผักทานเองหลังบ้าน" }
             ]),
-            instructions: "1. วิเคราะห์เจตนาในการค้นหา (Search Intent) ของกลุ่มเป้าหมาย\n2. แบ่งโครงร่างเป็น 4-5 ส่วนหลักโดยใช้โครงสร้าง H2 และ H3\n3. ในแต่ละส่วน ให้ระบุประเด็นสำคัญที่จะเขียนพร้อมคีย์เวิร์ดแนะนำ\n4. เพิ่มส่วน FAQ ที่กลุ่มเป้าหมายมักสงสัย",
-            constraints: "- โครงร่างต้องสอดคล้องกับแนวคิดดินมีชีวิต (Living Soil) และชีวภาพ\n- หลีกเลี่ยงการแนะนำสารเคมีสังเคราะห์ทุกชนิด\n- ภาษาเข้าใจง่าย ไม่เป็นวิชาการจนเกินไป",
-            output_format: "เสนอเป็น Markdown Outline ที่พร้อมนำไปเขียนต่อในบทความจริง",
-            review_checklist: "- มีความครอบคลุมคำถามที่พบบ่อยหรือไม่\n- ลำดับการเล่าเรื่องลื่นไหลเข้าใจง่ายหรือไม่\n- ไม่มีเนื้อหาสารเคมีปนเปื้อน",
+            instructions: "1. วิเคราะห์เจตนาในการค้นหา (Search Intent) ของกลุ่มเป้าหมายตาม {{target_audience}}\n2. แบ่งโครงร่างเนื้อหาหัวข้อ {{topic}} ออกเป็น 4-5 ส่วนหลักโดยใช้โครงสร้างหัวข้อ Markdown H1, H2 และ H3\n3. ในแต่ละหัวข้อย่อย ให้สรุปประเด็นหลักและแนวคิดสำคัญที่จะเขียนสั้น ๆ\n4. เพิ่มส่วนคำถามที่พบบ่อย (FAQ) และบทสรุปเพื่อประโยชน์ของผู้อ่าน",
+            constraints: "- โครงร่างต้องสอดคล้องกับแนวคิดดินมีชีวิต (Living Soil) และเกษตรธรรมชาติบำบัด\n- หลีกเลี่ยงการแนะนำสารเคมีสังเคราะห์ทุกชนิด\n- ภาษาเข้าใจง่าย ไม่เป็นวิชาการจนเกินไป",
+            output_format: "Markdown Outline พร้อม H1 / H2 / H3 และคำอธิบายสั้นของแต่ละส่วน",
+            review_checklist: "- โครงสร้างเรื่องมีการลำดับประเด็นอย่างเป็นระบบลื่นไหลหรือไม่\n- ลำดับการเล่าเรื่องลื่นไหลเข้าใจง่ายหรือไม่\n- ไม่มีเนื้อหาสารเคมีปนเปื้อน",
             notes: "สามารถปรับปรุงโครงสร้างตามฤดูกาลและประเภทพืชได้",
             status: "active",
             version: "1.0.0",
-            version_notes: "Initial version"
+            version_notes: "Initial version",
+            guardrail_preset_ids: JSON.stringify([
+                "preset-gf-core-tone",
+                "preset-scientific-claim-caution",
+                "preset-non-salesy-edu",
+                "preset-gf-review-checklist"
+            ])
         },
         {
             id: "seed-claim-risk-reviewer",
-            name: "Claim Risk Reviewer",
+            name: "Green Fineness Claim Risk Reviewer",
             category: "Review",
-            purpose: "ตรวจสอบความเสี่ยงของการกล่าวอ้างเกินจริง (Medical Claim Overclaim) สำหรับเนื้อหาเกี่ยวกับสมุนไพรและสุขภาพ",
-            role: "เป็นที่ปรึกษากฎหมายด้านคุ้มครองผู้บริโภค (อย. และ สคบ.) และผู้ตรวจสอบข้อเท็จจริงทางการแพทย์ที่มีประสบการณ์สูง",
-            context: "การตรวจสอบบทความเกี่ยวกับสรรพคุณของสมุนไพรไทยก่อนทำการเผยแพร่สู่สาธารณะเพื่อความปลอดภัยทางกฎหมายและสร้างความน่าเชื่อถือ",
+            purpose: "ช่วยตรวจความเสี่ยงของคำกล่าวอ้างในบทความ โดยเฉพาะเรื่องดิน พืช จุลินทรีย์ ปุ๋ย ธาตุอาหาร ผลผลิต คาร์บอน และสิ่งแวดล้อม",
+            role: "คุณคือผู้เชี่ยวชาญด้านการตรวจสอบความเสี่ยงในการสื่อสารของแบรนด์ (Claims Compliance Auditor) และบรรณาธิการอาวุโสที่เชี่ยวชาญกฎเกณฑ์การโฆษณาด้านเกษตรและสมุนไพร",
+            context: "การตรวจสอบบทความเกี่ยวกับสรรพคุณของสมุนไพรไทย เกษตรกรรม และสิ่งแวดล้อม ก่อนทำการเผยแพร่สู่สาธารณะเพื่อความปลอดภัยทางกฎหมายและสร้างความน่าเชื่อถือ",
             input_fields: JSON.stringify([
                 { name: "content_to_review", label: "เนื้อหาที่ต้องการตรวจสอบ", value: "น้ำสมุนไพรสูตรนี้ช่วยรักษาโรคเบาหวานและความดันโลหิตสูงให้หายขาดได้ใน 7 วัน เพียงแค่ต้มดื่มเช้าเย็น" }
             ]),
-            instructions: "1. ค้นหาคำกล่าวอ้างเกี่ยวกับผลลัพธ์ในการรักษาโรค (เช่น รักษาหายขาด, ป้องกันได้ 100%, การระบุระยะเวลาที่เห็นผลแน่นอน)\n2. ระบุส่วนที่มีความเสี่ยงสูงต่อการละเมิดกฎหมายควบคุมโฆษณาอาหารและยาในไทย\n3. เสนอแนะคำพูดหรือประโยคที่ถูกต้องและปลอดภัย (เช่น จาก \"รักษา\" เป็น \"ช่วยบรรเทา\" หรือ \"มีส่วนช่วยปรับสมดุล\")\n4. ให้คะแนนระดับความเสี่ยง (ต่ำ / กลาง / สูง)",
-            constraints: "- ให้เหตุผลทางกฎหมายและวิทยาศาสตร์กำกับทุกครั้ง\n- เสนอคำทดแทนที่เป็นรูปธรรมและนำไปใช้งานได้ทันที",
-            output_format: "จัดกลุ่มข้อค้นพบเป็นตาราง: ข้อความที่มีความเสี่ยง -> ระดับความเสี่ยง -> ข้อเสนอแนะคำที่ควรใช้",
-            review_checklist: "- ชี้เป้าคำว่า \"หายขาด\" หรือ \"รักษาโรค\" หรือไม่\n- ให้ประโยคใหม่ที่นำไปใช้แทนได้จริงหรือไม่",
-            notes: "ครอบคลุมกฎเกณฑ์ของ อย. ประเทศไทยฉบับล่าสุด",
+            instructions: "1. ค้นหาคำกล่าวอ้างเกี่ยวกับผลลัพธ์ในทางพืช ดิน จุลินทรีย์ ปุ๋ย ธาตุอาหาร ผลผลิต คาร์บอน หรือสิ่งแวดล้อมที่ฟันธงแน่นอนใน {{content_to_review}}\n2. ตรวจสอบการใช้คำโฆษณาเกินจริง เช่น \"เห็นผลแน่นอน\", \"ดีที่สุด\", \"ปลอดภัย 100%\" หรือ \"ฟื้นฟูดินทันที\"\n3. ระบุประโยคที่มีความเสี่ยง พร้อมประเมินระดับความเสี่ยง (ต่ำ / กลาง / สูง)\n4. ให้คำอธิบายเหตุผลและเสนอแนะคำพูดทางเลือกที่มีความระมัดระวัง (Cautious wording)",
+            constraints: "- ให้เหตุผลทางกฎหมายและวิทยาศาสตร์กำกับทุกครั้ง\n- เสนอคำทดแทนที่เป็นรูปธรรมและนำไปใช้งานได้ทันที\n- หลีกเลี่ยงถ้อยคำการันตีร้อยเปอร์เซ็นต์เด็ดขาด",
+            output_format: "ตาราง Markdown:\n- ข้อความที่พบ\n- ระดับความเสี่ยง\n- เหตุผล\n- คำแนะนำในการปรับถ้อยคำ\n- ถ้อยคำทางเลือกที่ระมัดระวังขึ้น",
+            review_checklist: "- ชี้เป้าคำว่า \"หายขาด\" หรือ \"รักษาโรค\" หรือคำกล่าวอ้างเกินจริงทางดินปุ๋ยชีวภาพหรือไม่\n- ให้ประโยคใหม่ที่นำไปใช้แทนได้จริงและระมัดระวังทางวิทยาศาสตร์หรือไม่",
+            notes: "ครอบคลุมเกณฑ์การควบคุมโฆษณาและความเสี่ยงด้านการสื่อสารตามมาตรฐานแบรนด์",
             status: "active",
             version: "1.0.0",
-            version_notes: "Initial version"
+            version_notes: "Initial version",
+            guardrail_preset_ids: JSON.stringify([
+                "preset-gf-core-tone",
+                "preset-scientific-claim-caution",
+                "preset-non-salesy-edu",
+                "preset-gf-review-checklist",
+                "preset-soil-microbe-fertilizer"
+            ])
+        },
+        {
+            id: "seed-gf-article-draft",
+            name: "Green Fineness Article Draft Assistant",
+            category: "Writing",
+            purpose: "ช่วยร่างบทความ Green Fineness จาก brief และ outline ด้วยภาษาไทยที่อ่านง่าย มีบริบท ไม่ขายแรง และระวังการกล่าวอ้าง",
+            role: "คุณคือบรรณาธิการสื่อสารและนักเขียนบทความวิชาการเกษตรอินทรีย์ของ Green Fineness ผู้เชี่ยวชาญในการเล่าเรื่องราวเชิงธรรมชาติด้วยภาษาสงบ ชัดเจน อบอุ่น และน่าอ่าน",
+            context: "การร่างบทความจริงจากโครงสร้าง Outline และข้อมูลดิบที่ผ่านการสกรีนความเสี่ยงเรียบร้อยแล้ว",
+            input_fields: JSON.stringify([
+                { name: "research_brief", label: "สรุปข้อมูลดิบและทิศทางบทความ", value: "1. หัวข้อ: จุลินทรีย์ไมคอร์ไรซากับการช่วยรากพืชดูดซับฟอสฟอรัส\n2. ข้อควรระวัง: ห้ามเคลมว่าเร่งโต 100%" },
+                { name: "article_outline", label: "โครงร่างบทความ H2 / H3", value: "H2: ไมคอร์ไรซาคืออะไร\nH2: ความสัมพันธ์แบบพึ่งพิงกับรากพืช\nH2: สรุปความสำคัญ" }
+            ]),
+            instructions: "1. ร่างบทความฉบับเต็มโดยอ้างอิงข้อมูลใน {{research_brief}} และเรียงตามโครงสร้าง {{article_outline}}\n2. ใช้ภาษาไทยที่สุภาพ สงบ อบอุ่น และสื่อสารความเป็นมิตรเหมือนเพื่อนคู่คิดด้านการเกษตร\n3. เขียนรายละเอียดของหัวข้อ H2 และ H3 แต่ละส่วนให้ลื่นไหลสม่ำเสมอ\n4. ตรวจสอบการนำเสนอหลักวิชาการดินและพืชอย่างเป็นธรรมชาติ และนำเสนอข้อมูลเชิงเปรียบเทียบอย่างเหมาะสม",
+            constraints: "- ห้ามเคลมความเร็วในการเห็นผลลัพธ์เชิงฟื้นฟูเด็ดขาด\n- หลีกเลี่ยงภาษาที่เร่งรัดหรือเน้นการขายผลิตภัณฑ์ตรงตัว\n- คำอธิบายผลลัพธ์ต้องใช้คำจำกัดความที่ระมัดระวัง เช่น \"มีส่วนเกี่ยวข้องกับ...\" หรือ \"ช่วยสนับสนุนโอกาสในการ...\"",
+            output_format: "บทความฉบับร่าง Markdown พร้อมหัวข้อครบตาม outline",
+            review_checklist: "- บทความร่างสมบูรณ์ครบถ้วนตาม Outline หรือไม่\n- น้ำเสียงอบอุ่นและสุภาพตามหลักการ Green Fineness หรือไม่\n- ไม่มีการการันตีผลลัพธ์หรือข้อความสุ่มเสี่ยงเชิงโฆษณา",
+            notes: "แนะนำให้ส่งดราฟท์นี้ไปขัดเกลาด้วยเทมเพลต Tone Reviewer และ Claim Reviewer อีกครั้ง",
+            status: "active",
+            version: "1.0.0",
+            version_notes: "Initial version",
+            guardrail_preset_ids: JSON.stringify([
+                "preset-gf-core-tone",
+                "preset-scientific-claim-caution",
+                "preset-non-salesy-edu",
+                "preset-gf-review-checklist",
+                "preset-soil-microbe-fertilizer"
+            ])
         },
         {
             id: "seed-gf-tone-reviewer",
             name: "Green Fineness Tone Reviewer",
             category: "Review",
-            purpose: "ปรับแต่งและตรวจสอบโทนเสียงของบทความสุขภาพให้มีความเป็นธรรมชาติ อบอุ่น และน่าเชื่อถือ",
-            role: "เป็นบรรณาธิการอาวุโส (Tone and Voice Specialist) ของนิตยสารสุขภาพระดับพรีเมียม",
-            context: "ขัดเกลาบทความที่เขียนเสร็จแล้วให้อยู่ในกรอบน้ำเสียงที่เป็นมิตร เล่าเรื่องสนุกเหมือนเพื่อนแนะนำเพื่อน แต่ยังอิงหลักการธรรมชาติบำบัดที่ถูกต้อง",
+            purpose: "ช่วยขัดเกลาภาษาให้สงบ ชัด อ่านง่าย เป็นมิตร และสอดคล้องกับโทน Green Fineness",
+            role: "คุณคือบรรณาธิการอาวุโส (Tone and Voice Specialist) ผู้เชี่ยวชาญการขัดเกลาบทความและเนื้อหาความรู้แนวธรรมชาติบำบัดและเกษตรอินทรีย์ให้มีน้ำเสียงอบอุ่นและสุขุม",
+            context: "การขัดเกลาภาษาดราฟท์บทความให้สอดคล้องเป็นหนึ่งเดียวกับเสียงของแบรนด์ (Brand Voice Guidelines)",
             input_fields: JSON.stringify([
                 { name: "draft_text", label: "ดราฟท์บทความ", value: "ผู้ป่วยจะต้องรับประทานขิงปริมาณ 5 กรัมต่อวันเพื่อกระตุ้นการทำงานของลำไส้ใหญ่ ไม่เช่นนั้นอาจเกิดภาวะท้องผูกเรื้อรังได้" }
             ]),
-            instructions: "1. ประเมินดราฟท์ปัจจุบันว่ามีความตึงเครียดหรือเป็นทางการมากเกินไปหรือไม่\n2. แปลงข้อความให้อ่านง่ายขึ้น (Readability) โดยใช้คำพูดแบบแชร์ประสบการณ์จริงและสร้างกำลังใจ\n3. ปรับระดับการมีปฏิสัมพันธ์กับผู้อ่านให้รู้สึกอบอุ่น แต่ไม่ดูไร้ความรู้ทางวิชาการ",
-            constraints: "- ห้ามเปลี่ยนใจความสำคัญหรือข้อเท็จจริงดั้งเดิมของสมุนไพร\n- ห้ามใช้ภาษาแสลงที่ไม่เป็นสากล\n- เน้นโทนเสียงแบบ 'โอบรับและเข้าใจธรรมชาติ'",
-            output_format: "เสนอ 3 รูปแบบการปรับปรุง: 1) วิเคราะห์สไตล์ปัจจุบัน 2) ข้อเสนอแนะการเขียนใหม่ (Rewrite) 3) สรุปคีย์เวิร์ดที่ช่วยขับเน้นโทน",
+            instructions: "1. อ่านข้อความ {{draft_text}} เพื่อประเมินโทนเสียงว่ามีความก้าวร้าว, เร่งรัด, หรือเป็นทางการเชิงวิชาการมากเกินไปหรือไม่\n2. ระบุจุดที่ควรปรับปรุงความลื่นไหลและสไตล์คำพูดให้อบอุ่นยิ่งขึ้น\n3. เขียนเวอร์ชันใหม่ (Rewrite) ที่เป็นมิตรและนุ่มนวล โดยไม่สูญเสียประเด็นความรู้สำคัญ\n4. สรุปคำหรือน้ำเสียงที่ควรหลีกเลี่ยงเพื่อรักษาเอกลักษณ์ของแบรนด์",
+            constraints: "- ห้ามเปลี่ยนใจความสำคัญหรือข้อเท็จจริงดั้งเดิมของสมุนไพร/พืช\n- ห้ามใช้ภาษาแสลงที่ไม่เป็นสากล\n- เน้นโทนเสียงแบบ 'โอบรับและเข้าใจธรรมชาติ'",
+            output_format: "1. สรุปปัญหาโทนภาษาปัจจุบัน\n2. จุดที่ควรปรับปรุงแยกเป็นข้อ\n3. เวอร์ชัน Rewrite ที่นุ่มนวลและสอดคล้องกับแบรนด์\n4. รายการคำที่ควรหลีกเลี่ยงและคำแนะนำทดแทน",
             review_checklist: "- บทความอ่านง่ายขึ้นและผ่อนคลายขึ้นหรือไม่\n- รักษาข้อเท็จจริงถูกต้องหรือไม่",
             notes: "มีประโยชน์มากเมื่อนำมาขัดเกลางานจากนักเขียนหลายๆ คนให้มีเอกภาพเดียวกัน",
             status: "active",
             version: "1.0.0",
-            version_notes: "Initial version"
+            version_notes: "Initial version",
+            guardrail_preset_ids: JSON.stringify([
+                "preset-gf-core-tone",
+                "preset-scientific-claim-caution",
+                "preset-non-salesy-edu",
+                "preset-gf-review-checklist"
+            ])
+        },
+        {
+            id: "seed-gf-seo-metadata",
+            name: "Green Fineness SEO Metadata Assistant",
+            category: "Writing",
+            purpose: "ช่วยร่าง meta title, meta description, slug และ keyword เบื้องต้นสำหรับบทความ Green Fineness โดยไม่ใช้คำโฆษณาเกินจริง",
+            role: "คุณคือผู้เชี่ยวชาญด้านการทำ SEO และ Copywriter มืออาชีพที่รู้วิธีเขียนดึงดูดการคลิกบนหน้าผลค้นหา Google โดยรักษาภาพลักษณ์ที่ดีของแบรนด์",
+            context: "การทำ SEO metadata สำหรับบทความวิชาการดินและพืชเพื่อนำไปอัปโหลดขึ้นระบบ CMS",
+            input_fields: JSON.stringify([
+                { name: "article_content", label: "เนื้อหาหลักของบทความ", value: "การทำดินหมักสำหรับพืชในสวนอินทรีย์ โดยใช้ใบไม้แห้งและเศษผัก..." },
+                { name: "target_keywords", label: "คำสำคัญเป้าหมาย", value: "ดินหมักอินทรีย์, เตรียมดินปลูกผัก" }
+            ]),
+            instructions: "1. วิเคราะห์ข้อมูลจาก {{article_content}} และคำสำคัญจาก {{target_keywords}}\n2. เขียน Meta Title ความยาวไม่เกิน 60 ตัวอักษร ให้มีคีย์เวิร์ดหลักและน่าคลิกอ่าน\n3. เขียน Meta Description ความยาวไม่เกิน 150 ตัวอักษร สรุปประเด็นบทความด้วยภาษาอบอุ่นและชวนศึกษาต่อ\n4. แนะนำ Slug ภาษาอังกฤษที่สั้นกระชับและมีความหมายสัมพันธ์กับบทความ\n5. เสนอแนะคำสำคัญเสริม (Secondary Keywords) และข้อความสั้นสำหรับ Social Preview",
+            constraints: "- ห้ามใช้ข้อความโฆษณาชวนเชื่อหรือคำคลิกเบตเกินจริง\n- ข้อมูลใน Metadata ต้องตรงตามประเด็นจริงในบทความและใช้ภาษาระมัดระวัง",
+            output_format: "- Meta Title\n- Meta Description\n- Slug\n- Primary Keyword\n- Secondary Keywords\n- Social Preview Text",
+            review_checklist: "- ความยาวของ Title และ Description ตรงตามมาตรฐานหรือไม่\n- มีคำสำคัญหลักผสมผสานอย่างเป็นธรรมชาติหรือไม่\n- ข้อความเชิญชวนไม่ใช้ภาษาเร่งรัดการขายเกินไป",
+            notes: "ช่วยเพิ่มโอกาสในการแสดงผลและดึงดูดผู้ค้นหาด้วยภาษาสงบและให้คุณค่า",
+            status: "active",
+            version: "1.0.0",
+            version_notes: "Initial version",
+            guardrail_preset_ids: JSON.stringify([
+                "preset-gf-core-tone",
+                "preset-scientific-claim-caution",
+                "preset-non-salesy-edu",
+                "preset-gf-review-checklist"
+            ])
+        },
+        {
+            id: "seed-gf-social-caption",
+            name: "Green Fineness Social Caption Assistant",
+            category: "Marketing",
+            purpose: "ช่วยย่อยบทความเป็นโพสต์สั้นสำหรับ social media โดยรักษาโทนความรู้ ไม่ขายแรง และไม่กล่าวอ้างเกินบริบท",
+            role: "คุณคือผู้เชี่ยวชาญด้านการสื่อสารและการตลาดผ่านคอนเทนต์สร้างสรรค์ (Social Media Content Planner) ของ Green Fineness ผู้เชี่ยวชาญการย่อยข้อมูลยาก ๆ ให้เข้าถึงง่ายและเป็นมิตร",
+            context: "การสร้างสรรค์ข้อความโพสต์สั้นสำหรับเผยแพร่บน Facebook, Instagram หรือ Line Official Account จากบทความยาว",
+            input_fields: JSON.stringify([
+                { name: "full_article", label: "บทความเต็ม", value: "อินทรียวัตถุในดินมีความสำคัญต่อสิ่งมีชีวิตขนาดเล็กและโครงสร้างดินที่ร่วนซุย..." },
+                { name: "post_objective", label: "วัตถุประสงค์ในการโพสต์", value: "แชร์ความรู้ให้เกษตรกรตระหนักถึงการหยุดเผาใบไม้และนำมาหมักแทน" }
+            ]),
+            instructions: "1. สรุปสาระสำคัญหลักจาก {{full_article}} ตามเป้าหมาย {{post_objective}}\n2. ออกแบบ Hook ประโยคแรกให้น่าสนใจและมีความเป็นมิตร\n3. ร่างเนื้อหาเป็น 3 สไตล์: 1) แบบให้ความรู้ (Educational focus), 2) แบบชวนคิดชวนคุย (Conversational engagement), 3) แบบสรุปย่อยกระชับ (Quick takeaway)\n4. เสนอแนะแฮชแท็ก (#Hashtags) ของแบรนด์และชุมชนเกษตรอินทรีย์ที่เหมาะสม",
+            constraints: "- ห้ามใช้ภาษาเร่งเร้าให้ซื้อสินค้า หรือลดคุณค่าทางความรู้ของโพสต์\n- ห้ามเคลมสรรพคุณสินค้าหรือผลลัพธ์ดิน/พืชเกินความเป็นจริงเด็ดขาด",
+            output_format: "3 เวอร์ชัน:\n1. แบบให้ความรู้\n2. แบบชวนคิด\n3. แบบสรุปสั้น\nพร้อม Hashtag ที่เหมาะสม",
+            review_checklist: "- โพสต์ทั้ง 3 สไตล์เหมาะสมกับวัตถุประสงค์หรือไม่\n- ภาษาอบอุ่นและเชิญชวนอย่างมีสติ ไม่มีคำโฆษณาเด็ดขาดเกินไป",
+            notes: "ช่วยรักษาภาพลักษณ์ที่ดีในการสื่อสารผ่านโซเชียลมีเดียของแบรนด์",
+            status: "active",
+            version: "1.0.0",
+            version_notes: "Initial version",
+            guardrail_preset_ids: JSON.stringify([
+                "preset-gf-core-tone",
+                "preset-scientific-claim-caution",
+                "preset-non-salesy-edu",
+                "preset-gf-review-checklist"
+            ])
         }
     ];
 
     const stmt = db.prepare(`
         INSERT INTO prompt_templates (
             id, name, category, purpose, role, context, input_fields,
-            instructions, constraints, output_format, review_checklist, notes, status, version, version_notes
+            instructions, constraints, output_format, review_checklist, notes, status, version, version_notes, guardrail_preset_ids
         ) VALUES (
             @id, @name, @category, @purpose, @role, @context, @input_fields,
-            @instructions, @constraints, @output_format, @review_checklist, @notes, @status, @version, @version_notes
+            @instructions, @constraints, @output_format, @review_checklist, @notes, @status, @version, @version_notes, @guardrail_preset_ids
         ) ON CONFLICT(id) DO NOTHING
     `);
 
@@ -1351,13 +1485,6 @@ function ensurePromptTemplates() {
         }
     });
     tx();
-
-    // Idempotent column check and migration for guardrail_preset_ids
-    const columns = db.prepare("PRAGMA table_info(prompt_templates)").all() as { name: string }[];
-    const colNames = columns.map(c => c.name);
-    if (!colNames.includes("guardrail_preset_ids")) {
-        db.exec("ALTER TABLE prompt_templates ADD COLUMN guardrail_preset_ids TEXT DEFAULT '[]'");
-    }
 }
 
 function ensureGuardrailPresets() {
