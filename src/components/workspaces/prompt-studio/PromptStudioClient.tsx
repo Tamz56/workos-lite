@@ -187,6 +187,35 @@ function cleanGreenFinenessClaims(text: string): string {
     return cleaned;
 }
 
+function checkFieldForSectionTags(text: string | null | undefined, fieldLabel: string): React.ReactNode {
+    if (!text) return null;
+    const targetTags = [
+        "[ROLE]",
+        "[PURPOSE]",
+        "[CONTEXT]",
+        "[INSTRUCTIONS]",
+        "[CONSTRAINTS]",
+        "[OUTPUT FORMAT]",
+        "[REVIEW CHECKLIST]",
+        "[GUARDRAILS]",
+        "[NOTES]",
+        "[USER INPUT]"
+    ];
+    
+    const foundTags = targetTags.filter(tag => text.includes(tag));
+    if (foundTags.length > 0) {
+        return (
+            <div className="mt-1 flex items-start gap-1.5 rounded-lg border border-amber-100 bg-amber-50 p-2 text-xs font-semibold leading-5 text-amber-700 shadow-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+                <span>
+                    พบ {foundTags.join(", ")} ในช่อง {fieldLabel} — ถ้าเป็นข้อมูลเฉพาะบทความ ให้ย้ายไปกรอกที่ Test Input Area ด้านขวา ถ้าเป็นคำอธิบายระบบ ให้ลบ tag นี้ออกและเหลือเฉพาะเนื้อหา
+                </span>
+            </div>
+        );
+    }
+    return null;
+}
+
 interface WfStepDraft {
     step_name: string;
     step_description: string;
@@ -2350,6 +2379,7 @@ export default function PromptStudioClient() {
                                     placeholder="จุดประสงค์หลักในการรัน Prompt นี้"
                                     className={INPUT_CLASS}
                                 />
+                                {checkFieldForSectionTags(editorFields.purpose, "วัตถุประสงค์ (Purpose)")}
                             </div>
                         </div>
 
@@ -2620,6 +2650,7 @@ export default function PromptStudioClient() {
                                     placeholder="เช่น คุณคือบรรณาธิการตรวจทานบทความวิชาการเกษตรอินทรีย์..."
                                     className={TEXTAREA_CLASS}
                                 />
+                                {checkFieldForSectionTags(editorFields.role, "บทบาท (Role)")}
                             </div>
 
                             <div>
@@ -2631,6 +2662,7 @@ export default function PromptStudioClient() {
                                     placeholder="บริบทโดยรอบ ข้อมูลพื้นฐาน องค์กร หรือกลุ่มเป้าหมาย..."
                                     className={TEXTAREA_CLASS}
                                 />
+                                {checkFieldForSectionTags(editorFields.context, "บริบท (Context)")}
                             </div>
                         </div>
 
@@ -2644,6 +2676,7 @@ export default function PromptStudioClient() {
                                 placeholder="ขั้นตอนการทำงาน 1, 2, 3 ทีละสเตป..."
                                 className={TEXTAREA_CLASS}
                             />
+                            {checkFieldForSectionTags(editorFields.instructions, "ขั้นตอนดำเนินงาน (Instructions)")}
                         </div>
 
                         <div>
@@ -2655,6 +2688,7 @@ export default function PromptStudioClient() {
                                 placeholder="สิ่งที่ห้ามทำเด็ดขาด เช่น ห้ามใช้สารเคมี, ห้ามใช้สัญลักษณ์นี้..."
                                 className={TEXTAREA_CLASS}
                             />
+                            {checkFieldForSectionTags(editorFields.constraints, "ข้อจำกัด / กฎเกณฑ์ (Constraints)")}
                         </div>
 
                         {/* Green Fineness Guardrails Preset Selection Panel */}
@@ -2748,6 +2782,7 @@ export default function PromptStudioClient() {
                                     placeholder="จัดรูปแบบคำตอบ เช่น แสดงเป็น Markdown Table หรือ JSON..."
                                     className={TEXTAREA_CLASS}
                                 />
+                                {checkFieldForSectionTags(editorFields.output_format, "รูปแบบผลลัพธ์ (Output Format)")}
                             </div>
 
                             <div>
@@ -2759,6 +2794,7 @@ export default function PromptStudioClient() {
                                     placeholder="การประเมินคุณภาพด้วยตนเองก่อนสรุปผล..."
                                     className={TEXTAREA_CLASS}
                                 />
+                                {checkFieldForSectionTags(editorFields.review_checklist, "รายการเช็คตรวจสอบก่อนส่ง (Review Checklist)")}
                             </div>
                         </div>
 
@@ -2772,6 +2808,7 @@ export default function PromptStudioClient() {
                                 placeholder="บันทึกข้อความภายในที่ไม่ได้ Compile ไปยัง Prompt"
                                 className={TEXTAREA_CLASS}
                             />
+                            {checkFieldForSectionTags(editorFields.notes, "บันทึกเพิ่มเติม (Notes)")}
                         </div>
                     </div>
                 </div>
@@ -3398,7 +3435,7 @@ export default function PromptStudioClient() {
 
                             {/* Compile Preview Area */}
                             <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
-                                <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-white flex-shrink-0">
+                                <div className="py-1.5 px-3 border-b border-slate-200 flex justify-between items-center bg-white flex-shrink-0">
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2">
                                             <Eye className="w-3.5 h-3.5 text-blue-500" />
@@ -3406,27 +3443,30 @@ export default function PromptStudioClient() {
                                                 {previewTab === "compiled" ? "Compiled Result" : "Template Spec"}
                                             </h2>
                                         </div>
-                                        <span className="text-[11px] text-slate-400 mt-0.5 leading-normal">
-                                            {previewTab === "compiled" 
-                                                ? "ข้อความคำสั่งที่แทนที่ค่าตัวแปรทดสอบแล้ว (พร้อมก๊อปปี้ไปป้อน AI)" 
-                                                : "โครงสร้างโครงร่างพารามิเตอร์และตัวแปรแบบ Raw Spec"
-                                            }
-                                        </span>
+                                        {previewTab === "compiled" ? (
+                                            <div className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                                                <span>ⓘ [USER INPUT] ใน Compiled Result อาจมาจาก Test Input Area โดยอัตโนมัติ ไม่ต้องลบ เว้นแต่มี warning ใต้ช่อง Template หลักด้านซ้าย</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[11px] text-slate-400 mt-0.5 leading-normal">
+                                                โครงสร้างโครงร่างพารามิเตอร์และตัวแปรแบบ Raw Spec
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {previewTab === "compiled" && selectedId && selectedId !== "new-template" && (
                                             <button
                                                 onClick={() => setRightPanelTab("history")}
-                                                className="flex items-center gap-1 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                                                className="flex items-center gap-1 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm"
                                             >
                                                 <Sliders className="w-3 h-3 text-blue-500" />
-                                                <span>บันทึกประวัติการทดสอบ</span>
+                                                <span>บันทึก Test</span>
                                             </button>
                                         )}
                                         <button
                                             onClick={handleCopy}
                                             disabled={!activePreviewText}
-                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm ${
                                                 copied 
                                                     ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
                                                     : "bg-blue-600 hover:bg-blue-500 text-white border-transparent"
@@ -3437,8 +3477,8 @@ export default function PromptStudioClient() {
                                                 {copied 
                                                     ? "คัดลอกสำเร็จ!" 
                                                     : previewTab === "compiled" 
-                                                        ? "คัดลอก Prompt พร้อมใช้" 
-                                                        : "คัดลอกโครงสร้างเทมเพลต"
+                                                        ? "คัดลอก Prompt" 
+                                                        : "คัดลอก Spec"
                                                 }
                                             </span>
                                         </button>
@@ -3446,7 +3486,7 @@ export default function PromptStudioClient() {
                                 </div>
 
                                 {/* Prompt rendering panel */}
-                                <div className="flex-1 m-3 p-4 overflow-y-auto bg-white border border-slate-200/60 rounded-xl shadow-inner font-mono text-sm text-slate-800 select-text whitespace-pre-wrap leading-6 custom-scrollbar">
+                                <div className="flex-1 m-2.5 p-4 overflow-y-auto bg-white border border-slate-200/60 rounded-xl shadow-inner font-mono text-sm text-slate-800 select-text whitespace-pre-wrap leading-6 custom-scrollbar">
                                     {activePreviewText ? (
                                         activePreviewText
                                     ) : (
