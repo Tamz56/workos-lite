@@ -141,27 +141,39 @@ const INPUT_CLASS = "w-full bg-white border border-slate-200 hover:border-slate-
 const TEXTAREA_CLASS = "w-full bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 selection:bg-blue-500/10 transition-all text-xs font-mono leading-relaxed shadow-sm";
 const SELECT_CLASS = "w-full bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all text-xs shadow-sm";
 
+let lastSafeInputFields: PromptInputField[] = [];
+
 function safeParseInputFields(jsonStr: string | null): PromptInputField[] {
-    if (!jsonStr) return [];
-    try {
-        const parsed = JSON.parse(jsonStr);
-        if (Array.isArray(parsed)) {
-            return parsed.map(item => {
-                const typedItem = item as Record<string, unknown>;
-                return {
-                    name: String(typedItem.name || ""),
-                    label: String(typedItem.label || typedItem.name || ""),
-                    value: String(typedItem.value || ""),
-                    placeholder: typedItem.placeholder !== undefined ? String(typedItem.placeholder) : undefined,
-                    helperText: typedItem.helperText !== undefined ? String(typedItem.helperText) : undefined,
-                    required: typedItem.required === true
-                };
-            }).filter(item => item.name !== "");
-        }
-    } catch (err) {
-        console.error("Failed to parse input fields JSON:", err);
+    if (!jsonStr) {
+        lastSafeInputFields = [];
+        return [];
     }
-    return [];
+    const trimmed = jsonStr.trim();
+    if (!trimmed) {
+        lastSafeInputFields = [];
+        return [];
+    }
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (!Array.isArray(parsed)) {
+            return lastSafeInputFields;
+        }
+        const mapped = parsed.map(item => {
+            const typedItem = item as Record<string, unknown>;
+            return {
+                name: String(typedItem.name || ""),
+                label: String(typedItem.label || typedItem.name || ""),
+                value: String(typedItem.value || ""),
+                placeholder: typedItem.placeholder !== undefined ? String(typedItem.placeholder) : undefined,
+                helperText: typedItem.helperText !== undefined ? String(typedItem.helperText) : undefined,
+                required: typedItem.required === true
+            };
+        }).filter(item => item.name !== "");
+        lastSafeInputFields = mapped;
+        return mapped;
+    } catch {
+        return lastSafeInputFields;
+    }
 }
 
 function cleanGreenFinenessClaims(text: string): string {
@@ -1362,7 +1374,9 @@ export default function PromptStudioClient() {
         try {
             const parsed = JSON.parse(val);
             if (!Array.isArray(parsed)) {
-                setJsonValidationError("รูปแบบ JSON ต้องเป็น Array: [ { 'name': '...', 'label': '...', 'value': '...' } ]");
+                setJsonValidationError(
+                    "JSON ไม่ถูกต้อง กรุณาใส่เฉพาะ array ของ input fields เช่น:\n[\n  { \"name\": \"topic\", \"label\": \"หัวข้อ\", \"value\": \"\" }\n]"
+                );
             } else {
                 setJsonValidationError(null);
                 // Sync values
@@ -1375,9 +1389,10 @@ export default function PromptStudioClient() {
                 });
                 setTestValues(initialValues);
             }
-        } catch (err: unknown) {
-            const errMsg = err instanceof Error ? err.message : "Invalid JSON format";
-            setJsonValidationError(`ข้อผิดพลาด JSON: ${errMsg}`);
+        } catch {
+            setJsonValidationError(
+                "JSON ไม่ถูกต้อง กรุณาใส่เฉพาะ array ของ input fields เช่น:\n[\n  { \"name\": \"topic\", \"label\": \"หัวข้อ\", \"value\": \"\" }\n]"
+            );
         }
     };
 
@@ -1678,6 +1693,7 @@ export default function PromptStudioClient() {
     // Save Template (POST or PATCH)
     const handleSave = async () => {
         if (jsonValidationError) {
+            alert("JSON ไม่ถูกต้อง กรุณาใส่เฉพาะ array ของ input fields เช่น:\n[\n  { \"name\": \"topic\", \"label\": \"หัวข้อ\", \"value\": \"\" }\n]");
             setApiError("ไม่สามารถบันทึกได้เนื่องจากรูปแบบ JSON ของ Input Fields ผิดพลาด");
             return;
         }
@@ -2579,9 +2595,9 @@ export default function PromptStudioClient() {
                                             }`}
                                         />
                                         {jsonValidationError ? (
-                                            <p className="text-red-600 text-[10px] flex items-center gap-1 font-mono">
-                                                <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                                                {jsonValidationError}
+                                            <p className="text-red-600 text-[10px] flex items-start gap-1 font-mono whitespace-pre-wrap">
+                                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                                                <span>{jsonValidationError}</span>
                                             </p>
                                         ) : (
                                             <p className="text-slate-500 text-[9px]">
