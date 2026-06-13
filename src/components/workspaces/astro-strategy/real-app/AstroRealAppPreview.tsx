@@ -20,10 +20,11 @@ import {
 } from "./data/astroRealAppMockData";
 
 import { AstroRealAppLocalStorageAdapter } from "./data/astroRealAppLocalStorageAdapter";
-import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel, AstroMonthlyReflectionViewModel, AstroOnboardingStatus, ThaiAstroStrategyOutput } from "./data/astroRealAppTypes";
+import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel, AstroMonthlyReflectionViewModel, AstroOnboardingStatus, ThaiAstroStrategyOutput, ChineseMetaphysicsStrategyOutput } from "./data/astroRealAppTypes";
 import { loadAstroBirthProfile } from "./data/astroRealAppBirthProfileStorageAdapter";
 import { buildAstroTimingInput, buildAstroEngineOutput } from "./data/astroRealAppAstrologyEngineAdapter";
 import { buildThaiAstroStrategyOutput } from "./data/astroRealAppThaiAstrologyAdapter";
+import { buildChineseMetaphysicsStrategyOutput } from "./data/astroRealAppChineseMetaphysicsAdapter";
 import { mapEngineOutputToTodayData } from "./data/astroRealAppTodayTimingViewModel";
 import { buildWeeklyTimingViewModel } from "./data/astroRealAppWeeklyTimingViewModel";
 import { AstroWeeklyPanel } from "./components/AstroWeeklyPanel";
@@ -101,6 +102,10 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
   // DEV-059: Thai Astrology calculation states
   const [thaiAstroContext, setThaiAstroContext] = React.useState<ThaiAstroStrategyOutput | null>(null);
   const [thaiAstroFallbackNote, setThaiAstroFallbackNote] = React.useState<string | null>(null);
+
+  // DEV-067: Chinese Metaphysics calculation states
+  const [chineseAstroContext, setChineseAstroContext] = React.useState<ChineseMetaphysicsStrategyOutput | null>(null);
+  const [chineseAstroFallbackNote, setChineseAstroFallbackNote] = React.useState<string | null>(null);
 
   // DEV-028: Weekly calculation states
   const [weeklyData, setWeeklyData] = React.useState<AstroWeeklyTimingViewModel>({
@@ -195,6 +200,18 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
           setThaiAstroContext(null);
           setThaiAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้ในขณะนี้");
         }
+
+        // Calculate Chinese Metaphysics (DEV-067)
+        try {
+          const targetDateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+          const chineseAstroOutput = buildChineseMetaphysicsStrategyOutput(birthProfile, targetDateStr);
+          setChineseAstroContext(chineseAstroOutput);
+          setChineseAstroFallbackNote(null);
+        } catch (err) {
+          console.error("Failed to calculate Chinese metaphysics timing context on mount:", err);
+          setChineseAstroContext(null);
+          setChineseAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนย่อยได้ในขณะนี้");
+        }
       } catch (err) {
         console.error("Failed to calculate today/weekly/monthly timing engine output on mount:", err);
         setTodayData(MOCK_TODAY_DATA);
@@ -202,6 +219,8 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
         setCalculationFallbackNote("ระบบเกิดข้อผิดพลาดในการคำนวณจังหวะดาราศาสตร์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
         setThaiAstroContext(null);
         setThaiAstroFallbackNote("ไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
+        setChineseAstroContext(null);
+        setChineseAstroFallbackNote("ไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
 
         // Fallback Weekly calculation
         const defaultProfile = loadAstroBirthProfile();
@@ -268,6 +287,18 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
           setThaiAstroContext(null);
           setThaiAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้ในขณะนี้");
         }
+
+        // Calculate Chinese Metaphysics (DEV-067)
+        try {
+          const targetDateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+          const chineseAstroOutput = buildChineseMetaphysicsStrategyOutput(birthProfile, targetDateStr);
+          setChineseAstroContext(chineseAstroOutput);
+          setChineseAstroFallbackNote(null);
+        } catch (err) {
+          console.error("Failed to calculate Chinese metaphysics timing context on tab active:", err);
+          setChineseAstroContext(null);
+          setChineseAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนย่อยได้ในขณะนี้");
+        }
       } catch (err) {
         console.error("Failed to calculate timing engine output on tab active:", err);
         setTodayData(MOCK_TODAY_DATA);
@@ -275,6 +306,8 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
         setCalculationFallbackNote("ระบบเกิดข้อผิดพลาดในการคำนวณจังหวะดาราศาสตร์ จึงย้อนกลับไปใช้ข้อมูลประมาณการทั่วไป");
         setThaiAstroContext(null);
         setThaiAstroFallbackNote("ไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
+        setChineseAstroContext(null);
+        setChineseAstroFallbackNote("ไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
 
         // Fallback Weekly calculation
         const defaultProfile = loadAstroBirthProfile();
@@ -473,10 +506,24 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
         setThaiAstroContext(null);
         setThaiAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้ในขณะนี้");
       }
+
+      // Recalculate Chinese Metaphysics (DEV-067)
+      try {
+        const targetDateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+        const chineseAstroOutput = buildChineseMetaphysicsStrategyOutput(defaultProfile, targetDateStr);
+        setChineseAstroContext(chineseAstroOutput);
+        setChineseAstroFallbackNote(null);
+      } catch (err) {
+        console.error("Failed to calculate Chinese metaphysics timing context on reset all data:", err);
+        setChineseAstroContext(null);
+        setChineseAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนย่อยได้ในขณะนี้");
+      }
     } catch (err) {
       console.error("Failed to recalculate timing on data reset:", err);
       setThaiAstroContext(null);
       setThaiAstroFallbackNote("ไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
+      setChineseAstroContext(null);
+      setChineseAstroFallbackNote("ไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
     }
   };
 
@@ -600,6 +647,8 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
               fallbackNote={isHydrated ? calculationFallbackNote : null}
               thaiAstroContext={isHydrated ? thaiAstroContext : null}
               thaiAstroFallbackNote={isHydrated ? thaiAstroFallbackNote : null}
+              chineseAstroContext={isHydrated ? chineseAstroContext : null}
+              chineseAstroFallbackNote={isHydrated ? chineseAstroFallbackNote : null}
             />
           )}
           {activeTab === "weekly" && (

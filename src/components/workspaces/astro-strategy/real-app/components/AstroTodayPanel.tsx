@@ -2,7 +2,7 @@
  
 import * as React from "react";
 import { Zap, Compass, CheckCircle, ShieldAlert, Activity, MessageSquare } from "lucide-react";
-import { AstroEngineMetadata, ThaiAstroStrategyOutput } from "../data/astroRealAppTypes";
+import { AstroEngineMetadata, ThaiAstroStrategyOutput, ChineseMetaphysicsStrategyOutput } from "../data/astroRealAppTypes";
  
 export type AstroTodayPanelProps = {
   strategyMode?: string;
@@ -24,6 +24,10 @@ export type AstroTodayPanelProps = {
   // DEV-059 props
   thaiAstroContext?: ThaiAstroStrategyOutput | null;
   thaiAstroFallbackNote?: string | null;
+
+  // DEV-067 props
+  chineseAstroContext?: ChineseMetaphysicsStrategyOutput | null;
+  chineseAstroFallbackNote?: string | null;
 };
 
 const DEFAULT_WORK_RECOMMENDATION_MAP: Record<string, string> = {
@@ -68,7 +72,11 @@ export function AstroTodayPanel({
   fallbackNote = null,
   thaiAstroContext = null,
   thaiAstroFallbackNote = null,
+  chineseAstroContext = null,
+  chineseAstroFallbackNote = null,
 }: AstroTodayPanelProps) {
+  const [chineseAstroExpanded, setChineseAstroExpanded] = React.useState(false);
+
   return (
     <div className="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-700/80 pb-4 gap-2">
@@ -193,6 +201,61 @@ export function AstroTodayPanel({
         <div className="bg-rose-950/25 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-350 flex items-start gap-2.5 animate-fadeIn">
           <ShieldAlert className="w-4 h-4 text-rose-450 shrink-0 mt-0.5" />
           <span>{thaiAstroFallbackNote}</span>
+        </div>
+      )}
+ 
+      {/* Chinese Metaphysics Context Card (DEV-067) */}
+      {chineseAstroContext && (
+        <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-xl space-y-2.5 hover:border-slate-700/80 transition-all animate-fadeIn">
+          <div 
+            className="flex items-center justify-between border-b border-slate-800/80 pb-2 cursor-pointer select-none"
+            onClick={() => setChineseAstroExpanded(!chineseAstroExpanded)}
+          >
+            <div className="flex items-center gap-2 text-violet-400">
+              <Compass className="w-4 h-4 shrink-0" />
+              <span className="font-bold text-xs sm:text-sm tracking-wide text-slate-200">
+                ☯️ คำแนะนำธาตุและฤดูกาลจีน (Chinese Metaphysics Context)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 text-[9px] font-mono rounded bg-slate-800/50 text-slate-350">
+                สอดคล้อง: {(chineseAstroContext.symbolicAlignment * 100).toFixed(0)}%
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold">
+                {chineseAstroExpanded ? "▲ ซ่อน" : "▼ ขยาย"}
+              </span>
+            </div>
+          </div>
+ 
+          {chineseAstroExpanded && (
+            <div className="text-xs text-slate-300 space-y-2 leading-relaxed animate-fadeIn">
+              <p className="font-semibold text-slate-100 flex items-center gap-1.5 flex-wrap">
+                <span>☯️ {chineseAstroContext.chineseMetaphysicsSignal}</span>
+                <span className="text-[10px] text-slate-400 font-normal">({chineseAstroContext.symbolicMeaning})</span>
+              </p>
+              <p className="text-slate-300">
+                <strong className="text-slate-200 font-medium">กลยุทธ์ธาตุประจำวัน:</strong> {chineseAstroContext.strategyImplication}
+              </p>
+              <p className="text-slate-300">
+                <strong className="text-slate-200 font-medium">คำแนะนำปฏิบัติ:</strong> {chineseAstroContext.suggestedAction}
+              </p>
+              {chineseAstroContext.cautionNote && (
+                <p className="text-rose-300/90 bg-rose-950/20 px-2.5 py-1 rounded border border-rose-950/40">
+                  <strong className="text-rose-200 font-semibold">ข้อสังเกต:</strong> {chineseAstroContext.cautionNote}
+                </p>
+              )}
+              <p className="text-[9px] text-slate-500 italic mt-1 pt-1.5 border-t border-slate-900 leading-normal">
+                *{chineseAstroContext.safetyDisclaimer}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+ 
+      {chineseAstroFallbackNote && (
+        <div className="bg-rose-950/25 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-350 flex items-start gap-2.5 animate-fadeIn">
+          <ShieldAlert className="w-4 h-4 text-rose-450 shrink-0 mt-0.5" />
+          <span>{chineseAstroFallbackNote}</span>
         </div>
       )}
  
