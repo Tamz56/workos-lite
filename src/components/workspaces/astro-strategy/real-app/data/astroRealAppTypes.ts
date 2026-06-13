@@ -427,6 +427,32 @@ export interface ThaiAstroStrategyOutput {
   readonly generatedAt: string;
 }
 
+export type ChineseElement = "wood" | "fire" | "earth" | "metal" | "water";
+
+export interface ChineseAstroTimingContext {
+  readonly dayMasterElement: ChineseElement;
+  readonly currentSeason: "spring" | "summer" | "autumn" | "winter" | "earth-transition";
+  readonly relationType: "supporting" | "neutral" | "caution";
+}
+
+export interface ChineseMetaphysicsStrategyOutput {
+  readonly layerName: "Chinese Metaphysics Strategy";
+  readonly source: string;
+  readonly timingContext: ChineseAstroTimingContext;
+  readonly chineseMetaphysicsSignal: string;
+  readonly elementFocus: ChineseElement;
+  readonly symbolicMeaning: string;
+  readonly strategyImplication: string;
+  readonly suggestedAction: string;
+  readonly reflectionPrompt: string;
+  readonly cautionNote: string;
+  readonly symbolicAlignment: number; // 0.0 to 1.0
+  readonly confidenceNotes: string;
+  readonly safetyDisclaimer: string;
+  readonly generatedAt: string;
+}
+
+
 
 
 
