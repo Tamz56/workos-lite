@@ -399,6 +399,35 @@ export interface AstroDataRestoreResult {
   error?: string;
 }
 
+export type ThaiAstroLayerSource = string;
+export type ThaiAstroSignal = string;
+export type ThaiAstroSymbolicAlignment = number;
+export type ThaiAstroCautionLevel = "low" | "medium" | "high";
+
+export interface ThaiAstroTimingContext {
+  readonly isBirthWeekdayCycle: boolean;
+  readonly currentYamIndex?: number;
+  readonly rawTimeChecked: string;
+}
+
+export interface ThaiAstroStrategyOutput {
+  readonly layerName: string;
+  readonly source: ThaiAstroLayerSource;
+  readonly timingContext: ThaiAstroTimingContext;
+  readonly thaiAstroSignal: ThaiAstroSignal;
+  readonly symbolicMeaning: string;
+  readonly strategyImplication: string;
+  readonly suggestedAction: string;
+  readonly reflectionPrompt: string;
+  readonly cautionNote: string;
+  readonly cautionLevel: ThaiAstroCautionLevel;
+  readonly symbolicAlignment: ThaiAstroSymbolicAlignment;
+  readonly confidenceNotes: string;
+  readonly safetyDisclaimer: string;
+  readonly generatedAt: string;
+}
+
+
 
 
 
