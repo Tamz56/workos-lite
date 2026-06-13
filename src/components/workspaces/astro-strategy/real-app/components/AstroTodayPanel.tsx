@@ -1,9 +1,9 @@
 "use client";
-
+ 
 import * as React from "react";
 import { Zap, Compass, CheckCircle, ShieldAlert, Activity, MessageSquare } from "lucide-react";
-import { AstroEngineMetadata } from "../data/astroRealAppTypes";
-
+import { AstroEngineMetadata, ThaiAstroStrategyOutput } from "../data/astroRealAppTypes";
+ 
 export type AstroTodayPanelProps = {
   strategyMode?: string;
   strategyDirection?: string;
@@ -16,10 +16,14 @@ export type AstroTodayPanelProps = {
   workRecommendationThaiMap?: Record<string, string>;
   riskPreventionThaiMap?: Record<string, string>;
   recoveryAnchorThaiMap?: Record<string, string>;
-
+ 
   // DEV-024 props
   engineMetadata?: AstroEngineMetadata;
   fallbackNote?: string | null;
+
+  // DEV-059 props
+  thaiAstroContext?: ThaiAstroStrategyOutput | null;
+  thaiAstroFallbackNote?: string | null;
 };
 
 const DEFAULT_WORK_RECOMMENDATION_MAP: Record<string, string> = {
@@ -62,6 +66,8 @@ export function AstroTodayPanel({
   recoveryAnchorThaiMap = DEFAULT_RECOVERY_ANCHOR_MAP,
   engineMetadata,
   fallbackNote = null,
+  thaiAstroContext = null,
+  thaiAstroFallbackNote = null,
 }: AstroTodayPanelProps) {
   return (
     <div className="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
@@ -146,7 +152,50 @@ export function AstroTodayPanel({
           </p>
         </div>
       </div>
-
+ 
+      {/* Thai Astrology Context Card (DEV-059) */}
+      {thaiAstroContext && (
+        <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-xl space-y-2.5 hover:border-slate-700/80 transition-all animate-fadeIn">
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+            <div className="flex items-center gap-2 text-amber-400">
+              <Compass className="w-4 h-4 shrink-0" />
+              <span className="font-bold text-xs sm:text-sm tracking-wide text-slate-200">จังหวะเวลาไทยประกอบการทบทวน (Thai Timing Context)</span>
+            </div>
+            <span className="px-2 py-0.5 text-[9px] font-mono rounded bg-slate-800/50 text-slate-350">
+              สอดคล้อง: {(thaiAstroContext.symbolicAlignment * 100).toFixed(0)}%
+            </span>
+          </div>
+ 
+          <div className="text-xs text-slate-300 space-y-2 leading-relaxed">
+            <p className="font-semibold text-slate-100 flex items-center gap-1.5 flex-wrap">
+              <span>🧭 {thaiAstroContext.thaiAstroSignal}</span>
+              <span className="text-[10px] text-slate-400 font-normal">({thaiAstroContext.symbolicMeaning})</span>
+            </p>
+            <p className="text-slate-300">
+              <strong className="text-slate-200 font-medium">ทิศทางเชิงฤกษ์:</strong> {thaiAstroContext.strategyImplication}
+            </p>
+            <p className="text-slate-300">
+              <strong className="text-slate-200 font-medium">คำแนะนำปฏิบัติ:</strong> {thaiAstroContext.suggestedAction}
+            </p>
+            {thaiAstroContext.cautionNote && (
+              <p className="text-rose-300/90 bg-rose-950/20 px-2.5 py-1 rounded border border-rose-950/40">
+                <strong className="text-rose-200 font-semibold">ข้อสังเกต:</strong> {thaiAstroContext.cautionNote}
+              </p>
+            )}
+            <p className="text-[9px] text-slate-500 italic mt-1 pt-1.5 border-t border-slate-900 leading-normal">
+              *{thaiAstroContext.safetyDisclaimer}
+            </p>
+          </div>
+        </div>
+      )}
+ 
+      {thaiAstroFallbackNote && (
+        <div className="bg-rose-950/25 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-350 flex items-start gap-2.5 animate-fadeIn">
+          <ShieldAlert className="w-4 h-4 text-rose-450 shrink-0 mt-0.5" />
+          <span>{thaiAstroFallbackNote}</span>
+        </div>
+      )}
+ 
       {engineMetadata ? (
         <div className="text-[10px] text-slate-400 border-t border-slate-700/60 pt-4 leading-normal space-y-1.5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[9px] text-slate-500">
