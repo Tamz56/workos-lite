@@ -452,9 +452,68 @@ export interface ChineseMetaphysicsStrategyOutput {
   readonly generatedAt: string;
 }
 
+export type ThaiTransitMode = "Focus" | "Stabilize" | "Pause";
 
+export interface ThaiTransitPlanetSummary {
+  readonly planetId: number;
+  readonly zodiacSign: string;
+  readonly isRetrograde: boolean;
+}
 
+export interface ThaiTransitHouseImpact {
+  readonly houseName: string;
+  readonly impactLevel: "high_support" | "high_pressure" | "neutral";
+  readonly durationDays: number;
+}
 
+export interface ThaiTransitElementRelationship {
+  readonly compatibilityType: "supporting" | "neutral" | "clashing";
+  readonly elementPairAdvice: string;
+}
 
+export type ThaiTransitSignalId =
+  | "TH_SIG_DEEP_WORK"
+  | "TH_SIG_QA_REVIEW"
+  | "TH_SIG_RECALIBRATE"
+  | "TH_SIG_COMMUNICATE"
+  | "TH_SIG_REST_EYE"
+  | "TH_SIG_AVOID_DECISION"
+  | "TH_SIG_REFACTOR";
 
+export type ThaiTransitWorkModeId =
+  | "structured_work"
+  | "system_design"
+  | "qa_testing"
+  | "debugging"
+  | "delivery"
+  | "summary_notes"
+  | "research"
+  | "system_cleanup"
+  | "meeting"
+  | "agreements"
+  | "self_pacing"
+  | "energy_check"
+  | "recovery"
+  | "review"
+  | "low_intensity";
+
+export interface ThaiTransitStrategyOutput {
+  readonly layerName: "Thai Transit Strategy";
+  readonly source: string;
+  readonly transitDate: string;
+  readonly transitMode: ThaiTransitMode;
+  readonly activeTransitHouses: string[];
+  readonly transitPlanetSummary: ThaiTransitPlanetSummary[];
+  readonly natalHouseImpacts: ThaiTransitHouseImpact[];
+  readonly elementRelationship: ThaiTransitElementRelationship;
+  readonly workTimingSignals: string[];
+  readonly decisionCautionSignals: string[];
+  readonly recoverySignals: string[];
+  readonly recommendedWorkModes: string[];
+  readonly avoidOrDelayModes: string[];
+  readonly reflectionPrompt: string;
+  readonly confidenceNotes: string;
+  readonly safetyDisclaimer: string;
+  readonly generatedAt: string;
+}
 
