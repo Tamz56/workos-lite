@@ -2,7 +2,7 @@
  
 import * as React from "react";
 import { Zap, Compass, CheckCircle, ShieldAlert, Activity, MessageSquare } from "lucide-react";
-import { AstroEngineMetadata, ThaiAstroStrategyOutput, ChineseMetaphysicsStrategyOutput } from "../data/astroRealAppTypes";
+import { AstroEngineMetadata, ThaiAstroStrategyOutput, ChineseMetaphysicsStrategyOutput, ThaiTransitStrategyOutput } from "../data/astroRealAppTypes";
  
 export type AstroTodayPanelProps = {
   strategyMode?: string;
@@ -28,6 +28,12 @@ export type AstroTodayPanelProps = {
   // DEV-067 props
   chineseAstroContext?: ChineseMetaphysicsStrategyOutput | null;
   chineseAstroFallbackNote?: string | null;
+
+  // DEV-078 props
+  thaiTransitContext?: ThaiTransitStrategyOutput | null;
+  thaiTransitFallbackNote?: string | null;
+  showThaiTransitContext?: boolean;
+  defaultThaiTransitCollapsed?: boolean;
 };
 
 const DEFAULT_WORK_RECOMMENDATION_MAP: Record<string, string> = {
@@ -74,8 +80,13 @@ export function AstroTodayPanel({
   thaiAstroFallbackNote = null,
   chineseAstroContext = null,
   chineseAstroFallbackNote = null,
+  thaiTransitContext = null,
+  thaiTransitFallbackNote = null,
+  showThaiTransitContext = true,
+  defaultThaiTransitCollapsed = true,
 }: AstroTodayPanelProps) {
   const [chineseAstroExpanded, setChineseAstroExpanded] = React.useState(false);
+  const [thaiTransitExpanded, setThaiTransitExpanded] = React.useState(!defaultThaiTransitCollapsed);
 
   return (
     <div className="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
@@ -256,6 +267,125 @@ export function AstroTodayPanel({
         <div className="bg-rose-950/25 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-350 flex items-start gap-2.5 animate-fadeIn">
           <ShieldAlert className="w-4 h-4 text-rose-450 shrink-0 mt-0.5" />
           <span>{chineseAstroFallbackNote}</span>
+        </div>
+      )}
+
+      {/* Thai Transit Context Card (DEV-078) */}
+      {showThaiTransitContext && thaiTransitContext && (
+        <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-xl space-y-2.5 hover:border-slate-700/80 transition-all animate-fadeIn">
+          <div 
+            className="flex items-center justify-between border-b border-slate-800/80 pb-2 cursor-pointer select-none"
+            onClick={() => setThaiTransitExpanded(!thaiTransitExpanded)}
+          >
+            <div className="flex items-center gap-2 text-indigo-400">
+              <Compass className="w-4 h-4 shrink-0" />
+              <span className="font-bold text-xs sm:text-sm tracking-wide text-slate-200">
+                🧭 จังหวะดวงจรไทยวันนี้ (Thai Transit Context)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 text-[9px] font-mono rounded bg-slate-800/50 text-slate-350">
+                โหมด: {thaiTransitContext.transitMode}
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold">
+                {thaiTransitExpanded ? "▲ ซ่อน" : "▼ ขยาย"}
+              </span>
+            </div>
+          </div>
+  
+          {/* Compact summary 1-2 lines shown when collapsed */}
+          {!thaiTransitExpanded && (
+            <p className="text-xs text-slate-400 italic leading-relaxed">
+              *จังหวะจรหลัก: {thaiTransitContext.transitMode} ({thaiTransitContext.elementRelationship.elementPairAdvice})
+            </p>
+          )}
+
+          {thaiTransitExpanded && (
+            <div className="text-xs text-slate-300 space-y-2.5 leading-relaxed animate-fadeIn">
+              <div className="flex flex-wrap items-center gap-2">
+                <strong className="text-slate-200 font-medium shrink-0">เรือนจรที่ถูกกระตุ้น:</strong>
+                {thaiTransitContext.activeTransitHouses.map((h, i) => (
+                  <span key={i} className="px-1.5 py-0.5 rounded bg-indigo-950/40 text-indigo-200 border border-indigo-500/20 text-[10px] font-mono">
+                    {h}
+                  </span>
+                ))}
+              </div>
+
+              <p className="text-slate-300">
+                <strong className="text-slate-200 font-medium">ธาตุสัมพันธ์จร:</strong> {thaiTransitContext.elementRelationship.elementPairAdvice}
+              </p>
+
+              {thaiTransitContext.recommendedWorkModes.length > 0 && (
+                <div className="text-slate-300">
+                  <strong className="text-slate-200 font-medium">โหมดงานส่งเสริม:</strong>{" "}
+                  {thaiTransitContext.recommendedWorkModes.map(m => {
+                    const maps: Record<string, string> = {
+                      structured_work: "จัดระบบโครงสร้างงาน",
+                      system_design: "ออกแบบโครงร่างระบบ",
+                      qa_testing: "ตรวจสอบความเสถียร/QA",
+                      debugging: "แก้ไขข้อบกพร่อง/ดีบัก",
+                      delivery: "สรุปผลส่งมอบงาน",
+                      summary_notes: "เขียนบันทึกย่อย",
+                      research: "ค้นคว้าข้อมูลเบื้องหลัง",
+                      system_cleanup: "จัดระเบียบเคลียร์ระบบ",
+                      meeting: "นัดหมายเจรจา/ประชุมทีม",
+                      agreements: "ตกลงข้อเสนอสัญญา",
+                      self_pacing: "จัดจังหวะกำลังตนเอง",
+                      energy_check: "ประเมินโฟกัสส่วนบุคคล",
+                      recovery: "พักฟื้นฟูจิตใจ",
+                      review: "ทบทวนการทำงานเบา",
+                      low_intensity: "ทำงานเบาความเค้นต่ำ"
+                    };
+                    return maps[m] || m;
+                  }).join(", ")}
+                </div>
+              )}
+
+              {thaiTransitContext.avoidOrDelayModes.length > 0 && (
+                <div className="text-slate-300">
+                  <strong className="text-rose-350 font-medium">ควรเลี่ยงหรือชะลอ:</strong>{" "}
+                  <span className="text-slate-350">
+                    {thaiTransitContext.avoidOrDelayModes.map(m => {
+                      const maps: Record<string, string> = {
+                        structured_work: "การขึ้นโครงสร้างใหม่ขนาดใหญ่",
+                        system_design: "การลงรายละเอียดสเปกซับซ้อน",
+                        meeting: "การนัดหมายตกลงประเด็นสำคัญ",
+                        agreements: "การลงนามข้อตกลงตึงเครียด"
+                      };
+                      return maps[m] || m;
+                    }).join(", ")}
+                  </span>
+                </div>
+              )}
+
+              {thaiTransitContext.decisionCautionSignals.length > 0 && (
+                <div className="text-amber-300 bg-amber-950/20 px-2.5 py-1 rounded border border-amber-950/40">
+                  <strong className="text-amber-200 font-semibold">ข้อควรพิจารณา:</strong>{" "}
+                  {thaiTransitContext.decisionCautionSignals.map(s => {
+                    const maps: Record<string, string> = {
+                      TH_SIG_AVOID_DECISION: "ควรลดการตัดสินใจสำคัญเชิงร้อนรนหรือสลับสับเปลี่ยนโปรเจกต์งานเร็วเกินไป",
+                      TH_SIG_RECALIBRATE: "แนะนำการตั้งหลักทบทวนแผนกลยุทธ์ส่วนตัวเพื่อจัดสรรพลังสมาธิใหม่"
+                    };
+                    return maps[s] || s;
+                  }).join(" / ")}
+                </div>
+              )}
+
+              <div className="text-[10px] text-slate-500 font-mono pt-1 border-t border-slate-900 leading-normal">
+                {thaiTransitContext.confidenceNotes}
+              </div>
+              <p className="text-[9px] text-slate-500 italic mt-0.5 leading-normal">
+                *{thaiTransitContext.safetyDisclaimer}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showThaiTransitContext && thaiTransitFallbackNote && (
+        <div className="bg-rose-950/25 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-350 flex items-start gap-2.5 animate-fadeIn">
+          <ShieldAlert className="w-4 h-4 text-rose-450 shrink-0 mt-0.5" />
+          <span>{thaiTransitFallbackNote}</span>
         </div>
       )}
  

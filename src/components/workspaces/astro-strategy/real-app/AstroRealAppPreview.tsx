@@ -20,10 +20,11 @@ import {
 } from "./data/astroRealAppMockData";
 
 import { AstroRealAppLocalStorageAdapter } from "./data/astroRealAppLocalStorageAdapter";
-import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel, AstroMonthlyReflectionViewModel, AstroOnboardingStatus, ThaiAstroStrategyOutput, ChineseMetaphysicsStrategyOutput } from "./data/astroRealAppTypes";
+import { ReflectionHistoryItem, AstroPlanningNotes, AstroReflectionDraft, AstroEngineMetadata, AstroTodayData, AstroWeeklyTimingViewModel, AstroMonthlyReflectionViewModel, AstroOnboardingStatus, ThaiAstroStrategyOutput, ChineseMetaphysicsStrategyOutput, ThaiTransitStrategyOutput } from "./data/astroRealAppTypes";
 import { loadAstroBirthProfile } from "./data/astroRealAppBirthProfileStorageAdapter";
 import { buildAstroTimingInput, buildAstroEngineOutput } from "./data/astroRealAppAstrologyEngineAdapter";
 import { buildThaiAstroStrategyOutput } from "./data/astroRealAppThaiAstrologyAdapter";
+import { buildThaiTransitStrategyOutput } from "./data/astroRealAppThaiTransitAdapter";
 import { buildChineseMetaphysicsStrategyOutput } from "./data/astroRealAppChineseMetaphysicsAdapter";
 import { mapEngineOutputToTodayData } from "./data/astroRealAppTodayTimingViewModel";
 import { buildWeeklyTimingViewModel } from "./data/astroRealAppWeeklyTimingViewModel";
@@ -55,6 +56,25 @@ const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
   { id: "guide", label: "📖 คู่มือ", description: "Guide & Ethics" },
   { id: "tools", label: "⚙️ เครื่องมือข้อมูล", description: "Data Tools" },
 ];
+
+function getZodiacFromWeekday(weekday: string): string {
+  const map: Record<string, string> = {
+    Sunday: "leo",
+    Monday: "taurus",
+    Tuesday: "scorpio",
+    Wednesday: "virgo",
+    Thursday: "sagittarius",
+    Friday: "libra",
+    Saturday: "capricorn"
+  };
+  return map[weekday] || "aries";
+}
+
+function getBirthWeekday(birthDate: string): string {
+  const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dateObj = new Date(birthDate);
+  return isNaN(dateObj.getTime()) ? "Sunday" : weekdays[dateObj.getDay()];
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -106,6 +126,10 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
   // DEV-067: Chinese Metaphysics calculation states
   const [chineseAstroContext, setChineseAstroContext] = React.useState<ChineseMetaphysicsStrategyOutput | null>(null);
   const [chineseAstroFallbackNote, setChineseAstroFallbackNote] = React.useState<string | null>(null);
+
+  // DEV-078: Thai Transit Astrology calculation states
+  const [thaiTransitContext, setThaiTransitContext] = React.useState<ThaiTransitStrategyOutput | null>(null);
+  const [thaiTransitFallbackNote, setThaiTransitFallbackNote] = React.useState<string | null>(null);
 
   // DEV-028: Weekly calculation states
   const [weeklyData, setWeeklyData] = React.useState<AstroWeeklyTimingViewModel>({
@@ -212,6 +236,33 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
           setChineseAstroContext(null);
           setChineseAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนย่อยได้ในขณะนี้");
         }
+
+        // Calculate Thai Transit (DEV-078)
+        try {
+          const targetDateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+          const clientTimeStr = new Date().toTimeString().split(" ")[0].slice(0, 5); // Format: HH:MM
+          const weekday = birthProfile.birthWeekday || getBirthWeekday(birthProfile.birthDate);
+          const natalAscendantZodiac = getZodiacFromWeekday(weekday);
+          const latestLog = loadedHistory[0];
+          const recentReflection = latestLog?.dailyCheckinSnapshot ? {
+            energyLevel: latestLog.dailyCheckinSnapshot.energyLevel === "low" ? ("low" as const) : ("medium" as const),
+            fatigueLevel: latestLog.dailyCheckinSnapshot.bodySignal === "fatigued" ? ("high" as const) : ("medium" as const)
+          } : undefined;
+
+          const transitOutput = buildThaiTransitStrategyOutput({
+            targetDate: targetDateStr,
+            targetTime: clientTimeStr,
+            timezone: birthProfile.timezone,
+            natalAscendantZodiac,
+            recentReflectionContext: recentReflection
+          });
+          setThaiTransitContext(transitOutput);
+          setThaiTransitFallbackNote(null);
+        } catch (err) {
+          console.error("Failed to calculate Thai transit context on mount:", err);
+          setThaiTransitContext(null);
+          setThaiTransitFallbackNote("ระบบไม่สามารถคำนวณดวงจรไทยย่อยได้ในขณะนี้");
+        }
       } catch (err) {
         console.error("Failed to calculate today/weekly/monthly timing engine output on mount:", err);
         setTodayData(MOCK_TODAY_DATA);
@@ -221,6 +272,8 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
         setThaiAstroFallbackNote("ไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
         setChineseAstroContext(null);
         setChineseAstroFallbackNote("ไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
+        setThaiTransitContext(null);
+        setThaiTransitFallbackNote("ไม่สามารถคำนวณดวงจรไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
 
         // Fallback Weekly calculation
         const defaultProfile = loadAstroBirthProfile();
@@ -299,6 +352,33 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
           setChineseAstroContext(null);
           setChineseAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนย่อยได้ในขณะนี้");
         }
+
+        // Calculate Thai Transit (DEV-078)
+        try {
+          const targetDateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+          const clientTimeStr = new Date().toTimeString().split(" ")[0].slice(0, 5); // Format: HH:MM
+          const weekday = birthProfile.birthWeekday || getBirthWeekday(birthProfile.birthDate);
+          const natalAscendantZodiac = getZodiacFromWeekday(weekday);
+          const latestLog = historyLogs[0];
+          const recentReflection = latestLog?.dailyCheckinSnapshot ? {
+            energyLevel: latestLog.dailyCheckinSnapshot.energyLevel === "low" ? ("low" as const) : ("medium" as const),
+            fatigueLevel: latestLog.dailyCheckinSnapshot.bodySignal === "fatigued" ? ("high" as const) : ("medium" as const)
+          } : undefined;
+
+          const transitOutput = buildThaiTransitStrategyOutput({
+            targetDate: targetDateStr,
+            targetTime: clientTimeStr,
+            timezone: birthProfile.timezone,
+            natalAscendantZodiac,
+            recentReflectionContext: recentReflection
+          });
+          setThaiTransitContext(transitOutput);
+          setThaiTransitFallbackNote(null);
+        } catch (err) {
+          console.error("Failed to calculate Thai transit context on tab active:", err);
+          setThaiTransitContext(null);
+          setThaiTransitFallbackNote("ระบบไม่สามารถคำนวณดวงจรไทยย่อยได้ในขณะนี้");
+        }
       } catch (err) {
         console.error("Failed to calculate timing engine output on tab active:", err);
         setTodayData(MOCK_TODAY_DATA);
@@ -308,6 +388,8 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
         setThaiAstroFallbackNote("ไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
         setChineseAstroContext(null);
         setChineseAstroFallbackNote("ไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
+        setThaiTransitContext(null);
+        setThaiTransitFallbackNote("ไม่สามารถคำนวณดวงจรไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
 
         // Fallback Weekly calculation
         const defaultProfile = loadAstroBirthProfile();
@@ -518,12 +600,41 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
         setChineseAstroContext(null);
         setChineseAstroFallbackNote("ระบบไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนย่อยได้ในขณะนี้");
       }
+
+      // Recalculate Thai Transit (DEV-078)
+      try {
+        const targetDateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+        const clientTimeStr = new Date().toTimeString().split(" ")[0].slice(0, 5); // Format: HH:MM
+        const weekday = defaultProfile.birthWeekday || getBirthWeekday(defaultProfile.birthDate);
+        const natalAscendantZodiac = getZodiacFromWeekday(weekday);
+        const latestLog = MOCK_HISTORY_LOGS[0];
+        const recentReflection = latestLog?.dailyCheckinSnapshot ? {
+          energyLevel: latestLog.dailyCheckinSnapshot.energyLevel === "low" ? ("low" as const) : ("medium" as const),
+          fatigueLevel: latestLog.dailyCheckinSnapshot.bodySignal === "fatigued" ? ("high" as const) : ("medium" as const)
+        } : undefined;
+
+        const transitOutput = buildThaiTransitStrategyOutput({
+          targetDate: targetDateStr,
+          targetTime: clientTimeStr,
+          timezone: defaultProfile.timezone,
+          natalAscendantZodiac,
+          recentReflectionContext: recentReflection
+        });
+        setThaiTransitContext(transitOutput);
+        setThaiTransitFallbackNote(null);
+      } catch (err) {
+        console.error("Failed to calculate Thai transit context on reset all data:", err);
+        setThaiTransitContext(null);
+        setThaiTransitFallbackNote("ระบบไม่สามารถคำนวณดวงจรไทยย่อยได้ในขณะนี้");
+      }
     } catch (err) {
       console.error("Failed to recalculate timing on data reset:", err);
       setThaiAstroContext(null);
       setThaiAstroFallbackNote("ไม่สามารถคำนวณจังหวะเวลาไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
       setChineseAstroContext(null);
       setChineseAstroFallbackNote("ไม่สามารถคำนวณจังหวะธาตุและฤดูกาลจีนได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
+      setThaiTransitContext(null);
+      setThaiTransitFallbackNote("ไม่สามารถคำนวณดวงจรไทยย่อยได้เนื่องจากข้อผิดพลาดในข้อมูลเกิด");
     }
   };
 
@@ -649,6 +760,8 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
               thaiAstroFallbackNote={isHydrated ? thaiAstroFallbackNote : null}
               chineseAstroContext={isHydrated ? chineseAstroContext : null}
               chineseAstroFallbackNote={isHydrated ? chineseAstroFallbackNote : null}
+              thaiTransitContext={isHydrated ? thaiTransitContext : null}
+              thaiTransitFallbackNote={isHydrated ? thaiTransitFallbackNote : null}
             />
           )}
           {activeTab === "weekly" && (
