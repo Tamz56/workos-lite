@@ -517,3 +517,64 @@ export interface ThaiTransitStrategyOutput {
   readonly generatedAt: string;
 }
 
+// DEV-082 Composer types
+export type NatalTransitStrategyMode = "Focus" | "Stabilize" | "Pause" | "Review" | "Recover";
+export type NatalTransitCautionLevel = "low" | "medium" | "high";
+
+export interface NatalTransitSuppressedSignal {
+  readonly signalId: string;
+  readonly sourceLayer: "natal" | "transit" | "history" | "engine" | "optional";
+  readonly suppressionReason: string;
+  readonly suppressedBy: "user_fatigue" | "today_engine_priority" | "low_confidence" | "duplicate";
+  readonly confidenceImpact: number;
+}
+
+export interface NatalTransitStrategyComposerOutput {
+  readonly layerName: string;
+  readonly source: string;
+  readonly strategyDate: string;
+  readonly strategyMode: NatalTransitStrategyMode;
+  readonly primaryRecommendation: string;
+  readonly secondaryRecommendation: string[];
+  readonly cautionLevel: NatalTransitCautionLevel;
+  readonly focusWindow?: string;
+  readonly workModePriority: string[];
+  readonly recoveryPriority: string[];
+  readonly decisionGuidance: string;
+  readonly supportingSignals: string[];
+  readonly suppressedSignals: NatalTransitSuppressedSignal[];
+  readonly conflictResolutionNotes: string;
+  readonly reflectionPrompt: string;
+  readonly confidenceNotes: string;
+  readonly safetyDisclaimer: string;
+  readonly generatedAt: string;
+}
+
+export interface NatalTransitComposerInput {
+  readonly targetDate: string;
+  readonly targetTime?: string;
+  readonly todayTimingData?: {
+    readonly strategyMode: string;
+    readonly strategyDirection: string;
+    readonly workRecommendations: string[];
+    readonly riskPreventions: string[];
+    readonly recoveryAnchors: string[];
+    readonly reflectionPrompt: string;
+  } | null;
+  readonly thaiTransitContext?: ThaiTransitStrategyOutput | null;
+  readonly natalStrategyProfile?: AstroBirthProfile | null;
+  readonly reflectionHistorySummary?: {
+    readonly totalLogsThisMonth: number;
+    readonly fatigueLevel?: "low" | "medium" | "high";
+    readonly energyLevel?: "low" | "medium" | "high";
+    readonly recentLowEnergySignalsDetected?: boolean;
+  } | null;
+  readonly thaiAstroContext?: ThaiAstroStrategyOutput | null;
+  readonly chineseAstroContext?: ChineseMetaphysicsStrategyOutput | null;
+  readonly userCurrentFocus?: string;
+  readonly userEnergyState?: {
+    readonly energyLevel?: "low" | "steady" | "hyper" | "variable";
+    readonly bodySignal?: "normal" | "fatigued" | "tense" | "refreshed";
+  } | null;
+}
+
