@@ -591,6 +591,7 @@ export default function PromptStudioClient() {
     const [isLoading, setIsLoading] = useState(true);
     const [apiError, setApiError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [copiedArbor, setCopiedArbor] = useState(false);
     const [showQuickGuide, setShowQuickGuide] = useState(false);
 
     // AI-Assisted Generator States
@@ -1752,6 +1753,123 @@ export default function PromptStudioClient() {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    // Build Arbor context Markdown summary
+    const buildArborContextMarkdown = () => {
+        const name = editorFields.name || activeTemplate?.name || "Not available";
+        const category = editorFields.category || activeTemplate?.category || "Not available";
+        const purpose = editorFields.purpose || activeTemplate?.purpose || "Not available";
+        const role = editorFields.role || activeTemplate?.role || "Not available";
+        const context = editorFields.context || activeTemplate?.context || "Not available";
+        const instructions = editorFields.instructions || activeTemplate?.instructions || "Not available";
+        const constraints = editorFields.constraints || activeTemplate?.constraints || "Not available";
+        const outputFormat = editorFields.output_format || activeTemplate?.output_format || "Not available";
+        const reviewChecklist = editorFields.review_checklist || activeTemplate?.review_checklist || "Not available";
+        const notes = editorFields.notes || activeTemplate?.notes || "Not available";
+
+        // Variables / placeholders
+        let variablesMarkdown = "None defined";
+        if (currentInputFields && currentInputFields.length > 0) {
+            variablesMarkdown = currentInputFields.map((field, idx) => {
+                return `${idx + 1}. **${field.label || field.name}** (\`{{${field.name}}}\`)\n` +
+                       `   - Required: ${field.required ? "Yes" : "No"}\n` +
+                       `   - Default: ${field.value || "None"}\n` +
+                       `   - Placeholder: ${field.placeholder || "None"}\n` +
+                       `   - Helper Text: ${field.helperText || "None"}`;
+            }).join("\n\n");
+        }
+
+        // Simulator Test Inputs
+        let testInputsMarkdown = "None simulated";
+        if (currentInputFields && currentInputFields.length > 0) {
+            testInputsMarkdown = currentInputFields.map(field => {
+                const val = testValues[field.name] || "";
+                return `- **${field.label || field.name}** (\`{{${field.name}}}\`): ${val || "(empty)"}`;
+            }).join("\n");
+        }
+
+        // Guardrails
+        const appliedPresetIds = parseGuardrailIds(editorFields.guardrail_preset_ids || activeTemplate?.guardrail_preset_ids);
+        const appliedPresets = appliedPresetIds
+            .map(id => guardrailPresets.find(p => p.id === id))
+            .filter(Boolean) as GuardrailPreset[];
+        
+        let guardrailsMarkdown = "None applied";
+        if (appliedPresets.length > 0) {
+            guardrailsMarkdown = appliedPresets.map(preset => `- **${preset.name}**: ${preset.content}`).join("\n");
+        }
+
+        // Return formatted markdown
+        return `# Arbor Context - Prompt Studio
+
+## Workspace Info
+- **Workspace/Page**: Prompt Studio (WorkOS-Lite / ArborDesk)
+- **Active Template ID**: ${selectedId || "None selected"}
+
+## Template Metadata
+- **Name**: ${name}
+- **Category**: ${category}
+- **Status**: ${editorFields.status || activeTemplate?.status || "draft"}
+- **Version**: ${editorFields.version || activeTemplate?.version || "1.0.0"}
+
+## Persona & Purpose
+- **Purpose**: ${purpose}
+- **Role**: ${role}
+- **Context**: ${context}
+
+## Prompt Body
+### Instructions
+\`\`\`
+${instructions}
+\`\`\`
+
+### Constraints
+\`\`\`
+${constraints}
+\`\`\`
+
+### Output Format
+\`\`\`
+${outputFormat}
+\`\`\`
+
+### Review Checklist
+\`\`\`
+${reviewChecklist}
+\`\`\`
+
+### Notes / Brief
+\`\`\`
+${notes}
+\`\`\`
+
+### Applied Guardrails
+${guardrailsMarkdown}
+
+## Variables / Input Fields
+${variablesMarkdown}
+
+## Simulator Test Inputs (Playground)
+${testInputsMarkdown}
+
+## Compiled Active Prompt (Playground Output)
+\`\`\`
+${compiledActivePrompt || "Not available"}
+\`\`\`
+
+## Template Structure (Raw Layout)
+\`\`\`
+${templateStructurePrompt || "Not available"}
+\`\`\`
+`;
+    };
+
+    const handleCopyArborContext = () => {
+        const markdown = buildArborContextMarkdown();
+        navigator.clipboard.writeText(markdown);
+        setCopiedArbor(true);
+        setTimeout(() => setCopiedArbor(false), 2000);
+    };
+
     // Create New Template
     const handleCreateNew = () => {
         const newTemp: Partial<PromptTemplate> = {
@@ -2441,6 +2559,18 @@ export default function PromptStudioClient() {
                             >
                                 <HelpCircle className="w-3.5 h-3.5" />
                                 <span>{showQuickGuide ? "ซ่อนแนะนำ" : "คู่มือการใช้"}</span>
+                            </button>
+                            <button
+                                onClick={handleCopyArborContext}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg font-semibold transition cursor-pointer border ${
+                                    copiedArbor 
+                                        ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                }`}
+                                title="คัดลอก Markdown Context ทั้งหมดส่งต่อให้ Arbor"
+                            >
+                                {copiedArbor ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                                <span>{copiedArbor ? "คัดลอกแล้ว!" : "Copy Arbor Context"}</span>
                             </button>
                             {selectedId && selectedId !== "new-template" && (
                                 <button
