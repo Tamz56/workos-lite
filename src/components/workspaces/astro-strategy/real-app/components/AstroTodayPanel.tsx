@@ -2,7 +2,7 @@
  
 import * as React from "react";
 import { Zap, Compass, CheckCircle, ShieldAlert, Activity, MessageSquare } from "lucide-react";
-import { AstroEngineMetadata, ThaiAstroStrategyOutput, ChineseMetaphysicsStrategyOutput, ThaiTransitStrategyOutput } from "../data/astroRealAppTypes";
+import { AstroEngineMetadata, ThaiAstroStrategyOutput, ChineseMetaphysicsStrategyOutput, ThaiTransitStrategyOutput, NatalTransitStrategyComposerOutput } from "../data/astroRealAppTypes";
  
 export type AstroTodayPanelProps = {
   strategyMode?: string;
@@ -34,6 +34,12 @@ export type AstroTodayPanelProps = {
   thaiTransitFallbackNote?: string | null;
   showThaiTransitContext?: boolean;
   defaultThaiTransitCollapsed?: boolean;
+
+  // DEV-085 props
+  composerStrategyContext?: NatalTransitStrategyComposerOutput | null;
+  showComposerStrategySummary?: boolean;
+  defaultComposerSummaryCollapsed?: boolean;
+  composerSummaryVariant?: "compact" | "expanded";
 };
 
 const DEFAULT_WORK_RECOMMENDATION_MAP: Record<string, string> = {
@@ -84,9 +90,13 @@ export function AstroTodayPanel({
   thaiTransitFallbackNote = null,
   showThaiTransitContext = true,
   defaultThaiTransitCollapsed = true,
+  composerStrategyContext = null,
+  showComposerStrategySummary = true,
+  defaultComposerSummaryCollapsed = true,
 }: AstroTodayPanelProps) {
   const [chineseAstroExpanded, setChineseAstroExpanded] = React.useState(false);
   const [thaiTransitExpanded, setThaiTransitExpanded] = React.useState(!defaultThaiTransitCollapsed);
+  const [composerSummaryExpanded, setComposerSummaryExpanded] = React.useState(!defaultComposerSummaryCollapsed);
 
   return (
     <div className="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-6 sm:p-8 space-y-6">
@@ -120,6 +130,103 @@ export function AstroTodayPanel({
             <strong>ทิศทางกลยุทธ์ (Strategic Direction):</strong> {strategyDirection}
           </p>
         </div>
+
+        {/* Composer Strategy Summary Layer (DEV-085) */}
+        {showComposerStrategySummary && composerStrategyContext && (
+          <div className="bg-gradient-to-r from-indigo-950/40 via-slate-900/60 to-violet-950/40 border border-indigo-500/30 rounded-xl p-5 space-y-3 hover:border-indigo-500/50 transition-all animate-fadeIn sm:col-span-2">
+            <div 
+              className="flex items-center justify-between border-b border-indigo-500/20 pb-2.5 cursor-pointer select-none"
+              onClick={() => setComposerSummaryExpanded(!composerSummaryExpanded)}
+            >
+              <div className="flex items-center gap-2 text-indigo-300">
+                <Compass className="w-4.5 h-4.5 text-indigo-400 animate-pulse" />
+                <span className="font-bold text-xs sm:text-sm tracking-wide text-slate-100">
+                  🎯 สรุปคำแนะนำเชิงประสานยุทธศาสตร์ (Composer Strategy Summary)
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 text-[9px] font-semibold rounded bg-indigo-950/80 text-indigo-200 border border-indigo-500/25">
+                  โหมดรวม: {composerStrategyContext.strategyMode}
+                </span>
+                <span className="text-[10px] text-slate-400 font-bold">
+                  {composerSummaryExpanded ? "▲ ซ่อน" : "▼ ขยาย"}
+                </span>
+              </div>
+            </div>
+
+            {/* Compact summary 1 line shown when collapsed */}
+            {!composerSummaryExpanded && (
+              <p className="text-xs text-slate-350 leading-relaxed font-medium flex items-center gap-1">
+                <span>🌟 {composerStrategyContext.primaryRecommendation}</span>
+              </p>
+            )}
+
+            {composerSummaryExpanded && (
+              <div className="text-xs text-slate-300 space-y-3 leading-relaxed animate-fadeIn">
+                <div className="bg-slate-950/50 border border-indigo-950/60 p-3.5 rounded-lg space-y-2">
+                  <p className="font-semibold text-slate-100 flex items-center gap-1.5">
+                    <span className="text-indigo-400">🌟 ยุทธศาสตร์หลัก:</span>
+                    <span>{composerStrategyContext.primaryRecommendation}</span>
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-[11px] text-slate-350">
+                    <div>
+                      <strong className="text-slate-200 font-medium">ประเภทงานที่แนะนำ:</strong>{" "}
+                      {composerStrategyContext.workModePriority.map(m => {
+                        const maps: Record<string, string> = {
+                          structured_work: "จัดระบบโครงสร้างงาน",
+                          system_design: "ออกแบบโครงร่างระบบ",
+                          qa_testing: "ตรวจสอบความเสถียร/QA",
+                          debugging: "แก้ไขข้อบกพร่อง/ดีบัก",
+                          delivery: "สรุปผลส่งมอบงาน",
+                          summary_notes: "เขียนบันทึกย่อย",
+                          research: "ค้นคว้าข้อมูลเบื้องหลัง",
+                          system_cleanup: "จัดระเบียบเคลียร์ระบบ",
+                          meeting: "นัดหมายเจรจา/ประชุมทีม",
+                          agreements: "ตกลงข้อเสนอสัญญา",
+                          self_pacing: "จัดจังหวะกำลังตนเอง",
+                          energy_check: "ประเมินโฟกัสส่วนบุคคล",
+                          recovery: "พักฟื้นฟูจิตใจ",
+                          review: "ทบทวนการทำงานเบา",
+                          low_intensity: "ทำงานเบาความเค้นต่ำ"
+                        };
+                        return maps[m] || m;
+                      }).join(", ")}
+                    </div>
+                    <div>
+                      <strong className="text-slate-200 font-medium">การคืนพลังงานสมอง:</strong>{" "}
+                      {composerStrategyContext.recoveryPriority.join(", ")}
+                    </div>
+                  </div>
+                </div>
+
+                {composerStrategyContext.cautionLevel !== "low" && (
+                  <div className="text-amber-300 bg-amber-950/20 px-3 py-2 rounded-lg border border-amber-500/15 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                      <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>ข้อพึงระวังสะท้อนสมอง (ระดับ: {composerStrategyContext.cautionLevel})</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-normal">
+                      {composerStrategyContext.decisionGuidance}
+                    </p>
+                  </div>
+                )}
+
+                <div className="bg-violet-950/10 border border-violet-500/10 p-3 rounded-lg space-y-1">
+                  <strong className="text-violet-300 font-medium block">📝 คำถามสะท้อนคิดประจำวัน:</strong>
+                  <p className="italic text-slate-350 text-[11px]">
+                    “{composerStrategyContext.reflectionPrompt}”
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between text-[9px] text-slate-500 font-mono pt-1.5 border-t border-slate-800/80 gap-1 leading-relaxed">
+                  <span>{composerStrategyContext.confidenceNotes}</span>
+                  <span>*{composerStrategyContext.safetyDisclaimer}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Work Recommendation */}
         <div className="bg-slate-950/70 border border-slate-700/80 p-6 rounded-xl space-y-3 hover:border-slate-650 transition-all">
