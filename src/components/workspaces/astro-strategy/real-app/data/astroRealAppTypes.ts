@@ -578,3 +578,75 @@ export interface NatalTransitComposerInput {
   } | null;
 }
 
+export type ThaiZodiacSign =
+  | "aries"
+  | "taurus"
+  | "gemini"
+  | "cancer"
+  | "leo"
+  | "virgo"
+  | "libra"
+  | "scorpio"
+  | "sagittarius"
+  | "capricorn"
+  | "aquarius"
+  | "pisces";
+
+export type ThaiHouseName =
+  | "ตนุ"
+  | "กดุมภะ"
+  | "สหัชชะ"
+  | "พันธุ"
+  | "ปุตตะ"
+  | "อริ"
+  | "ปัตนิ"
+  | "มรณะ"
+  | "ศุภะ"
+  | "กัมมะ"
+  | "ลาภะ"
+  | "วินาศ";
+
+export type ThaiHouseNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+
+export interface ThaiHouseMappingInput {
+  ascendantZodiacSign: string;
+  ascendantConfidenceScore: number;
+  calculationMethod: string;
+  dayBoundaryRisk: boolean;
+  birthDataConfidence: "high" | "medium" | "low" | "unknown";
+  generatedAt?: string;
+}
+
+export interface ThaiHousePlacementV01 {
+  houseNumber: ThaiHouseNumber;
+  houseNameThai: ThaiHouseName;
+  zodiacSign: ThaiZodiacSign;
+  themeCategory: "work" | "resource" | "network" | "obstacle" | "recharge" | "other";
+  workLifeTheme: string;
+  strategyMeaningIds: string[];
+  cautionSignalIds: string[];
+  recoverySignalIds: string[];
+  confidenceScore: number;
+  uncertaintyNotes: string;
+}
+
+export interface ThaiHouseMappingV01 {
+  mappingId: string;
+  source: string;
+  calculationVersion: string;
+  houseSystem: string;
+  ascendant: {
+    zodiacSign: string;
+    confidenceScore: number;
+    calculationMethod: string;
+  };
+  houses: ThaiHousePlacementV01[];
+  dominantWorkHouses: number[];
+  sensitiveHouses: number[];
+  strategicSignalIds: string[];
+  confidenceNotes: string;
+  safetyDisclaimer: string;
+  generatedAt: string;
+}
+
+
