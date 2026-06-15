@@ -604,6 +604,8 @@ const quickPromptGroups: QuickPromptGroup[] = [
         description: "แปลงไอเดียตั้งต้นเป็นโครงสร้าง Brief วิจัยกลยุทธ์",
         template: `คุณคือผู้เชี่ยวชาญด้านกลยุทธ์คอนเทนต์ของ Arbor โปรดช่วยแปลงไอเดีย/ข้อมูลนำเข้าต่อไปนี้ให้เป็นโครงร่าง Strategic Research Brief ที่มีข้อมูลวัตถุประสงค์ กลุ่มเป้าหมาย ประเด็นท้าทาย และแนวทางการนำเสนอเชิงวิทยาศาสตร์/ธรรมชาติ
 
+ถ้าข้อมูลที่ได้รับเป็นเพียงหัวข้อสั้น ๆ หรือข้อความไม่กี่ย่อหน้า ให้ช่วยวิเคราะห์แบบขยายในระดับหัวข้อ / framing / ความเสี่ยง / แนวทางต่อยอด แทนการตอบสั้นเกินไป
+
 ข้อมูลนำเข้า:
 {{input}}`
       },
@@ -620,7 +622,9 @@ const quickPromptGroups: QuickPromptGroup[] = [
         id: "arbor-final-review",
         label: "Final Review",
         description: "ตรวจทานเนื้อหาตามเกณฑ์ความปลอดภัยและโทนเสียงของแบรนด์",
-        template: `โปรดตรวจสอบเนื้อหาต่อไปนี้ตามเกณฑ์ความปลอดภัยและ Voice & Tone ของ Green Fineness (ความสุภาพ อบอุ่น อิงวิทยาศาสตร์ ไม่กล่าวอ้างสรรพคุณเกินจริง เช่น เห็นผลร้อยเปอร์เซ็นต์ หรือรักษาโรค) พร้อมแนะนำข้อความปรับปรุงแก้ไข
+        template: `โปรดตรวจสอบเนื้อหาต่อไปนี้ตามเกณฑ์ความปลอดภัยและ Voice & Tone ของ Green Fineness (ความสุภาพ อบอุ่น สงบ และชัดเจน อิงวิทยาศาสตร์ ไม่กล่าวอ้างสรรพคุณเกินจริง เช่น เห็นผลร้อยเปอร์เซ็นต์ หรือรักษาโรค) พร้อมแนะนำข้อความปรับปรุงแก้ไข
+
+ถ้าข้อมูลที่ได้รับเป็นเพียงหัวข้อสั้น ๆ หรือข้อความไม่กี่ย่อหน้า ให้ช่วยวิเคราะห์แบบขยายในระดับหัวข้อ / framing / ความเสี่ยง / แนวทางต่อยอด แทนการตอบสั้นเกินไป
 
 เนื้อหาที่ต้องการตรวจสอบ:
 {{input}}`
@@ -631,7 +635,46 @@ const quickPromptGroups: QuickPromptGroup[] = [
         description: "สังเคราะห์สรุปข้อมูลและบันทึกต่างๆ เข้าด้วยกันเป็นดราฟต์สุดท้าย",
         template: `โปรดช่วยรวบรวม สังเคราะห์ และเรียบเรียงข้อมูล วัตถุดิบ หรือโน้ตตกค้างต่อไปนี้ ให้กลายเป็นบทสรุปสุดท้ายที่ลื่นไหล อ่านง่าย และมีความยาวเป็นระเบียบชัดเจน
 
+ถ้าข้อมูลที่ได้รับเป็นเพียงหัวข้อสั้น ๆ หรือข้อความไม่กี่ย่อหน้า ให้ช่วยวิเคราะห์แบบขยายในระดับหัวข้อ / framing / ความเสี่ยง / แนวทางต่อยอด แทนการตอบสั้นเกินไป
+
 ข้อมูลวัตถุดิบ:
+{{input}}`
+      }
+    ]
+  },
+  {
+    name: "Green Fineness",
+    color: "from-green-600 to-emerald-600",
+    prompts: [
+      {
+        id: "gf-tone-safety-check",
+        label: "ตรวจโทนและความปลอดภัย",
+        description: "ตรวจทานเนื้อหาตามเกณฑ์ความสุภาพ อบอุ่น สงบ และคำนึงถึงความเสี่ยงเชิงกฎหมายและการเคลม",
+        template: `คุณคือผู้ตรวจสอบความเสี่ยงด้านการสื่อสารและโทนเสียงของ Green Fineness โปรดตรวจสอบข้อความนำเข้าต่อไปนี้อย่างละเอียดถี่ถ้วน
+
+เกณฑ์การตรวจสอบ:
+1. สุภาพ อบอุ่น สงบ และชัดเจน
+2. อิงความรู้และหลักวิทยาศาสตร์อย่างระมัดระวัง (Cautious scientific wording)
+3. ไม่กล่าวอ้างสรรพคุณเกินจริง (High-risk Claim Avoidance)
+4. ไม่ใช้ภาษาขายแรง (Non-salesy)
+5. ไม่ฟันธงผลลัพธ์ด้านพืช ดิน จุลินทรีย์ ธาตุอาหาร ผลผลิต คาร์บอน หรือสิ่งแวดล้อม
+6. ใช้ถ้อยคำระมัดระวัง เช่น "อาจ", "มีส่วนเกี่ยวข้องกับ", "ภายใต้เงื่อนไขที่เหมาะสม", "ในบางบริบท" เมื่อพูดถึงผลลัพธ์
+7. ถ้าข้อความนำเข้าเป็นเพียงหัวข้อสั้น ๆ ให้วิเคราะห์และตรวจแบบขยาย ไม่ตอบสั้นเกินไป
+
+กรุณาส่งมอบผลลัพธ์ในรูปแบบ Markdown ดังนี้:
+1. สถานะ: Passed / Partial / Failed (พร้อมระบุระดับความมั่นใจ)
+2. เหตุผล: อธิบายสั้น ๆ ถึงสถานะที่ระบุ
+3. ความเหมาะสมของเนื้อหา: รายละเอียดความเหมาะสมเมื่อเทียบกับ Voice & Tone
+4. ความเสี่ยงด้านการตีความ: จุดที่มีความเสี่ยงเชิงกฎหมายหรือการเคลมเกินจริง
+5. คำหรือวลีที่ควรระวัง: (เช่น ดีที่สุด, ปลอดภัย 100%, เห็นผลแน่นอน, ฟื้นฟูดินทันที)
+6. ข้อความที่ควรปรับ: จุดที่ต้องแก้ไข
+7. เวอร์ชันปรับปรุงที่แนะนำ: ข้อเสนอปรับปรุงถ้อยคำใหม่ที่สงบและปลอดภัย
+8. ถ้าข้อความนำเข้าเป็นเพียงหัวข้อ: เสนอหัวข้อทางเลือกเชิงกลยุทธ์ 5 แบบ (ที่ปลอดภัยและน่าสนใจ)
+9. ถ้าข้อความนำเข้าเป็นเพียงหัวข้อ: เสนอคำโปรยสั้น (Intro hook) ประกอบหัวข้อ 3 แบบ
+10. ข้อควรระวังเมื่อนำไปขยายเขียนบทความจริงในอนาคต
+11. ขั้นถัดไปที่แนะนำ (1 ขั้นที่นำไปทำต่อได้ทันที)
+
+ข้อความนำเข้า:
 {{input}}`
       }
     ]
@@ -644,10 +687,102 @@ const quickPromptGroups: QuickPromptGroup[] = [
         id: "gemini-visual-brief",
         label: "Visual Brief",
         description: "สร้าง Visual Prompts หรือคำแนะนำการจัดวางหน้าตา UI",
-        template: `คุณคือ UI/UX Designer และ Visual Art Director โปรดช่วยแปลงข้อมูล/คอนเซปต์ต่อไปนี้ ให้กลายเป็นแบบร่างคำแนะนำการออกแบบทางทัศนศิลป์ (Visual Brief) หรือข้อความสำหรับป้อน AI วาดภาพ (Image Prompt) ที่ละเอียดและสวยงาม
+        template: `คุณคือ UI/UX Designer, Visual Art Director และ Prompt Engineer สำหรับงานภาพประกอบ
 
-คอนเซปต์:
-{{input}}`
+โปรดแปลงข้อมูล/คอนเซปต์ต่อไปนี้ให้เป็น Visual Brief และ Image Prompt แบบละเอียด พร้อมนำไปใช้กับ Gemini หรือ AI สร้างภาพได้ทันที
+
+ข้อมูล/คอนเซปต์:
+{{input}}
+
+ข้อกำหนดสำคัญ:
+- ห้ามตอบสั้น
+- แม้ input จะเป็นเพียงหัวข้อสั้น ๆ หรือ commit message ให้ตีความเป็น concept เชิงภาพและขยายให้เป็น visual direction ที่ใช้งานได้จริง
+- ถ้าเป็นงาน software / product / UI ให้สื่อออกมาเป็น dashboard, workspace, system panel, workflow, หรือ product hero shot
+- ถ้าเป็นงาน Green Fineness ให้ใช้โทนสงบ ธรรมชาติ มีบริบท ไม่แฟนตาซี ไม่ขายแรง
+- ห้ามใส่ข้อความจำนวนมากในภาพ
+- ห้ามใส่โลโก้จริง QR code watermark หรือ text ที่อ่านได้จริงในภาพ
+- ถ้าจำเป็นต้องมีข้อความ ให้ระบุว่าให้ใส่ใน Canva ภายหลัง
+- ภาพต้องดูสะอาด มีองค์ประกอบชัด และเหมาะกับบทความ / product update / documentation
+
+โปรดตอบเป็นโครงสร้างต่อไปนี้อย่างละเอียด:
+
+1. TL;DR
+สรุปแนวภาพหลักใน 2-3 บรรทัด
+
+2. Visual Concept
+อธิบายแนวคิดภาพหลัก สิ่งที่ภาพควรสื่อ และความรู้สึกที่ต้องการให้ผู้ชมรับรู้
+
+3. Use Case
+ระบุว่าภาพนี้เหมาะใช้กับ:
+- บทความ
+- social post
+- product update
+- documentation
+- hero image
+พร้อมเหตุผลสั้น ๆ
+
+4. Mood & Tone
+ระบุ mood อย่างน้อย 5 คำ พร้อมคำอธิบาย เช่น calm, organized, precise, warm, professional
+
+5. Composition
+อธิบายการจัดวางภาพอย่างละเอียด:
+- มุมกล้อง
+- จุดโฟกัสหลัก
+- foreground
+- middle ground
+- background
+- การเว้นพื้นที่ว่างสำหรับข้อความภายหลัง
+
+6. Key Visual Elements
+ระบุองค์ประกอบหลักในภาพอย่างน้อย 6 รายการ พร้อมหน้าที่ของแต่ละองค์ประกอบ
+
+7. Color Palette
+เสนอชุดสีหลัก 5 สี พร้อมบทบาทของสี เช่น background, panel, accent, highlight, text overlay area
+
+8. Lighting & Texture
+อธิบายแสง เงา พื้นผิว และระดับความสมจริงของภาพ
+
+9. Style Direction
+ระบุสไตล์ภาพที่เหมาะสม เช่น:
+- modern SaaS dashboard mockup
+- editorial product illustration
+- clean workspace interface
+- soft realistic UI render
+พร้อมคำอธิบาย
+
+10. Image Prompt ภาษาไทย
+เขียน prompt ภาษาไทยแบบละเอียดอย่างน้อย 120-180 คำ สำหรับนำไปใช้สร้างภาพ
+
+11. Image Prompt ภาษาอังกฤษ
+เขียน prompt ภาษาอังกฤษแบบละเอียดอย่างน้อย 120-180 words สำหรับนำไปใช้สร้างภาพ
+
+12. Negative Prompt
+ระบุสิ่งที่ต้องหลีกเลี่ยง เช่น:
+- unreadable text
+- real logos
+- QR code
+- watermark
+- robot cliché
+- excessive neon glow
+- cluttered UI
+- fantasy effects
+- distorted screen
+- busy infographic
+
+13. Alt Text ภาษาไทย
+เขียน alt text 1 ประโยค
+
+14. Caption ภาษาไทย
+เขียน caption 1-2 ประโยคในโทนสงบ ชัดเจน และไม่ขายแรง
+
+15. Canva Note
+ถ้าต้องมีข้อความบนภาพ ให้ระบุว่าควรใส่ข้อความใน Canva ภายหลัง ไม่ควรให้ AI สร้างข้อความในภาพโดยตรง
+
+16. Variations
+เสนอ variation 3 แบบ:
+- แบบ minimal
+- แบบ editorial
+- แบบ product hero`
       },
       {
         id: "gemini-agri-context",
@@ -4470,9 +4605,19 @@ ${templateStructurePrompt || "Not available"}
                             <div className="flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar text-xs">
                                 {/* Textarea input */}
                                 <div className="flex flex-col space-y-1.5 bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
-                                    <label className="text-slate-800 font-bold text-[10px] uppercase tracking-wider">
-                                        ป้อนข้อความนำเข้า (Input)
-                                    </label>
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-slate-800 font-bold text-[10px] uppercase tracking-wider">
+                                            ป้อนข้อความนำเข้า (Input)
+                                        </label>
+                                        {quickInput && (
+                                            <button
+                                                onClick={() => setQuickInput("")}
+                                                className="text-slate-400 hover:text-red-500 active:text-red-600 text-[10px] font-bold transition-all cursor-pointer"
+                                            >
+                                                ล้างข้อมูล
+                                            </button>
+                                        )}
+                                    </div>
                                     <textarea
                                         value={quickInput}
                                         onChange={(e) => setQuickInput(e.target.value)}
@@ -4510,17 +4655,26 @@ ${templateStructurePrompt || "Not available"}
                                     <div className="flex justify-between items-center">
                                         <span className="text-slate-800 font-bold text-[10px] uppercase tracking-wider">ผลลัพธ์คำสั่ง (Generated Prompt)</span>
                                         {quickOutput && (
-                                            <button
-                                                onClick={handleCopyQuickOutput}
-                                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer shadow-sm ${
-                                                    quickCopied 
-                                                        ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
-                                                        : "bg-blue-600 hover:bg-blue-500 text-white border-transparent"
-                                                }`}
-                                            >
-                                                {quickCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                                <span>{quickCopied ? "คัดลอกแล้ว!" : "คัดลอก Prompt"}</span>
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setQuickOutput("")}
+                                                    className="text-slate-400 hover:text-red-500 active:text-red-600 text-[10px] font-bold transition-all cursor-pointer"
+                                                >
+                                                    ล้างผลลัพธ์
+                                                </button>
+                                                <span className="text-slate-300">|</span>
+                                                <button
+                                                    onClick={handleCopyQuickOutput}
+                                                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer shadow-sm ${
+                                                        quickCopied 
+                                                            ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
+                                                            : "bg-blue-600 hover:bg-blue-500 text-white border-transparent"
+                                                    }`}
+                                                >
+                                                    {quickCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                                    <span>{quickCopied ? "คัดลอกแล้ว!" : "คัดลอก Prompt"}</span>
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                     <textarea
