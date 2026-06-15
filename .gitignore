@@ -34,3 +34,7 @@ data/*.db-journal
 
 data/workos.db
 tsconfig.tsbuildinfo
+
+# Temporary scratch files
+scratch/*
+!scratch/migrate_content_topics.cjs
