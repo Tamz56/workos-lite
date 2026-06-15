@@ -649,4 +649,82 @@ export interface ThaiHouseMappingV01 {
   generatedAt: string;
 }
 
+// ASTRO-REAL-APP-DEV-099 — Thai Planet Placement Types
+export type ThaiPlanetId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+
+export type ThaiPlanetPlacementConfidence = 'pending' | 'approximate' | 'validated' | 'unavailable';
+
+export type ThaiPlanetPlacementValidationStatus =
+  | 'not-validated'
+  | 'reference-matched'
+  | 'reference-mismatch'
+  | 'not-comparable';
+
+export type ThaiPlanetPlacementComparisonStatus =
+  | 'matched'
+  | 'mismatch'
+  | 'not-comparable'
+  | 'system-mismatch';
+
+export interface ThaiPlanetPlacementInput {
+  birthDate: string;
+  birthTime: string;
+  birthLocation: {
+    label: string;
+    latitude?: number;
+    longitude?: number;
+    timezone: string;
+  };
+  calendarSystem: 'pending-reference-validation' | 'thai-solar' | 'gregorian' | 'system-specific';
+  calculationSystem: 'pending-reference-validation' | 'thai-traditional' | 'sidereal' | 'system-specific';
+}
+
+export interface ThaiPlanetMappingEntry {
+  planetId: ThaiPlanetId;
+  label: string;
+  role: string;
+  mappingStatus: 'pending-reference-validation' | 'validated' | 'system-specific';
+  sourceNote?: string;
+}
+
+export interface ThaiPlanetPlacementResult {
+  planetId: ThaiPlanetId;
+  signRasi: string | 'pending-reference-validation' | 'unavailable';
+  degree: string | 'pending-reference-validation' | 'unavailable';
+  segment?: string | 'pending-reference-validation' | 'unavailable';
+  specialStatus?: string | 'pending-reference-validation' | 'unavailable';
+  confidence: ThaiPlanetPlacementConfidence;
+  validationStatus: ThaiPlanetPlacementValidationStatus;
+  notes?: string;
+}
+
+export interface ThaiPlanetPlacementReferenceCaseLike {
+  caseId: string;
+  birthDate: string;
+  birthTime: string;
+  birthLocation: string;
+  timezone: string;
+  calendarSystem: string;
+  sourceType: string;
+  referenceConfidence: string;
+  validationStatus: string;
+  notes?: string;
+  expectedPlacements?: Array<{
+    planetId: number;
+    expectedSignRasi: string;
+    expectedDegree: string;
+    expectedSegment?: string;
+    expectedSpecialStatus?: string;
+    validationSourceNote?: string;
+  }>;
+}
+
+export interface ThaiPlanetPlacementComparison {
+  caseId: string;
+  planetId: ThaiPlanetId;
+  runtimeValue: ThaiPlanetPlacementResult;
+  expectedValueStatus: 'pending-reference-validation' | 'validated' | 'unavailable';
+  comparisonStatus: ThaiPlanetPlacementComparisonStatus;
+  notes?: string;
+}
 
