@@ -854,10 +854,59 @@ const quickPromptGroups: QuickPromptGroup[] = [
         id: "antigravity-impl-brief",
         label: "Implementation Brief",
         description: "ร่างเอกสารวางแผนพัฒนาระบบ (Goal, Scope, Risks, Matrix)",
-        template: `โปรดแปลงคำอธิบายความต้องการพัฒนาระบบต่อไปนี้ ให้กลายเป็นร่างแผนการพัฒนาระบบทางเทคนิค (Technical Implementation Plan) โดยระบุ Goal, Scope, Non-scope, Proposed Changes, Verification Plan และ Risks & Edge Cases อย่างมีระบบ
+        template: `โปรดแปลงคำอธิบายความต้องการพัฒนาระบบต่อไปนี้ ให้กลายเป็นร่างแผนการพัฒนาระบบทางเทคนิคอย่างเป็นระบบ
 
 ความต้องการของระบบ:
-{{input}}`
+{{input}}
+
+ข้อกำหนดสำคัญ:
+- ถ้าข้อมูลนำเข้าเป็นเพียงข้อความสั้น ๆ เช่น commit message, feature title หรือ issue title ให้ตีความอย่างระมัดระวัง
+- แยก “สิ่งที่รู้แน่” ออกจาก “สมมติฐาน”
+- ห้ามสรุปเหมือนรู้รายละเอียดทั้งหมด หากข้อมูลยังไม่พอ
+- ให้เสนอแผนแบบปลอดภัยและจำกัด scope
+- ห้ามเสนอการแก้ unrelated files
+- ห้าม commit จนกว่าจะได้รับคำสั่งยืนยัน
+- ถ้าเป็นงานใน Prompt Studio / WorkOS ให้รักษา logic เดิม เช่น save, import, archive, version control, variable compilation และ state management
+
+กรุณาส่งมอบผลลัพธ์ใน Markdown ตามโครงนี้:
+
+# Technical Implementation Plan
+
+## 1. Goal
+เป้าหมายของงานนี้คืออะไร
+
+## 2. Known Input
+สิ่งที่รู้แน่จากข้อมูลนำเข้า
+
+## 3. Assumptions
+สมมติฐานที่ใช้ในการวางแผน หากข้อมูลยังไม่พอ
+
+## 4. Scope
+สิ่งที่จะทำในรอบนี้
+
+## 5. Non-scope
+สิ่งที่จะไม่ทำในรอบนี้
+
+## 6. Proposed Changes
+ระบุการเปลี่ยนแปลงที่เสนออย่างเป็นข้อ ๆ
+
+## 7. Likely Files to Change
+ระบุไฟล์ที่น่าจะเกี่ยวข้อง ถ้าทราบ
+
+## 8. Files / Logic That Must Not Be Changed
+ระบุส่วนที่ต้องรักษาไว้
+
+## 9. Verification Plan
+ระบุคำสั่งทดสอบ เช่น lint, build, manual QA
+
+## 10. Risks & Edge Cases
+ระบุความเสี่ยงที่อาจเกิดขึ้น
+
+## 11. Manual QA Checklist
+รายการตรวจบน browser หรือ UI จริง
+
+## 12. Recommended Next Step
+แนะนำ 1 ขั้นตอนถัดไปเท่านั้น`
       },
       {
         id: "antigravity-bug-fix",
