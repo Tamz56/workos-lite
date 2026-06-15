@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { 
     Plus, 
     Search, 
@@ -4698,9 +4699,18 @@ ${templateStructurePrompt || "Not available"}
                     {rightPanelTab === "quick-prompt" && (
                         <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
                             <div className="p-4 border-b border-slate-200 bg-white flex flex-col flex-shrink-0 space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 text-violet-500 animate-pulse" />
-                                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Quick Prompt Panel</h2>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 text-violet-500 animate-pulse" />
+                                        <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Quick Prompt Panel</h2>
+                                    </div>
+                                    <Link 
+                                        href="/workspaces/prompt-lite"
+                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-100 rounded-lg transition-all cursor-pointer shadow-2xs animate-fade-in"
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                                        <span>เปิด Prompt Lite เต็มหน้า</span>
+                                    </Link>
                                 </div>
                                 <span className="text-[10px] text-slate-600 leading-normal font-medium">
                                     Prompt Studio Lite: ช่วยสร้างคำสั่งสำเร็จรูปสำหรับส่งต่อไปใช้งานในแพลตฟอร์มอื่น ๆ อย่างรวดเร็ว
