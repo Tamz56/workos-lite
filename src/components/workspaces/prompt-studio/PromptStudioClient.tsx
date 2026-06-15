@@ -818,6 +818,62 @@ const quickPromptGroups: QuickPromptGroup[] = [
     color: "from-emerald-600 to-teal-600",
     prompts: [
       {
+        id: "notebooklm-search-queries",
+        label: "Search Queries",
+        description: "สร้างคำถามสืบค้นข้อมูลเพิ่มเติมสำหรับ NotebookLM หรือแหล่งวิชาการ",
+        template: `คุณคือผู้ช่วยวิจัยของ Arbor และ Green Fineness
+
+โปรดวิเคราะห์ดราฟต์ข้อมูลต่อไปนี้ และเสนอรายการหัวข้อ คีย์เวิร์ด คำศัพท์วิชาการ และคำถามสืบค้น เพื่อนำไปใช้ค้นเอกสารอ้างอิง แหล่งข้อมูล หรือ NotebookLM เพิ่มเติม
+
+ดราฟต์ข้อมูล:
+{{input}}
+
+ข้อกำหนดสำคัญ:
+- ถ้าข้อมูลนำเข้าเป็นเพียงหัวข้อสั้น ๆ ให้ช่วยขยายเป็นแผนค้นข้อมูล ไม่ตอบสั้น
+- แยกคำค้นภาษาไทยและภาษาอังกฤษ
+- เน้นคำค้นที่ช่วยสนับสนุนบทความเชิงความรู้ ไม่ใช่คำโฆษณา
+- ระบุจุดที่ควรมีหลักฐานรองรับก่อนเขียน
+- หลีกเลี่ยงการสร้าง claim เกินข้อมูล
+- ถ้าเกี่ยวกับพืช ดิน จุลินทรีย์ ธาตุอาหาร ผลผลิต คาร์บอน หรือสิ่งแวดล้อม ให้ระบุคำถามที่ต้องตรวจสอบอย่างระมัดระวัง
+
+กรุณาส่งมอบผลลัพธ์เป็น Markdown ตามโครงนี้:
+
+# Research Search Plan
+
+## 1. Core Topic
+สรุปหัวข้อหลักที่ต้องค้น
+
+## 2. Key Concepts
+ระบุแนวคิดหลัก 5-10 ข้อ
+
+## 3. Thai Search Keywords
+เสนอคีย์เวิร์ดภาษาไทย
+
+## 4. English Search Keywords
+เสนอคีย์เวิร์ดภาษาอังกฤษ
+
+## 5. Scientific Terms
+เสนอคำศัพท์วิชาการที่ควรใช้ค้น
+
+## 6. Search Queries for NotebookLM
+เสนอคำถามสำหรับค้นใน NotebookLM อย่างน้อย 8 ข้อ
+
+## 7. Search Queries for Academic Sources
+เสนอคำค้นหรือคำถามสำหรับค้นแหล่งวิชาการอย่างน้อย 8 ข้อ
+
+## 8. Source Types to Prioritize
+ระบุประเภทแหล่งข้อมูลที่ควรใช้ เช่น textbook, extension article, university source, review paper
+
+## 9. Source Types to Avoid
+ระบุแหล่งข้อมูลที่ควรระวัง เช่น โฆษณาสินค้า, บทความไม่มีแหล่งอ้างอิง, claim ทางการตลาด
+
+## 10. Claim Areas That Need Evidence
+ระบุประเด็นที่ต้องมีหลักฐานก่อนเขียน
+
+## 11. Recommended Next Step
+แนะนำ 1 ขั้นตอนถัดไปเท่านั้น`
+      },
+      {
         id: "notebooklm-search-sources",
         label: "Search Sources",
         description: "วางโครงร่างคำสืบค้นคีย์เวิร์ดวิจัยจากดราฟต์งาน",
@@ -4696,6 +4752,11 @@ ${templateStructurePrompt || "Not available"}
                                                 </button>
                                             ))}
                                         </div>
+                                        {group.name === "NotebookLM" && (
+                                            <div className="text-[9px] text-slate-500 font-medium pt-1.5 border-t border-slate-100">
+                                                NotebookLM: เตรียมคำค้น source และ material pack จากแหล่งอ้างอิง
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
 
