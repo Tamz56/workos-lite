@@ -11,8 +11,11 @@ import {
   ThaiPlanetPlacementInput,
   ThaiPlanetPlacementResult,
   ThaiPlanetPlacementReferenceCaseLike,
-  ThaiPlanetPlacementComparison
+  ThaiPlanetPlacementComparison,
+  ThaiPlanetPlacementRuntimeAdapterV01
 } from './astroRealAppTypes';
+
+import { buildThaiPlanetPlacementSafetySummary } from './astroRealAppThaiPlanetPlacementSafety';
 
 /**
  * รายการรหัสประจำดาวเคราะห์ของปฏิทินไทย 10 ตำแหน่ง (๐ ถึง ๙)
@@ -96,5 +99,43 @@ export function compareThaiPlanetPlacementWithReference(
     expectedValueStatus: 'validated',
     comparisonStatus: 'not-comparable',
     notes: 'Real matching logic is intentionally not implemented in this stub.'
+  };
+}
+
+/**
+ * รวมประสานข้อมูลตำแหน่งดาวเคราะห์ไทยจำลอง v0.1 (Runtime Adapter Orchestrator)
+ * ทำหน้าที่เรียกใช้ Stub และ Safety Summary ร่วมกันเพื่อส่งมอบผลลัพธ์เป็นเอกภาพ
+ *
+ * @param input ข้อมูลนำเข้าสำหรับประกอบการประมาณการ (เช่น วันเกิด เวลาเกิด เขตเวลาเกิด)
+ * @param referenceCase กรณีศึกษาอ้างอิงสอบเทียบ (ถ้ามี)
+ * @returns รายงานผลลัพธ์ประมาณการดวงดาวและบทสรุปความปลอดภัย
+ */
+export function buildThaiPlanetPlacementRuntimeAdapterV01(
+  input: ThaiPlanetPlacementInput,
+  referenceCase?: ThaiPlanetPlacementReferenceCaseLike
+): ThaiPlanetPlacementRuntimeAdapterV01 {
+  // 1. เรียกใช้ Stub
+  const results = buildThaiPlanetPlacementStub(input);
+
+  // 2. เรียกใช้ Safety Summary
+  const safetySummary = buildThaiPlanetPlacementSafetySummary(results, referenceCase);
+
+  // 3. กำหนด inputStatus โดยห้ามสื่อว่ามีการคำนวณจริงแล้ว (ใช้ pending เมื่อมี placeholder หรือ stub-only)
+  // หากปฏิทินหรือระบบการคำนวณยังเป็นแบบรอการตรวจสอบ ให้เป็น pending เสมอ
+  const isInputPending =
+    input.calendarSystem === 'pending-reference-validation' ||
+    input.calculationSystem === 'pending-reference-validation';
+  const inputStatus = isInputPending ? 'pending' : 'unavailable';
+
+  // 4. การใช้ generatedAt เป็น metadata เท่านั้น
+  const generatedAt = new Date().toISOString();
+
+  return {
+    inputStatus,
+    results,
+    safetySummary,
+    adapterStatus: 'stub-only',
+    generatedAt,
+    notes: 'Thai planet placement runtime orchestrator v0.1. Output remains in a safe placeholder/stub state.'
   };
 }

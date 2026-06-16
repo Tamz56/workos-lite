@@ -736,3 +736,12 @@ export interface ThaiPlanetPlacementSafetySummary {
   issues: string[];
 }
 
+export interface ThaiPlanetPlacementRuntimeAdapterV01 {
+  inputStatus: 'pending' | 'approximate' | 'validated' | 'unavailable';
+  results: ThaiPlanetPlacementResult[];
+  safetySummary: ThaiPlanetPlacementSafetySummary;
+  adapterStatus: 'stub-only' | 'not-validated';
+  generatedAt: string;
+  notes: string;
+}
+
