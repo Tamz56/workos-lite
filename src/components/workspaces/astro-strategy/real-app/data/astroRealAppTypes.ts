@@ -728,3 +728,11 @@ export interface ThaiPlanetPlacementComparison {
   notes?: string;
 }
 
+export interface ThaiPlanetPlacementSafetySummary {
+  comparableCount: number;
+  notComparableCount: number;
+  validatedCount: number;
+  pendingCount: number;
+  issues: string[];
+}
+
