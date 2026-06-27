@@ -9,6 +9,7 @@ import { AstroReflectionHistoryPanel } from "./components/AstroReflectionHistory
 import { AstroStrategyPlanningPanel } from "./components/AstroStrategyPlanningPanel";
 import { AstroGuideEthicsPanel } from "./components/AstroGuideEthicsPanel";
 import { AstroPreviewDataToolsPanel } from "./components/AstroPreviewDataToolsPanel";
+import { ThaiPlanetPlacementDiagnosticsSection } from "./components/diagnostics/ThaiPlanetPlacementDiagnosticsSection";
 import { AstroBirthProfilePanel } from "./components/AstroBirthProfilePanel";
 import { AstroStrategyAppShell } from "./AstroStrategyAppShell";
 
@@ -984,14 +985,17 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
               closingQuote={MOCK_GUIDE_DATA.closingQuote}
             />
           )}
-          {activeTab === "tools" && (
-            <AstroPreviewDataToolsPanel
-              onResetHistory={handleResetHistoryOnly}
-              onResetPlanning={handleResetPlanningOnly}
-              onResetDraft={handleResetDraftOnly}
-              onResetAll={handleResetAllData}
-              onResetOnboarding={handleResetOnboarding}
-            />
+          {activeTab === "tools" && variant !== "production" && (
+            <div className="space-y-6">
+              <AstroPreviewDataToolsPanel
+                onResetHistory={handleResetHistoryOnly}
+                onResetPlanning={handleResetPlanningOnly}
+                onResetDraft={handleResetDraftOnly}
+                onResetAll={handleResetAllData}
+                onResetOnboarding={handleResetOnboarding}
+              />
+              <ThaiPlanetPlacementDiagnosticsSection variant={variant} />
+            </div>
           )}
         </div>
 
