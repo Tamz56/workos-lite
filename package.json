@@ -12,7 +12,10 @@
     "smoke:events": "node scripts/smoke_events.js",
     "smoke:backup": "node scripts/smoke_backup.js",
     "migrate:nutrient": "tsx scripts/migrate-nutrient-planner-lists.ts",
-    "migrate:ba": "tsx scripts/migrate-ba-sprint-lists.ts"
+    "migrate:ba": "tsx scripts/migrate-ba-sprint-lists.ts",
+    "test": "node node_modules/vitest/vitest.mjs",
+    "test:run": "node node_modules/vitest/vitest.mjs run",
+    "test:e2e": "node node_modules/@playwright/test/cli.js test"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -45,6 +48,7 @@
     "zod": "^4.3.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/archiver": "^7.0.0",
     "@types/better-sqlite3": "^7.6.13",
@@ -57,6 +61,7 @@
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.9"
   }
 }

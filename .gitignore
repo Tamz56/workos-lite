@@ -38,3 +38,10 @@ tsconfig.tsbuildinfo
 # Temporary scratch files
 scratch/*
 !scratch/migrate_content_topics.cjs
+
+# Testing artifacts
+test-results/
+playwright-report/
+blob-report/
+.playwright-cache/
+tmp/
