@@ -20,7 +20,8 @@ import {
     Share2,
     Search,
     ChevronDown,
-    Wand2
+    Wand2,
+    BarChart2
 } from "lucide-react";
 import { validatePayload } from "@/lib/arborInboxSchema";
 
@@ -90,7 +91,7 @@ interface WritingStudioTabProps {
     onRefresh: () => void;
 }
 
-type SubTabKey = "narrative" | "knowledge" | "social" | "seo" | "utm" | "review";
+type SubTabKey = "narrative" | "knowledge" | "social" | "seo" | "utm" | "performance" | "review";
 
 export default function WritingStudioTab({ 
     projectId, 
@@ -183,6 +184,59 @@ export default function WritingStudioTab({
     const [isReviewing, setIsReviewing] = useState(false);
     const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
+    // 1. Publishing Record
+    const [publishedDate, setPublishedDate] = useState("");
+    const [facebookGroupUrl, setFacebookGroupUrl] = useState("");
+    const [facebookPageUrl, setFacebookPageUrl] = useState("");
+    const [personalPostUrl, setPersonalPostUrl] = useState("");
+    const [utmCampaign, setUtmCampaign] = useState("");
+    const [publishStatus, setPublishStatus] = useState("Draft");
+
+    // 2. Feedback Snapshots
+    const createEmptySnapshot = () => ({
+        snapshotDate: "",
+        views: "",
+        users: "",
+        events: "",
+        engagementTime: "",
+        sourceMedium: "",
+        fbReach: "",
+        fbReactions: "",
+        fbComments: "",
+        fbShares: "",
+        fbClicks: "",
+        notes: ""
+    });
+    const [snapshot24h, setSnapshot24h] = useState(createEmptySnapshot());
+    const [snapshot7d, setSnapshot7d] = useState(createEmptySnapshot());
+    const [snapshot30d, setSnapshot30d] = useState(createEmptySnapshot());
+
+    // 3. Notable Feedback
+    const [notableComments, setNotableComments] = useState("");
+    const [audienceQuestions, setAudienceQuestions] = useState("");
+    const [misunderstanding, setMisunderstanding] = useState("");
+    const [userLanguage, setUserLanguage] = useState("");
+    const [followupTopic, setFollowupTopic] = useState("");
+
+    // 4. Arbor Insight
+    const [whatWorked, setWhatWorked] = useState("");
+    const [whatDidNotWork, setWhatDidNotWork] = useState("");
+    const [topicSignal, setTopicSignal] = useState("");
+    const [trafficSignal, setTrafficSignal] = useState("");
+    const [engagementSignal, setEngagementSignal] = useState("");
+    const [repostPotential, setRepostPotential] = useState("");
+    const [followupPotential, setFollowupPotential] = useState("");
+    const [recommendedAction, setRecommendedAction] = useState("");
+
+    // 5. Next Content Decision
+    const [decision, setDecision] = useState("No action");
+    const [decisionPriority, setDecisionPriority] = useState("Medium");
+    const [decisionTargetDate, setDecisionTargetDate] = useState("");
+    const [decisionNotes, setDecisionNotes] = useState("");
+
+    // Handoff states
+    const [copyPromptSuccess, setCopyPromptSuccess] = useState(false);
+
     // WorkOS Handoff Package states
     const [isWorkOSModalOpen, setIsWorkOSModalOpen] = useState(false);
     const [generatedPackageText, setGeneratedPackageText] = useState("");
@@ -212,12 +266,57 @@ export default function WritingStudioTab({
             let legacyHeroSub = "";
             let pubUrl = "";
             let campName = "";
+
+            let pubDate = "";
+            let fbGroupUrl = "";
+            let fbPageUrl = "";
+            let personalUrl = "";
+            let utmCamp = "";
+            let pubStatus = "Draft";
+
+            let s24 = {
+                snapshotDate: "", views: "", users: "", events: "", engagementTime: "",
+                sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: ""
+            };
+            let s7 = {
+                snapshotDate: "", views: "", users: "", events: "", engagementTime: "",
+                sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: ""
+            };
+            let s30 = {
+                snapshotDate: "", views: "", users: "", events: "", engagementTime: "",
+                sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: ""
+            };
+
+            let notable = { comments: "", questions: "", confusion: "", language: "", followupTopic: "" };
+            let insight = { whatWorked: "", whatDidNotWork: "", topicSignal: "", trafficSignal: "", engagementSignal: "", repostPotential: "", followupPotential: "", recommendedAction: "" };
+            let nextDec = { decision: "No action", priority: "Medium", targetDate: "", notes: "" };
+
             if (activeProject.notes) {
                 try {
                     const parsed = JSON.parse(activeProject.notes);
                     legacyHeroSub = parsed.hero_subtitle || "";
                     pubUrl = parsed.published_url || "";
                     campName = parsed.campaign_name || "";
+
+                    const pf = parsed.performanceFeedback;
+                    if (pf) {
+                        const pr = pf.publishingRecord || {};
+                        pubDate = pr.publishedDate || "";
+                        fbGroupUrl = pr.facebookGroupUrl || "";
+                        fbPageUrl = pr.facebookPageUrl || "";
+                        personalUrl = pr.personalPostUrl || "";
+                        utmCamp = pr.utmCampaign || "";
+                        pubStatus = pr.publishStatus || "Draft";
+
+                        const snaps = pf.snapshots || {};
+                        if (snaps.snap24h) s24 = { ...s24, ...snaps.snap24h };
+                        if (snaps.snap7d) s7 = { ...s7, ...snaps.snap7d };
+                        if (snaps.snap30d) s30 = { ...s30, ...snaps.snap30d };
+
+                        if (pf.notableFeedback) notable = { ...notable, ...pf.notableFeedback };
+                        if (pf.arborInsight) insight = { ...insight, ...pf.arborInsight };
+                        if (pf.nextDecision) nextDec = { ...nextDec, ...pf.nextDecision };
+                    }
                 } catch {
                     // notes is plain text
                 }
@@ -225,6 +324,37 @@ export default function WritingStudioTab({
             setHeroSubtitle(legacyHeroSub);
             setPublishedUrl(pubUrl);
             setCampaignName(campName);
+
+            setPublishedDate(pubDate);
+            setFacebookGroupUrl(fbGroupUrl);
+            setFacebookPageUrl(fbPageUrl);
+            setPersonalPostUrl(personalUrl);
+            setUtmCampaign(utmCamp);
+            setPublishStatus(pubStatus);
+
+            setSnapshot24h(s24);
+            setSnapshot7d(s7);
+            setSnapshot30d(s30);
+
+            setNotableComments(notable.comments);
+            setAudienceQuestions(notable.questions);
+            setMisunderstanding(notable.confusion);
+            setUserLanguage(notable.language);
+            setFollowupTopic(notable.followupTopic);
+
+            setWhatWorked(insight.whatWorked);
+            setWhatDidNotWork(insight.whatDidNotWork);
+            setTopicSignal(insight.topicSignal);
+            setTrafficSignal(insight.trafficSignal);
+            setEngagementSignal(insight.engagementSignal);
+            setRepostPotential(insight.repostPotential);
+            setFollowupPotential(insight.followupPotential);
+            setRecommendedAction(insight.recommendedAction);
+
+            setDecision(nextDec.decision);
+            setDecisionPriority(nextDec.priority);
+            setDecisionTargetDate(nextDec.targetDate);
+            setDecisionNotes(nextDec.notes);
 
             // Narrative fields fallback ONLY
             setNarrativeTitle(activeProject.narrative_title || activeProject.title || "");
@@ -347,10 +477,64 @@ export default function WritingStudioTab({
         if (!activeProject) return;
         setSaving(true);
         try {
+            // Parse existing notes to preserve other keys
+            let parsedExistingNotes: any = {};
+            if (activeProject.notes) {
+                try {
+                    parsedExistingNotes = JSON.parse(activeProject.notes);
+                } catch {
+                    // Fallback to preserve legacy plain text
+                    parsedExistingNotes = {
+                        legacyNotesText: activeProject.notes
+                    };
+                }
+            }
+
             const extraNotes = JSON.stringify({
+                ...parsedExistingNotes,
                 hero_subtitle: heroSubtitle,
                 published_url: publishedUrl,
-                campaign_name: campaignName
+                campaign_name: campaignName,
+                
+                performanceFeedback: {
+                    publishingRecord: {
+                        publishedUrl: publishedUrl,
+                        publishedDate: publishedDate,
+                        facebookGroupUrl: facebookGroupUrl,
+                        facebookPageUrl: facebookPageUrl,
+                        personalPostUrl: personalPostUrl,
+                        utmCampaign: utmCampaign,
+                        publishStatus: publishStatus
+                    },
+                    snapshots: {
+                        snap24h: snapshot24h,
+                        snap7d: snapshot7d,
+                        snap30d: snapshot30d
+                    },
+                    notableFeedback: {
+                        comments: notableComments,
+                        questions: audienceQuestions,
+                        confusion: misunderstanding,
+                        language: userLanguage,
+                        followupTopic: followupTopic
+                    },
+                    arborInsight: {
+                        whatWorked: whatWorked,
+                        whatDidNotWork: whatDidNotWork,
+                        topicSignal: topicSignal,
+                        trafficSignal: trafficSignal,
+                        engagementSignal: engagementSignal,
+                        repostPotential: repostPotential,
+                        followupPotential: followupPotential,
+                        recommendedAction: recommendedAction
+                    },
+                    nextDecision: {
+                        decision: decision,
+                        priority: decisionPriority,
+                        targetDate: decisionTargetDate,
+                        notes: decisionNotes
+                    }
+                }
             });
 
             // 1. Save metadata
@@ -904,6 +1088,59 @@ export default function WritingStudioTab({
         }
     };
 
+    const handleCopyInsightPrompt = () => {
+        let prompt = `คุณคือ Arbor Insight Analyzer หน้าที่ของคุณคือการวิเคราะห์ประสิทธิภาพบทความ Green Fineness เพื่อสรุปข้อมูลและกำหนดทิศทางเนื้อหาถัดไป\n\n`;
+        prompt += `หัวข้อบทความ: ${workingTitle}\n`;
+        prompt += `ลิงก์ที่เผยแพร่:\n`;
+        prompt += `- Website: ${publishedUrl || "N/A"}\n`;
+        prompt += `- FB Group: ${facebookGroupUrl || "N/A"}\n`;
+        prompt += `- FB Page: ${facebookPageUrl || "N/A"}\n`;
+        prompt += `- Personal Profile: ${personalPostUrl || "N/A"}\n\n`;
+        
+        prompt += `--- สรุปตัวชี้วัด (Metrics Summary) ---\n`;
+        if (snapshot24h) {
+            prompt += `[Snapshot 24h] วันที่: ${snapshot24h.snapshotDate || "N/A"}\n`;
+            prompt += `- GA4 Views: ${snapshot24h.views || 0} | Users: ${snapshot24h.users || 0} | Avg Time: ${snapshot24h.engagementTime || 0}s\n`;
+            prompt += `- FB Reach: ${snapshot24h.fbReach || 0} | Reactions: ${snapshot24h.fbReactions || 0} | Comments: ${snapshot24h.fbComments || 0}\n`;
+        }
+        if (snapshot7d) {
+            prompt += `[Snapshot 7d] วันที่: ${snapshot7d.snapshotDate || "N/A"}\n`;
+            prompt += `- GA4 Views: ${snapshot7d.views || 0} | Users: ${snapshot7d.users || 0} | Avg Time: ${snapshot7d.engagementTime || 0}s\n`;
+            prompt += `- FB Reach: ${snapshot7d.fbReach || 0} | Reactions: ${snapshot7d.fbReactions || 0} | Comments: ${snapshot7d.fbComments || 0}\n`;
+        }
+        if (snapshot30d) {
+            prompt += `[Snapshot 30d] วันที่: ${snapshot30d.snapshotDate || "N/A"}\n`;
+            prompt += `- GA4 Views: ${snapshot30d.views || 0} | Users: ${snapshot30d.users || 0} | Avg Time: ${snapshot30d.engagementTime || 0}s\n`;
+            prompt += `- FB Reach: ${snapshot30d.fbReach || 0} | Reactions: ${snapshot30d.fbReactions || 0} | Comments: ${snapshot30d.fbComments || 0}\n`;
+        }
+        prompt += `\n`;
+        
+        prompt += `--- คำถาม/ความคิดเห็นจากผู้อ่าน (Notable Feedback) ---\n`;
+        prompt += `- ความคิดเห็นสำคัญ: ${notableComments || "ไม่มี"}\n`;
+        prompt += `- คำถามจากทางบ้าน: ${audienceQuestions || "ไม่มี"}\n`;
+        prompt += `- จุดที่เข้าใจผิด/สับสน: ${misunderstanding || "ไม่มี"}\n`;
+        prompt += `- ภาษา/คำพูดที่น่าสนใจ: ${userLanguage || "ไม่มี"}\n\n`;
+        
+        prompt += `--- คำถามสำหรับวิเคราะห์ (Request for Analysis) ---\n`;
+        prompt += `ช่วยวิเคราะห์ข้อมูลประสิทธิภาพบทความด้านบน และสรุปคำตอบให้ตรงประเด็นในหัวข้อต่อไปนี้ในรูปแบบ Markdown:\n`;
+        prompt += `1. What Worked (อะไรที่ทำได้ดี/ได้ผลลัพธ์ดี)\n`;
+        prompt += `2. What Did Not Work (อะไรที่ยังขาดหรือควรปรับปรุง)\n`;
+        prompt += `3. Topic Signal (สัญญาณความชอบของหัวข้อนี้ จาก Reach/Engagement)\n`;
+        prompt += `4. Traffic Signal (ปริมาณและคุณภาพของการดึงดูดทราฟฟิกเว็บ)\n`;
+        prompt += `5. Engagement Signal (การตอบสนอง คอมเมนต์ คำถาม หรือการแชร์)\n`;
+        prompt += `6. Repost Potential (มีศักยภาพในการนำมารีโพสต์ซ้ำอีกหรือไม่ และเมื่อใด)\n`;
+        prompt += `7. Follow-up Potential (ไอเดียในการทำคอนเทนต์ต่อยอด/บทความถัดไป)\n`;
+        prompt += `8. Recommended Next Action (คำแนะนำสำหรับขั้นตอนต่อไป เช่น อัปเดตเนื้อหา, ทำอินโฟกราฟิก, หรือเขียนบทความใหม่)\n`;
+
+        navigator.clipboard.writeText(prompt);
+        setCopyPromptSuccess(true);
+        setTimeout(() => setCopyPromptSuccess(false), 2000);
+    };
+
+    const handleMarkReviewed = () => {
+        setPublishStatus("Reviewed");
+    };
+
     const handleCopyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text);
         setCopyStatus(label);
@@ -1095,6 +1332,18 @@ export default function WritingStudioTab({
                             >
                                 <span>UTM / Publish</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                                onClick={() => setSubTab("performance")}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                    subTab === "performance" 
+                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
+                                        : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                            >
+                                <span>Performance / Feedback</span>
+                                <BarChart2 className="w-3.5 h-3.5" />
                             </button>
 
                             <button
@@ -1776,6 +2025,493 @@ export default function WritingStudioTab({
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 6. Performance / Feedback Panel */}
+                        {subTab === "performance" && (
+                            <div className="space-y-6 animate-in fade-in-50 duration-200">
+                                <div className="flex items-center justify-between border-b border-theme-border/60 pb-3">
+                                    <div>
+                                        <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest flex items-center gap-2">
+                                            <BarChart2 className="text-blue-600 w-4 h-4" />
+                                            Performance & Feedback Review
+                                        </h3>
+                                        <p className="text-[10px] font-bold text-theme-muted mt-0.5">ติดตามผลลัพธ์หลังการเผยแพร่ วิเคราะห์ผลตอบรับ และสรุปแนวทางการต่อยอดบทความ</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            type="button"
+                                            onClick={handleCopyInsightPrompt}
+                                            className="px-4 py-2 bg-purple-600/10 text-purple-600 dark:text-purple-400 hover:bg-purple-600/20 rounded-xl text-xs font-black transition-all border border-purple-500/10 flex items-center gap-1.5 shadow-sm"
+                                        >
+                                            <Copy size={13} />
+                                            {copyPromptSuccess ? "คัดลอก Prompt สำเร็จ!" : "Copy Arbor Insight Prompt"}
+                                        </button>
+                                        {publishStatus !== "Reviewed" && (
+                                            <button 
+                                                type="button"
+                                                onClick={handleMarkReviewed}
+                                                className="px-4 py-2 bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600/20 rounded-xl text-xs font-black transition-all border border-emerald-500/10 flex items-center gap-1.5 shadow-sm"
+                                            >
+                                                <CheckCircle size={13} />
+                                                Mark Reviewed
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Publishing Record */}
+                                <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary border-b border-theme-border/40 pb-1.5">Publishing Record (ประวัติการเผยแพร่)</h4>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase tracking-wider">Publish Status (สถานะการเผยแพร่)</label>
+                                            <select 
+                                                value={publishStatus}
+                                                onChange={(e) => setPublishStatus(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            >
+                                                <option value="Draft">Draft</option>
+                                                <option value="Ready for Website">Ready for Website</option>
+                                                <option value="Published">Published</option>
+                                                <option value="Posted to Facebook Group">Posted to Facebook Group</option>
+                                                <option value="Posted to Facebook Page">Posted to Facebook Page</option>
+                                                <option value="Feedback Pending">Feedback Pending</option>
+                                                <option value="Reviewed">Reviewed</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase tracking-wider">Published Date (วันที่เผยแพร่)</label>
+                                            <input 
+                                                type="date"
+                                                value={publishedDate}
+                                                onChange={(e) => setPublishedDate(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase tracking-wider">Published URL (Website)</label>
+                                            <input 
+                                                type="text"
+                                                value={publishedUrl}
+                                                onChange={(e) => setPublishedUrl(e.target.value)}
+                                                placeholder="https://greenfineness.com/..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase tracking-wider">UTM Campaign</label>
+                                            <input 
+                                                type="text"
+                                                value={campaignName}
+                                                onChange={(e) => setCampaignName(e.target.value)}
+                                                placeholder="e.g. golden-pea-launch-2026"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase tracking-wider">Facebook Group Post URL</label>
+                                            <input 
+                                                type="text"
+                                                value={facebookGroupUrl}
+                                                onChange={(e) => setFacebookGroupUrl(e.target.value)}
+                                                placeholder="https://facebook.com/groups/..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase tracking-wider">Facebook Page Post URL</label>
+                                            <input 
+                                                type="text"
+                                                value={facebookPageUrl}
+                                                onChange={(e) => setFacebookPageUrl(e.target.value)}
+                                                placeholder="https://facebook.com/page/..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1 md:col-span-2">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase tracking-wider">Personal Post URL</label>
+                                            <input 
+                                                type="text"
+                                                value={personalPostUrl}
+                                                onChange={(e) => setPersonalPostUrl(e.target.value)}
+                                                placeholder="https://facebook.com/personal/..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Feedback Snapshots (Fixed 3 Cards) */}
+                                <div className="space-y-4">
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary">Feedback Snapshots (ตัวชี้วัดประสิทธิภาพ)</h4>
+                                    
+                                    <div className="grid grid-cols-1 gap-6">
+                                        {[
+                                            { label: "24-Hour Snapshot (หลังเผยแพร่ 24 ชม.)", state: snapshot24h, setter: setSnapshot24h },
+                                            { label: "7-Day Snapshot (หลังเผยแพร่ 7 วัน)", state: snapshot7d, setter: setSnapshot7d },
+                                            { label: "30-Day Snapshot (หลังเผยแพร่ 30 วัน)", state: snapshot30d, setter: setSnapshot30d }
+                                        ].map((snap, i) => (
+                                            <div key={i} className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
+                                                <div className="border-b border-theme-border/40 pb-1.5">
+                                                    <h5 className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">{snap.label}</h5>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                    <div className="space-y-1 col-span-2">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">Snapshot Date (วันที่เก็บสถิติ)</label>
+                                                        <input 
+                                                            type="date"
+                                                            value={snap.state.snapshotDate}
+                                                            onChange={(e) => snap.setter({ ...snap.state, snapshotDate: e.target.value })}
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Page Views</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.views}
+                                                            onChange={(e) => snap.setter({ ...snap.state, views: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Active Users</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.users}
+                                                            onChange={(e) => snap.setter({ ...snap.state, users: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Events</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.events}
+                                                            onChange={(e) => snap.setter({ ...snap.state, events: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Avg Engagement (s)</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.engagementTime}
+                                                            onChange={(e) => snap.setter({ ...snap.state, engagementTime: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1 col-span-2">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Top Source / Medium</label>
+                                                        <input 
+                                                            type="text"
+                                                            value={snap.state.sourceMedium}
+                                                            onChange={(e) => snap.setter({ ...snap.state, sourceMedium: e.target.value })}
+                                                            placeholder="fb / post"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Group Reach</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.fbReach}
+                                                            onChange={(e) => snap.setter({ ...snap.state, fbReach: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Reactions</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.fbReactions}
+                                                            onChange={(e) => snap.setter({ ...snap.state, fbReactions: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Comments</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.fbComments}
+                                                            onChange={(e) => snap.setter({ ...snap.state, fbComments: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Shares</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.fbShares}
+                                                            onChange={(e) => snap.setter({ ...snap.state, fbShares: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Link Clicks</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={snap.state.fbClicks}
+                                                            onChange={(e) => snap.setter({ ...snap.state, fbClicks: e.target.value })}
+                                                            placeholder="0"
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1 col-span-4">
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">Notes (ข้อสังเกตของ Snapshot)</label>
+                                                        <textarea 
+                                                            value={snap.state.notes}
+                                                            onChange={(e) => snap.setter({ ...snap.state, notes: e.target.value })}
+                                                            placeholder="ข้อสังเกตเพิ่มเติมสำหรับ Snapshot นี้..."
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl p-2.5 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Notable Feedback */}
+                                <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary border-b border-theme-border/40 pb-1.5">Notable Feedback (คำติชมที่สำคัญจากผู้อ่าน)</h4>
+                                    
+                                    <div className="space-y-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Notable Comments (ความคิดเห็นเด่น)</label>
+                                            <textarea 
+                                                value={notableComments}
+                                                onChange={(e) => setNotableComments(e.target.value)}
+                                                placeholder="ความคิดเห็นเด่นจากกลุ่มเป้าหมาย (ทั้งบวกและลบ)..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Audience Questions (คำถามที่พบบ่อย)</label>
+                                            <textarea 
+                                                value={audienceQuestions}
+                                                onChange={(e) => setAudienceQuestions(e.target.value)}
+                                                placeholder="ผู้อ่านพิมพ์ถามคำถามอะไรบ่อยๆ หลังอ่านโพสต์..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Misunderstanding / Confusion (จุดที่ผู้อ่านสับสน/เข้าใจผิด)</label>
+                                            <textarea 
+                                                value={misunderstanding}
+                                                onChange={(e) => setMisunderstanding(e.target.value)}
+                                                placeholder="จุดที่ผู้อ่านเกิดความเข้าใจผิด หรือพิมพ์แสดงความสงสัยสับสน..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Interesting User Language (ภาษา/คำพูดของลูกค้าที่น่าสนใจ)</label>
+                                            <textarea 
+                                                value={userLanguage}
+                                                onChange={(e) => setUserLanguage(e.target.value)}
+                                                placeholder="คำศัพท์ หรือสำนวนการพูดที่กลุ่มเป้าหมายใช้พูดคุย..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Potential Follow-up Topic (หัวข้อต่อยอดที่มีศักยภาพ)</label>
+                                            <textarea 
+                                                value={followupTopic}
+                                                onChange={(e) => setFollowupTopic(e.target.value)}
+                                                placeholder="หัวข้อบทความใหม่ที่มีโอกาสประสบความสำเร็จจากการต่อยอด..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Arbor Insights */}
+                                <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary border-b border-theme-border/40 pb-1.5">Arbor Insights (วิเคราะห์ผลลัพธ์)</h4>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1 col-span-2">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">What Worked (ส่วนที่ดีและได้ผลตอบรับยอดเยี่ยม)</label>
+                                            <textarea 
+                                                value={whatWorked}
+                                                onChange={(e) => setWhatWorked(e.target.value)}
+                                                placeholder="หัวข้อ/ภาพ/ข้อความส่วนที่ดึงดูด Reach ได้มาก..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1 col-span-2">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">What Did Not Work (ส่วนที่ไม่ได้ผลและควรปรับแก้)</label>
+                                            <textarea 
+                                                value={whatDidNotWork}
+                                                onChange={(e) => setWhatDidNotWork(e.target.value)}
+                                                placeholder="จุดที่ผลลัพธ์ออกมาไม่ดี ช่องทางที่ Reach ต่ำ..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Topic Signal (สัญญาณความชอบต่อหัวข้อ)</label>
+                                            <input 
+                                                type="text"
+                                                value={topicSignal}
+                                                onChange={(e) => setTopicSignal(e.target.value)}
+                                                placeholder="e.g. High, Medium, Low"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Traffic Signal (สัญญาณการนำเข้าเว็บบล็อก)</label>
+                                            <input 
+                                                type="text"
+                                                value={trafficSignal}
+                                                onChange={(e) => setTrafficSignal(e.target.value)}
+                                                placeholder="e.g. Strong click-throughs from Facebook Group"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Engagement Signal (สัญญาณการปฏิสัมพันธ์)</label>
+                                            <input 
+                                                type="text"
+                                                value={engagementSignal}
+                                                onChange={(e) => setEngagementSignal(e.target.value)}
+                                                placeholder="e.g. Active discussions under group post"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Repost Potential (โอกาสการรีโพสต์/แชร์ซ้ำ)</label>
+                                            <input 
+                                                type="text"
+                                                value={repostPotential}
+                                                onChange={(e) => setRepostPotential(e.target.value)}
+                                                placeholder="e.g. Yes (in 3 months with new hook)"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Follow-up Potential (โอกาสสร้างตอนต่อยอด)</label>
+                                            <input 
+                                                type="text"
+                                                value={followupPotential}
+                                                onChange={(e) => setFollowupPotential(e.target.value)}
+                                                placeholder="e.g. High (develop Golden Pea Amino Guide)"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Recommended Next Action (ก้าวถัดไปที่แนะนำ)</label>
+                                            <input 
+                                                type="text"
+                                                value={recommendedAction}
+                                                onChange={(e) => setRecommendedAction(e.target.value)}
+                                                placeholder="e.g. Repost to fitness page or make short video"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Next Content Decision */}
+                                <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary border-b border-theme-border/40 pb-1.5">Next Content Decision (การตัดสินใจทางกลยุทธ์คอนเทนต์)</h4>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase">Decision (ผลลัพธ์การตัดสินใจ)</label>
+                                            <select 
+                                                value={decision}
+                                                onChange={(e) => setDecision(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            >
+                                                <option value="Keep as evergreen">Keep as evergreen</option>
+                                                <option value="Repost later">Repost later</option>
+                                                <option value="Make infographic">Make infographic</option>
+                                                <option value="Write follow-up article">Write follow-up article</option>
+                                                <option value="Improve headline">Improve headline</option>
+                                                <option value="Improve image">Improve image</option>
+                                                <option value="Add internal links">Add internal links</option>
+                                                <option value="Update article">Update article</option>
+                                                <option value="Create short explainer">Create short explainer</option>
+                                                <option value="Create video script">Create video script</option>
+                                                <option value="No action">No action</option>
+                                                <option value="Review later">Review later</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase">Priority (ระดับความสำคัญ)</label>
+                                            <select 
+                                                value={decisionPriority}
+                                                onChange={(e) => setDecisionPriority(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            >
+                                                <option value="Low">Low</option>
+                                                <option value="Medium">Medium</option>
+                                                <option value="High">High</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase">Target Date (วันเป้าหมายงาน)</label>
+                                            <input 
+                                                type="date"
+                                                value={decisionTargetDate}
+                                                onChange={(e) => setDecisionTargetDate(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1 md:col-span-3">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase">Decision Notes / Details (ข้อความการวิเคราะห์/หมายเหตุ)</label>
+                                            <textarea 
+                                                value={decisionNotes}
+                                                onChange={(e) => setDecisionNotes(e.target.value)}
+                                                placeholder="สรุปแนวทางการประมวลผลต่อยอดคอนเทนต์..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-20 resize-y"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
