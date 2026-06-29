@@ -54,6 +54,19 @@ export default function ArborInboxClient() {
         loadLogs();
     }, [loadLogs]);
 
+    useEffect(() => {
+        try {
+            const handoff = sessionStorage.getItem("workos.arborInbox.pendingPayload");
+            if (handoff) {
+                setPayloadText(handoff);
+                sessionStorage.removeItem("workos.arborInbox.pendingPayload");
+                handleValidate(handoff);
+            }
+        } catch (err) {
+            console.error("Failed to read handoff payload from sessionStorage", err);
+        }
+    }, []);
+
     const handleClear = () => {
         setPayloadText("");
         setValidationChecked(false);
@@ -65,8 +78,9 @@ export default function ArborInboxClient() {
         setStatusMessage(null);
     };
 
-    const handleValidate = async () => {
-        if (!payloadText.trim()) return;
+    const handleValidate = async (overrideText?: string) => {
+        const textToValidate = overrideText !== undefined ? overrideText : payloadText;
+        if (!textToValidate.trim()) return;
 
         setLoading(true);
         setStatusMessage(null);
@@ -74,7 +88,7 @@ export default function ArborInboxClient() {
         
         let parsed: any;
         try {
-            parsed = JSON.parse(payloadText);
+            parsed = JSON.parse(textToValidate);
         } catch (e: any) {
             setErrors([`JSON Syntax Error: ${e.message}`]);
             setIsValid(false);
@@ -266,7 +280,7 @@ export default function ArborInboxClient() {
                                 </button>
                             )}
                             <button
-                                onClick={handleValidate}
+                                onClick={() => handleValidate()}
                                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all disabled:bg-theme-border disabled:text-theme-muted flex items-center gap-1.5 shadow-md shadow-blue-600/15"
                                 disabled={loading || importing || !payloadText.trim()}
                             >

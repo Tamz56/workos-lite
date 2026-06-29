@@ -22,6 +22,7 @@ import {
     ChevronDown,
     Wand2
 } from "lucide-react";
+import { validatePayload } from "@/lib/arborInboxSchema";
 
 interface WritingProject {
     id: string;
@@ -181,6 +182,14 @@ export default function WritingStudioTab({
     const [reviewResult, setReviewResult] = useState<any>(null);
     const [isReviewing, setIsReviewing] = useState(false);
     const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
+    // WorkOS Handoff Package states
+    const [isWorkOSModalOpen, setIsWorkOSModalOpen] = useState(false);
+    const [generatedPackageText, setGeneratedPackageText] = useState("");
+    const [copyPackageSuccess, setCopyPackageSuccess] = useState(false);
+    const [validationErrors, setValidationErrors] = useState<string[]>([]);
+    const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+    const [isPackageValid, setIsPackageValid] = useState(true);
 
     // Sync state when activeProject changes
     useEffect(() => {
@@ -721,6 +730,180 @@ export default function WritingStudioTab({
         }, 800);
     };
 
+    const handleGenerateWorkOSPackage = () => {
+        if (!activeProject) return;
+
+        const activeBody = (subTab === "knowledge") ? knowledgeBody : narrativeBody;
+        const currentSeoTitle = (seoMode === "knowledge") ? knowledgeTitle : narrativeTitle;
+        const currentSeoSlug = (seoMode === "knowledge") ? knowledgeSlug : narrativeSlug;
+        const currentMetaTitle = (seoMode === "knowledge") ? knowledgeMetaTitle : narrativeMetaTitle;
+        const currentMetaDesc = (seoMode === "knowledge") ? knowledgeMetaDescription : narrativeMetaDescription;
+        const currentKeywords = (seoMode === "knowledge") ? knowledgeKeywords : narrativeKeywords;
+
+        // Combined content
+        let combinedContent = `# ${workingTitle}\n`;
+        combinedContent += `Episode Code: ${resolvedEpisodeId || "N/A"}\n`;
+        combinedContent += `Writing Mode: ${activeProject.writing_mode || "N/A"}\n\n`;
+        combinedContent += `${activeBody}\n\n`;
+        combinedContent += `---\n## SEO & Metadata\n`;
+        combinedContent += `- **Slug**: ${currentSeoSlug || "N/A"}\n`;
+        combinedContent += `- **Meta Title**: ${currentMetaTitle || "N/A"}\n`;
+        combinedContent += `- **Meta Description**: ${currentMetaDesc || "N/A"}\n`;
+        combinedContent += `- **Keywords**: ${currentKeywords || "N/A"}\n\n`;
+        combinedContent += `## Social Drafts\n`;
+        combinedContent += `### Facebook Group\n${facebookGroupPost || "N/A"}\n\n`;
+        combinedContent += `### Facebook Page\n${facebookPagePost || "N/A"}\n\n`;
+        combinedContent += `### Personal Profile\n${personalPost || "N/A"}\n\n`;
+        combinedContent += `### Caption & Hashtags\n${shortCaption || "N/A"}\n${hashtags || ""}\n\n`;
+        combinedContent += `## UTM / Publish\n`;
+        combinedContent += `- **Published URL**: ${publishedUrl || "N/A"}\n`;
+        combinedContent += `- **Campaign Name**: ${campaignName || "N/A"}\n`;
+        combinedContent += `- **Group UTM**: ${groupUtm || "N/A"}\n`;
+        combinedContent += `- **Page UTM**: ${pageUtm || "N/A"}\n`;
+        combinedContent += `- **Personal UTM**: ${personalUtm || "N/A"}\n\n`;
+        if (reviewResult) {
+            combinedContent += `## Arbor Review Notes\n`;
+            combinedContent += `- **Summary**: ${reviewResult.summary || "N/A"}\n`;
+            combinedContent += `- **Next Step**: ${reviewResult.next_step || "N/A"}\n`;
+        }
+
+        const payload = {
+            schemaVersion: "workos-arbor-import-v0.1",
+            source: "Arbor Writing Lab Handoff",
+            importBatchTitle: `GF-ARTICLE — ${workingTitle}`,
+            items: [
+                {
+                    type: "project",
+                    title: "Green Fineness Content",
+                    status: "planned"
+                },
+                {
+                    type: "article_note",
+                    targetProject: "Green Fineness Content",
+                    title: workingTitle,
+                    status: "draft",
+                    content: combinedContent,
+                    nextActions: [
+                        `Claim Review: ${workingTitle}`,
+                        `Image Brief: ${workingTitle}`,
+                        `SEO Fields: ${workingTitle}`,
+                        `Facebook Group Post: ${workingTitle}`,
+                        `Facebook Page Post: ${workingTitle}`,
+                        `Personal Post: ${workingTitle}`,
+                        `Analytics Tracking: ${workingTitle}`
+                    ],
+                    metadata: {
+                        topic_id: activeProject.topic_id || "",
+                        author: "Arbor Content Bot",
+                        episodeCode: resolvedEpisodeId || "",
+                        journeyStage: activeProject.journey_stage || "",
+                        seo: {
+                            title: currentSeoTitle || "",
+                            slug: currentSeoSlug || "",
+                            metaTitle: currentMetaTitle || "",
+                            metaDescription: currentMetaDesc || "",
+                            keywords: currentKeywords || ""
+                        },
+                        socialDrafts: {
+                            facebookGroup: facebookGroupPost || "",
+                            facebookPage: facebookPagePost || "",
+                            personal: personalPost || "",
+                            caption: shortCaption || "",
+                            hashtags: hashtags || ""
+                        },
+                        publish: {
+                            url: publishedUrl || "",
+                            campaignName: campaignName || ""
+                        },
+                        arborReview: reviewResult ? {
+                            summary: reviewResult.summary || "",
+                            next_step: reviewResult.next_step || "",
+                            strengths: reviewResult.strengths || [],
+                            revisions: reviewResult.revisions || [],
+                            risks: reviewResult.risks || []
+                        } : null
+                    }
+                },
+                {
+                    type: "task",
+                    targetProject: "Green Fineness Content",
+                    title: `GF Article — Claim Review: ${workingTitle}`,
+                    status: "planned",
+                    workspace: "content"
+                },
+                {
+                    type: "task",
+                    targetProject: "Green Fineness Content",
+                    title: `GF Article — Image Brief: ${workingTitle}`,
+                    status: "planned",
+                    workspace: "content"
+                },
+                {
+                    type: "task",
+                    targetProject: "Green Fineness Content",
+                    title: `GF Article — SEO Fields: ${workingTitle}`,
+                    status: "planned",
+                    workspace: "content"
+                },
+                {
+                    type: "task",
+                    targetProject: "Green Fineness Content",
+                    title: `GF Article — Facebook Group Post: ${workingTitle}`,
+                    status: "planned",
+                    workspace: "content"
+                },
+                {
+                    type: "task",
+                    targetProject: "Green Fineness Content",
+                    title: `GF Article — Facebook Page Post: ${workingTitle}`,
+                    status: "planned",
+                    workspace: "content"
+                },
+                {
+                    type: "task",
+                    targetProject: "Green Fineness Content",
+                    title: `GF Article — Personal Post: ${workingTitle}`,
+                    status: "planned",
+                    workspace: "content"
+                },
+                {
+                    type: "task",
+                    targetProject: "Green Fineness Content",
+                    title: `GF Article — Analytics Tracking: ${workingTitle}`,
+                    status: "planned",
+                    workspace: "content"
+                }
+            ]
+        };
+
+        // Run validation check in-browser
+        const projectLookups = projects.map(p => ({ name: p.title, slug: p.slug || "" }));
+        const result = validatePayload(payload, projectLookups);
+
+        setIsPackageValid(result.valid);
+        setValidationErrors(result.errors);
+        setValidationWarnings(result.warnings);
+
+        setGeneratedPackageText(JSON.stringify(payload, null, 2));
+        setIsWorkOSModalOpen(true);
+    };
+
+    const handleCopyPackage = () => {
+        navigator.clipboard.writeText(generatedPackageText);
+        setCopyPackageSuccess(true);
+        setTimeout(() => setCopyPackageSuccess(false), 2000);
+    };
+
+    const handleSendToInbox = () => {
+        try {
+            sessionStorage.setItem("workos.arborInbox.pendingPayload", generatedPackageText);
+            window.location.href = "/arbor-inbox";
+        } catch (err) {
+            console.error("Failed to store handoff payload in sessionStorage", err);
+            alert("ไม่สามารถส่งข้อมูลได้เนื่องจากระบบจัดเก็บข้อมูลเบราว์เซอร์ไม่ทำงาน");
+        }
+    };
+
     const handleCopyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text);
         setCopyStatus(label);
@@ -930,6 +1113,18 @@ export default function WritingStudioTab({
                         {lastSaved && (
                             <div className="px-4 py-2 text-[10px] text-theme-muted font-bold text-center">
                                 บันทึกล่าสุด: {lastSaved.toLocaleTimeString('th-TH')}
+                            </div>
+                        )}
+
+                        {activeProject && (
+                            <div className="pt-3 border-t border-theme-border/60 px-1">
+                                <button
+                                    onClick={handleGenerateWorkOSPackage}
+                                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    Generate WorkOS Package
+                                </button>
                             </div>
                         )}
                         </div>
@@ -1694,6 +1889,99 @@ export default function WritingStudioTab({
                             </div>
                         )}
 
+                    </div>
+                </div>
+            )}
+            {/* Modal for WorkOS Package Handoff */}
+            {isWorkOSModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-theme-card border border-theme-border rounded-[32px] max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-theme-border/60 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-black text-theme-primary flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-blue-600 animate-pulse" />
+                                    <span>WorkOS Import Package Generator</span>
+                                </h3>
+                                <p className="text-[10px] font-bold text-theme-muted mt-0.5">
+                                    แพ็กเกจข้อมูลโครงสร้างมาตรฐาน workos-arbor-import-v0.1 สำหรับพร้อมนำเข้า Arbor Inbox
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setIsWorkOSModalOpen(false)}
+                                className="w-8 h-8 rounded-full bg-theme-panel hover:bg-theme-hover flex items-center justify-center text-theme-secondary hover:text-theme-primary transition-all font-bold"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 overflow-y-auto flex-1 space-y-4 text-left">
+                            <div className="text-xs text-theme-secondary bg-blue-500/5 border border-blue-500/10 p-4 rounded-2xl leading-normal space-y-1">
+                                <div className="font-bold text-blue-600 dark:text-blue-400">💡 การประมวลผลข้อมูลสำเร็จ:</div>
+                                <p>แพ็กเกจนี้ประกอบด้วยโปรเจกต์ <strong>Green Fineness Content</strong>, บทความแบบระบุโครงสร้าง 1 รายการ และงานย่อย (Marketing/Editorial Tasks) 7 รายการเพื่อเริ่มขั้นตอนการทำงานทางเทคนิคและการตลาด</p>
+                            </div>
+
+                            {/* Validation Results in Modal */}
+                            <div className="p-4 rounded-2xl border text-xs leading-normal space-y-2 bg-theme-panel/40 border-theme-border/60">
+                                <div className="flex items-center gap-2">
+                                    <span className={`w-2.5 h-2.5 rounded-full ${isPackageValid ? "bg-green-500 animate-pulse" : "bg-red-500 animate-pulse"}`} />
+                                    <span className="font-black uppercase tracking-widest text-theme-primary">
+                                        Validation Status: {isPackageValid ? "PASSED (ผ่านการตรวจสอบ)" : "FAILED (พบข้อผิดพลาด)"}
+                                    </span>
+                                </div>
+                                
+                                {validationErrors.length > 0 && (
+                                    <div className="space-y-1">
+                                        <div className="font-bold text-red-500">ข้อผิดพลาด (Errors):</div>
+                                        {validationErrors.map((err, i) => (
+                                            <div key={i} className="text-red-600 dark:text-red-400 pl-3 border-l-2 border-red-500">• {err}</div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {validationWarnings.length > 0 && (
+                                    <div className="space-y-1">
+                                        <div className="font-bold text-amber-500">ข้อควรระวัง (Warnings):</div>
+                                        {validationWarnings.map((wrn, i) => (
+                                            <div key={i} className="text-amber-600 dark:text-amber-400 pl-3 border-l-2 border-amber-500">• {wrn}</div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {isPackageValid && validationErrors.length === 0 && (
+                                    <div className="text-green-600 dark:text-green-400 font-bold">✓ โครงสร้างข้อมูลสมบูรณ์ ปลอดภัย สามารถนำเข้า Arbor Inbox ได้ทันที</div>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-theme-muted">JSON PAYLOAD PREVIEW</span>
+                                    <span className="text-[9px] font-black text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded">workos-arbor-import-v0.1</span>
+                                </div>
+                                <pre className="p-4 bg-theme-input dark:bg-zinc-950 border border-theme-border rounded-2xl text-xs font-mono overflow-auto max-h-[350px] leading-relaxed custom-scrollbar text-theme-primary select-all">
+                                    {generatedPackageText}
+                                </pre>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-6 border-t border-theme-border/60 bg-theme-panel/40 flex flex-col sm:flex-row items-center justify-end gap-3">
+                            <button
+                                onClick={handleCopyPackage}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700/60 rounded-xl text-xs font-bold text-neutral-600 dark:text-theme-secondary hover:bg-neutral-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Copy className="w-3.5 h-3.5" />
+                                {copyPackageSuccess ? "คัดลอกสำเร็จ!" : "คัดลอก JSON (Copy JSON)"}
+                            </button>
+                            <button
+                                onClick={handleSendToInbox}
+                                className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-blue-500/10"
+                            >
+                                <Share2 className="w-3.5 h-3.5" />
+                                ส่งไปยัง Arbor Inbox (Send to Inbox)
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
