@@ -5,6 +5,8 @@ import {
     generateSlug, 
     SUPPORTED_SCHEMA_VERSION 
 } from "@/lib/arborInboxSchema";
+import fs from "fs";
+import path from "path";
 
 describe("Arbor Inbox - generateSlug", () => {
     it("should format ASCII project titles into lowercase alphanumeric slugs with hyphens", () => {
@@ -177,5 +179,27 @@ describe("Arbor Inbox - buildPreview", () => {
 
         expect(preview.tasks[1].title).toBe("project:project-alpha Do something else");
         expect(preview.tasks[1].originalTitle).toBe("Do something else");
+    });
+});
+
+describe("Arbor Inbox - Verify JSON Examples", () => {
+    it("should successfully validate gf-article-import-example.json", () => {
+        const filePath = path.resolve(process.cwd(), "docs/arbor/examples/gf-article-import-example.json");
+        const raw = fs.readFileSync(filePath, "utf-8");
+        const payload = JSON.parse(raw);
+        
+        const result = validatePayload(payload, []);
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+    });
+
+    it("should successfully validate project-brief-import-example.json", () => {
+        const filePath = path.resolve(process.cwd(), "docs/arbor/examples/project-brief-import-example.json");
+        const raw = fs.readFileSync(filePath, "utf-8");
+        const payload = JSON.parse(raw);
+        
+        const result = validatePayload(payload, []);
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
     });
 });
