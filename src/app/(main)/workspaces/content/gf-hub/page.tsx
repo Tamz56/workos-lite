@@ -66,6 +66,16 @@ export default function GreenFinenessHub() {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            const tab = params.get("tab");
+            if (tab === "analytics" || tab === "optimizer" || tab === "strategy" || tab === "backlog" || tab === "production" || tab === "draft_stock" || tab === "publish_queue") {
+                setActiveTab(tab as TabKey);
+            }
+        }
+    }, []);
+
     const handleSeed = async () => {
         setSeeding(true);
         try {

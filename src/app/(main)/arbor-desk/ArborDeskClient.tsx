@@ -17,6 +17,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { workspaceLabel } from "@/lib/workspaces";
+import CommandCenterPanel from "@/components/arbor-desk/CommandCenterPanel";
 
 interface OverviewData {
     continueLastWork: {
@@ -215,6 +216,8 @@ export default function ArborDeskClient() {
                     <ArrowPathIcon className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
+
+            <CommandCenterPanel />
 
             {loading && !data ? (
                 <div className="flex-1 flex flex-col items-center justify-center py-20 gap-4">
