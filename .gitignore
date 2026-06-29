@@ -45,3 +45,5 @@ playwright-report/
 blob-report/
 .playwright-cache/
 tmp/
+# Arbor Inbox runtime logs
+data/arbor_inbox_logs.json

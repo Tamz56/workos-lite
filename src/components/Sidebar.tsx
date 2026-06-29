@@ -144,6 +144,13 @@ export function Sidebar() {
                         active={pathname.startsWith("/projects")}
                         isCollapsed={isCollapsed}
                     />
+                    <NavItem
+                        href="/arbor-inbox"
+                        label="Arbor Inbox"
+                        icon={<InboxIcon className="w-5 h-5" />}
+                        active={pathname === "/arbor-inbox" || pathname.startsWith("/arbor-inbox")}
+                        isCollapsed={isCollapsed}
+                    />
                 </div>
 
                 {/* 2) Active Workspaces */}

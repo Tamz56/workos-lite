@@ -63,6 +63,7 @@ export default function ArborDeskClient() {
     const [noteContent, setNoteContent] = useState("");
     const [savingNote, setSavingNote] = useState(false);
     const [noteMessage, setNoteMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [recentImports, setRecentImports] = useState<any[]>([]);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -72,6 +73,17 @@ export default function ArborDeskClient() {
             if (!res.ok) throw new Error("Failed to load desk data");
             const json = await res.json();
             setData(json);
+
+            // Fetch recent imports safely
+            try {
+                const logsRes = await fetch("/api/arbor-inbox", { cache: "no-store" });
+                if (logsRes.ok) {
+                    const logsJson = await logsRes.json();
+                    setRecentImports(logsJson.slice(0, 3));
+                }
+            } catch (logsErr) {
+                console.error("Failed to load recent imports on desk", logsErr);
+            }
         } catch (err: any) {
             console.error("ArborDesk load error", err);
             setError(err?.message || "Failed to load dashboard data");
@@ -461,6 +473,69 @@ export default function ArborDeskClient() {
                             ) : (
                                 <div className="py-6 text-center text-xs text-theme-muted font-bold italic">
                                     ไม่มีโครงการที่จะแสดง
+                                </div>
+                            )}
+                        </section>
+
+                        {/* 7. Recent Arbor Imports */}
+                        <section className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Recent Imports</h2>
+                                <Link href="/arbor-inbox" className="text-[10px] font-black text-blue-600 hover:underline">
+                                    Arbor Inbox
+                                </Link>
+                            </div>
+
+                            {recentImports.length > 0 ? (
+                                <div className="space-y-3">
+                                    {recentImports.map((imp) => {
+                                        const totalCreated = 
+                                            (imp.summary?.projectsCreated || 0) +
+                                            (imp.summary?.notesCreated || 0) +
+                                            (imp.summary?.tasksCreated || 0) +
+                                            (imp.summary?.articleNotesCreated || 0);
+                                        const date = new Date(imp.createdAt).toLocaleDateString('th-TH', { 
+                                            day: 'numeric', 
+                                            month: 'short',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+
+                                        return (
+                                            <div 
+                                                key={imp.id}
+                                                className="p-3 bg-theme-input/40 dark:bg-zinc-900/40 border border-theme-border rounded-2xl space-y-1 text-left"
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-[10px] font-bold text-theme-primary truncate max-w-[150px]" title={imp.importBatchTitle}>
+                                                        {imp.importBatchTitle}
+                                                    </span>
+                                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${
+                                                        imp.status === "success" 
+                                                            ? "bg-green-500/10 text-green-600 border border-green-500/10" 
+                                                            : "bg-red-500/10 text-red-500 border border-red-500/10"
+                                                    }`}>
+                                                        {imp.status}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[8px] text-theme-muted font-bold">
+                                                    <span>{date}</span>
+                                                    <span>
+                                                        Created: +{totalCreated} | Skip: {imp.summary?.skipped || 0}
+                                                    </span>
+                                                </div>
+                                                {imp.summary?.errors && imp.summary.errors.length > 0 && (
+                                                    <div className="text-[8px] text-red-500 font-bold truncate">
+                                                        Err: {imp.summary.errors.join(", ")}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="py-4 text-center text-xs text-theme-muted font-bold italic">
+                                    ไม่มีประวัติการนำเข้า
                                 </div>
                             )}
                         </section>
