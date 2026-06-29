@@ -21,13 +21,15 @@ import {
     Calendar,
     AlertCircle,
     Trash2,
-    BarChart2
+    BarChart2,
+    Wand2
 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
 import { buildGreenFinenessUtmUrl, extractGreenFinenessTopicId, extractGreenFinenessArticleTitle, extractGreenFinenessTaskRole } from "@/lib/content/utm";
 import ContentPerformanceDashboard from "@/components/workspaces/content/gf-hub/ContentPerformanceDashboard";
+import GFOrganicContentOptimizer from "@/components/workspaces/content/gf-hub/GFOrganicContentOptimizer";
 
-type TabKey = "strategy" | "backlog" | "production" | "draft_stock" | "publish_queue" | "analytics";
+type TabKey = "strategy" | "backlog" | "production" | "draft_stock" | "publish_queue" | "analytics" | "optimizer";
 
 export default function GreenFinenessHub() {
     const [activeTab, setActiveTab] = useState<TabKey>("strategy");
@@ -212,6 +214,13 @@ export default function GreenFinenessHub() {
                 >
                     <BarChart2 className="w-4 h-4" />
                     Performance Analytics
+                </button>
+                <button 
+                    onClick={() => setActiveTab("optimizer")}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "optimizer" ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"}`}
+                >
+                    <Wand2 className="w-4 h-4" />
+                    Organic Optimizer
                 </button>
             </div>
 
@@ -720,6 +729,10 @@ export default function GreenFinenessHub() {
 
                 {activeTab === "analytics" && (
                     <ContentPerformanceDashboard projects={writingProjects} />
+                )}
+
+                {activeTab === "optimizer" && (
+                    <GFOrganicContentOptimizer projects={writingProjects} />
                 )}
             </div>
 
