@@ -82,7 +82,12 @@ export function generateSlug(title: string): string {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
     if (!s || !/^[a-z0-9-]+$/.test(s)) {
-        s = `project-${nanoid(6).toLowerCase()}`;
+        const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        let rand = "";
+        for (let i = 0; i < 6; i++) {
+            rand += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        s = `project-${rand}`;
     }
     return s;
 }

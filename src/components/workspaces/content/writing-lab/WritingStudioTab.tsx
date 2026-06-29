@@ -24,6 +24,7 @@ import {
     BarChart2
 } from "lucide-react";
 import { validatePayload } from "@/lib/arborInboxSchema";
+import ArticleCommandPanel from "@/components/workspaces/content/writing-lab/ArticleCommandPanel";
 
 interface WritingProject {
     id: string;
@@ -1366,7 +1367,7 @@ export default function WritingStudioTab({
                         )}
 
                         {activeProject && (
-                            <div className="pt-3 border-t border-theme-border/60 px-1">
+                            <div className="pt-3 border-t border-theme-border/60 px-1 space-y-3">
                                 <button
                                     onClick={handleGenerateWorkOSPackage}
                                     className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-sm"
@@ -1374,6 +1375,42 @@ export default function WritingStudioTab({
                                     <Sparkles className="w-3.5 h-3.5" />
                                     Generate WorkOS Package
                                 </button>
+                                
+                                <ArticleCommandPanel
+                                    activeProject={activeProject}
+                                    saving={saving}
+                                    onSave={handleSave}
+                                    onGeneratePackage={handleGenerateWorkOSPackage}
+                                    generatedPackageText={generatedPackageText}
+                                    onSendToInbox={handleSendToInbox}
+                                    onCopyInsightPrompt={handleCopyInsightPrompt}
+                                    
+                                    workingTitle={workingTitle}
+                                    slug={slug}
+                                    narrativeSlug={narrativeSlug}
+                                    knowledgeSlug={knowledgeSlug}
+                                    heroSubtitle={heroSubtitle}
+                                    narrativeHeroSubtitle={narrativeHeroSubtitle}
+                                    knowledgeHeroSubtitle={knowledgeHeroSubtitle}
+                                    shortSummary={shortSummary}
+                                    narrativeShortSummary={narrativeShortSummary}
+                                    knowledgeShortSummary={knowledgeShortSummary}
+                                    metaTitle={metaTitle}
+                                    narrativeMetaTitle={narrativeMetaTitle}
+                                    knowledgeMetaTitle={knowledgeMetaTitle}
+                                    metaDescription={metaDescription}
+                                    narrativeMetaDescription={narrativeMetaDescription}
+                                    knowledgeMetaDescription={knowledgeMetaDescription}
+                                    narrativeBody={narrativeBody}
+                                    knowledgeBody={knowledgeBody}
+                                    shortCaption={shortCaption}
+                                    facebookGroupPost={facebookGroupPost}
+                                    facebookPagePost={facebookPagePost}
+                                    personalPost={personalPost}
+                                    campaignName={campaignName}
+                                    publishStatus={publishStatus}
+                                    decision={decision}
+                                />
                             </div>
                         )}
                         </div>
