@@ -20,18 +20,21 @@ import {
     Share2,
     Calendar,
     AlertCircle,
-    Trash2
+    Trash2,
+    BarChart2
 } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
 import { buildGreenFinenessUtmUrl, extractGreenFinenessTopicId, extractGreenFinenessArticleTitle, extractGreenFinenessTaskRole } from "@/lib/content/utm";
+import ContentPerformanceDashboard from "@/components/workspaces/content/gf-hub/ContentPerformanceDashboard";
 
-type TabKey = "strategy" | "backlog" | "production" | "draft_stock" | "publish_queue";
+type TabKey = "strategy" | "backlog" | "production" | "draft_stock" | "publish_queue" | "analytics";
 
 export default function GreenFinenessHub() {
     const [activeTab, setActiveTab] = useState<TabKey>("strategy");
     const [seasons, setSeasons] = useState<any[]>([]);
     const [episodes, setEpisodes] = useState<any[]>([]);
     const [articles, setArticles] = useState<any[]>([]);
+    const [writingProjects, setWritingProjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [seeding, setSeeding] = useState(false);
     const [toast, setToast] = useState<{ isVisible: boolean; message: string }>({ isVisible: false, message: "" });
@@ -39,15 +42,17 @@ export default function GreenFinenessHub() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [sRes, eRes, aRes] = await Promise.all([
+            const [sRes, eRes, aRes, wpRes] = await Promise.all([
                 fetch("/api/content/gf/seasons"),
                 fetch("/api/content/gf/episodes"),
-                fetch("/api/content/articles")
+                fetch("/api/content/articles"),
+                fetch("/api/content/writing-lab/projects")
             ]);
             
             if (sRes.ok) setSeasons(await sRes.json());
             if (eRes.ok) setEpisodes(await eRes.json());
             if (aRes.ok) setArticles(await aRes.json());
+            if (wpRes.ok) setWritingProjects(await wpRes.json());
         } catch (error) {
             console.error("Failed to fetch Hub data", error);
         } finally {
@@ -200,6 +205,13 @@ export default function GreenFinenessHub() {
                 >
                     <Send className="w-4 h-4" />
                     Publish Queue
+                </button>
+                <button 
+                    onClick={() => setActiveTab("analytics")}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "analytics" ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"}`}
+                >
+                    <BarChart2 className="w-4 h-4" />
+                    Performance Analytics
                 </button>
             </div>
 
@@ -704,6 +716,10 @@ export default function GreenFinenessHub() {
                             )}
                         </div>
                     </div>
+                )}
+
+                {activeTab === "analytics" && (
+                    <ContentPerformanceDashboard projects={writingProjects} />
                 )}
             </div>
 
