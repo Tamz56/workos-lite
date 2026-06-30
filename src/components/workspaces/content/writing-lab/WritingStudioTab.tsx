@@ -291,6 +291,7 @@ export default function WritingStudioTab({
             let notable = { comments: "", questions: "", confusion: "", language: "", followupTopic: "" };
             let insight = { whatWorked: "", whatDidNotWork: "", topicSignal: "", trafficSignal: "", engagementSignal: "", repostPotential: "", followupPotential: "", recommendedAction: "" };
             let nextDec = { decision: "No action", priority: "Medium", targetDate: "", notes: "" };
+            let reviewRes: any = null;
 
             if (activeProject.notes) {
                 try {
@@ -317,6 +318,7 @@ export default function WritingStudioTab({
                         if (pf.notableFeedback) notable = { ...notable, ...pf.notableFeedback };
                         if (pf.arborInsight) insight = { ...insight, ...pf.arborInsight };
                         if (pf.nextDecision) nextDec = { ...nextDec, ...pf.nextDecision };
+                        if (pf.arborReview) reviewRes = pf.arborReview;
                     }
                 } catch {
                     // notes is plain text
@@ -356,6 +358,7 @@ export default function WritingStudioTab({
             setDecisionPriority(nextDec.priority);
             setDecisionTargetDate(nextDec.targetDate);
             setDecisionNotes(nextDec.notes);
+            setReviewResult(reviewRes);
 
             // Narrative fields fallback ONLY
             setNarrativeTitle(activeProject.narrative_title || activeProject.title || "");
@@ -534,7 +537,8 @@ export default function WritingStudioTab({
                         priority: decisionPriority,
                         targetDate: decisionTargetDate,
                         notes: decisionNotes
-                    }
+                    },
+                    arborReview: reviewResult
                 }
             });
 

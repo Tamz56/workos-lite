@@ -131,22 +131,32 @@ export default function ArborInboxClient() {
         setImporting(true);
         setStatusMessage(null);
 
+        const isUpdate = parsedPayload.schemaVersion === "workos-writing-lab-update-v0.1";
+        const action = isUpdate ? "apply_update" : "import";
+
         try {
             const res = await fetch("/api/arbor-inbox", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "import", payload: parsedPayload })
+                body: JSON.stringify({ action, payload: parsedPayload })
             });
 
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data.error || "Failed to import items");
+                throw new Error(data.error || "Failed to process items");
             }
 
-            setStatusMessage({
-                type: "success",
-                text: `นำเข้าข้อมูลสำเร็จ! โครงการ: +${data.log.summary.projectsCreated}, โน้ต: +${data.log.summary.notesCreated}, งาน: +${data.log.summary.tasksCreated}, โน้ตบทความ: +${data.log.summary.articleNotesCreated} (ข้าม: ${data.log.summary.skipped})`
-            });
+            if (isUpdate) {
+                setStatusMessage({
+                    type: "success",
+                    text: `อัปเดตข้อมูลบทความสำเร็จ! โปรเจกต์เป้าหมาย: "${data.log.summary.targetProject || 'N/A'}", จำนวนฟิลด์ที่อัปเดต: ${data.log.summary.fieldsUpdated}`
+                });
+            } else {
+                setStatusMessage({
+                    type: "success",
+                    text: `นำเข้าข้อมูลสำเร็จ! โครงการ: +${data.log.summary.projectsCreated}, โน้ต: +${data.log.summary.notesCreated}, งาน: +${data.log.summary.tasksCreated}, โน้ตบทความ: +${data.log.summary.articleNotesCreated} (ข้าม: ${data.log.summary.skipped})`
+                });
+            }
             
             // Reload logs and clear input
             loadLogs();
@@ -161,7 +171,7 @@ export default function ArborInboxClient() {
         } catch (err: any) {
             setStatusMessage({
                 type: "error",
-                text: `การนำเข้าข้อมูลล้มเหลว: ${err.message}`
+                text: `การประมวลผลข้อมูลล้มเหลว: ${err.message}`
             });
         } finally {
             setImporting(false);
@@ -365,7 +375,7 @@ export default function ArborInboxClient() {
                                 ) : (
                                     <CheckCircleIcon className="w-4 h-4" />
                                 )}
-                                Confirm Import
+                                {parsedPayload?.schemaVersion === "workos-writing-lab-update-v0.1" ? "Confirm Apply Updates" : "Confirm Import"}
                             </button>
                         )}
                     </div>
@@ -374,6 +384,69 @@ export default function ArborInboxClient() {
                         <div className="py-20 flex flex-col items-center justify-center text-theme-muted italic text-xs font-bold gap-3">
                             <DocumentTextIcon className="w-12 h-12 text-theme-border" />
                             กด Parse & Validate เพื่อดูตัวอย่างข้อมูลนำเข้าที่นี่
+                        </div>
+                    ) : (preview as any).schemaType === "writing_lab_update" ? (
+                        <div className="space-y-6 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
+                            {/* Target Project Box */}
+                            <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl space-y-2">
+                                <h3 className="text-xs font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider">
+                                    Target Writing Project
+                                </h3>
+                                <div className="text-xs space-y-1">
+                                    <div><span className="font-bold text-theme-muted">Title:</span> <span className="font-black text-theme-primary">{(preview as any).targetProject?.title || "Not Found"}</span></div>
+                                    <div><span className="font-bold text-theme-muted">Slug:</span> <span className="font-bold text-theme-secondary">{(preview as any).targetProject?.slug || "N/A"}</span></div>
+                                    <div><span className="font-bold text-theme-muted">ID:</span> <code className="text-[10px] bg-theme-input px-1 py-0.5 rounded text-theme-secondary">{(preview as any).targetProject?.id || "N/A"}</code></div>
+                                </div>
+                            </div>
+
+                            {/* Update Groups */}
+                            {Object.keys((preview as any).groups).map((groupKey) => {
+                                const groupItems = (preview as any).groups[groupKey];
+                                if (!groupItems || groupItems.length === 0) return null;
+
+                                return (
+                                    <div key={groupKey} className="space-y-2.5">
+                                        <h3 className="text-xs font-black uppercase text-theme-muted tracking-wider border-b border-theme-border/40 pb-1 flex justify-between items-center">
+                                            <span>Group: {groupKey.toUpperCase()}</span>
+                                            <span className="text-[10px] text-theme-muted font-bold">{groupItems.length} fields</span>
+                                        </h3>
+                                        
+                                        <div className="space-y-2">
+                                            {groupItems.map((item: any, idx: number) => (
+                                                <div key={idx} className="p-3.5 bg-theme-input/40 border border-theme-border rounded-2xl text-xs space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-black text-theme-primary">{item.key}</span>
+                                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                                                            item.impact === "overwrite_warning" 
+                                                                ? "bg-amber-500/10 text-amber-600 border border-amber-500/20" 
+                                                                : item.impact === "empty_to_filled"
+                                                                ? "bg-green-500/10 text-green-600 border border-green-500/20"
+                                                                : "bg-neutral-500/10 text-neutral-500 border border-neutral-500/20"
+                                                        }`}>
+                                                            {item.impact === "overwrite_warning" ? "⚠️ Overwrites content" : item.impact === "empty_to_filled" ? "+ Adds new value" : "Unchanged"}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <div className="grid grid-cols-2 gap-3 text-[10px] leading-relaxed">
+                                                        <div className="bg-red-500/5 p-2 rounded-xl border border-red-500/10">
+                                                            <div className="font-bold text-red-500 uppercase text-[8px] tracking-wider mb-1">Old Value</div>
+                                                            <div className="font-medium text-theme-secondary break-words line-clamp-3" title={item.prev}>
+                                                                {item.prev || <span className="italic opacity-60">(Empty)</span>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-green-500/5 p-2 rounded-xl border border-green-500/10">
+                                                            <div className="font-bold text-green-600 uppercase text-[8px] tracking-wider mb-1">Proposed Value</div>
+                                                            <div className="font-black text-theme-primary break-words line-clamp-3" title={item.new}>
+                                                                {item.new || <span className="italic opacity-60">(Empty)</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="space-y-6 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
@@ -548,22 +621,36 @@ export default function ArborInboxClient() {
                                             </span>
                                         </td>
                                         <td className="py-3.5 px-4 text-center font-bold">
-                                            <span className="text-blue-600 dark:text-blue-400" title="Projects">{log.summary.projectsCreated}</span>
-                                            <span className="text-theme-muted mx-1">/</span>
-                                            <span className="text-teal-600 dark:text-teal-400" title="Notes">{log.summary.notesCreated}</span>
-                                            <span className="text-theme-muted mx-1">/</span>
-                                            <span className="text-purple-600 dark:text-purple-400" title="Tasks">{log.summary.tasksCreated}</span>
-                                            <span className="text-theme-muted mx-1">/</span>
-                                            <span className="text-amber-600 dark:text-amber-400" title="Article Notes">{log.summary.articleNotesCreated}</span>
+                                            {log.schemaVersion === "workos-writing-lab-update-v0.1" ? (
+                                                <span className="text-indigo-600 dark:text-indigo-400" title="Fields Updated">
+                                                    Updated: {(log.summary as any).fieldsUpdated || 0} fields
+                                                </span>
+                                            ) : (
+                                                <>
+                                                    <span className="text-blue-600 dark:text-blue-400" title="Projects">{log.summary.projectsCreated}</span>
+                                                    <span className="text-theme-muted mx-1">/</span>
+                                                    <span className="text-teal-600 dark:text-teal-400" title="Notes">{log.summary.notesCreated}</span>
+                                                    <span className="text-theme-muted mx-1">/</span>
+                                                    <span className="text-purple-600 dark:text-purple-400" title="Tasks">{log.summary.tasksCreated}</span>
+                                                    <span className="text-theme-muted mx-1">/</span>
+                                                    <span className="text-amber-600 dark:text-amber-400" title="Article Notes">{log.summary.articleNotesCreated}</span>
+                                                </>
+                                            )}
                                         </td>
                                         <td className="py-3.5 px-4 text-theme-muted font-semibold max-w-xs truncate" title={log.summary.errors?.join(", ") || ""}>
-                                            {log.summary.skipped > 0 && `Skipped Project: ${log.summary.skipped}`}
-                                            {log.summary.errors && log.summary.errors.length > 0 && (
-                                                <span className="text-red-500 font-bold block truncate">
-                                                    Errors: {log.summary.errors.join("; ")}
-                                                </span>
+                                            {log.schemaVersion === "workos-writing-lab-update-v0.1" ? (
+                                                <span>Target: {(log.summary as any).targetProject || "N/A"}</span>
+                                            ) : (
+                                                <>
+                                                    {log.summary.skipped > 0 && `Skipped Project: ${log.summary.skipped}`}
+                                                    {log.summary.errors && log.summary.errors.length > 0 && (
+                                                        <span className="text-red-500 font-bold block truncate">
+                                                            Errors: {log.summary.errors.join("; ")}
+                                                        </span>
+                                                    )}
+                                                    {log.summary.skipped === 0 && (!log.summary.errors || log.summary.errors.length === 0) && "-"}
+                                                </>
                                             )}
-                                            {log.summary.skipped === 0 && (!log.summary.errors || log.summary.errors.length === 0) && "-"}
                                         </td>
                                     </tr>
                                 ))}

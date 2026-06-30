@@ -2,6 +2,7 @@
 import { nanoid } from "nanoid";
 
 export const SUPPORTED_SCHEMA_VERSION = "workos-arbor-import-v0.1";
+export const SCHEMA_UPDATE_VERSION = "workos-writing-lab-update-v0.1";
 export const SUPPORTED_ITEM_TYPES = ["project", "note", "task", "article_note"] as const;
 
 export type ItemType = (typeof SUPPORTED_ITEM_TYPES)[number];
@@ -105,8 +106,10 @@ export function validatePayload(payload: any, existingProjects: ProjectLookup[])
         return { valid: false, errors, warnings };
     }
 
-    if (payload.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
-        errors.push(`Top-level: schemaVersion must be exactly "${SUPPORTED_SCHEMA_VERSION}"`);
+    const version = payload.schemaVersion;
+    if (version !== SUPPORTED_SCHEMA_VERSION && version !== SCHEMA_UPDATE_VERSION) {
+        errors.push(`Top-level: schemaVersion must be exactly "${SUPPORTED_SCHEMA_VERSION}" or "${SCHEMA_UPDATE_VERSION}"`);
+        return { valid: false, errors, warnings };
     }
 
     if (typeof payload.source !== "string" || !payload.source.trim()) {
@@ -117,6 +120,61 @@ export function validatePayload(payload: any, existingProjects: ProjectLookup[])
         errors.push('Top-level: Missing required field "importBatchTitle"');
     }
 
+    // 2. Writing Lab Update Validation
+    if (version === SCHEMA_UPDATE_VERSION) {
+        const target = payload.target;
+        if (!target || typeof target !== "object") {
+            errors.push('Top-level: Missing or invalid "target" object');
+        } else {
+            if (target.type !== "writing_lab_project") {
+                errors.push('target: "type" must be exactly "writing_lab_project"');
+            }
+            const hasId = typeof target.projectId === "string" && target.projectId.trim();
+            const hasSlug = typeof target.projectSlug === "string" && target.projectSlug.trim();
+            if (!hasId && !hasSlug) {
+                errors.push('target: At least one of "projectId" or "projectSlug" must be provided');
+            }
+        }
+
+        const fields = payload.fields;
+        if (!fields || typeof fields !== "object") {
+            errors.push('Top-level: Missing or invalid "fields" object containing updates');
+        } else {
+            const groupKeys = Object.keys(fields);
+            if (groupKeys.length === 0) {
+                errors.push('fields: "fields" object must contain at least one update group');
+            }
+            const allowedGroups = ["seo", "socialDrafts", "utmPublish", "arborReview", "performanceFeedback"];
+            for (const key of groupKeys) {
+                if (!allowedGroups.includes(key)) {
+                    errors.push(`fields: Unsupported field group "${key}"`);
+                } else {
+                    const groupVal = fields[key];
+                    if (!groupVal || typeof groupVal !== "object" || Array.isArray(groupVal)) {
+                        errors.push(`fields: Group "${key}" must be a JSON object`);
+                    } else {
+                        // Value types validation for specific groups
+                        if (key === "arborReview") {
+                            const reviewKeys = ["summary", "next_step", "strengths", "revisions", "risks"];
+                            for (const rk of Object.keys(groupVal)) {
+                                if (!reviewKeys.includes(rk)) {
+                                    errors.push(`fields.arborReview: Unsupported review field "${rk}"`);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors,
+            warnings
+        };
+    }
+
+    // 3. Project/Note/Task Import validation (old version)
     if (!Array.isArray(payload.items)) {
         errors.push('Top-level: "items" must be a non-empty array');
         return { valid: false, errors, warnings };
@@ -139,7 +197,7 @@ export function validatePayload(payload: any, existingProjects: ProjectLookup[])
         }
     });
 
-    // 2. Item-Level Validation
+    // Item-Level Validation (old version items loop)
     payload.items.forEach((item: any, idx: number) => {
         const itemNum = idx + 1;
 
@@ -223,7 +281,22 @@ export function validatePayload(payload: any, existingProjects: ProjectLookup[])
 /**
  * Builds the Preview Data to be displayed before user imports the payload.
  */
-export function buildPreview(payload: ImportPayload, existingProjects: ProjectLookup[]): PreviewData {
+export function buildPreview(payload: any, existingProjects: ProjectLookup[]): PreviewData {
+    if (payload.schemaVersion === SCHEMA_UPDATE_VERSION) {
+        return {
+            projects: [],
+            notes: [],
+            tasks: [],
+            articleNotes: [],
+            // Custom properties safely bypassed for typescript signature
+            ...({
+                isWritingLabUpdate: true,
+                target: payload.target,
+                fields: payload.fields
+            } as any)
+        };
+    }
+
     const projects: PreviewData["projects"] = [];
     const notes: PreviewData["notes"] = [];
     const tasks: PreviewData["tasks"] = [];
@@ -240,7 +313,7 @@ export function buildPreview(payload: ImportPayload, existingProjects: ProjectLo
         return generateSlug(targetProject);
     };
 
-    payload.items.forEach((item) => {
+    payload.items.forEach((item: any) => {
         if (item.type === "project") {
             const titleLower = item.title.trim().toLowerCase();
             const slug = generateSlug(item.title);

@@ -6,7 +6,8 @@ import {
     buildPreview, 
     generateSlug, 
     buildNoteContent,
-    SUPPORTED_SCHEMA_VERSION 
+    SUPPORTED_SCHEMA_VERSION,
+    SCHEMA_UPDATE_VERSION
 } from "@/lib/arborInboxSchema";
 import { 
     readImportLogs, 
@@ -16,6 +17,21 @@ import {
 import { normalizeWorkspace } from "@/lib/workspaces";
 
 export const dynamic = "force-dynamic";
+
+// Deep merge helper for nested notes objects
+function deepMerge(target: any, source: any) {
+    if (!source) return target;
+    if (!target || typeof target !== "object") return source;
+    const result = { ...target };
+    for (const key of Object.keys(source)) {
+        if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
+            result[key] = deepMerge(target[key], source[key]);
+        } else {
+            result[key] = source[key];
+        }
+    }
+    return result;
+}
 
 export async function GET() {
     try {
@@ -36,8 +52,8 @@ export async function POST(req: NextRequest) {
         const { action } = body;
         payload = body.payload;
 
-        if (!action || !["validate", "import"].includes(action)) {
-            return NextResponse.json({ error: "Invalid action. Allowed values: validate, import" }, { status: 400 });
+        if (!action || !["validate", "import", "apply_update"].includes(action)) {
+            return NextResponse.json({ error: "Invalid action. Allowed values: validate, import, apply_update" }, { status: 400 });
         }
 
         if (!payload) {
@@ -46,8 +62,164 @@ export async function POST(req: NextRequest) {
 
         const db = getDb();
         const existingProjects = db.prepare("SELECT name, slug FROM projects").all() as { name: string; slug: string }[];
+        const version = payload.schemaVersion;
 
+        // 1. VALIDATE ACTION
         if (action === "validate") {
+            if (version === SCHEMA_UPDATE_VERSION) {
+                // Fetch target project details for comparison preview
+                let targetRow: any = null;
+                if (payload.target?.projectId) {
+                    targetRow = db.prepare("SELECT * FROM gf_writing_projects WHERE id = ?").get(payload.target.projectId);
+                }
+                if (!targetRow && payload.target?.projectSlug) {
+                    targetRow = db.prepare("SELECT * FROM gf_writing_projects WHERE slug = ?").get(payload.target.projectSlug);
+                }
+
+                const errors: string[] = [];
+                const warnings: string[] = [];
+
+                if (!targetRow) {
+                    errors.push(`Target project "${payload.target?.projectId || payload.target?.projectSlug}" not found in database`);
+                }
+
+                const validationResult = validatePayload(payload, existingProjects);
+                validationResult.errors.push(...errors);
+
+                const previewGroups: any = {};
+                let fieldsUpdatedCount = 0;
+
+                if (targetRow && payload.fields) {
+                    let parsedNotes: any = {};
+                    if (targetRow.notes) {
+                        try {
+                            parsedNotes = JSON.parse(targetRow.notes);
+                        } catch {
+                            parsedNotes = { legacyNotesText: targetRow.notes };
+                        }
+                    }
+
+                    const compareFields = (groupKey: string, mappings: Record<string, { type: "column" | "notes" | "pf" | "arborReview", path?: string }>) => {
+                        const fieldsInPayload = payload.fields[groupKey];
+                        if (!fieldsInPayload) return;
+
+                        previewGroups[groupKey] = [];
+                        for (const key of Object.keys(fieldsInPayload)) {
+                            fieldsUpdatedCount++;
+                            const mapping = mappings[key];
+                            let prevVal: any = undefined;
+                            const newVal = fieldsInPayload[key];
+
+                            if (mapping) {
+                                if (mapping.type === "column") {
+                                    prevVal = targetRow[key];
+                                } else if (mapping.type === "notes") {
+                                    prevVal = parsedNotes[mapping.path || key];
+                                } else if (mapping.type === "pf") {
+                                    const pf = parsedNotes.performanceFeedback || {};
+                                    if (mapping.path) {
+                                        const parts = mapping.path.split(".");
+                                        let curr = pf;
+                                        for (const p of parts) {
+                                            curr = curr ? curr[p] : undefined;
+                                        }
+                                        prevVal = curr;
+                                    }
+                                } else if (mapping.type === "arborReview") {
+                                    const pf = parsedNotes.performanceFeedback || {};
+                                    const review = pf.arborReview || {};
+                                    prevVal = review[key];
+                                }
+                            }
+
+                            let impact = "empty_to_filled";
+                            const prevStr = prevVal !== undefined && prevVal !== null ? String(prevVal) : "";
+                            const newStr = newVal !== undefined && newVal !== null ? String(newVal) : "";
+
+                            if (prevStr === newStr) {
+                                impact = "unchanged";
+                            } else if (prevStr) {
+                                impact = "overwrite_warning";
+                                validationResult.warnings.push(`ฟิลด์ "${key}" ในกลุ่ม "${groupKey}" มีข้อมูลเดิมอยู่แล้วและจะถูกเขียนทับ`);
+                            }
+
+                            previewGroups[groupKey].push({
+                                key,
+                                prev: prevStr,
+                                new: newStr,
+                                impact
+                            });
+                        }
+                    };
+
+                    const seoMappings: any = {};
+                    const seoCols = [
+                        "title", "slug", "meta_title", "meta_description", "keywords", "excerpt",
+                        "narrative_title", "narrative_slug", "narrative_hero_subtitle", "narrative_featured_image_url",
+                        "narrative_short_summary", "narrative_meta_title", "narrative_meta_description", "narrative_keywords",
+                        "narrative_schema_jsonld", "narrative_status", "narrative_editors_pick", "narrative_related_knowledge_article", "narrative_journey_stage",
+                        "knowledge_title", "knowledge_slug", "knowledge_hero_subtitle", "knowledge_featured_image_url",
+                        "knowledge_short_summary", "knowledge_meta_title", "knowledge_meta_description", "knowledge_keywords",
+                        "knowledge_schema_jsonld", "knowledge_status", "knowledge_editors_pick", "knowledge_related_narrative_article",
+                        "knowledge_primary_keyword", "knowledge_secondary_keywords", "knowledge_category"
+                    ];
+                    for (const col of seoCols) {
+                        seoMappings[col] = { type: "column" };
+                    }
+
+                    const socialMappings: any = {};
+                    const socialCols = ["group_post_markdown", "page_post_markdown", "personal_post_markdown", "social_caption", "hashtags"];
+                    for (const col of socialCols) {
+                        socialMappings[col] = { type: "column" };
+                    }
+
+                    const utmMappings = {
+                        publishedUrl: { type: "notes", path: "published_url" },
+                        campaignName: { type: "notes", path: "campaign_name" },
+                        publishStatus: { type: "pf", path: "publishingRecord.publishStatus" },
+                        publishedDate: { type: "pf", path: "publishingRecord.publishedDate" },
+                        facebookGroupUrl: { type: "pf", path: "publishingRecord.facebookGroupUrl" },
+                        facebookPageUrl: { type: "pf", path: "publishingRecord.facebookPageUrl" },
+                        personalPostUrl: { type: "pf", path: "publishingRecord.personalPostUrl" },
+                        utmCampaign: { type: "pf", path: "publishingRecord.utmCampaign" }
+                    } as const;
+
+                    const arborReviewMappings = {
+                        summary: { type: "arborReview" },
+                        next_step: { type: "arborReview" },
+                        strengths: { type: "arborReview" },
+                        revisions: { type: "arborReview" },
+                        risks: { type: "arborReview" }
+                    } as const;
+
+                    const perfMappings = {
+                        snapshots: { type: "notes", path: "performanceFeedback.snapshots" },
+                        notableFeedback: { type: "notes", path: "performanceFeedback.notableFeedback" },
+                        arborInsight: { type: "notes", path: "performanceFeedback.arborInsight" },
+                        nextDecision: { type: "notes", path: "performanceFeedback.nextDecision" }
+                    } as const;
+
+                    compareFields("seo", seoMappings);
+                    compareFields("socialDrafts", socialMappings);
+                    compareFields("utmPublish", utmMappings);
+                    compareFields("arborReview", arborReviewMappings);
+                    compareFields("performanceFeedback", perfMappings);
+                }
+
+                return NextResponse.json({
+                    valid: validationResult.valid,
+                    errors: validationResult.errors,
+                    warnings: validationResult.warnings,
+                    preview: {
+                        schemaType: "writing_lab_update",
+                        targetProject: targetRow ? { id: targetRow.id, title: targetRow.title, slug: targetRow.slug } : null,
+                        groups: previewGroups,
+                        fieldsUpdatedCount
+                    }
+                });
+            }
+
+            // Old version validation path
             const validationResult = validatePayload(payload, existingProjects);
             const preview = buildPreview(payload, existingProjects);
             return NextResponse.json({
@@ -58,7 +230,166 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // Action: import
+        // 2. APPLY UPDATE ACTION
+        if (action === "apply_update") {
+            if (version !== SCHEMA_UPDATE_VERSION) {
+                return NextResponse.json({ error: "Invalid action for old schema version" }, { status: 400 });
+            }
+
+            let targetRow: any = null;
+            if (payload.target?.projectId) {
+                targetRow = db.prepare("SELECT * FROM gf_writing_projects WHERE id = ?").get(payload.target.projectId);
+            }
+            if (!targetRow && payload.target?.projectSlug) {
+                targetRow = db.prepare("SELECT * FROM gf_writing_projects WHERE slug = ?").get(payload.target.projectSlug);
+            }
+
+            if (!targetRow) {
+                return NextResponse.json({ error: "ไม่พบโปรเจกต์เป้าหมายสำหรับเขียนร่าง" }, { status: 400 });
+            }
+
+            let parsedNotes: any = {};
+            if (targetRow.notes) {
+                try {
+                    parsedNotes = JSON.parse(targetRow.notes);
+                } catch {
+                    parsedNotes = { legacyNotesText: targetRow.notes };
+                }
+            }
+
+            const updates: string[] = [];
+            const values: any[] = [];
+
+            // Map columns from seo and socialDrafts
+            const allowedCols = [
+                "title", "slug", "meta_title", "meta_description", "keywords", "excerpt",
+                "narrative_title", "narrative_slug", "narrative_hero_subtitle", "narrative_featured_image_url",
+                "narrative_short_summary", "narrative_meta_title", "narrative_meta_description", "narrative_keywords",
+                "narrative_schema_jsonld", "narrative_status", "narrative_editors_pick", "narrative_related_knowledge_article", "narrative_journey_stage",
+                "knowledge_title", "knowledge_slug", "knowledge_hero_subtitle", "knowledge_featured_image_url",
+                "knowledge_short_summary", "knowledge_meta_title", "knowledge_meta_description", "knowledge_keywords",
+                "knowledge_schema_jsonld", "knowledge_status", "knowledge_editors_pick", "knowledge_related_narrative_article",
+                "knowledge_primary_keyword", "knowledge_secondary_keywords", "knowledge_category",
+                "group_post_markdown", "page_post_markdown", "personal_post_markdown", "social_caption", "hashtags"
+            ];
+
+            if (payload.fields.seo) {
+                for (const col of allowedCols) {
+                    if (payload.fields.seo[col] !== undefined) {
+                        updates.push(`${col} = ?`);
+                        values.push(payload.fields.seo[col]);
+                    }
+                }
+            }
+            if (payload.fields.socialDrafts) {
+                for (const col of allowedCols) {
+                    if (payload.fields.socialDrafts[col] !== undefined) {
+                        updates.push(`${col} = ?`);
+                        values.push(payload.fields.socialDrafts[col]);
+                    }
+                }
+            }
+
+            // Map notes updates defensively
+            if (!parsedNotes.performanceFeedback) {
+                parsedNotes.performanceFeedback = {};
+            }
+
+            if (payload.fields.utmPublish) {
+                const utm = payload.fields.utmPublish;
+                if (utm.publishedUrl !== undefined) {
+                    parsedNotes.published_url = utm.publishedUrl;
+                }
+                if (utm.campaignName !== undefined) {
+                    parsedNotes.campaign_name = utm.campaignName;
+                }
+
+                if (!parsedNotes.performanceFeedback.publishingRecord) {
+                    parsedNotes.performanceFeedback.publishingRecord = {};
+                }
+                const pr = parsedNotes.performanceFeedback.publishingRecord;
+                if (utm.publishedUrl !== undefined) pr.publishedUrl = utm.publishedUrl;
+                if (utm.publishedDate !== undefined) pr.publishedDate = utm.publishedDate;
+                if (utm.facebookGroupUrl !== undefined) pr.facebookGroupUrl = utm.facebookGroupUrl;
+                if (utm.facebookPageUrl !== undefined) pr.facebookPageUrl = utm.facebookPageUrl;
+                if (utm.personalPostUrl !== undefined) pr.personalPostUrl = utm.personalPostUrl;
+                if (utm.utmCampaign !== undefined) pr.utmCampaign = utm.utmCampaign;
+                if (utm.publishStatus !== undefined) pr.publishStatus = utm.publishStatus;
+            }
+
+            if (payload.fields.arborReview) {
+                parsedNotes.performanceFeedback.arborReview = {
+                    ...parsedNotes.performanceFeedback.arborReview,
+                    ...payload.fields.arborReview
+                };
+            }
+
+            if (payload.fields.performanceFeedback) {
+                const pf = payload.fields.performanceFeedback;
+                if (pf.snapshots) {
+                    parsedNotes.performanceFeedback.snapshots = deepMerge(
+                        parsedNotes.performanceFeedback.snapshots,
+                        pf.snapshots
+                    );
+                }
+                if (pf.notableFeedback) {
+                    parsedNotes.performanceFeedback.notableFeedback = deepMerge(
+                        parsedNotes.performanceFeedback.notableFeedback,
+                        pf.notableFeedback
+                    );
+                }
+                if (pf.arborInsight) {
+                    parsedNotes.performanceFeedback.arborInsight = deepMerge(
+                        parsedNotes.performanceFeedback.arborInsight,
+                        pf.arborInsight
+                    );
+                }
+                if (pf.nextDecision) {
+                    parsedNotes.performanceFeedback.nextDecision = deepMerge(
+                        parsedNotes.performanceFeedback.nextDecision,
+                        pf.nextDecision
+                    );
+                }
+            }
+
+            updates.push("notes = ?");
+            values.push(JSON.stringify(parsedNotes));
+            updates.push("updated_at = datetime('now')");
+
+            const sql = `UPDATE gf_writing_projects SET ${updates.join(", ")} WHERE id = ?`;
+            values.push(targetRow.id);
+
+            db.transaction(() => {
+                db.prepare(sql).run(...values);
+            })();
+
+            // Write success log
+            const logEntry: ImportLog = {
+                id: nanoid(),
+                importBatchTitle: payload.importBatchTitle,
+                source: payload.source,
+                schemaVersion: payload.schemaVersion,
+                createdAt: new Date().toISOString(),
+                status: "success",
+                summary: {
+                    projectsCreated: 0,
+                    notesCreated: 0,
+                    tasksCreated: 0,
+                    articleNotesCreated: 0,
+                    skipped: 0,
+                    errors: [],
+                    ...({
+                        fieldsUpdated: Object.keys(payload.fields).reduce((acc, k) => acc + Object.keys(payload.fields[k]).length, 0),
+                        targetProject: targetRow.title
+                    } as any)
+                }
+            };
+
+            await appendImportLog(logEntry);
+            return NextResponse.json({ success: true, log: logEntry });
+        }
+
+        // 3. OLD VERSION IMPORT ACTION
         // Re-validate to ensure data safety before executing transaction
         const validationResult = validatePayload(payload, existingProjects);
         if (!validationResult.valid) {
@@ -77,7 +408,6 @@ export async function POST(req: NextRequest) {
 
         try {
             db.transaction(() => {
-                // Load projects again inside transaction to prevent race conditions
                 const projectMap = new Map<string, string>();
                 const currentProjects = db.prepare("SELECT id, name, slug FROM projects").all() as { id: string, name: string, slug: string }[];
                 for (const p of currentProjects) {
@@ -88,7 +418,6 @@ export async function POST(req: NextRequest) {
                 const projectsToCreate = payload.items.filter((item: any) => item.type === "project");
                 const otherItems = payload.items.filter((item: any) => item.type !== "project");
 
-                // 1. Create Projects
                 for (const item of projectsToCreate) {
                     const titleLower = item.title.trim().toLowerCase();
                     const slug = generateSlug(item.title);
@@ -111,7 +440,6 @@ export async function POST(req: NextRequest) {
                     projectsCreated++;
                 }
 
-                // 2. Create other items
                 for (const item of otherItems) {
                     const targetKey = item.targetProject.trim().toLowerCase();
                     let projectId = projectMap.get(targetKey);
@@ -195,7 +523,6 @@ export async function POST(req: NextRequest) {
             throw txErr;
         }
 
-        // Save success log
         const logEntry: ImportLog = {
             id: nanoid(),
             importBatchTitle: payload.importBatchTitle,
@@ -216,7 +543,6 @@ export async function POST(req: NextRequest) {
         try {
             await appendImportLog(logEntry);
         } catch (logErr: any) {
-            // Log writing failed, but db transaction completed successfully
             return NextResponse.json({ 
                 success: true, 
                 warning: `นำเข้าข้อมูลสำเร็จ แต่ไม่สามารถบันทึกประวัติการนำเข้าได้: ${logErr.message}`,
@@ -229,7 +555,6 @@ export async function POST(req: NextRequest) {
     } catch (err: any) {
         console.error("Import processing error", err);
         
-        // Save failed log
         const logEntry: ImportLog = {
             id: nanoid(),
             importBatchTitle: payload?.importBatchTitle || "Untitled Batch",
