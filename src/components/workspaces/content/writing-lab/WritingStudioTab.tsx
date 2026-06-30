@@ -689,12 +689,14 @@ export default function WritingStudioTab({
                         }
                     },
                     facebookSnapshots: {
+                        ...(parsedExistingNotes.performanceFeedback?.facebookSnapshots || {}),
                         snap24h: fbSnap24h,
                         snap7d: fbSnap7d,
                         snap30d: fbSnap30d,
                         snap90d: fbSnap90d
                     },
                     ga4Snapshots: {
+                        ...(parsedExistingNotes.performanceFeedback?.ga4Snapshots || {}),
                         snap24h: ga4Snap24h,
                         snap7d: ga4Snap7d,
                         snap30d: ga4Snap30d,

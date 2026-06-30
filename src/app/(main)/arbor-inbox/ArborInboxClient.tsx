@@ -37,12 +37,42 @@ export default function ArborInboxClient() {
     const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
     // Markdown import mode states
-    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics" | "manual_snapshot">("json");
+    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics" | "manual_snapshot" | "screenshot">("json");
     const [markdownText, setMarkdownText] = useState("");
     const [parsedResult, setParsedResult] = useState<any>(null);
     const [writingProjects, setWritingProjects] = useState<any[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>("");
     const [manualProjectId, setManualProjectId] = useState<string>("");
+
+    // Screenshot Snapshot states
+    const [screenshotPreviewUrl, setScreenshotPreviewUrl] = useState("");
+    const [screenshotType, setScreenshotType] = useState("Facebook Page");
+    const [ssProjectId, setSsProjectId] = useState("");
+    const [ssWindow, setSsWindow] = useState("24h");
+    const [ssDate, setSsDate] = useState(() => new Date().toISOString().split("T")[0]);
+    const [ssPublishedDate, setSsPublishedDate] = useState("");
+    const [ssImportNote, setSsImportNote] = useState("");
+    const [ssAnalyzing, setSsAnalyzing] = useState(false);
+    // GA4 fields
+    const [ssGa4Title, setSsGa4Title] = useState("");
+    const [ssGa4Path, setSsGa4Path] = useState("");
+    const [ssGa4Views, setSsGa4Views] = useState("");
+    const [ssGa4Users, setSsGa4Users] = useState("");
+    const [ssGa4EngTime, setSsGa4EngTime] = useState("");
+    const [ssGa4Events, setSsGa4Events] = useState("");
+    const [ssGa4Bounce, setSsGa4Bounce] = useState("");
+    const [ssGa4SrcMed, setSsGa4SrcMed] = useState("");
+    // Facebook fields
+    const [ssFbTitle, setSsFbTitle] = useState("");
+    const [ssFbUrl, setSsFbUrl] = useState("");
+    const [ssFbViewsReach, setSsFbViewsReach] = useState("");
+    const [ssFbEngagement, setSsFbEngagement] = useState("");
+    const [ssFbReactions, setSsFbReactions] = useState("");
+    const [ssFbComments, setSsFbComments] = useState("");
+    const [ssFbShares, setSsFbShares] = useState("");
+    const [ssFbClicks, setSsFbClicks] = useState("");
+    const [ssFbPhotoViews, setSsFbPhotoViews] = useState("");
+    const [ssFbOtherClicks, setSsFbOtherClicks] = useState("");
 
     // Manual Quick Post Snapshot states
     const [quickProjectId, setQuickProjectId] = useState("");
@@ -307,6 +337,265 @@ export default function ArborInboxClient() {
                 }
             }
         };
+
+        setPayloadText(JSON.stringify(generatedPayload, null, 2));
+        handleValidate(JSON.stringify(generatedPayload));
+    };
+
+    const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setScreenshotPreviewUrl(event.target?.result as string);
+                handleSimulateScreenshotExtraction(screenshotType);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleScreenshotPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        const item = e.clipboardData.items[0];
+        if (item && item.type.indexOf("image") !== -1) {
+            const file = item.getAsFile();
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setScreenshotPreviewUrl(event.target?.result as string);
+                    handleSimulateScreenshotExtraction(screenshotType);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    };
+
+    const handleSimulateScreenshotExtraction = (typeSelected: string) => {
+        setSsAnalyzing(true);
+        setTimeout(() => {
+            if (typeSelected === "GA4") {
+                setSsGa4Title("EP.10.3 Cytokinin guide - Green Fineness");
+                setSsGa4Path("/library/cytokinin-guide");
+                setSsGa4Views("350");
+                setSsGa4Users("310");
+                setSsGa4EngTime("85");
+                setSsGa4Events("480");
+                setSsGa4Bounce("28.5");
+                setSsGa4SrcMed("organic / google");
+            } else {
+                setSsFbTitle("EP.10.3 Cytokinin - ความสำคัญต่อการเจริญเติบโตของพืช");
+                setSsFbUrl("https://facebook.com/posts/cytokinin-103");
+                setSsFbViewsReach("227");
+                setSsFbEngagement("14");
+                setSsFbReactions("11");
+                setSsFbComments("0");
+                setSsFbShares("3");
+                setSsFbClicks("5");
+                setSsFbPhotoViews("0");
+                setSsFbOtherClicks("0");
+            }
+            setSsAnalyzing(false);
+            setStatusMessage({
+                type: "success",
+                text: "วิเคราะห์ภาพสถิติเบื้องต้นสำเร็จ (กรุณาตรวจและแก้ไขค่าด้วยตนเองเพื่อความถูกต้องก่อนนำเข้า)"
+            });
+        }, 800);
+    };
+
+    const handleGenerateScreenshotSnapshot = () => {
+        setStatusMessage(null);
+
+        if (!ssProjectId) {
+            setStatusMessage({ type: "error", text: "Target Writing Project is required. (กรุณาเลือกโครงการเขียนร่างเป้าหมาย)" });
+            return;
+        }
+        if (!ssWindow) {
+            setStatusMessage({ type: "error", text: "Snapshot Window is required. (กรุณาระบุรอบช่วงเวลาสถิติ)" });
+            return;
+        }
+        if (!ssDate) {
+            setStatusMessage({ type: "error", text: "Snapshot Date is required. (กรุณาระบุวันที่บันทึกสถิติ)" });
+            return;
+        }
+
+        const parseVal = (val: string): number => {
+            if (!val || !val.trim()) return 0;
+            const parsed = parseFloat(val);
+            return isNaN(parsed) ? 0 : parsed;
+        };
+
+        const matched = writingProjects.find(p => p.id === ssProjectId);
+        if (!matched) {
+            setStatusMessage({ type: "error", text: "Target project not found. (ไม่พบโครงการที่ระบุ)" });
+            return;
+        }
+
+        let generatedPayload: any = null;
+
+        if (screenshotType === "GA4") {
+            const views = parseVal(ssGa4Views);
+            const activeUsers = parseVal(ssGa4Users);
+            const averageEngagementTime = parseVal(ssGa4EngTime);
+            const events = parseVal(ssGa4Events);
+            const bounceRate = parseVal(ssGa4Bounce);
+
+            if (views <= 0 && activeUsers <= 0 && averageEngagementTime <= 0 && events <= 0 && bounceRate <= 0) {
+                setStatusMessage({ type: "error", text: "At least one GA4 metric must be greater than 0. (กรุณากรอกตัวชี้วัดประสิทธิภาพของ GA4 อย่างน้อยหนึ่งฟิลด์)" });
+                return;
+            }
+
+            if (views < 0 || activeUsers < 0 || averageEngagementTime < 0 || events < 0 || bounceRate < 0) {
+                setStatusMessage({ type: "error", text: "Metrics cannot be negative. (ตัวเลขสถิติตัวชี้วัดห้ามเป็นค่าติดลบ)" });
+                return;
+            }
+
+            if (!ssGa4Title.trim() && !ssGa4Path.trim()) {
+                setStatusMessage({ type: "error", text: "GA4 snapshots require a page title or path to target a specific article. (กรุณากรอกชื่อหัวข้อหรือที่อยู่ลิงก์บทความ GA4)" });
+                return;
+            }
+
+            const windowKey = `snap${ssWindow}`;
+            const ga4Snapshots = {
+                [windowKey]: {
+                    snapshotDate: ssDate,
+                    window: ssWindow,
+                    publishedUrl: ssGa4Path || "",
+                    pageTitle: ssGa4Title || "",
+                    views,
+                    activeUsers,
+                    events,
+                    averageEngagementTime,
+                    bounceRate: ssGa4Bounce || "",
+                    sourceMedium: ssGa4SrcMed || "",
+                    notes: ssImportNote || ""
+                }
+            };
+
+            const rawSummaryParts = [
+                `Views=${views}`,
+                activeUsers > 0 ? `Users=${activeUsers}` : null,
+                events > 0 ? `Events=${events}` : null
+            ].filter(Boolean);
+
+            const sourceMetadata = {
+                sourceFileName: "Screenshot Upload",
+                sourceType: "GA4",
+                snapshotWindow: ssWindow,
+                snapshotDate: ssDate,
+                matchedBy: "manual",
+                matchConfidence: "Manual",
+                rowType: "screenshot_snapshot",
+                importMethod: "screenshot_assisted",
+                rawSourceSummary: `GA4 Screenshot: ${rawSummaryParts.join(", ")}`,
+                importNote: ssImportNote || ""
+            };
+
+            generatedPayload = {
+                schemaVersion: "workos-writing-lab-update-v0.1",
+                source: "Arbor",
+                importBatchTitle: `Screenshot Snapshot - GA4 ${ssWindow}`,
+                action: "apply_update",
+                target: {
+                    type: "writing_lab_project",
+                    projectId: matched.id,
+                    projectSlug: matched.slug
+                },
+                fields: {
+                    performanceFeedback: {
+                        ga4Snapshots,
+                        sourceMetadata
+                    }
+                }
+            };
+        } else {
+            const reach = parseVal(ssFbViewsReach);
+            const engagement = parseVal(ssFbEngagement);
+            const reactions = parseVal(ssFbReactions);
+            const comments = parseVal(ssFbComments);
+            const shares = parseVal(ssFbShares);
+            const linkClicks = parseVal(ssFbClicks);
+            const photoViews = parseVal(ssFbPhotoViews);
+            const otherClicks = parseVal(ssFbOtherClicks);
+
+            if (reach <= 0 && engagement <= 0 && reactions <= 0 && comments <= 0 && shares <= 0 && linkClicks <= 0 && photoViews <= 0 && otherClicks <= 0) {
+                setStatusMessage({ type: "error", text: "At least one Facebook metric must be greater than 0. (กรุณากรอกตัวชี้วัดประสิทธิภาพของ Facebook อย่างน้อยหนึ่งฟิลด์)" });
+                return;
+            }
+
+            if (reach < 0 || engagement < 0 || reactions < 0 || comments < 0 || shares < 0 || linkClicks < 0 || photoViews < 0 || otherClicks < 0) {
+                setStatusMessage({ type: "error", text: "Metrics cannot be negative. (ตัวเลขสถิติตัวชี้วัดห้ามเป็นค่าติดลบ)" });
+                return;
+            }
+
+            let platform = "facebook_page";
+            let sourceType = "facebook_page_post";
+            if (screenshotType === "Facebook Group Post") {
+                platform = "facebook_group";
+                sourceType = "facebook_group_post";
+            } else if (screenshotType === "Personal Profile Post") {
+                platform = "facebook_personal";
+                sourceType = "personal_profile_post";
+            }
+
+            const windowKey = `snap${ssWindow}`;
+            const facebookSnapshots = {
+                [windowKey]: {
+                    snapshotDate: ssDate,
+                    window: ssWindow,
+                    platform,
+                    postUrl: ssFbUrl || "",
+                    reach,
+                    reactions,
+                    comments,
+                    shares,
+                    linkClicks,
+                    engagement,
+                    photoViews,
+                    otherClicks,
+                    publishedDate: ssPublishedDate || "",
+                    notes: ssImportNote || ""
+                }
+            };
+
+            const rawSummaryParts = [
+                `Views/Reach=${reach}`,
+                engagement > 0 ? `Engagement=${engagement}` : null,
+                reactions > 0 ? `Reactions=${reactions}` : null,
+                comments > 0 ? `Comments=${comments}` : null,
+                shares > 0 ? `Shares=${shares}` : null,
+                linkClicks > 0 ? `LinkClicks=${linkClicks}` : null
+            ].filter(Boolean);
+
+            const sourceMetadata = {
+                sourceFileName: "Screenshot Upload",
+                sourceType,
+                snapshotWindow: ssWindow,
+                snapshotDate: ssDate,
+                matchedBy: "manual",
+                matchConfidence: "Manual",
+                rowType: "screenshot_snapshot",
+                importMethod: "screenshot_assisted",
+                rawSourceSummary: `Facebook Screenshot: ${rawSummaryParts.join(", ")}`,
+                importNote: ssImportNote || ""
+            };
+
+            generatedPayload = {
+                schemaVersion: "workos-writing-lab-update-v0.1",
+                source: "Arbor",
+                importBatchTitle: `Screenshot Snapshot - Facebook ${ssWindow}`,
+                action: "apply_update",
+                target: {
+                    type: "writing_lab_project",
+                    projectId: matched.id,
+                    projectSlug: matched.slug
+                },
+                fields: {
+                    performanceFeedback: {
+                        facebookSnapshots,
+                        sourceMetadata
+                    }
+                }
+            };
+        }
 
         setPayloadText(JSON.stringify(generatedPayload, null, 2));
         handleValidate(JSON.stringify(generatedPayload));
@@ -654,6 +943,16 @@ export default function ArborInboxClient() {
                             }`}
                         >
                             Quick Post Snapshot
+                        </button>
+                        <button
+                            onClick={() => setImportMode("screenshot")}
+                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                                importMode === "screenshot"
+                                    ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
+                                    : "text-theme-muted hover:text-theme-primary"
+                            }`}
+                        >
+                            Screenshot Snapshot
                         </button>
                     </div>
 
@@ -1276,6 +1575,366 @@ export default function ArborInboxClient() {
                             >
                                 <CheckCircleIcon className="w-4 h-4" />
                                 Generate Quick Snapshot Package
+                            </button>
+                        </div>
+                    )}
+
+                    {importMode === "screenshot" && (
+                        <div className="space-y-4">
+                            <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-2xl text-[11px] text-blue-700 dark:text-blue-400 font-bold space-y-1">
+                                <div>ℹ️ แนบภาพ Screenshot และตรวจสอบป้อนตัวเลขสถิติเพื่อความรวดเร็ว (Screenshot-assisted entry)</div>
+                                <div className="text-[10px] text-theme-muted font-medium">คำชี้แจง: ระบบจะจำลองตัวเลขอ้างอิงเบื้องต้นให้เป็นตัวอย่างหลังจากอัปโหลด กรุณาตรวจสอบและกรอก/แก้ไขค่าด้วยตนเองเพื่อรับรองความถูกต้อง</div>
+                            </div>
+
+                            {/* Drop/Upload Area and Form side by side */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                {/* Left Side: Upload / Paste Area */}
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Attach Screenshot (แนบภาพสกรีนช็อตรองรับลากวาง/วางไฟล์ภาพ)
+                                    </label>
+                                    
+                                    <div 
+                                        onPaste={handleScreenshotPaste}
+                                        className="border-2 border-dashed border-theme-border/60 hover:border-theme-primary/40 transition-all rounded-3xl p-5 text-center flex flex-col items-center justify-center gap-3 bg-theme-panel/10 min-h-[220px] relative overflow-hidden group cursor-pointer"
+                                    >
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleScreenshotChange}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                        {screenshotPreviewUrl ? (
+                                            <div className="w-full h-full flex flex-col items-center justify-center relative">
+                                                <img 
+                                                    src={screenshotPreviewUrl} 
+                                                    alt="Screenshot preview" 
+                                                    className="max-h-[180px] rounded-xl object-contain shadow-md border border-theme-border/40"
+                                                />
+                                                <div className="mt-2 text-[10px] text-theme-muted group-hover:text-theme-primary font-bold">คลิกหรือลากวางภาพใหม่เพื่อเปลี่ยนแปลง</div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <span className="w-12 h-12 rounded-full bg-theme-input flex items-center justify-center text-theme-muted border border-theme-border/30 group-hover:text-theme-primary group-hover:scale-105 transition-all">📸</span>
+                                                <div>
+                                                    <span className="text-xs font-black text-theme-primary block">ลากรูปภาพมาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์ หรือกดวางภาพ (Ctrl+V)</span>
+                                                    <span className="text-[10px] text-theme-muted block mt-1">สกรีนช็อตของสถิติ GA4 หรือ Facebook Insight</span>
+                                                </div>
+                                            </>
+                                        )}
+                                        {ssAnalyzing && (
+                                            <div className="absolute inset-0 bg-theme-card/90 flex flex-col items-center justify-center gap-2 transition-all">
+                                                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                                <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider animate-pulse">Analyzing Screenshot...</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Right Side: General details & Screenshot Type */}
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                            Screenshot Type (ประเภทภาพหน้าจอ) <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={screenshotType}
+                                            onChange={(e) => {
+                                                setScreenshotType(e.target.value);
+                                                if (screenshotPreviewUrl) {
+                                                    handleSimulateScreenshotExtraction(e.target.value);
+                                                }
+                                            }}
+                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                        >
+                                            <option value="GA4">GA4 Article</option>
+                                            <option value="Facebook Page Post">Facebook Page Post</option>
+                                            <option value="Facebook Group Post">Facebook Group Post</option>
+                                            <option value="Personal Profile Post">Personal Profile Post</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                            Target Writing Project (โครงการเขียนร่างเป้าหมาย) <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={ssProjectId}
+                                            onChange={(e) => setSsProjectId(e.target.value)}
+                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                        >
+                                            <option value="">-- เลือกโครงการร่างเป้าหมาย --</option>
+                                            {writingProjects.map((proj) => (
+                                                <option key={proj.id} value={proj.id}>
+                                                    {proj.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                                Snapshot Window (รอบช่วงเวลาสถิติ) <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={ssWindow}
+                                                onChange={(e) => setSsWindow(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                            >
+                                                <option value="12h">12 Hours (12 ชม.)</option>
+                                                <option value="24h">24 Hours (24 ชม. แรก)</option>
+                                                <option value="3d">3 Days (3 วันแรก)</option>
+                                                <option value="7d">7 Days (7 วันแรก)</option>
+                                                <option value="15d">15 Days (15 วันแรก)</option>
+                                                <option value="30d">30 Days (30 วันแรก)</option>
+                                                <option value="SincePublished">Since Published (ตั้งแต่เผยแพร่)</option>
+                                                <option value="CustomRange">Custom Range (ช่วงเวลาอื่น/กำหนดเอง)</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                                Snapshot Date (วันที่บันทึกสถิติ) <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={ssDate}
+                                                onChange={(e) => setSsDate(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs text-theme-primary font-bold focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section: Metrics Input Fields */}
+                            <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-3xl space-y-4 mt-3">
+                                <div className="flex items-center justify-between border-b border-theme-border/40 pb-2">
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary">
+                                        Verify & Edit Metrics (กรุณาตรวจและแก้ไขค่าตัวเลขด้วยตนเอง)
+                                    </h4>
+                                    <span className="text-[9px] font-bold text-yellow-600 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/10 uppercase">
+                                        Check required
+                                    </span>
+                                </div>
+
+                                {screenshotType === "GA4" ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Page Title (หัวข้อโพสต์/เพจ)</label>
+                                            <input
+                                                type="text"
+                                                value={ssGa4Title}
+                                                onChange={(e) => setSsGa4Title(e.target.value)}
+                                                placeholder="เช่น EP.10.3 Cytokinin guide"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Page Path / URL (ลิงก์บทความ)</label>
+                                            <input
+                                                type="text"
+                                                value={ssGa4Path}
+                                                onChange={(e) => setSsGa4Path(e.target.value)}
+                                                placeholder="/library/..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Views (จำนวนการดู)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssGa4Views}
+                                                onChange={(e) => setSsGa4Views(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Active Users (ผู้ใช้ที่ใช้งานอยู่)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssGa4Users}
+                                                onChange={(e) => setSsGa4Users(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Average Engagement Time (เวลาเฉลี่ยวินาที)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                value={ssGa4EngTime}
+                                                onChange={(e) => setSsGa4EngTime(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Event Count (จำนวนเหตุการณ์)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssGa4Events}
+                                                onChange={(e) => setSsGa4Events(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Bounce Rate (อัตราการตีกลับ - %)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="เช่น 28.5"
+                                                value={ssGa4Bounce}
+                                                onChange={(e) => setSsGa4Bounce(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Source / Medium (แหล่งที่มา/สื่อ)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="เช่น organic / google"
+                                                value={ssGa4SrcMed}
+                                                onChange={(e) => setSsGa4SrcMed(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                        <div className="space-y-1 col-span-2">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Post Title (หัวข้อโพสต์)</label>
+                                            <input
+                                                type="text"
+                                                value={ssFbTitle}
+                                                onChange={(e) => setSsFbTitle(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 col-span-2">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Post URL (ที่อยู่โพสต์เฟซบุ๊ก)</label>
+                                            <input
+                                                type="text"
+                                                value={ssFbUrl}
+                                                onChange={(e) => setSsFbUrl(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Reach / Views (คนเข้าถึง)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssFbViewsReach}
+                                                onChange={(e) => setSsFbViewsReach(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Engagement (ยอดมีส่วนร่วม)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssFbEngagement}
+                                                onChange={(e) => setSsFbEngagement(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Reactions (ความรู้สึก)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssFbReactions}
+                                                onChange={(e) => setSsFbReactions(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Comments (ความคิดเห็น)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssFbComments}
+                                                onChange={(e) => setSsFbComments(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Shares (ยอดแชร์)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssFbShares}
+                                                onChange={(e) => setSsFbShares(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Link Clicks (คลิกลิงก์)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssFbClicks}
+                                                onChange={(e) => setSsFbClicks(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Photo Views (ดูรูป)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssFbPhotoViews}
+                                                onChange={(e) => setSsFbPhotoViews(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Other Clicks (คลิกอื่น)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ssFbOtherClicks}
+                                                onChange={(e) => setSsFbOtherClicks(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 col-span-2">
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Published Date (วันที่โพสต์)</label>
+                                            <input
+                                                type="date"
+                                                value={ssPublishedDate}
+                                                onChange={(e) => setSsPublishedDate(e.target.value)}
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs text-theme-primary font-bold focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-1.5 col-span-4 border-t border-theme-border/20 pt-3">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Import Note (หมายเหตุการนำเข้าสถิติ)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={ssImportNote}
+                                        onChange={(e) => setSsImportNote(e.target.value)}
+                                        placeholder="ระบุข้อความบันทึกความจำสั้น..."
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleGenerateScreenshotSnapshot}
+                                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-green-600/15"
+                            >
+                                <CheckCircleIcon className="w-4 h-4" />
+                                Generate Snapshot Package
                             </button>
                         </div>
                     )}

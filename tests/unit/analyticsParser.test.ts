@@ -373,3 +373,108 @@ describe("Manual Quick Post Snapshot Payload Validation", () => {
         expect(validation.valid).toBe(false);
     });
 });
+
+describe("Screenshot-assisted Snapshot Payload Validation", () => {
+    const SCHEMA_UPDATE_VERSION = "workos-writing-lab-update-v0.1";
+
+    it("should validate a valid GA4 screenshot-assisted snapshot payload successfully", () => {
+        const payload = {
+            schemaVersion: SCHEMA_UPDATE_VERSION,
+            source: "Arbor",
+            importBatchTitle: "Screenshot Snapshot - GA4 24h",
+            action: "apply_update",
+            target: {
+                type: "writing_lab_project",
+                projectId: "proj_01",
+                projectSlug: "golden-pea"
+            },
+            fields: {
+                performanceFeedback: {
+                    ga4Snapshots: {
+                        snap24h: {
+                            snapshotDate: "2026-06-29",
+                            window: "24h",
+                            publishedUrl: "/library/golden-pea-amino-acid-guide",
+                            pageTitle: "EP.10.3 Cytokinin guide",
+                            views: 350,
+                            activeUsers: 310,
+                            events: 480,
+                            averageEngagementTime: 85,
+                            bounceRate: "28.5",
+                            sourceMedium: "organic / google",
+                            notes: "Screenshot manual verify"
+                        }
+                    },
+                    sourceMetadata: {
+                        sourceFileName: "Screenshot Upload",
+                        sourceType: "GA4",
+                        snapshotWindow: "24h",
+                        snapshotDate: "2026-06-29",
+                        matchedBy: "manual",
+                        matchConfidence: "Manual",
+                        rowType: "screenshot_snapshot",
+                        importMethod: "screenshot_assisted",
+                        rawSourceSummary: "GA4 Screenshot: Views=350, Users=310, Events=480",
+                        importNote: "Screenshot manual verify"
+                    }
+                }
+            }
+        };
+
+        const validation = validatePayload(payload, []);
+        expect(validation.valid).toBe(true);
+        expect(validation.errors).toHaveLength(0);
+    });
+
+    it("should validate a valid Facebook screenshot-assisted snapshot payload successfully", () => {
+        const payload = {
+            schemaVersion: SCHEMA_UPDATE_VERSION,
+            source: "Arbor",
+            importBatchTitle: "Screenshot Snapshot - Facebook 7d",
+            action: "apply_update",
+            target: {
+                type: "writing_lab_project",
+                projectId: "proj_01",
+                projectSlug: "golden-pea"
+            },
+            fields: {
+                performanceFeedback: {
+                    facebookSnapshots: {
+                        snap7d: {
+                            snapshotDate: "2026-06-29",
+                            window: "7d",
+                            platform: "facebook_group",
+                            postUrl: "https://facebook.com/groups/posts/123",
+                            reach: 227,
+                            reactions: 11,
+                            comments: 0,
+                            shares: 3,
+                            linkClicks: 5,
+                            engagement: 14,
+                            photoViews: 0,
+                            otherClicks: 0,
+                            publishedDate: "2026-06-22",
+                            notes: "Screenshot verification note"
+                        }
+                    },
+                    sourceMetadata: {
+                        sourceFileName: "Screenshot Upload",
+                        sourceType: "facebook_group_post",
+                        snapshotWindow: "7d",
+                        snapshotDate: "2026-06-29",
+                        matchedBy: "manual",
+                        matchConfidence: "Manual",
+                        rowType: "screenshot_snapshot",
+                        importMethod: "screenshot_assisted",
+                        rawSourceSummary: "Facebook Screenshot: Views/Reach=227, Engagement=14, Reactions=11, Shares=3, LinkClicks=5",
+                        importNote: "Screenshot verification note"
+                    }
+                }
+            }
+        };
+
+        const validation = validatePayload(payload, []);
+        expect(validation.valid).toBe(true);
+        expect(validation.errors).toHaveLength(0);
+    });
+});
