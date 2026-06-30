@@ -43,29 +43,172 @@ export default function ContentPerformanceDashboard({ projects }: ContentPerform
         return num.toLocaleString();
     };
 
-    // Latest snapshot helper (Priority: 30d > 7d > 24h, must have at least one metric or note)
-    const getLatestSnapshot = (snapshots: any) => {
-        if (!snapshots) return null;
+    // Merge helper to combine legacy combined snapshots, ga4Snapshots, and facebookSnapshots.
+    const getMergedSnapshots = (pf: any) => {
+        const merged: any = {};
         
-        const hasData = (snap: any) => {
-            if (!snap) return false;
-            return !!(
-                snap.views || snap.users || snap.events || snap.engagementTime ||
-                snap.sourceMedium || snap.fbReach || snap.fbReactions ||
-                snap.fbComments || snap.fbShares || snap.fbClicks || snap.notes
-            );
-        };
+        // Merge legacy/combined snapshots first
+        if (pf.snapshots) {
+            Object.keys(pf.snapshots).forEach(k => {
+                merged[k] = { ...merged[k], ...pf.snapshots[k] };
+            });
+        }
+        
+        // Merge ga4Snapshots
+        if (pf.ga4Snapshots) {
+            Object.keys(pf.ga4Snapshots).forEach(k => {
+                merged[k] = { ...merged[k], ...pf.ga4Snapshots[k] };
+            });
+        }
+        
+        // Merge facebookSnapshots
+        if (pf.facebookSnapshots) {
+            Object.keys(pf.facebookSnapshots).forEach(k => {
+                const snap = pf.facebookSnapshots[k];
+                // Map Facebook metric fields to table expectation (reach -> fbReach, reactions -> fbReactions, comments -> fbComments, shares -> fbShares, linkClicks -> fbClicks)
+                merged[k] = { 
+                    ...merged[k], 
+                    ...snap,
+                    fbReach: snap.reach !== undefined ? snap.reach : (merged[k]?.fbReach || snap.fbReach || ""),
+                    fbReactions: snap.reactions !== undefined ? snap.reactions : (merged[k]?.fbReactions || snap.fbReactions || ""),
+                    fbComments: snap.comments !== undefined ? snap.comments : (merged[k]?.fbComments || snap.fbComments || ""),
+                    fbShares: snap.shares !== undefined ? snap.shares : (merged[k]?.fbShares || snap.fbShares || ""),
+                    fbClicks: snap.linkClicks !== undefined ? snap.linkClicks : (merged[k]?.fbClicks || snap.fbClicks || "")
+                };
+            });
+        }
+        
+        return merged;
+    };
 
-        if (hasData(snapshots.snap30d)) {
-            return { type: "30d", ...snapshots.snap30d };
+    // Helper to find latest snapshot based on date priority or window priority
+    const getLatestSnapshotFromGroup = (snapshotsGroup: any) => {
+        if (!snapshotsGroup) return null;
+        
+        // Find all non-empty snapshots
+        const validSnaps = Object.entries(snapshotsGroup)
+            .map(([windowKey, snap]: [string, any]) => {
+                if (!snap) return null;
+                const hasVal = !!(
+                    snap.views || snap.activeUsers || snap.users || snap.events || snap.engagementTime ||
+                    snap.sourceMedium || snap.fbReach || snap.fbReactions || snap.fbComments || 
+                    snap.fbShares || snap.fbClicks || snap.reach || snap.reactions || snap.comments || 
+                    snap.shares || snap.linkClicks || snap.notes || snap.platform
+                );
+                if (!hasVal) return null;
+                return { windowKey, ...snap };
+            })
+            .filter((snap): snap is any => snap !== null);
+
+        if (validSnaps.length === 0) return null;
+
+        // Try sorting by snapshotDate latest first (Primary rule)
+        const withDate = validSnaps.filter(s => s.snapshotDate && s.snapshotDate.trim());
+        if (withDate.length > 0) {
+            withDate.sort((a, b) => {
+                const dateA = new Date(a.snapshotDate).getTime();
+                const dateB = new Date(b.snapshotDate).getTime();
+                if (!isNaN(dateA) && !isNaN(dateB)) {
+                    return dateB - dateA; // descending (latest date first)
+                }
+                return 0;
+            });
+            const latest = withDate[0];
+            const type = latest.windowKey.replace(/^snap/, "");
+            return { type, ...latest };
         }
-        if (hasData(snapshots.snap7d)) {
-            return { type: "7d", ...snapshots.snap7d };
+
+        // If no snapshotDate, fallback to window priority:
+        // sincePublished / cumulative -> 90d -> 30d -> 15d -> 7d -> 3d -> 24h -> 12h -> customRange
+        const windowPriorityOrder = [
+            "snapSincePublished",
+            "snapSince_published",
+            "snapCumulative",
+            "snap90d",
+            "snap30d",
+            "snap15d",
+            "snap7d",
+            "snap3d",
+            "snap24h",
+            "snap12h",
+            "snapCustomRange",
+            "snapCustom_range"
+        ];
+
+        for (const wk of windowPriorityOrder) {
+            const found = validSnaps.find(s => s.windowKey.toLowerCase() === wk.toLowerCase());
+            if (found) {
+                const type = found.windowKey.replace(/^snap/, "");
+                return { type, ...found };
+            }
         }
-        if (hasData(snapshots.snap24h)) {
-            return { type: "24h", ...snapshots.snap24h };
+
+        // Last fallback: return the first valid snapshot
+        const first = validSnaps[0];
+        const type = first.windowKey.replace(/^snap/, "");
+        return { type, ...first };
+    };
+
+    // Helper to get latest GA4 snapshot specifically
+    const getLatestGa4Snapshot = (pf: any) => {
+        if (!pf) return null;
+        const ga4Snaps = pf.ga4Snapshots || {};
+        
+        // Merge from legacy combined snapshots if they have views or sourceMedium
+        const mergedGa4: any = {};
+        if (pf.snapshots) {
+            Object.keys(pf.snapshots).forEach(k => {
+                const snap = pf.snapshots[k];
+                if (snap && (snap.views || snap.users || snap.activeUsers || snap.sourceMedium)) {
+                    mergedGa4[k] = { ...snap };
+                }
+            });
         }
-        return null;
+        Object.keys(ga4Snaps).forEach(k => {
+            if (ga4Snaps[k]) {
+                mergedGa4[k] = { ...mergedGa4[k], ...ga4Snaps[k] };
+            }
+        });
+
+        return getLatestSnapshotFromGroup(mergedGa4);
+    };
+
+    // Helper to get latest Facebook snapshot specifically
+    const getLatestFacebookSnapshot = (pf: any) => {
+        if (!pf) return null;
+        const fbSnaps = pf.facebookSnapshots || {};
+        
+        // Merge from legacy combined snapshots if they have fbReach or similar
+        const mergedFb: any = {};
+        if (pf.snapshots) {
+            Object.keys(pf.snapshots).forEach(k => {
+                const snap = pf.snapshots[k];
+                if (snap && (snap.fbReach || snap.fbReactions || snap.fbComments || snap.fbShares || snap.fbClicks || snap.reach || snap.platform)) {
+                    mergedFb[k] = { 
+                        ...snap,
+                        reach: snap.fbReach !== undefined ? snap.fbReach : snap.reach,
+                        reactions: snap.fbReactions !== undefined ? snap.fbReactions : snap.reactions,
+                        comments: snap.fbComments !== undefined ? snap.fbComments : snap.comments,
+                        shares: snap.fbShares !== undefined ? snap.fbShares : snap.shares,
+                        linkClicks: snap.fbClicks !== undefined ? snap.fbClicks : snap.linkClicks
+                    };
+                }
+            });
+        }
+        Object.keys(fbSnaps).forEach(k => {
+            if (fbSnaps[k]) {
+                mergedFb[k] = { ...mergedFb[k], ...fbSnaps[k] };
+            }
+        });
+
+        return getLatestSnapshotFromGroup(mergedFb);
+    };
+
+    // Keep table compatibility by reading from all combined/merged snapshots
+    const getLatestSnapshot = (pf: any) => {
+        if (!pf) return null;
+        const merged = getMergedSnapshots(pf);
+        return getLatestSnapshotFromGroup(merged);
     };
 
     // Parse and filter projects with performance feedback defensively
@@ -113,25 +256,83 @@ export default function ContentPerformanceDashboard({ projects }: ContentPerform
         return { name: dec, count };
     });
 
-    // Traffic Source Signals group by (read from latest snapshot sourceMedium)
-    const trafficSourcesMap: { [key: string]: number } = {};
-    let totalSourcesCount = 0;
+    // Website Traffic Sources Grouping
+    const websiteTrafficMap: { [key: string]: { count: number; views: number; users: number } } = {};
+    let totalWebsiteSourcesCount = 0;
 
     analyticsProjects.forEach(p => {
-        const latest = getLatestSnapshot(p.pf.snapshots);
-        if (latest) {
-            const rawSource = latest.sourceMedium || "Unknown";
+        const latestGa4 = getLatestGa4Snapshot(p.pf);
+        if (latestGa4) {
+            const rawSource = latestGa4.sourceMedium || "Unknown";
             const source = rawSource.trim() === "" ? "Unknown" : rawSource.trim();
-            trafficSourcesMap[source] = (trafficSourcesMap[source] || 0) + 1;
-            totalSourcesCount++;
+            const views = parseMetricNumber(latestGa4.views || latestGa4.viewsCount || latestGa4.views);
+            const users = parseMetricNumber(latestGa4.activeUsers || latestGa4.users);
+
+            if (!websiteTrafficMap[source]) {
+                websiteTrafficMap[source] = { count: 0, views: 0, users: 0 };
+            }
+            websiteTrafficMap[source].count++;
+            websiteTrafficMap[source].views += views;
+            websiteTrafficMap[source].users += users;
+            totalWebsiteSourcesCount++;
         }
     });
 
-    const trafficSourcesList = Object.entries(trafficSourcesMap)
-        .map(([name, count]) => ({
+    const websiteSourcesList = Object.entries(websiteTrafficMap)
+        .map(([name, data]) => ({
             name,
-            count,
-            percentage: totalSourcesCount > 0 ? Math.round((count / totalSourcesCount) * 100) : 0
+            count: data.count,
+            views: data.views,
+            users: data.users,
+            percentage: totalWebsiteSourcesCount > 0 ? Math.round((data.count / totalWebsiteSourcesCount) * 100) : 0
+        }))
+        .sort((a, b) => b.count - a.count);
+
+    // Facebook/Social Platform Sources Grouping
+    const socialPlatformMap: { [key: string]: { count: number; reach: number; reactions: number; comments: number; shares: number } } = {};
+    let totalSocialSourcesCount = 0;
+
+    analyticsProjects.forEach(p => {
+        const latestFb = getLatestFacebookSnapshot(p.pf);
+        if (latestFb) {
+            let platformRaw = latestFb.platform || p.pf.sourceMetadata?.sourceType || "facebook";
+            
+            // Normalize label
+            let sourceLabel = "Facebook";
+            if (platformRaw === "facebook_group_post" || platformRaw === "facebook_group") {
+                sourceLabel = "Facebook Group";
+            } else if (platformRaw === "facebook_page_post" || platformRaw === "facebook_page") {
+                sourceLabel = "Facebook Page";
+            } else if (platformRaw === "personal_profile_post" || platformRaw === "facebook_personal") {
+                sourceLabel = "Personal Profile";
+            }
+
+            const reach = parseMetricNumber(latestFb.reach || latestFb.fbReach);
+            const reactions = parseMetricNumber(latestFb.reactions || latestFb.fbReactions);
+            const comments = parseMetricNumber(latestFb.comments || latestFb.fbComments);
+            const shares = parseMetricNumber(latestFb.shares || latestFb.fbShares);
+
+            if (!socialPlatformMap[sourceLabel]) {
+                socialPlatformMap[sourceLabel] = { count: 0, reach: 0, reactions: 0, comments: 0, shares: 0 };
+            }
+            socialPlatformMap[sourceLabel].count++;
+            socialPlatformMap[sourceLabel].reach += reach;
+            socialPlatformMap[sourceLabel].reactions += reactions;
+            socialPlatformMap[sourceLabel].comments += comments;
+            socialPlatformMap[sourceLabel].shares += shares;
+            totalSocialSourcesCount++;
+        }
+    });
+
+    const socialSourcesList = Object.entries(socialPlatformMap)
+        .map(([name, data]) => ({
+            name,
+            count: data.count,
+            reach: data.reach,
+            reactions: data.reactions,
+            comments: data.comments,
+            shares: data.shares,
+            percentage: totalSocialSourcesCount > 0 ? Math.round((data.count / totalSocialSourcesCount) * 100) : 0
         }))
         .sort((a, b) => b.count - a.count);
 
@@ -207,36 +408,86 @@ export default function ContentPerformanceDashboard({ projects }: ContentPerform
 
             {/* Mid Section: Traffic & Buckets */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Traffic Source Signals */}
-                <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm space-y-4">
-                    <div>
-                        <h4 className="text-sm font-black text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
-                            <Globe size={16} className="text-emerald-500" />
-                            Traffic Source Signals
-                        </h4>
-                        <p className="text-[10px] font-bold text-neutral-400 mt-0.5">สัดส่วนช่องทางทราฟฟิกหลักจากสถิติล่าสุด (latest snapshot)</p>
+                {/* Traffic & Social Source Signals (Stacked vertically) */}
+                <div className="space-y-6">
+                    {/* Website Traffic Sources */}
+                    <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm space-y-4">
+                        <div>
+                            <h4 className="text-sm font-black text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <Globe size={16} className="text-emerald-500" />
+                                Website Traffic Sources
+                            </h4>
+                            <p className="text-[10px] font-bold text-neutral-400 mt-0.5">สัดส่วนช่องทางทราฟฟิกหลักบนเว็บไซต์จาก GA4 (latest snapshot)</p>
+                        </div>
+
+                        {websiteSourcesList.length === 0 ? (
+                            <div className="py-8 text-center text-xs text-neutral-400 font-bold border border-dashed border-neutral-100 rounded-2xl bg-neutral-50/20">
+                                ไม่มีข้อมูลแหล่งที่มาเว็บไซต์ (Empty State)
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {websiteSourcesList.map((source, i) => (
+                                    <div key={i} className="space-y-1.5">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="font-bold text-neutral-700">{source.name}</span>
+                                            <span className="font-black text-neutral-900">{source.count} ตอน ({source.percentage}%)</span>
+                                        </div>
+                                        <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
+                                            <div 
+                                                className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                                                style={{ width: `${source.percentage}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] font-medium text-neutral-400">
+                                            <span>Views: <strong className="text-neutral-600">{source.views.toLocaleString()}</strong></span>
+                                            <span>•</span>
+                                            <span>Users: <strong className="text-neutral-600">{source.users.toLocaleString()}</strong></span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
-                    {trafficSourcesList.length === 0 ? (
-                        <div className="py-6 text-center text-xs text-neutral-400 font-bold">ไม่มีข้อมูลแหล่งที่มา</div>
-                    ) : (
-                        <div className="space-y-3">
-                            {trafficSourcesList.map((source, i) => (
-                                <div key={i} className="space-y-1.5">
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="font-bold text-neutral-700">{source.name}</span>
-                                        <span className="font-black text-neutral-900">{source.count} ตอน ({source.percentage}%)</span>
-                                    </div>
-                                    <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
-                                        <div 
-                                            className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
-                                            style={{ width: `${source.percentage}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
+                    {/* Social Platform Sources */}
+                    <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm space-y-4">
+                        <div>
+                            <h4 className="text-sm font-black text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <Share2 size={16} className="text-blue-500" />
+                                Social Platform Sources
+                            </h4>
+                            <p className="text-[10px] font-bold text-neutral-400 mt-0.5">ช่องทางสถิติบนเครือข่ายสังคมออนไลน์จาก Facebook (latest snapshot)</p>
                         </div>
-                    )}
+
+                        {socialSourcesList.length === 0 ? (
+                            <div className="py-8 text-center text-xs text-neutral-400 font-bold border border-dashed border-neutral-100 rounded-2xl bg-neutral-50/20">
+                                ไม่มีข้อมูลสถิติช่องทางโซเชียล (Empty State)
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {socialSourcesList.map((source, i) => (
+                                    <div key={i} className="space-y-2">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="font-bold text-neutral-700">{source.name}</span>
+                                            <span className="font-black text-neutral-900">{source.count} โพสต์ ({source.percentage}%)</span>
+                                        </div>
+                                        <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
+                                            <div 
+                                                className="bg-blue-500 h-full rounded-full transition-all duration-500" 
+                                                style={{ width: `${source.percentage}%` }}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[9px] font-medium text-neutral-400">
+                                            <span>Reach/Views: <strong className="text-neutral-600">{source.reach.toLocaleString()}</strong></span>
+                                            <span>Reactions: <strong className="text-neutral-600">{source.reactions.toLocaleString()}</strong></span>
+                                            <span>Comments: <strong className="text-neutral-600">{source.comments.toLocaleString()}</strong></span>
+                                            <span>Shares: <strong className="text-neutral-600">{source.shares.toLocaleString()}</strong></span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Decision Buckets */}
@@ -363,7 +614,7 @@ export default function ContentPerformanceDashboard({ projects }: ContentPerform
                                 </tr>
                             ) : (
                                 filteredProjects.map((project) => {
-                                    const latest = getLatestSnapshot(project.pf.snapshots);
+                                     const latest = getLatestSnapshot(project.pf);
                                     return (
                                         <tr key={project.id} className="hover:bg-neutral-50/30 transition-colors">
                                             <td className="py-4 px-6 font-bold text-neutral-900 max-w-xs truncate">
