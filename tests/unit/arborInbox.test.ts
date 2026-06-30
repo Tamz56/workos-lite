@@ -214,4 +214,18 @@ describe("Arbor Inbox - Verify JSON Examples", () => {
         expect(payload.schemaVersion).toBe("workos-writing-lab-update-v0.1");
         expect(payload.fields.performanceFeedback).toBeDefined();
     });
+
+    it("should successfully validate gf-ga4-facebook-combined-snapshot-example.json", () => {
+        const filePath = path.resolve(process.cwd(), "docs/arbor/examples/gf-ga4-facebook-combined-snapshot-example.json");
+        const raw = fs.readFileSync(filePath, "utf-8");
+        const payload = JSON.parse(raw);
+        
+        const result = validatePayload(payload, []);
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+        expect(payload.schemaVersion).toBe("workos-writing-lab-update-v0.1");
+        expect(payload.fields.performanceFeedback.facebookSnapshots).toBeDefined();
+        expect(payload.fields.performanceFeedback.ga4Snapshots).toBeDefined();
+        expect(payload.fields.performanceFeedback.combinedAnalysis).toBeDefined();
+    });
 });

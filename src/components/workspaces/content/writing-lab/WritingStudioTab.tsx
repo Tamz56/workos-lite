@@ -193,6 +193,41 @@ export default function WritingStudioTab({
     const [utmCampaign, setUtmCampaign] = useState("");
     const [publishStatus, setPublishStatus] = useState("Draft");
 
+    const createEmptyFacebookSnapshot = (windowKey: string) => ({
+        snapshotDate: "",
+        window: windowKey,
+        platform: "facebook_page",
+        postUrl: "",
+        publishedDate: "",
+        reach: "",
+        reactions: "",
+        comments: "",
+        shares: "",
+        linkClicks: "",
+        saves: "",
+        notableComments: "",
+        audienceQuestions: "",
+        confusion: "",
+        audienceLanguage: "",
+        notes: ""
+    });
+
+    const createEmptyGA4Snapshot = (windowKey: string) => ({
+        snapshotDate: "",
+        window: windowKey,
+        publishedUrl: "",
+        pageTitle: "",
+        views: "",
+        activeUsers: "",
+        events: "",
+        averageEngagementTime: "",
+        bounceRate: "",
+        sourceMedium: "",
+        organicUsers: "",
+        referralUsers: "",
+        notes: ""
+    });
+
     // 2. Feedback Snapshots
     const createEmptySnapshot = () => ({
         snapshotDate: "",
@@ -211,6 +246,31 @@ export default function WritingStudioTab({
     const [snapshot24h, setSnapshot24h] = useState(createEmptySnapshot());
     const [snapshot7d, setSnapshot7d] = useState(createEmptySnapshot());
     const [snapshot30d, setSnapshot30d] = useState(createEmptySnapshot());
+
+    const [fbActiveSnap, setFbActiveSnap] = useState<"24h" | "7d" | "30d" | "90d">("24h");
+    const [ga4ActiveSnap, setGa4ActiveSnap] = useState<"24h" | "7d" | "30d" | "90d">("24h");
+
+    // New Facebook Snapshots
+    const [fbSnap24h, setFbSnap24h] = useState(createEmptyFacebookSnapshot("24h"));
+    const [fbSnap7d, setFbSnap7d] = useState(createEmptyFacebookSnapshot("7d"));
+    const [fbSnap30d, setFbSnap30d] = useState(createEmptyFacebookSnapshot("30d"));
+    const [fbSnap90d, setFbSnap90d] = useState(createEmptyFacebookSnapshot("90d"));
+
+    // New GA4 Snapshots
+    const [ga4Snap24h, setGa4Snap24h] = useState(createEmptyGA4Snapshot("24h"));
+    const [ga4Snap7d, setGa4Snap7d] = useState(createEmptyGA4Snapshot("7d"));
+    const [ga4Snap30d, setGa4Snap30d] = useState(createEmptyGA4Snapshot("30d"));
+    const [ga4Snap90d, setGa4Snap90d] = useState(createEmptyGA4Snapshot("90d"));
+
+    // Combined Analysis additional states
+    const [performanceSummary, setPerformanceSummary] = useState("");
+    const [distributionSignal, setDistributionSignal] = useState("");
+    const [websiteSignal, setWebsiteSignal] = useState("");
+    const [hookSignal, setHookSignal] = useState("");
+    const [imageSignal, setImageSignal] = useState("");
+    const [ctaSignal, setCtaSignal] = useState("");
+    const [seoSignal, setSeoSignal] = useState("");
+    const [commentSignal, setCommentSignal] = useState("");
 
     // 3. Notable Feedback
     const [notableComments, setNotableComments] = useState("");
@@ -275,23 +335,24 @@ export default function WritingStudioTab({
             let utmCamp = "";
             let pubStatus = "Draft";
 
-            let s24 = {
-                snapshotDate: "", views: "", users: "", events: "", engagementTime: "",
-                sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: ""
-            };
-            let s7 = {
-                snapshotDate: "", views: "", users: "", events: "", engagementTime: "",
-                sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: ""
-            };
-            let s30 = {
-                snapshotDate: "", views: "", users: "", events: "", engagementTime: "",
-                sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: ""
-            };
-
+            let s24 = { snapshotDate: "", views: "", users: "", events: "", engagementTime: "", sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: "" };
+            let s7 = { snapshotDate: "", views: "", users: "", events: "", engagementTime: "", sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: "" };
+            let s30 = { snapshotDate: "", views: "", users: "", events: "", engagementTime: "", sourceMedium: "", fbReach: "", fbReactions: "", fbComments: "", fbShares: "", fbClicks: "", notes: "" };
             let notable = { comments: "", questions: "", confusion: "", language: "", followupTopic: "" };
             let insight = { whatWorked: "", whatDidNotWork: "", topicSignal: "", trafficSignal: "", engagementSignal: "", repostPotential: "", followupPotential: "", recommendedAction: "" };
             let nextDec = { decision: "No action", priority: "Medium", targetDate: "", notes: "" };
             let reviewRes: any = null;
+
+            let fb24 = createEmptyFacebookSnapshot("24h");
+            let fb7 = createEmptyFacebookSnapshot("7d");
+            let fb30 = createEmptyFacebookSnapshot("30d");
+            let fb90 = createEmptyFacebookSnapshot("90d");
+            let ga24 = createEmptyGA4Snapshot("24h");
+            let ga7 = createEmptyGA4Snapshot("7d");
+            let ga30 = createEmptyGA4Snapshot("30d");
+            let ga90 = createEmptyGA4Snapshot("90d");
+
+            let combSummary = "", combDistSig = "", combWebSig = "", combHookSig = "", combImgSig = "", combCtaSig = "", combSeoSig = "", combCommSig = "";
 
             if (activeProject.notes) {
                 try {
@@ -299,7 +360,6 @@ export default function WritingStudioTab({
                     legacyHeroSub = parsed.hero_subtitle || "";
                     pubUrl = parsed.published_url || "";
                     campName = parsed.campaign_name || "";
-
                     const pf = parsed.performanceFeedback;
                     if (pf) {
                         const pr = pf.publishingRecord || {};
@@ -314,20 +374,67 @@ export default function WritingStudioTab({
                         if (snaps.snap24h) s24 = { ...s24, ...snaps.snap24h };
                         if (snaps.snap7d) s7 = { ...s7, ...snaps.snap7d };
                         if (snaps.snap30d) s30 = { ...s30, ...snaps.snap30d };
-
                         if (pf.notableFeedback) notable = { ...notable, ...pf.notableFeedback };
                         if (pf.arborInsight) insight = { ...insight, ...pf.arborInsight };
                         if (pf.nextDecision) nextDec = { ...nextDec, ...pf.nextDecision };
                         if (pf.arborReview) reviewRes = pf.arborReview;
+
+                        const fbSnaps = pf.facebookSnapshots || {};
+                        const getFb = (w: string, leg: any) => {
+                            const c = fbSnaps[w] || {};
+                            return {
+                                snapshotDate: c.snapshotDate || leg.snapshotDate || "", window: w.replace("snap", ""),
+                                platform: c.platform || "facebook_page", postUrl: c.postUrl || fbPageUrl || "",
+                                publishedDate: c.publishedDate || pubDate || "", reach: c.reach ?? leg.fbReach ?? "",
+                                reactions: c.reactions ?? leg.fbReactions ?? "", comments: c.comments ?? leg.fbComments ?? "",
+                                shares: c.shares ?? leg.fbShares ?? "", linkClicks: c.linkClicks ?? leg.fbClicks ?? "",
+                                saves: c.saves || "", notableComments: c.notableComments || "", audienceQuestions: c.audienceQuestions || "",
+                                confusion: c.confusion || "", audienceLanguage: c.audienceLanguage || "", notes: c.notes || leg.notes || ""
+                            };
+                        };
+                        fb24 = getFb("snap24h", snaps.snap24h || {});
+                        fb7 = getFb("snap7d", snaps.snap7d || {});
+                        fb30 = getFb("snap30d", snaps.snap30d || {});
+                        fb90 = getFb("snap90d", {});
+
+                        const ga4Snaps = pf.ga4Snapshots || {};
+                        const getGa4 = (w: string, leg: any) => {
+                            const c = ga4Snaps[w] || {};
+                            return {
+                                snapshotDate: c.snapshotDate || leg.snapshotDate || "", window: w.replace("snap", ""),
+                                publishedUrl: c.publishedUrl || pubUrl || "", pageTitle: c.pageTitle || activeProject.title || "",
+                                views: c.views ?? leg.views ?? "", activeUsers: c.activeUsers ?? leg.users ?? "",
+                                events: c.events ?? leg.events ?? "", averageEngagementTime: c.averageEngagementTime ?? leg.engagementTime ?? "",
+                                bounceRate: c.bounceRate || "", sourceMedium: c.sourceMedium || leg.sourceMedium || "",
+                                organicUsers: c.organicUsers || "", referralUsers: c.referralUsers || "", notes: c.notes || leg.notes || ""
+                            };
+                        };
+                        ga24 = getGa4("snap24h", snaps.snap24h || {});
+                        ga7 = getGa4("snap7d", snaps.snap7d || {});
+                        ga30 = getGa4("snap30d", snaps.snap30d || {});
+                        ga90 = getGa4("snap90d", {});
+
+                        const comb = pf.combinedAnalysis || {};
+                        combSummary = comb.performanceSummary || "";
+                        combDistSig = comb.distributionSignal || "";
+                        combWebSig = comb.websiteSignal || "";
+                        combHookSig = comb.hookSignal || "";
+                        combImgSig = comb.imageSignal || "";
+                        combCtaSig = comb.ctaSignal || "";
+                        combSeoSig = comb.seoSignal || "";
+                        combCommSig = comb.commentSignal || "";
+
+                        if (comb.topicSignal) insight.topicSignal = comb.topicSignal;
+                        if (comb.whatWorked) insight.whatWorked = comb.whatWorked;
+                        if (comb.whatDidNotWork) insight.whatDidNotWork = comb.whatDidNotWork;
+                        if (comb.recommendedAction) insight.recommendedAction = comb.recommendedAction;
+                        if (comb.nextDecision) nextDec = { ...nextDec, ...comb.nextDecision };
                     }
-                } catch {
-                    // notes is plain text
-                }
+                } catch {}
             }
             setHeroSubtitle(legacyHeroSub);
             setPublishedUrl(pubUrl);
             setCampaignName(campName);
-
             setPublishedDate(pubDate);
             setFacebookGroupUrl(fbGroupUrl);
             setFacebookPageUrl(fbPageUrl);
@@ -338,6 +445,25 @@ export default function WritingStudioTab({
             setSnapshot24h(s24);
             setSnapshot7d(s7);
             setSnapshot30d(s30);
+
+            setFbSnap24h(fb24);
+            setFbSnap7d(fb7);
+            setFbSnap30d(fb30);
+            setFbSnap90d(fb90);
+
+            setGa4Snap24h(ga24);
+            setGa4Snap7d(ga7);
+            setGa4Snap30d(ga30);
+            setGa4Snap90d(ga90);
+
+            setPerformanceSummary(combSummary);
+            setDistributionSignal(combDistSig);
+            setWebsiteSignal(combWebSig);
+            setHookSignal(combHookSig);
+            setImageSignal(combImgSig);
+            setCtaSignal(combCtaSig);
+            setSeoSignal(combSeoSig);
+            setCommentSignal(combCommSig);
 
             setNotableComments(notable.comments);
             setAudienceQuestions(notable.questions);
@@ -511,9 +637,60 @@ export default function WritingStudioTab({
                         publishStatus: publishStatus
                     },
                     snapshots: {
-                        snap24h: snapshot24h,
-                        snap7d: snapshot7d,
-                        snap30d: snapshot30d
+                        snap24h: {
+                            snapshotDate: ga4Snap24h.snapshotDate || fbSnap24h.snapshotDate || "",
+                            views: ga4Snap24h.views || "",
+                            users: ga4Snap24h.activeUsers || "",
+                            events: ga4Snap24h.events || "",
+                            engagementTime: ga4Snap24h.averageEngagementTime || "",
+                            sourceMedium: ga4Snap24h.sourceMedium || "",
+                            fbReach: fbSnap24h.reach || "",
+                            fbReactions: fbSnap24h.reactions || "",
+                            fbComments: fbSnap24h.comments || "",
+                            fbShares: fbSnap24h.shares || "",
+                            fbClicks: fbSnap24h.linkClicks || "",
+                            notes: ga4Snap24h.notes || fbSnap24h.notes || ""
+                        },
+                        snap7d: {
+                            snapshotDate: ga4Snap7d.snapshotDate || fbSnap7d.snapshotDate || "",
+                            views: ga4Snap7d.views || "",
+                            users: ga4Snap7d.activeUsers || "",
+                            events: ga4Snap7d.events || "",
+                            engagementTime: ga4Snap7d.averageEngagementTime || "",
+                            sourceMedium: ga4Snap7d.sourceMedium || "",
+                            fbReach: fbSnap7d.reach || "",
+                            fbReactions: fbSnap7d.reactions || "",
+                            fbComments: fbSnap7d.comments || "",
+                            fbShares: fbSnap7d.shares || "",
+                            fbClicks: fbSnap7d.linkClicks || "",
+                            notes: ga4Snap7d.notes || fbSnap7d.notes || ""
+                        },
+                        snap30d: {
+                            snapshotDate: ga4Snap30d.snapshotDate || fbSnap30d.snapshotDate || "",
+                            views: ga4Snap30d.views || "",
+                            users: ga4Snap30d.activeUsers || "",
+                            events: ga4Snap30d.events || "",
+                            engagementTime: ga4Snap30d.averageEngagementTime || "",
+                            sourceMedium: ga4Snap30d.sourceMedium || "",
+                            fbReach: fbSnap30d.reach || "",
+                            fbReactions: fbSnap30d.reactions || "",
+                            fbComments: fbSnap30d.comments || "",
+                            fbShares: fbSnap30d.shares || "",
+                            fbClicks: fbSnap30d.linkClicks || "",
+                            notes: ga4Snap30d.notes || fbSnap30d.notes || ""
+                        }
+                    },
+                    facebookSnapshots: {
+                        snap24h: fbSnap24h,
+                        snap7d: fbSnap7d,
+                        snap30d: fbSnap30d,
+                        snap90d: fbSnap90d
+                    },
+                    ga4Snapshots: {
+                        snap24h: ga4Snap24h,
+                        snap7d: ga4Snap7d,
+                        snap30d: ga4Snap30d,
+                        snap90d: ga4Snap90d
                     },
                     notableFeedback: {
                         comments: notableComments,
@@ -531,6 +708,26 @@ export default function WritingStudioTab({
                         repostPotential: repostPotential,
                         followupPotential: followupPotential,
                         recommendedAction: recommendedAction
+                    },
+                    combinedAnalysis: {
+                        performanceSummary: performanceSummary,
+                        distributionSignal: distributionSignal,
+                        websiteSignal: websiteSignal,
+                        topicSignal: topicSignal,
+                        hookSignal: hookSignal,
+                        imageSignal: imageSignal,
+                        ctaSignal: ctaSignal,
+                        seoSignal: seoSignal,
+                        commentSignal: commentSignal,
+                        whatWorked: whatWorked,
+                        whatDidNotWork: whatDidNotWork,
+                        recommendedAction: recommendedAction,
+                        nextDecision: {
+                            decision: decision,
+                            priority: decisionPriority,
+                            targetDate: decisionTargetDate,
+                            notes: decisionNotes
+                        }
                     },
                     nextDecision: {
                         decision: decision,
@@ -1094,48 +1291,73 @@ export default function WritingStudioTab({
     };
 
     const handleCopyInsightPrompt = () => {
+        if (!activeProject) return;
         let prompt = `คุณคือ Arbor Insight Analyzer หน้าที่ของคุณคือการวิเคราะห์ประสิทธิภาพบทความ Green Fineness เพื่อสรุปข้อมูลและกำหนดทิศทางเนื้อหาถัดไป\n\n`;
         prompt += `หัวข้อบทความ: ${workingTitle}\n`;
+        prompt += `Project ID หรือ Slug ของระบบ: ${activeProject.id} หรือ ${activeProject.slug || "N/A"}\n`;
         prompt += `ลิงก์ที่เผยแพร่:\n`;
         prompt += `- Website: ${publishedUrl || "N/A"}\n`;
         prompt += `- FB Group: ${facebookGroupUrl || "N/A"}\n`;
         prompt += `- FB Page: ${facebookPageUrl || "N/A"}\n`;
         prompt += `- Personal Profile: ${personalPostUrl || "N/A"}\n\n`;
         
-        prompt += `--- สรุปตัวชี้วัด (Metrics Summary) ---\n`;
-        if (snapshot24h) {
-            prompt += `[Snapshot 24h] วันที่: ${snapshot24h.snapshotDate || "N/A"}\n`;
-            prompt += `- GA4 Views: ${snapshot24h.views || 0} | Users: ${snapshot24h.users || 0} | Avg Time: ${snapshot24h.engagementTime || 0}s\n`;
-            prompt += `- FB Reach: ${snapshot24h.fbReach || 0} | Reactions: ${snapshot24h.fbReactions || 0} | Comments: ${snapshot24h.fbComments || 0}\n`;
-        }
-        if (snapshot7d) {
-            prompt += `[Snapshot 7d] วันที่: ${snapshot7d.snapshotDate || "N/A"}\n`;
-            prompt += `- GA4 Views: ${snapshot7d.views || 0} | Users: ${snapshot7d.users || 0} | Avg Time: ${snapshot7d.engagementTime || 0}s\n`;
-            prompt += `- FB Reach: ${snapshot7d.fbReach || 0} | Reactions: ${snapshot7d.fbReactions || 0} | Comments: ${snapshot7d.fbComments || 0}\n`;
-        }
-        if (snapshot30d) {
-            prompt += `[Snapshot 30d] วันที่: ${snapshot30d.snapshotDate || "N/A"}\n`;
-            prompt += `- GA4 Views: ${snapshot30d.views || 0} | Users: ${snapshot30d.users || 0} | Avg Time: ${snapshot30d.engagementTime || 0}s\n`;
-            prompt += `- FB Reach: ${snapshot30d.fbReach || 0} | Reactions: ${snapshot30d.fbReactions || 0} | Comments: ${snapshot30d.fbComments || 0}\n`;
-        }
-        prompt += `\n`;
+        prompt += `--- สรุปตัวชี้วัดปัจจุบัน (Current Metrics Summary) ---\n`;
+        prompt += `[Facebook Snapshots]\n`;
+        prompt += `- 24h: Reach ${fbSnap24h.reach || 0} | Reactions ${fbSnap24h.reactions || 0} | Comments ${fbSnap24h.comments || 0} | Clicks ${fbSnap24h.linkClicks || 0}\n`;
+        prompt += `- 7d: Reach ${fbSnap7d.reach || 0} | Reactions ${fbSnap7d.reactions || 0} | Comments ${fbSnap7d.comments || 0} | Clicks ${fbSnap7d.linkClicks || 0}\n`;
+        prompt += `- 30d: Reach ${fbSnap30d.reach || 0} | Reactions ${fbSnap30d.reactions || 0} | Comments ${fbSnap30d.comments || 0} | Clicks ${fbSnap30d.linkClicks || 0}\n`;
+        prompt += `- 90d: Reach ${fbSnap90d.reach || 0} | Reactions ${fbSnap90d.reactions || 0} | Comments ${fbSnap90d.comments || 0} | Clicks ${fbSnap90d.linkClicks || 0}\n\n`;
         
-        prompt += `--- คำถาม/ความคิดเห็นจากผู้อ่าน (Notable Feedback) ---\n`;
+        prompt += `[GA4 Snapshots]\n`;
+        prompt += `- 24h: Views ${ga4Snap24h.views || 0} | Users ${ga4Snap24h.activeUsers || 0} | Avg Time ${ga4Snap24h.averageEngagementTime || 0}s\n`;
+        prompt += `- 7d: Views ${ga4Snap7d.views || 0} | Users ${ga4Snap7d.activeUsers || 0} | Avg Time ${ga4Snap7d.averageEngagementTime || 0}s\n`;
+        prompt += `- 30d: Views ${ga4Snap30d.views || 0} | Users ${ga4Snap30d.activeUsers || 0} | Avg Time ${ga4Snap30d.averageEngagementTime || 0}s\n`;
+        prompt += `- 90d: Views ${ga4Snap90d.views || 0} | Users ${ga4Snap90d.activeUsers || 0} | Avg Time ${ga4Snap90d.averageEngagementTime || 0}s\n\n`;
+        
+        prompt += `--- คำถาม/ความคิดเห็นสะสมจากผู้อ่าน (Audience Feedback) ---\n`;
         prompt += `- ความคิดเห็นสำคัญ: ${notableComments || "ไม่มี"}\n`;
         prompt += `- คำถามจากทางบ้าน: ${audienceQuestions || "ไม่มี"}\n`;
         prompt += `- จุดที่เข้าใจผิด/สับสน: ${misunderstanding || "ไม่มี"}\n`;
         prompt += `- ภาษา/คำพูดที่น่าสนใจ: ${userLanguage || "ไม่มี"}\n\n`;
         
-        prompt += `--- คำถามสำหรับวิเคราะห์ (Request for Analysis) ---\n`;
-        prompt += `ช่วยวิเคราะห์ข้อมูลประสิทธิภาพบทความด้านบน และสรุปคำตอบให้ตรงประเด็นในหัวข้อต่อไปนี้ในรูปแบบ Markdown:\n`;
-        prompt += `1. What Worked (อะไรที่ทำได้ดี/ได้ผลลัพธ์ดี)\n`;
-        prompt += `2. What Did Not Work (อะไรที่ยังขาดหรือควรปรับปรุง)\n`;
-        prompt += `3. Topic Signal (สัญญาณความชอบของหัวข้อนี้ จาก Reach/Engagement)\n`;
-        prompt += `4. Traffic Signal (ปริมาณและคุณภาพของการดึงดูดทราฟฟิกเว็บ)\n`;
-        prompt += `5. Engagement Signal (การตอบสนอง คอมเมนต์ คำถาม หรือการแชร์)\n`;
-        prompt += `6. Repost Potential (มีศักยภาพในการนำมารีโพสต์ซ้ำอีกหรือไม่ และเมื่อใด)\n`;
-        prompt += `7. Follow-up Potential (ไอเดียในการทำคอนเทนต์ต่อยอด/บทความถัดไป)\n`;
-        prompt += `8. Recommended Next Action (คำแนะนำสำหรับขั้นตอนต่อไป เช่น อัปเดตเนื้อหา, ทำอินโฟกราฟิก, หรือเขียนบทความใหม่)\n`;
+        prompt += `--- คำขอร้องวิเคราะห์ (Request for Analysis) ---\n`;
+        prompt += `ช่วยนำข้อมูลสถิติและ Feedback ด้านบนไปวิเคราะห์ร่วมกับผลตอบรับจริง แล้วตอบกลับโดยจัดทำชุดข้อมูลในรูปแบบ JSON ตามสกีมา "workos-writing-lab-update-v0.1" นี้เท่านั้น:\n\n`;
+        prompt += `\`\`\`json\n`;
+        prompt += `{\n`;
+        prompt += `  "schemaVersion": "workos-writing-lab-update-v0.1",\n`;
+        prompt += `  "action": "apply_update",\n`;
+        prompt += `  "target": {\n`;
+        prompt += `    "type": "writing_lab_project",\n`;
+        prompt += `    "projectId": "${activeProject.id}",\n`;
+        prompt += `    "projectSlug": "${activeProject.slug || ""}"\n`;
+        prompt += `  },\n`;
+        prompt += `  "fields": {\n`;
+        prompt += `    "performanceFeedback": {\n`;
+        prompt += `      "combinedAnalysis": {\n`;
+        prompt += `        "performanceSummary": "วิเคราะห์รวม...",\n`;
+        prompt += `        "distributionSignal": "การกระจาย...",\n`;
+        prompt += `        "websiteSignal": "บนเว็บไซต์...",\n`;
+        prompt += `        "topicSignal": "ความสนใจหัวข้อ...",\n`;
+        prompt += `        "hookSignal": "สัญญาณ Hook...",\n`;
+        prompt += `        "imageSignal": "สัญญาณภาพประกอบ...",\n`;
+        prompt += `        "ctaSignal": "สัญญาณ CTA...",\n`;
+        prompt += `        "seoSignal": "สัญญาณ SEO...",\n`;
+        prompt += `        "commentSignal": "สัญญาณความคิดเห็น...",\n`;
+        prompt += `        "whatWorked": "อะไรที่ทำได้ดี...",\n`;
+        prompt += `        "whatDidNotWork": "อะไรที่ควรแก้...",\n`;
+        prompt += `        "recommendedAction": "ก้าวถัดไป..."\n`;
+        prompt += `      },\n`;
+        prompt += `      "nextDecision": {\n`;
+        prompt += `        "decision": "Repost later / Make infographic / Write follow-up article / Keep as evergreen",\n`;
+        prompt += `        "priority": "High / Medium / Low",\n`;
+        prompt += `        "targetDate": "YYYY-MM-DD",\n`;
+        prompt += `        "notes": "เหตุผลการตัดสินใจ..."\n`;
+        prompt += `      }\n`;
+        prompt += `    }\n`;
+        prompt += `  }\n`;
+        prompt += `}\n`;
+        prompt += `\`\`\`\n\n`;
+        prompt += `ให้ตอบเฉพาะบล็อก JSON ที่มีข้อมูลวิเคราะห์ที่สมบูรณ์เท่านั้น เพื่อความรวดเร็วในการคัดลอกไปอัปเดตระบบครับ`;
 
         navigator.clipboard.writeText(prompt);
         setCopyPromptSuccess(true);
@@ -2192,160 +2414,342 @@ export default function WritingStudioTab({
                                     </div>
                                 </div>
 
-                                {/* Feedback Snapshots (Fixed 3 Cards) */}
-                                <div className="space-y-4">
-                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary">Feedback Snapshots (ตัวชี้วัดประสิทธิภาพ)</h4>
-                                    
-                                    <div className="grid grid-cols-1 gap-6">
-                                        {[
-                                            { label: "24-Hour Snapshot (หลังเผยแพร่ 24 ชม.)", state: snapshot24h, setter: setSnapshot24h },
-                                            { label: "7-Day Snapshot (หลังเผยแพร่ 7 วัน)", state: snapshot7d, setter: setSnapshot7d },
-                                            { label: "30-Day Snapshot (หลังเผยแพร่ 30 วัน)", state: snapshot30d, setter: setSnapshot30d }
-                                        ].map((snap, i) => (
-                                            <div key={i} className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
-                                                <div className="border-b border-theme-border/40 pb-1.5">
-                                                    <h5 className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">{snap.label}</h5>
+                                {/* Facebook Snapshots */}
+                                <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
+                                    <div className="flex items-center justify-between border-b border-theme-border/40 pb-2">
+                                        <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary">
+                                            Facebook Snapshots (Post-Level Distribution)
+                                        </h4>
+                                        <div className="flex bg-theme-input rounded-lg p-0.5 border border-theme-border/30">
+                                            {(["24h", "7d", "30d", "90d"] as const).map((w) => (
+                                                <button
+                                                    key={w}
+                                                    type="button"
+                                                    onClick={() => setFbActiveSnap(w)}
+                                                    className={`px-2 py-1 text-[10px] font-black rounded-md transition-all ${
+                                                        fbActiveSnap === w
+                                                            ? "bg-theme-card text-blue-600 shadow-sm border border-theme-border/10"
+                                                            : "text-theme-muted hover:text-theme-primary"
+                                                    }`}
+                                                >
+                                                    {w}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {(() => {
+                                        const activeFb = fbActiveSnap === "24h" ? fbSnap24h : fbActiveSnap === "7d" ? fbSnap7d : fbActiveSnap === "30d" ? fbSnap30d : fbSnap90d;
+                                        const activeFbSetter = fbActiveSnap === "24h" ? setFbSnap24h : fbActiveSnap === "7d" ? setFbSnap7d : fbActiveSnap === "30d" ? setFbSnap30d : setFbSnap90d;
+
+                                        return (
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Snapshot Date</label>
+                                                    <input
+                                                        type="date"
+                                                        value={activeFb.snapshotDate || ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, snapshotDate: e.target.value })}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
                                                 </div>
-
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                                    <div className="space-y-1 col-span-2">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">Snapshot Date (วันที่เก็บสถิติ)</label>
-                                                        <input 
-                                                            type="date"
-                                                            value={snap.state.snapshotDate}
-                                                            onChange={(e) => snap.setter({ ...snap.state, snapshotDate: e.target.value })}
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
-                                                        />
-                                                    </div>
-
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Platform</label>
+                                                    <select
+                                                        value={activeFb.platform || "facebook_page"}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, platform: e.target.value })}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-bold text-theme-primary outline-none"
+                                                    >
+                                                        <option value="facebook_page">Facebook Page</option>
+                                                        <option value="facebook_group">Facebook Group</option>
+                                                        <option value="personal_profile">Personal Profile</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1 col-span-2">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Post URL</label>
+                                                    <input
+                                                        type="text"
+                                                        value={activeFb.postUrl || ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, postUrl: e.target.value })}
+                                                        placeholder="https://facebook.com/..."
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Published Date</label>
+                                                    <input
+                                                        type="date"
+                                                        value={activeFb.publishedDate || ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, publishedDate: e.target.value })}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Reach / Views</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeFb.reach !== undefined ? activeFb.reach : ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, reach: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Reactions</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeFb.reactions !== undefined ? activeFb.reactions : ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, reactions: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Comments</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeFb.comments !== undefined ? activeFb.comments : ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, comments: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Shares</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeFb.shares !== undefined ? activeFb.shares : ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, shares: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Link Clicks</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeFb.linkClicks !== undefined ? activeFb.linkClicks : ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, linkClicks: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Saves</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeFb.saves !== undefined ? activeFb.saves : ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, saves: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="col-span-1 md:col-span-4 grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-theme-border/20">
                                                     <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Page Views</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.views}
-                                                            onChange={(e) => snap.setter({ ...snap.state, views: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">Notable Comments</label>
+                                                        <textarea
+                                                            value={activeFb.notableComments || ""}
+                                                            onChange={(e) => activeFbSetter({ ...activeFb, notableComments: e.target.value })}
+                                                            placeholder="ความคิดเห็นที่น่าสังเกต..."
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl p-2.5 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                                         />
                                                     </div>
-
                                                     <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Active Users</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.users}
-                                                            onChange={(e) => snap.setter({ ...snap.state, users: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">Audience Questions</label>
+                                                        <textarea
+                                                            value={activeFb.audienceQuestions || ""}
+                                                            onChange={(e) => activeFbSetter({ ...activeFb, audienceQuestions: e.target.value })}
+                                                            placeholder="คำถามจากทางบ้าน..."
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl p-2.5 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                                         />
                                                     </div>
-
                                                     <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Events</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.events}
-                                                            onChange={(e) => snap.setter({ ...snap.state, events: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">Confusion / Misunderstanding</label>
+                                                        <textarea
+                                                            value={activeFb.confusion || ""}
+                                                            onChange={(e) => activeFbSetter({ ...activeFb, confusion: e.target.value })}
+                                                            placeholder="จุดที่ลูกค้างงหรือสับสน..."
+                                                            className="w-full bg-theme-input border border-theme-border rounded-xl p-2.5 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                                         />
                                                     </div>
-
                                                     <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Avg Engagement (s)</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.engagementTime}
-                                                            onChange={(e) => snap.setter({ ...snap.state, engagementTime: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
-                                                        />
-                                                    </div>
-
-                                                    <div className="space-y-1 col-span-2">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Top Source / Medium</label>
-                                                        <input 
-                                                            type="text"
-                                                            value={snap.state.sourceMedium}
-                                                            onChange={(e) => snap.setter({ ...snap.state, sourceMedium: e.target.value })}
-                                                            placeholder="fb / post"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
-                                                        />
-                                                    </div>
-
-                                                    <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Group Reach</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.fbReach}
-                                                            onChange={(e) => snap.setter({ ...snap.state, fbReach: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
-                                                        />
-                                                    </div>
-
-                                                    <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Reactions</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.fbReactions}
-                                                            onChange={(e) => snap.setter({ ...snap.state, fbReactions: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
-                                                        />
-                                                    </div>
-
-                                                    <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Comments</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.fbComments}
-                                                            onChange={(e) => snap.setter({ ...snap.state, fbComments: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
-                                                        />
-                                                    </div>
-
-                                                    <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Shares</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.fbShares}
-                                                            onChange={(e) => snap.setter({ ...snap.state, fbShares: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
-                                                        />
-                                                    </div>
-
-                                                    <div className="space-y-1">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">FB Link Clicks</label>
-                                                        <input 
-                                                            type="number"
-                                                            value={snap.state.fbClicks}
-                                                            onChange={(e) => snap.setter({ ...snap.state, fbClicks: e.target.value })}
-                                                            placeholder="0"
-                                                            className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 text-xs font-medium text-theme-primary outline-none"
-                                                        />
-                                                    </div>
-
-                                                    <div className="space-y-1 col-span-4">
-                                                        <label className="text-[9px] font-black text-theme-muted uppercase">Notes (ข้อสังเกตของ Snapshot)</label>
-                                                        <textarea 
-                                                            value={snap.state.notes}
-                                                            onChange={(e) => snap.setter({ ...snap.state, notes: e.target.value })}
-                                                            placeholder="ข้อสังเกตเพิ่มเติมสำหรับ Snapshot นี้..."
+                                                        <label className="text-[9px] font-black text-theme-muted uppercase">Audience Language / Vocabulary</label>
+                                                        <textarea
+                                                            value={activeFb.audienceLanguage || ""}
+                                                            onChange={(e) => activeFbSetter({ ...activeFb, audienceLanguage: e.target.value })}
+                                                            placeholder="คำพูดเด่นของลูกค้า..."
                                                             className="w-full bg-theme-input border border-theme-border rounded-xl p-2.5 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                                         />
                                                     </div>
                                                 </div>
+                                                <div className="space-y-1 col-span-4">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Notes</label>
+                                                    <textarea
+                                                        value={activeFb.notes || ""}
+                                                        onChange={(e) => activeFbSetter({ ...activeFb, notes: e.target.value })}
+                                                        placeholder="ข้อสังเกตเพิ่มเติมสำหรับ Facebook Snapshot Window นี้..."
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl p-2.5 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                                    />
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
 
-                                {/* Notable Feedback */}
+                                {/* GA4 Snapshots */}
                                 <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
-                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary border-b border-theme-border/40 pb-1.5">Notable Feedback (คำติชมที่สำคัญจากผู้อ่าน)</h4>
+                                    <div className="flex items-center justify-between border-b border-theme-border/40 pb-2">
+                                        <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary">
+                                            GA4 Snapshots (Article-Level Website Metrics)
+                                        </h4>
+                                        <div className="flex bg-theme-input rounded-lg p-0.5 border border-theme-border/30">
+                                            {(["24h", "7d", "30d", "90d"] as const).map((w) => (
+                                                <button
+                                                    key={w}
+                                                    type="button"
+                                                    onClick={() => setGa4ActiveSnap(w)}
+                                                    className={`px-2 py-1 text-[10px] font-black rounded-md transition-all ${
+                                                        ga4ActiveSnap === w
+                                                            ? "bg-theme-card text-blue-600 shadow-sm border border-theme-border/10"
+                                                            : "text-theme-muted hover:text-theme-primary"
+                                                    }`}
+                                                >
+                                                    {w}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {(() => {
+                                        const activeGa4 = ga4ActiveSnap === "24h" ? ga4Snap24h : ga4ActiveSnap === "7d" ? ga4Snap7d : ga4ActiveSnap === "30d" ? ga4Snap30d : ga4Snap90d;
+                                        const activeGa4Setter = ga4ActiveSnap === "24h" ? setGa4Snap24h : ga4ActiveSnap === "7d" ? setGa4Snap7d : ga4ActiveSnap === "30d" ? setGa4Snap30d : setGa4Snap90d;
+
+                                        return (
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Snapshot Date</label>
+                                                    <input
+                                                        type="date"
+                                                        value={activeGa4.snapshotDate || ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, snapshotDate: e.target.value })}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1 col-span-3">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Published URL</label>
+                                                    <input
+                                                        type="text"
+                                                        value={activeGa4.publishedUrl || ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, publishedUrl: e.target.value })}
+                                                        placeholder="https://greenfineness.com/library/..."
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1 col-span-2">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Page Title</label>
+                                                    <input
+                                                        type="text"
+                                                        value={activeGa4.pageTitle || ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, pageTitle: e.target.value })}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">GA4 Page Views</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeGa4.views !== undefined ? activeGa4.views : ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, views: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Active Users</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeGa4.activeUsers !== undefined ? activeGa4.activeUsers : ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, activeUsers: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Events Count</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeGa4.events !== undefined ? activeGa4.events : ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, events: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Avg Engagement Time (s)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeGa4.averageEngagementTime !== undefined ? activeGa4.averageEngagementTime : ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, averageEngagementTime: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Bounce Rate (%)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={activeGa4.bounceRate || ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, bounceRate: e.target.value })}
+                                                        placeholder="e.g. 45"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Top Source / Medium</label>
+                                                    <input
+                                                        type="text"
+                                                        value={activeGa4.sourceMedium || ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, sourceMedium: e.target.value })}
+                                                        placeholder="e.g. fb / post"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Organic Users</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeGa4.organicUsers !== undefined ? activeGa4.organicUsers : ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, organicUsers: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Referral Users</label>
+                                                    <input
+                                                        type="number"
+                                                        value={activeGa4.referralUsers !== undefined ? activeGa4.referralUsers : ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, referralUsers: e.target.value })}
+                                                        placeholder="0"
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-2.5 py-1.5 font-medium text-theme-primary outline-none"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1 col-span-4">
+                                                    <label className="text-[9px] font-black text-theme-muted uppercase">Notes</label>
+                                                    <textarea
+                                                        value={activeGa4.notes || ""}
+                                                        onChange={(e) => activeGa4Setter({ ...activeGa4, notes: e.target.value })}
+                                                        placeholder="ข้อสังเกตเพิ่มเติมสำหรับ GA4 Snapshot Window นี้..."
+                                                        className="w-full bg-theme-input border border-theme-border rounded-xl p-2.5 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                                {/* Audience Feedback */}
+                                <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary border-b border-theme-border/40 pb-1.5">Audience Feedback (คำตอบรับและคำติชมเชิงลึก)</h4>
                                     
                                     <div className="space-y-3">
                                         <div className="space-y-1">
@@ -2353,7 +2757,7 @@ export default function WritingStudioTab({
                                             <textarea 
                                                 value={notableComments}
                                                 onChange={(e) => setNotableComments(e.target.value)}
-                                                placeholder="ความคิดเห็นเด่นจากกลุ่มเป้าหมาย (ทั้งบวกและลบ)..."
+                                                placeholder="ความคิดเห็นเด่นจากกลุ่มเป้าหมาย..."
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                             />
                                         </div>
@@ -2363,131 +2767,172 @@ export default function WritingStudioTab({
                                             <textarea 
                                                 value={audienceQuestions}
                                                 onChange={(e) => setAudienceQuestions(e.target.value)}
-                                                placeholder="ผู้อ่านพิมพ์ถามคำถามอะไรบ่อยๆ หลังอ่านโพสต์..."
+                                                placeholder="คำถามจากทางบ้าน..."
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Misunderstanding / Confusion (จุดที่ผู้อ่านสับสน/เข้าใจผิด)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Misunderstanding / Confusion (จุดที่ผู้อ่านสับสน)</label>
                                             <textarea 
                                                 value={misunderstanding}
                                                 onChange={(e) => setMisunderstanding(e.target.value)}
-                                                placeholder="จุดที่ผู้อ่านเกิดความเข้าใจผิด หรือพิมพ์แสดงความสงสัยสับสน..."
+                                                placeholder="จุดที่ผู้อ่านแสดงความเข้าใจผิดหรือสับสน..."
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Interesting User Language (ภาษา/คำพูดของลูกค้าที่น่าสนใจ)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Interesting User Language (ภาษาที่ลูกค้าใช้พูดคุย)</label>
                                             <textarea 
                                                 value={userLanguage}
                                                 onChange={(e) => setUserLanguage(e.target.value)}
-                                                placeholder="คำศัพท์ หรือสำนวนการพูดที่กลุ่มเป้าหมายใช้พูดคุย..."
+                                                placeholder="คำพูดเด่นของลูกค้า..."
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Potential Follow-up Topic (หัวข้อต่อยอดที่มีศักยภาพ)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Potential Follow-up Topic (หัวข้อต่อยอด)</label>
                                             <textarea 
                                                 value={followupTopic}
                                                 onChange={(e) => setFollowupTopic(e.target.value)}
-                                                placeholder="หัวข้อบทความใหม่ที่มีโอกาสประสบความสำเร็จจากการต่อยอด..."
+                                                placeholder="แนวทางหัวข้อบทความใหม่สำหรับการต่อยอด..."
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                             />
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* Arbor Insights */}
+                                {/* Combined Analysis */}
                                 <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
-                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary border-b border-theme-border/40 pb-1.5">Arbor Insights (วิเคราะห์ผลลัพธ์)</h4>
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary border-b border-theme-border/40 pb-1.5">Combined Analysis (สรุปบทวิเคราะห์รวม)</h4>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1 col-span-2">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">What Worked (ส่วนที่ดีและได้ผลตอบรับยอดเยี่ยม)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Performance Summary (บทวิเคราะห์ผลลัพธ์การเผยแพร่ภาพรวม)</label>
                                             <textarea 
-                                                value={whatWorked}
-                                                onChange={(e) => setWhatWorked(e.target.value)}
-                                                placeholder="หัวข้อ/ภาพ/ข้อความส่วนที่ดึงดูด Reach ได้มาก..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
-                                            />
-                                        </div>
-
-                                        <div className="space-y-1 col-span-2">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">What Did Not Work (ส่วนที่ไม่ได้ผลและควรปรับแก้)</label>
-                                            <textarea 
-                                                value={whatDidNotWork}
-                                                onChange={(e) => setWhatDidNotWork(e.target.value)}
-                                                placeholder="จุดที่ผลลัพธ์ออกมาไม่ดี ช่องทางที่ Reach ต่ำ..."
+                                                value={performanceSummary}
+                                                onChange={(e) => setPerformanceSummary(e.target.value)}
+                                                placeholder="วิเคราะห์ประสิทธิภาพและสรุปสัญญาณตอบรับทางกลยุทธ์..."
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Topic Signal (สัญญาณความชอบต่อหัวข้อ)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Distribution Signal (สัญญาณการกระจายโพสต์)</label>
+                                            <input 
+                                                type="text"
+                                                value={distributionSignal}
+                                                onChange={(e) => setDistributionSignal(e.target.value)}
+                                                placeholder="e.g. Strong reach in group, poor engagement page"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Website Signal (สัญญาณพฤติกรรมบนเว็บ)</label>
+                                            <input 
+                                                type="text"
+                                                value={websiteSignal}
+                                                onChange={(e) => setWebsiteSignal(e.target.value)}
+                                                placeholder="e.g. High average engagement time, low bounce rate"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Topic Signal (สัญญาณหัวข้อ)</label>
                                             <input 
                                                 type="text"
                                                 value={topicSignal}
                                                 onChange={(e) => setTopicSignal(e.target.value)}
-                                                placeholder="e.g. High, Medium, Low"
+                                                placeholder="e.g. High interest on Plant Hormones"
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Traffic Signal (สัญญาณการนำเข้าเว็บบล็อก)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Hook Signal (สัญญาณประโยคเปิดหัว)</label>
                                             <input 
                                                 type="text"
-                                                value={trafficSignal}
-                                                onChange={(e) => setTrafficSignal(e.target.value)}
-                                                placeholder="e.g. Strong click-throughs from Facebook Group"
+                                                value={hookSignal}
+                                                onChange={(e) => setHookSignal(e.target.value)}
+                                                placeholder="e.g. Cytokinin split test hook A won B by 2x"
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Engagement Signal (สัญญาณการปฏิสัมพันธ์)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Image Signal (สัญญาณภาพประกอบ)</label>
                                             <input 
                                                 type="text"
-                                                value={engagementSignal}
-                                                onChange={(e) => setEngagementSignal(e.target.value)}
-                                                placeholder="e.g. Active discussions under group post"
+                                                value={imageSignal}
+                                                onChange={(e) => setImageSignal(e.target.value)}
+                                                placeholder="e.g. Clean infographics had 3x more shares"
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Repost Potential (โอกาสการรีโพสต์/แชร์ซ้ำ)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">CTA Signal (สัญญาณปุ่มกด/Call to Action)</label>
                                             <input 
                                                 type="text"
-                                                value={repostPotential}
-                                                onChange={(e) => setRepostPotential(e.target.value)}
-                                                placeholder="e.g. Yes (in 3 months with new hook)"
+                                                value={ctaSignal}
+                                                onChange={(e) => setCtaSignal(e.target.value)}
+                                                placeholder="e.g. Link to amino acid product was active"
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Follow-up Potential (โอกาสสร้างตอนต่อยอด)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">SEO Signal (สัญญาณดัชนีเว็บ)</label>
                                             <input 
                                                 type="text"
-                                                value={followupPotential}
-                                                onChange={(e) => setFollowupPotential(e.target.value)}
-                                                placeholder="e.g. High (develop Golden Pea Amino Guide)"
+                                                value={seoSignal}
+                                                onChange={(e) => setSeoSignal(e.target.value)}
+                                                placeholder="e.g. Primary keyword ranking page 2 already"
                                                 className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
                                             />
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Recommended Next Action (ก้าวถัดไปที่แนะนำ)</label>
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Comment Signal (สัญญาณความคิดเห็น)</label>
                                             <input 
                                                 type="text"
+                                                value={commentSignal}
+                                                onChange={(e) => setCommentSignal(e.target.value)}
+                                                placeholder="e.g. Professional tone inquiries on dosage"
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1 col-span-2">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">What Worked (จุดที่สำเร็จด้วยดี)</label>
+                                            <textarea 
+                                                value={whatWorked}
+                                                onChange={(e) => setWhatWorked(e.target.value)}
+                                                placeholder="หัวข้อ/ภาพ/ข้อความส่วนที่ดึงดูดใจผู้คนสำเร็จ..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1 col-span-2">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">What Did Not Work (จุดที่ควรปรับปรุง)</label>
+                                            <textarea 
+                                                value={whatDidNotWork}
+                                                onChange={(e) => setWhatDidNotWork(e.target.value)}
+                                                placeholder="ส่วนที่ได้ผลลัพธ์ต่ำกว่าเป้าหมาย..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1 col-span-2">
+                                            <label className="text-[10px] font-black text-theme-muted uppercase font-black">Recommended Next Action (ก้าวถัดไปที่ควรทำ)</label>
+                                            <textarea 
                                                 value={recommendedAction}
                                                 onChange={(e) => setRecommendedAction(e.target.value)}
-                                                placeholder="e.g. Repost to fitness page or make short video"
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-medium text-theme-primary outline-none"
+                                                placeholder="ข้อเสนอแนะสำหรับการต่อยอดในอนาคต..."
+                                                className="w-full bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                             />
                                         </div>
                                     </div>

@@ -15,6 +15,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { PreviewData, ImportPayload } from "@/lib/arborInboxSchema";
 import { ImportLog } from "@/lib/arborInboxStore";
+import { parseArticleMarkdown, generateUpdatePayload } from "@/lib/articleParser";
 
 export default function ArborInboxClient() {
     const [payloadText, setPayloadText] = useState("");
@@ -33,6 +34,59 @@ export default function ArborInboxClient() {
     // Status message for import execution
     const [importing, setImporting] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+    // Markdown import mode states
+    const [importMode, setImportMode] = useState<"json" | "markdown">("json");
+    const [markdownText, setMarkdownText] = useState("");
+    const [parsedResult, setParsedResult] = useState<any>(null);
+    const [writingProjects, setWritingProjects] = useState<any[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+
+    useEffect(() => {
+        fetch("/api/content/writing-lab/projects")
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setWritingProjects(data);
+                }
+            })
+            .catch(err => console.error("Error loading writing projects:", err));
+    }, []);
+
+    const handleParseMarkdown = (textToParse: string, targetId?: string) => {
+        const result = parseArticleMarkdown(textToParse);
+        setParsedResult(result);
+
+        const projId = targetId || selectedProjectId;
+        let targetProject = writingProjects.find(p => p.id === projId);
+
+        // Pre-select matching project if none selected yet
+        if (!projId && result.fields.slug) {
+            const matched = writingProjects.find(
+                p => p.slug === result.fields.slug || p.title === result.fields.title
+            );
+            if (matched) {
+                targetProject = matched;
+                setSelectedProjectId(matched.id);
+            }
+        }
+
+        const generatedPayload = generateUpdatePayload(
+            result,
+            { id: targetProject?.id || "", slug: targetProject?.slug || "" },
+            `Markdown Import - ${result.fields.title || "Untitled"}`
+        );
+
+        setPayloadText(JSON.stringify(generatedPayload, null, 2));
+
+        // Add internal warnings from parser to UI warnings state
+        if (result.warnings.length > 0) {
+            setWarnings(result.warnings);
+        }
+
+        // Validate generated JSON
+        handleValidate(JSON.stringify(generatedPayload));
+    };
 
     // Load import logs from API
     const loadLogs = useCallback(async () => {
@@ -277,40 +331,163 @@ export default function ArborInboxClient() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 {/* Left panel: Input Area */}
                 <div className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-black uppercase tracking-wider text-theme-secondary">JSON Payload</h2>
-                        <div className="flex items-center gap-2">
-                            {payloadText.trim() && (
-                                <button
-                                    onClick={handleClear}
-                                    className="px-3 py-1 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all font-bold"
-                                    disabled={loading || importing}
-                                >
-                                    Clear
-                                </button>
-                            )}
-                            <button
-                                onClick={() => handleValidate()}
-                                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all disabled:bg-theme-border disabled:text-theme-muted flex items-center gap-1.5 shadow-md shadow-blue-600/15"
-                                disabled={loading || importing || !payloadText.trim()}
-                            >
-                                {loading ? (
-                                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <SparklesIcon className="w-4 h-4" />
-                                )}
-                                Parse & Validate
-                            </button>
-                        </div>
+                    <div className="flex bg-theme-input rounded-2xl p-1 border border-theme-border/40 mb-2">
+                        <button
+                            onClick={() => setImportMode("json")}
+                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                                importMode === "json"
+                                    ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
+                                    : "text-theme-muted hover:text-theme-primary"
+                            }`}
+                        >
+                            JSON Payload
+                        </button>
+                        <button
+                            onClick={() => setImportMode("markdown")}
+                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                                importMode === "markdown"
+                                    ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
+                                    : "text-theme-muted hover:text-theme-primary"
+                            }`}
+                        >
+                            Paste Article Markdown
+                        </button>
                     </div>
 
-                    <textarea
-                        value={payloadText}
-                        onChange={(e) => setPayloadText(e.target.value)}
-                        placeholder='วาง JSON payload ที่นี่... เช่น: {"schemaVersion": "workos-arbor-import-v0.1", "source": "ChatGPT", ...}'
-                        className="w-full min-h-[350px] font-mono text-xs bg-theme-input border border-theme-border rounded-2xl p-4 outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary placeholder:text-theme-muted"
-                        disabled={loading || importing}
-                    />
+                    {importMode === "json" && (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-sm font-black uppercase tracking-wider text-theme-secondary">JSON Payload</h2>
+                                <div className="flex items-center gap-2">
+                                    {payloadText.trim() && (
+                                        <button
+                                            onClick={handleClear}
+                                            className="px-3 py-1 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all font-bold"
+                                            disabled={loading || importing}
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleValidate()}
+                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all disabled:bg-theme-border disabled:text-theme-muted flex items-center gap-1.5 shadow-md shadow-blue-600/15"
+                                        disabled={loading || importing || !payloadText.trim()}
+                                    >
+                                        {loading ? (
+                                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <SparklesIcon className="w-4 h-4" />
+                                        )}
+                                        Parse & Validate
+                                    </button>
+                                </div>
+                            </div>
+
+                            <textarea
+                                value={payloadText}
+                                onChange={(e) => setPayloadText(e.target.value)}
+                                placeholder='วาง JSON payload ที่นี่... เช่น: {"schemaVersion": "workos-arbor-import-v0.1", "source": "ChatGPT", ...}'
+                                className="w-full min-h-[350px] font-mono text-xs bg-theme-input border border-theme-border rounded-2xl p-4 outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary placeholder:text-theme-muted"
+                                disabled={loading || importing}
+                            />
+                        </div>
+                    )}
+
+                    {importMode === "markdown" && (
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-theme-secondary uppercase tracking-wider">
+                                    Target Writing Project (โครงการเขียนร่างเป้าหมาย)
+                                </label>
+                                <select
+                                    value={selectedProjectId}
+                                    onChange={(e) => {
+                                        const nextId = e.target.value;
+                                        setSelectedProjectId(nextId);
+                                        if (markdownText.trim()) {
+                                            handleParseMarkdown(markdownText, nextId);
+                                        }
+                                    }}
+                                    className="w-full bg-theme-input border border-theme-border rounded-2xl px-4 py-2.5 text-xs text-theme-primary font-bold focus:outline-none focus:border-theme-border/80 transition-all"
+                                >
+                                    <option value="">-- เลือกโครงการร่างเป้าหมาย --</option>
+                                    {writingProjects.map((proj) => (
+                                        <option key={proj.id} value={proj.id}>
+                                            {proj.title} ({proj.slug || "no-slug"})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <textarea
+                                value={markdownText}
+                                onChange={(e) => setMarkdownText(e.target.value)}
+                                placeholder="วางเนื้อหาร่างบทความ Markdown ที่นี่... (ต้องมีหัวข้อ ## Website Fields และ ## Suggested References)"
+                                className="w-full min-h-[300px] font-mono text-xs bg-theme-input border border-theme-border rounded-2xl p-4 outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary placeholder:text-theme-muted"
+                                disabled={loading || importing}
+                            />
+
+                            <button
+                                onClick={() => handleParseMarkdown(markdownText)}
+                                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/15"
+                                disabled={loading || importing || !markdownText.trim()}
+                            >
+                                <SparklesIcon className="w-4 h-4" />
+                                Parse Markdown to Update Package
+                            </button>
+
+                            {parsedResult && (
+                                <div className="space-y-4 border-t border-theme-border/30 pt-4">
+                                    {/* Parsed Fields Summary */}
+                                    <div className="bg-theme-input/30 p-4 border border-theme-border/60 rounded-2xl space-y-2">
+                                        <h3 className="text-xs font-black uppercase text-theme-secondary tracking-wider">
+                                            Parsed Fields Summary
+                                        </h3>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                            <div><span className="font-bold text-theme-muted">Title:</span> <span className="font-semibold text-theme-primary">{parsedResult.fields.title || "(Missing)"}</span></div>
+                                            <div><span className="font-bold text-theme-muted">Slug:</span> <span className="font-semibold text-theme-primary">{parsedResult.fields.slug || "(Missing)"}</span></div>
+                                            <div><span className="font-bold text-theme-muted">Content Layer:</span> <span className="font-semibold text-blue-600 dark:text-blue-400">{parsedResult.fields.contentLayer || "(Missing)"}</span></div>
+                                            <div><span className="font-bold text-theme-muted">Category:</span> <span className="font-semibold text-theme-primary">{parsedResult.fields.category || "(None)"}</span></div>
+                                            <div><span className="font-bold text-theme-muted">Journey Stage:</span> <span className="font-semibold text-theme-primary">{parsedResult.fields.journeyStage || "(None)"}</span></div>
+                                            <div><span className="font-bold text-theme-muted">Primary Keyword:</span> <span className="font-semibold text-theme-primary">{parsedResult.fields.primaryKeyword || "(None)"}</span></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Missing Fields Warnings */}
+                                    {parsedResult.missingFields.length > 0 && (
+                                        <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-2xl text-xs flex items-start gap-2 text-red-600 dark:text-red-400 font-semibold">
+                                            <XCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                                            <div>
+                                                <span>พบฟิลด์บังคับขาดหาย: </span>
+                                                <span className="font-black">{parsedResult.missingFields.join(", ")}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Image Checklist */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-theme-secondary uppercase tracking-wider block">
+                                            Image Placeholders Checklist
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {parsedResult.imageChecklist.map((img: any) => (
+                                                <div key={img.placeholder} className={`p-2.5 border rounded-xl text-xs flex items-center justify-between font-bold ${
+                                                    img.detected 
+                                                        ? "bg-green-500/5 border-green-500/15 text-green-700 dark:text-green-400"
+                                                        : "bg-amber-500/5 border-amber-500/15 text-amber-700 dark:text-amber-400"
+                                                }`}>
+                                                    <span>{img.placeholder}</span>
+                                                    <span className="text-[10px] uppercase font-black">
+                                                        {img.detected ? "✓ Found" : "⚠️ Missing"}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Validation Feedback Panel */}
                     {validationChecked && (

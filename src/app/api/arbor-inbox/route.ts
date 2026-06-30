@@ -161,7 +161,8 @@ export async function POST(req: NextRequest) {
                         "knowledge_title", "knowledge_slug", "knowledge_hero_subtitle", "knowledge_featured_image_url",
                         "knowledge_short_summary", "knowledge_meta_title", "knowledge_meta_description", "knowledge_keywords",
                         "knowledge_schema_jsonld", "knowledge_status", "knowledge_editors_pick", "knowledge_related_narrative_article",
-                        "knowledge_primary_keyword", "knowledge_secondary_keywords", "knowledge_category"
+                        "knowledge_primary_keyword", "knowledge_secondary_keywords", "knowledge_category",
+                        "references_notes", "narrative_body", "knowledge_body"
                     ];
                     for (const col of seoCols) {
                         seoMappings[col] = { type: "column" };
@@ -270,7 +271,8 @@ export async function POST(req: NextRequest) {
                 "knowledge_short_summary", "knowledge_meta_title", "knowledge_meta_description", "knowledge_keywords",
                 "knowledge_schema_jsonld", "knowledge_status", "knowledge_editors_pick", "knowledge_related_narrative_article",
                 "knowledge_primary_keyword", "knowledge_secondary_keywords", "knowledge_category",
-                "group_post_markdown", "page_post_markdown", "personal_post_markdown", "social_caption", "hashtags"
+                "group_post_markdown", "page_post_markdown", "personal_post_markdown", "social_caption", "hashtags",
+                "references_notes", "narrative_body", "knowledge_body"
             ];
 
             if (payload.fields.seo) {
@@ -332,6 +334,24 @@ export async function POST(req: NextRequest) {
                         pf.snapshots
                     );
                 }
+                if (pf.facebookSnapshots) {
+                    parsedNotes.performanceFeedback.facebookSnapshots = deepMerge(
+                        parsedNotes.performanceFeedback.facebookSnapshots,
+                        pf.facebookSnapshots
+                    );
+                }
+                if (pf.ga4Snapshots) {
+                    parsedNotes.performanceFeedback.ga4Snapshots = deepMerge(
+                        parsedNotes.performanceFeedback.ga4Snapshots,
+                        pf.ga4Snapshots
+                    );
+                }
+                if (pf.combinedAnalysis) {
+                    parsedNotes.performanceFeedback.combinedAnalysis = deepMerge(
+                        parsedNotes.performanceFeedback.combinedAnalysis,
+                        pf.combinedAnalysis
+                    );
+                }
                 if (pf.notableFeedback) {
                     parsedNotes.performanceFeedback.notableFeedback = deepMerge(
                         parsedNotes.performanceFeedback.notableFeedback,
@@ -350,6 +370,36 @@ export async function POST(req: NextRequest) {
                         pf.nextDecision
                     );
                 }
+
+                // Sync new facebook/ga4 snapshots into legacy snapshots for backward compatibility
+                const legSnaps = parsedNotes.performanceFeedback.snapshots || {};
+                const fbSnaps = parsedNotes.performanceFeedback.facebookSnapshots || {};
+                const ga4Snaps = parsedNotes.performanceFeedback.ga4Snapshots || {};
+
+                const syncLeg = (w: string) => {
+                    const leg = legSnaps[w] || {};
+                    const fb = fbSnaps[w] || {};
+                    const ga4 = ga4Snaps[w] || {};
+                    return {
+                        snapshotDate: ga4.snapshotDate || fb.snapshotDate || leg.snapshotDate || "",
+                        views: ga4.views !== undefined ? ga4.views : leg.views || "",
+                        users: ga4.activeUsers !== undefined ? ga4.activeUsers : leg.users || "",
+                        events: ga4.events !== undefined ? ga4.events : leg.events || "",
+                        engagementTime: ga4.averageEngagementTime !== undefined ? ga4.averageEngagementTime : leg.engagementTime || "",
+                        sourceMedium: ga4.sourceMedium || leg.sourceMedium || "",
+                        fbReach: fb.reach !== undefined ? fb.reach : leg.fbReach || "",
+                        fbReactions: fb.reactions !== undefined ? fb.reactions : leg.fbReactions || "",
+                        fbComments: fb.comments !== undefined ? fb.comments : leg.fbComments || "",
+                        fbShares: fb.shares !== undefined ? fb.shares : leg.fbShares || "",
+                        fbClicks: fb.linkClicks !== undefined ? fb.linkClicks : leg.fbClicks || "",
+                        notes: ga4.notes || fb.notes || leg.notes || ""
+                    };
+                };
+                parsedNotes.performanceFeedback.snapshots = {
+                    snap24h: syncLeg("snap24h"),
+                    snap7d: syncLeg("snap7d"),
+                    snap30d: syncLeg("snap30d")
+                };
             }
 
             updates.push("notes = ?");
