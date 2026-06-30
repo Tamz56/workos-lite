@@ -4,7 +4,7 @@ export interface ParsedColumn {
     header: string;
     sampleValue: string;
     suggestedMapping: string; // e.g. "views", "reach", "unsupported"
-    confidence: "High" | "Medium" | "Low";
+    confidence: "High" | "Medium" | "Low" | "Manual";
     warning?: string;
 }
 
@@ -12,12 +12,13 @@ export interface ParsedRow {
     rawLine: string;
     cells: string[];
     extractedData: Record<string, any>;
+    rowType: "facebook_post" | "facebook_group_overview" | "summary" | "unknown";
     matchedProject?: {
         id: string;
         title: string;
         slug: string;
-        method: "exact_url" | "slug" | "title" | "manual_selection";
-        confidence: "High" | "Medium" | "Low";
+        method: "exact_url" | "slug" | "title" | "manual" | "manual_selection";
+        confidence: "High" | "Medium" | "Low" | "Manual";
     };
 }
 
@@ -41,14 +42,18 @@ const GA4_MAPPINGS: Record<string, string[]> = {
 
 // Columns mapping configurations for Facebook
 const FB_MAPPINGS: Record<string, string[]> = {
-    reach: ["reach", "views", "impressions", "ดูแล้ว", "การเข้าถึง", "post reach", "ยอดเข้าถึง"],
-    reactions: ["reactions", "ความรู้สึก", "reaction", "like", "likes", "ถูกใจ"],
+    postTitle: ["โพสต์", "ข้อความโพสต์", "เนื้อหาโพสต์", "post title", "post text", "message"],
+    postCreator: ["ผู้โพสต์", "creator", "author"],
+    postUrl: ["ลิงก์โพสต์", "post url", "post_url", "url", "ลิงก์", "link", "permalink"],
+    reach: ["reach", "views", "impressions", "ดูแล้ว", "การเข้าถึง", "post reach", "ยอดเข้าถึง", "จำนวนคนที่เข้าถึง"],
+    reactions: ["reactions", "ความรู้สึก", "reaction", "like", "likes", "ถูกใจ", "การตอบสนอง"],
     comments: ["comments", "ความคิดเห็น", "comment", "คอมเมนต์"],
     shares: ["shares", "การแชร์", "share", "แชร์"],
-    linkClicks: ["link clicks", "ลิงก์คลิก", "จำนวนการคลิกลิงก์", "link_clicks", "clicks", "คลิก"],
+    linkClicks: ["link clicks", "ลิงก์คลิก", "จำนวนการคลิกลิงก์", "link_clicks", "clicks", "คลิก", "การคลิกลิงก์"],
+    otherClicks: ["other clicks", "การคลิกอื่นๆ", "other_clicks"],
+    photoViews: ["photo views", "photo_views", "ยอดดูรูปภาพ"],
     saves: ["saves", "บันทึก", "save"],
-    postUrl: ["post url", "ลิงก์โพสต์", "post_url", "url", "ลิงก์", "link"],
-    date: ["date", "วันที่", "published date", "date published"]
+    date: ["date", "วันที่", "published date", "date published", "created time"]
 };
 
 // Check if raw text line is empty or comment
@@ -60,10 +65,8 @@ function parseLineToCells(line: string): string[] {
         return line.split(";").map(c => c.trim().replace(/^["']|["']$/g, ""));
     }
     if (line.includes(",")) {
-        // Simple comma split (not full RFC-4180 parser, but works for standard sheets copy)
         return line.split(",").map(c => c.trim().replace(/^["']|["']$/g, ""));
     }
-    // Consecutive spaces split
     return line.split(/\s{2,}/).map(c => c.trim().replace(/^["']|["']$/g, ""));
 }
 
@@ -102,19 +105,22 @@ export function parseAnalyticsData(rawText: string, writingProjects: any[] = [])
     headers.forEach(h => {
         const lower = h.toLowerCase();
         
-        // Check FB Group daily report keywords
-        if (lower.includes("daily active members") || lower.includes("active members") || lower.includes("total members") || lower.includes("group members")) {
+        if (lower.includes("daily active members") || 
+            lower.includes("active members") || 
+            lower.includes("total members") || 
+            lower.includes("group members") ||
+            lower.includes("เข้าร่วมแล้ว") ||
+            lower.includes("โพสต์หรือแสดงความคิดเห็น")
+        ) {
             isFbGroupDaily = true;
         }
 
-        // GA4 score check
         for (const list of Object.values(GA4_MAPPINGS)) {
             if (list.some(keyword => lower.includes(keyword.toLowerCase()))) {
                 ga4Score++;
             }
         }
 
-        // Facebook score check
         for (const list of Object.values(FB_MAPPINGS)) {
             if (list.some(keyword => lower.includes(keyword.toLowerCase()))) {
                 fbScore++;
@@ -131,37 +137,100 @@ export function parseAnalyticsData(rawText: string, writingProjects: any[] = [])
         result.sourceType = "Facebook";
     }
 
+    // Helper to scan non-empty sample value inside a column
+    const getColumnSampleVal = (colIdx: number): string => {
+        if (samples[colIdx]) return samples[colIdx].trim();
+        for (let i = 1; i < lines.length; i++) {
+            const cells = parseLineToCells(lines[i]);
+            if (cells[colIdx]) return cells[colIdx].trim();
+        }
+        return "";
+    };
+
     // 4. Map Columns
     const activeMappings = result.sourceType === "GA4" ? GA4_MAPPINGS : FB_MAPPINGS;
 
     headers.forEach((h, idx) => {
         const lowerHeader = h.toLowerCase();
         let suggestedMapping = "unsupported";
-        let confidence: "High" | "Medium" | "Low" = "Low";
+        let confidence: ParsedColumn["confidence"] = "Low";
         let warning: string | undefined = undefined;
 
-        for (const [dbField, aliases] of Object.entries(activeMappings)) {
-            if (aliases.some(alias => lowerHeader === alias.toLowerCase())) {
-                suggestedMapping = dbField;
-                confidence = "High";
-                break;
-            } else if (aliases.some(alias => lowerHeader.includes(alias.toLowerCase()))) {
-                suggestedMapping = dbField;
-                confidence = "Medium";
+        // Custom logic for "โพสต์" / "post"
+        const sampleVal = getColumnSampleVal(idx);
+        if (result.sourceType === "Facebook" || result.sourceType === "FacebookGroupDaily") {
+            if (h === "โพสต์" || lowerHeader === "post") {
+                if (/^\d+$/.test(sampleVal)) {
+                    suggestedMapping = "unsupported";
+                    confidence = "High";
+                    warning = "หัวข้อ 'โพสต์' ในตารางนี้เป็นตัวเลขจำนวนโพสต์สะสม ไม่ใช่ข้อความเนื้อหาโพสต์ จึงถูกละเว้น";
+                } else if (sampleVal.startsWith("http") || sampleVal.includes("facebook.com") || sampleVal.includes("/posts/")) {
+                    suggestedMapping = "postUrl";
+                    confidence = "High";
+                } else {
+                    suggestedMapping = "postTitle";
+                    confidence = "High";
+                }
             }
         }
 
+        // Regular aliases mapping fallback
         if (suggestedMapping === "unsupported") {
+            for (const [dbField, aliases] of Object.entries(activeMappings)) {
+                // Skip matching for postTitle/postUrl if already handled above
+                if ((dbField === "postTitle" || dbField === "postUrl") && (h === "โพสต์" || lowerHeader === "post")) {
+                    continue;
+                }
+
+                if (aliases.some(alias => lowerHeader === alias.toLowerCase())) {
+                    suggestedMapping = dbField;
+                    confidence = "High";
+                    break;
+                } else if (aliases.some(alias => lowerHeader.includes(alias.toLowerCase()))) {
+                    suggestedMapping = dbField;
+                    confidence = "Medium";
+                }
+            }
+        }
+
+        if (suggestedMapping === "unsupported" && !warning) {
             warning = "คอลัมน์นี้ไม่ได้รับการรองรับในฐานข้อมูล จะถูกละเว้นขณะอัปเดต";
         }
 
         result.columns.push({
             header: h,
-            sampleValue: samples[idx] || "",
+            sampleValue: sampleVal || samples[idx] || "",
             suggestedMapping,
             confidence,
             warning
         });
+    });
+
+    // Resolve duplicate column mapping collisions (keep the one with highest confidence)
+    const mappingBestIdx: Record<string, { idx: number; confidenceScore: number }> = {};
+    const confidenceScores = { High: 3, Medium: 2, Low: 1, Manual: 4 };
+
+    result.columns.forEach((col, idx) => {
+        if (col.suggestedMapping === "unsupported") return;
+        const score = confidenceScores[col.confidence] || 1;
+        const existing = mappingBestIdx[col.suggestedMapping];
+
+        if (!existing) {
+            mappingBestIdx[col.suggestedMapping] = { idx, confidenceScore: score };
+        } else {
+            if (score > existing.confidenceScore) {
+                const prevCol = result.columns[existing.idx];
+                prevCol.suggestedMapping = "unsupported";
+                prevCol.confidence = "Low";
+                prevCol.warning = `คอลัมน์นี้ถูกละเว้นเนื่องจากคอลัมน์อื่น (${col.header}) จับคู่กับฟิลด์เดียวกันด้วยความมั่นใจสูงกว่า`;
+                
+                mappingBestIdx[col.suggestedMapping] = { idx, confidenceScore: score };
+            } else {
+                col.suggestedMapping = "unsupported";
+                col.confidence = "Low";
+                col.warning = `คอลัมน์นี้ถูกละเว้นเนื่องจากคอลัมน์อื่น (${result.columns[existing.idx].header}) จับคู่กับฟิลด์เดียวกันด้วยความมั่นใจสูงกว่า`;
+            }
+        }
     });
 
     // 5. Parse Rows & Article Matching
@@ -174,8 +243,7 @@ export function parseAnalyticsData(rawText: string, writingProjects: any[] = [])
         result.columns.forEach((col, idx) => {
             if (col.suggestedMapping !== "unsupported" && cells[idx] !== undefined) {
                 const rawVal = cells[idx];
-                // Convert numeric values appropriately
-                if (["views", "activeUsers", "events", "reach", "reactions", "comments", "shares", "linkClicks", "saves"].includes(col.suggestedMapping)) {
+                if (["views", "activeUsers", "events", "reach", "reactions", "comments", "shares", "linkClicks", "saves", "otherClicks", "photoViews"].includes(col.suggestedMapping)) {
                     const parsedNum = parseInt(rawVal.replace(/,/g, ""), 10);
                     extractedData[col.suggestedMapping] = isNaN(parsedNum) ? 0 : parsedNum;
                 } else {
@@ -184,11 +252,37 @@ export function parseAnalyticsData(rawText: string, writingProjects: any[] = [])
             }
         });
 
+        // Row classification
+        let rowType: ParsedRow["rowType"] = "unknown";
+        if (result.sourceType === "GA4") {
+            rowType = "unknown";
+        } else if (result.sourceType === "Facebook" || result.sourceType === "FacebookGroupDaily") {
+            rowType = result.sourceType === "FacebookGroupDaily" ? "facebook_group_overview" : "facebook_post";
+        }
+
+        // Summary row detection
+        const isSummary = cells.some(cell => {
+            const val = cell.trim().toLowerCase();
+            return (
+                val === "total" ||
+                val === "summary" ||
+                val === "รวม" ||
+                val === "เฉลี่ย" ||
+                val === "average" ||
+                val === "ผลรวม" ||
+                val.includes("รวมทั้งหมด") ||
+                val.includes("ค่าเฉลี่ย")
+            );
+        });
+
+        if (isSummary) {
+            rowType = "summary";
+        }
+
         // Article matching logic
         let matchedProj: ParsedRow["matchedProject"] = undefined;
 
-        if (writingProjects.length > 0 && result.sourceType !== "FacebookGroupDaily") {
-            // Find cells containing path or URL
+        if (writingProjects.length > 0 && (rowType === "facebook_post" || result.sourceType === "GA4")) {
             let pathOrUrlCandidate = "";
             let titleCandidate = "";
 
@@ -260,6 +354,7 @@ export function parseAnalyticsData(rawText: string, writingProjects: any[] = [])
             rawLine: rowLine,
             cells,
             extractedData,
+            rowType,
             matchedProject: matchedProj
         });
     }
@@ -282,7 +377,7 @@ function normalizeUrl(url: string): string {
 }
 
 function extractSlugFromPath(pathOrUrl: string): string {
-    const normalized = pathOrUrl.trim().split("?")[0]; // remove query params
+    const normalized = pathOrUrl.trim().split("?")[0];
     const segments = normalized.split("/").filter(s => s.length > 0);
     if (segments.length === 0) return "";
     return segments[segments.length - 1];
@@ -296,17 +391,24 @@ export function generateSnapshotPayload(
         snapshotWindow: string;
         snapshotDate: string;
         importNote?: string;
-    }
+    },
+    rowIndex: number = 0
 ): any {
     const isGA4 = metadata.sourceType === "GA4";
     const windowKey = `snap${metadata.snapshotWindow}`;
 
+    const isGroupOverview = row.rowType === "facebook_group_overview";
+    const finalSourceType = isGroupOverview ? "facebook_group_overview" : metadata.sourceType;
+
     const performanceFeedback: any = {
         sourceMetadata: {
             ...metadata,
+            sourceType: finalSourceType,
             matchedBy: row.matchedProject?.method || "manual_selection",
             matchConfidence: row.matchedProject?.confidence || "Low",
-            rawSourceSummary: row.rawLine.substring(0, 150)
+            rawSourceSummary: row.rawLine.substring(0, 150),
+            rowType: row.rowType,
+            rowIndex
         }
     };
 
@@ -325,11 +427,15 @@ export function generateSnapshotPayload(
             }
         };
     } else {
+        const platform = finalSourceType === "facebook_group_overview" 
+            ? "facebook_group" 
+            : (metadata.sourceType === "Facebook" ? "facebook_page" : "facebook_group");
+
         performanceFeedback.facebookSnapshots = {
             [windowKey]: {
                 snapshotDate: metadata.snapshotDate,
                 window: metadata.snapshotWindow,
-                platform: metadata.sourceType === "Facebook" ? "facebook_page" : "facebook_group",
+                platform,
                 postUrl: row.extractedData.postUrl || "",
                 reach: row.extractedData.reach || 0,
                 reactions: row.extractedData.reactions || 0,
@@ -337,7 +443,9 @@ export function generateSnapshotPayload(
                 shares: row.extractedData.shares || 0,
                 linkClicks: row.extractedData.linkClicks || 0,
                 saves: row.extractedData.saves || 0,
-                notes: metadata.importNote || ""
+                notes: isGroupOverview 
+                    ? `Group Overview Import: ${metadata.importNote || ""}`.trim()
+                    : (metadata.importNote || "")
             }
         };
     }
@@ -345,7 +453,7 @@ export function generateSnapshotPayload(
     return {
         schemaVersion: "workos-writing-lab-update-v0.1",
         source: "Arbor",
-        importBatchTitle: `Analytics Import - ${metadata.sourceType} ${metadata.snapshotWindow}`,
+        importBatchTitle: `Analytics Import - ${finalSourceType} ${metadata.snapshotWindow}`,
         action: "apply_update",
         target: {
             type: "writing_lab_project",
