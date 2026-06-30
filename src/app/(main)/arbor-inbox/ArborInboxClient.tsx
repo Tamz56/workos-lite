@@ -16,6 +16,7 @@ import {
 import { PreviewData, ImportPayload } from "@/lib/arborInboxSchema";
 import { ImportLog } from "@/lib/arborInboxStore";
 import { parseArticleMarkdown, generateUpdatePayload } from "@/lib/articleParser";
+import { parseAnalyticsData, generateSnapshotPayload } from "@/lib/analyticsParser";
 
 export default function ArborInboxClient() {
     const [payloadText, setPayloadText] = useState("");
@@ -36,11 +37,74 @@ export default function ArborInboxClient() {
     const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
     // Markdown import mode states
-    const [importMode, setImportMode] = useState<"json" | "markdown">("json");
+    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics">("json");
     const [markdownText, setMarkdownText] = useState("");
     const [parsedResult, setParsedResult] = useState<any>(null);
     const [writingProjects, setWritingProjects] = useState<any[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+
+    // Analytics import mode states
+    const [analyticsText, setAnalyticsText] = useState("");
+    const [analyticsWindow, setAnalyticsWindow] = useState("24h");
+    const [analyticsSource, setAnalyticsSource] = useState("GA4");
+    const [analyticsDate, setAnalyticsDate] = useState(() => new Date().toISOString().split("T")[0]);
+    const [analyticsNote, setAnalyticsNote] = useState("");
+    const [analyticsResult, setAnalyticsResult] = useState<any>(null);
+    const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
+
+    const handleParseAnalytics = (textToParse: string) => {
+        if (!textToParse.trim()) return;
+        const result = parseAnalyticsData(textToParse, writingProjects);
+        setAnalyticsResult(result);
+        setSelectedRowIndex(0);
+
+        if (result.sourceType === "GA4") {
+            setAnalyticsSource("GA4");
+        } else if (result.sourceType === "Facebook") {
+            setAnalyticsSource("Facebook");
+        } else if (result.sourceType === "FacebookGroupDaily") {
+            setAnalyticsSource("FacebookGroupDaily");
+        }
+
+        // Auto target matched project of the first row
+        if (result.rows.length > 0 && result.rows[0].matchedProject) {
+            setSelectedProjectId(result.rows[0].matchedProject.id);
+        } else {
+            setSelectedProjectId("");
+        }
+    };
+
+    const handleGenerateAnalyticsPayload = () => {
+        if (!analyticsResult || analyticsResult.rows.length === 0) return;
+        const row = analyticsResult.rows[selectedRowIndex];
+
+        const rowToPack = { ...row };
+        const activeProjId = selectedProjectId || (row.matchedProject?.id);
+        if (activeProjId) {
+            const matched = writingProjects.find(p => p.id === activeProjId);
+            if (matched) {
+                rowToPack.matchedProject = {
+                    id: matched.id,
+                    title: matched.title,
+                    slug: matched.slug,
+                    method: selectedProjectId ? "manual_selection" : (row.matchedProject?.method || "manual_selection"),
+                    confidence: selectedProjectId ? "High" : (row.matchedProject?.confidence || "High")
+                };
+            }
+        }
+
+        const metadata = {
+            sourceFileName: "Pasted Text",
+            sourceType: analyticsSource,
+            snapshotWindow: analyticsWindow,
+            snapshotDate: analyticsDate,
+            importNote: analyticsNote
+        };
+
+        const generatedPayload = generateSnapshotPayload(rowToPack, metadata);
+        setPayloadText(JSON.stringify(generatedPayload, null, 2));
+        handleValidate(JSON.stringify(generatedPayload));
+    };
 
     useEffect(() => {
         fetch("/api/content/writing-lab/projects")
@@ -352,6 +416,16 @@ export default function ArborInboxClient() {
                         >
                             Paste Article Markdown
                         </button>
+                        <button
+                            onClick={() => setImportMode("analytics")}
+                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                                importMode === "analytics"
+                                    ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
+                                    : "text-theme-muted hover:text-theme-primary"
+                            }`}
+                        >
+                            Analytics CSV / Table
+                        </button>
                     </div>
 
                     {importMode === "json" && (
@@ -489,6 +563,217 @@ export default function ArborInboxClient() {
                         </div>
                     )}
 
+                    {importMode === "analytics" && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Snapshot Window (ช่วงเวลาสถิติ)
+                                    </label>
+                                    <select
+                                        value={analyticsWindow}
+                                        onChange={(e) => setAnalyticsWindow(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                    >
+                                        <option value="24h">24 Hours (24 ชม. แรก)</option>
+                                        <option value="7d">7 Days (7 วันแรก)</option>
+                                        <option value="30d">30 Days (30 วันแรก)</option>
+                                        <option value="90d">90 Days (90 วันแรก)</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Data Source (แหล่งข้อมูลต้นทาง)
+                                    </label>
+                                    <select
+                                        value={analyticsSource}
+                                        onChange={(e) => setAnalyticsSource(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                    >
+                                        <option value="GA4">Google Analytics 4 (GA4)</option>
+                                        <option value="Facebook">Facebook Page</option>
+                                        <option value="FacebookGroupDaily">Facebook Group Daily Report</option>
+                                        <option value="PersonalProfile">Personal Profile Post</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Snapshot Date (วันที่บันทึกสถิติ)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={analyticsDate}
+                                        onChange={(e) => setAnalyticsDate(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs text-theme-primary font-bold focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Manual Target Selector (เลือกระบุโครงการร่างปลายทาง)
+                                    </label>
+                                    <select
+                                        value={selectedProjectId}
+                                        onChange={(e) => setSelectedProjectId(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                    >
+                                        <option value="">-- ไม่บังคับ (ใช้ค่าระบบเดาอัตโนมัติ) --</option>
+                                        {writingProjects.map((proj) => (
+                                            <option key={proj.id} value={proj.id}>
+                                                {proj.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Import Note (หมายเหตุการนำเข้าสถิติ)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={analyticsNote}
+                                        onChange={(e) => setAnalyticsNote(e.target.value)}
+                                        placeholder="เช่น ยอดแชร์คึกคักเป็นพิเศษเนื่องจากได้พาร์ทเนอร์ช่วยแชร์..."
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                    Paste CSV / Table Text (วางข้อความตารางสถิติดิบที่นี่)
+                                </label>
+                                <textarea
+                                    value={analyticsText}
+                                    onChange={(e) => setAnalyticsText(e.target.value)}
+                                    placeholder="คัดลอกตารางจาก Google Sheets หรือ Excel แล้วนำมาวางที่นี่..."
+                                    className="w-full min-h-[150px] font-mono text-xs bg-theme-input border border-theme-border rounded-2xl p-4 outline-none focus:border-theme-border/80 transition-all resize-y text-theme-primary placeholder:text-theme-muted"
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => handleParseAnalytics(analyticsText)}
+                                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/15"
+                                disabled={!analyticsText.trim()}
+                            >
+                                <SparklesIcon className="w-4 h-4" />
+                                Parse & Review Mapping
+                            </button>
+
+                            {analyticsResult && (
+                                <div className="space-y-4 border-t border-theme-border/30 pt-4">
+                                    {/* Warnings if group report or unknown */}
+                                    {analyticsResult.warning && (
+                                        <div className="p-3 bg-amber-500/5 border border-amber-500/15 rounded-2xl text-[11px] flex items-start gap-2 text-amber-700 dark:text-amber-400 font-bold">
+                                            <ExclamationTriangleIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                                            <span>{analyticsResult.warning}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Classification display */}
+                                    <div className="flex items-center justify-between text-xs font-bold bg-theme-input/40 border border-theme-border rounded-xl p-3">
+                                        <span className="text-theme-muted">Detected Report Type:</span>
+                                        <span className="px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded text-[10px] font-black uppercase">
+                                            {analyticsResult.sourceType}
+                                        </span>
+                                    </div>
+
+                                    {/* Column mappings list */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                            Detected Columns & Mappings
+                                        </label>
+                                        <div className="max-h-[180px] overflow-y-auto space-y-1.5 border border-theme-border rounded-xl p-3 bg-theme-input/20">
+                                            {analyticsResult.columns.map((col: any, idx: number) => (
+                                                <div key={idx} className="flex justify-between items-center text-[11px] p-2 bg-theme-card border border-theme-border/60 rounded-lg">
+                                                    <div>
+                                                        <span className="font-bold text-theme-primary block">{col.header}</span>
+                                                        <span className="text-[10px] text-theme-muted">Sample: "{col.sampleValue || "N/A"}"</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                                            col.suggestedMapping === "unsupported"
+                                                                ? "bg-neutral-500/10 text-neutral-500 border border-neutral-500/20"
+                                                                : "bg-green-500/10 text-green-600 border border-green-500/20"
+                                                        }`}>
+                                                            {col.suggestedMapping}
+                                                        </span>
+                                                        {col.warning && <span className="block text-[9px] text-amber-500 mt-0.5">{col.warning}</span>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Rows matching & selection list */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                            Select Row / Article to Import ({analyticsResult.rows.length} rows)
+                                        </label>
+                                        <div className="space-y-2 max-h-[220px] overflow-y-auto">
+                                            {analyticsResult.rows.map((row: any, idx: number) => {
+                                                const matched = row.matchedProject;
+                                                const isSelected = selectedRowIndex === idx;
+                                                return (
+                                                    <div 
+                                                        key={idx}
+                                                        onClick={() => {
+                                                            setSelectedRowIndex(idx);
+                                                            if (matched) {
+                                                                setSelectedProjectId(matched.id);
+                                                            } else {
+                                                                setSelectedProjectId("");
+                                                            }
+                                                        }}
+                                                        className={`p-3 border rounded-2xl text-xs cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                                                            isSelected
+                                                                ? "bg-blue-500/5 border-blue-600 text-theme-primary font-bold shadow-sm"
+                                                                : "bg-theme-card border-theme-border hover:border-theme-border/80 text-theme-secondary"
+                                                        }`}
+                                                    >
+                                                        <div className="space-y-1 shrink-0 max-w-[75%]">
+                                                            <div className="font-semibold truncate">Row {idx + 1}: {row.rawLine.substring(0, 100)}</div>
+                                                            <div className="text-[10px] text-theme-muted">
+                                                                {Object.keys(row.extractedData).map(k => `${k}: ${row.extractedData[k]}`).join(" | ")}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right flex flex-col items-end gap-1">
+                                                            {matched ? (
+                                                                <>
+                                                                    <span className="font-bold text-theme-primary truncate max-w-[120px] block">{matched.title}</span>
+                                                                    <span className="text-[9px] px-1 bg-green-500/10 border border-green-500/20 text-green-600 rounded">
+                                                                        Match: {matched.method} ({matched.confidence})
+                                                                    </span>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-[9px] px-1 bg-red-500/10 border border-red-500/20 text-red-600 rounded font-black">
+                                                                    ⚠️ No Match
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Generate package button */}
+                                    <button
+                                        onClick={handleGenerateAnalyticsPayload}
+                                        className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-green-600/15"
+                                        disabled={!selectedProjectId && (!analyticsResult.rows[selectedRowIndex]?.matchedProject?.id)}
+                                    >
+                                        <CheckCircleIcon className="w-4 h-4" />
+                                        Generate Snapshot Update Package
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Validation Feedback Panel */}
                     {validationChecked && (
                         <div className={`p-4 rounded-2xl border ${
@@ -575,6 +860,19 @@ export default function ArborInboxClient() {
                                     <div><span className="font-bold text-theme-muted">ID:</span> <code className="text-[10px] bg-theme-input px-1 py-0.5 rounded text-theme-secondary">{(preview as any).targetProject?.id || "N/A"}</code></div>
                                 </div>
                             </div>
+
+                            {/* Duplicate Snapshot Overwrite Warnings */}
+                            {warnings.some(w => w.includes("Snapshot สำหรับช่วงเวลา")) && (
+                                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1 text-xs text-amber-700 dark:text-amber-400 font-bold">
+                                    <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                                        <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
+                                        <span>คำเตือน: พบการเขียนทับ Snapshot เดิม</span>
+                                    </div>
+                                    <p className="text-[11px] font-medium leading-relaxed mt-1">
+                                        ข้อมูลสถิติ Snapshot สำหรับแพลตฟอร์มและรอบเวลานี้มีข้อมูลในระบบอยู่ก่อนแล้ว การกดยืนยันปุ่มเขียวด้านบนจะเขียนทับข้อมูลชุดเดิมด้วยค่าสถิติใหม่นี้ทันที!
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Update Groups */}
                             {Object.keys((preview as any).groups).map((groupKey) => {

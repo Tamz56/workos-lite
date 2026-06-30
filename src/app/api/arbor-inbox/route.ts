@@ -99,6 +99,29 @@ export async function POST(req: NextRequest) {
                         }
                     }
 
+                    if (payload.fields.performanceFeedback) {
+                        const pfPayload = payload.fields.performanceFeedback;
+                        const pfExisting = parsedNotes.performanceFeedback || {};
+
+                        if (pfPayload.facebookSnapshots) {
+                            const existingFB = pfExisting.facebookSnapshots || {};
+                            for (const win of Object.keys(pfPayload.facebookSnapshots)) {
+                                if (existingFB[win] && Object.keys(existingFB[win]).length > 0) {
+                                    validationResult.warnings.push(`ตรวจพบข้อมูล Facebook Snapshot สำหรับช่วงเวลา "${win}" อยู่แล้วในระบบ หากยืนยันบันทึกจะเขียนทับข้อมูลเดิม`);
+                                }
+                            }
+                        }
+
+                        if (pfPayload.ga4Snapshots) {
+                            const existingGA4 = pfExisting.ga4Snapshots || {};
+                            for (const win of Object.keys(pfPayload.ga4Snapshots)) {
+                                if (existingGA4[win] && Object.keys(existingGA4[win]).length > 0) {
+                                    validationResult.warnings.push(`ตรวจพบข้อมูล GA4 Snapshot สำหรับช่วงเวลา "${win}" อยู่แล้วในระบบ หากยืนยันบันทึกจะเขียนทับข้อมูลเดิม`);
+                                }
+                            }
+                        }
+                    }
+
                     const compareFields = (groupKey: string, mappings: Record<string, { type: "column" | "notes" | "pf" | "arborReview", path?: string }>) => {
                         const fieldsInPayload = payload.fields[groupKey];
                         if (!fieldsInPayload) return;
@@ -195,9 +218,13 @@ export async function POST(req: NextRequest) {
 
                     const perfMappings = {
                         snapshots: { type: "notes", path: "performanceFeedback.snapshots" },
+                        facebookSnapshots: { type: "notes", path: "performanceFeedback.facebookSnapshots" },
+                        ga4Snapshots: { type: "notes", path: "performanceFeedback.ga4Snapshots" },
+                        combinedAnalysis: { type: "notes", path: "performanceFeedback.combinedAnalysis" },
                         notableFeedback: { type: "notes", path: "performanceFeedback.notableFeedback" },
                         arborInsight: { type: "notes", path: "performanceFeedback.arborInsight" },
-                        nextDecision: { type: "notes", path: "performanceFeedback.nextDecision" }
+                        nextDecision: { type: "notes", path: "performanceFeedback.nextDecision" },
+                        sourceMetadata: { type: "notes", path: "performanceFeedback.sourceMetadata" }
                     } as const;
 
                     compareFields("seo", seoMappings);
@@ -368,6 +395,12 @@ export async function POST(req: NextRequest) {
                     parsedNotes.performanceFeedback.nextDecision = deepMerge(
                         parsedNotes.performanceFeedback.nextDecision,
                         pf.nextDecision
+                    );
+                }
+                if (pf.sourceMetadata) {
+                    parsedNotes.performanceFeedback.sourceMetadata = deepMerge(
+                        parsedNotes.performanceFeedback.sourceMetadata,
+                        pf.sourceMetadata
                     );
                 }
 

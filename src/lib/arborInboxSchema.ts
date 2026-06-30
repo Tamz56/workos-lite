@@ -162,6 +162,24 @@ export function validatePayload(payload: any, existingProjects: ProjectLookup[])
                                 }
                             }
                         }
+                        if (key === "performanceFeedback") {
+                            const pfKeys = [
+                                "snapshots",
+                                "facebookSnapshots",
+                                "ga4Snapshots",
+                                "combinedAnalysis",
+                                "notableFeedback",
+                                "arborInsight",
+                                "nextDecision",
+                                "arborReview",
+                                "sourceMetadata"
+                            ];
+                            for (const pfk of Object.keys(groupVal)) {
+                                if (!pfKeys.includes(pfk)) {
+                                    errors.push(`fields.performanceFeedback: Unsupported performance feedback field "${pfk}"`);
+                                }
+                            }
+                        }
                     }
                 }
             }
