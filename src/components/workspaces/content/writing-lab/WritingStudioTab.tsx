@@ -209,7 +209,10 @@ export default function WritingStudioTab({
         audienceQuestions: "",
         confusion: "",
         audienceLanguage: "",
-        notes: ""
+        notes: "",
+        isMistake: false,
+        correctedAt: "",
+        correctionNote: ""
     });
 
     const createEmptyGA4Snapshot = (windowKey: string) => ({
@@ -255,6 +258,7 @@ export default function WritingStudioTab({
     const [fbSnap7d, setFbSnap7d] = useState(createEmptyFacebookSnapshot("7d"));
     const [fbSnap30d, setFbSnap30d] = useState(createEmptyFacebookSnapshot("30d"));
     const [fbSnap90d, setFbSnap90d] = useState(createEmptyFacebookSnapshot("90d"));
+    const [fbSourceMetadata, setFbSourceMetadata] = useState<any>({});
 
     // New GA4 Snapshots
     const [ga4Snap24h, setGa4Snap24h] = useState(createEmptyGA4Snapshot("24h"));
@@ -389,9 +393,13 @@ export default function WritingStudioTab({
                                 reactions: c.reactions ?? leg.fbReactions ?? "", comments: c.comments ?? leg.fbComments ?? "",
                                 shares: c.shares ?? leg.fbShares ?? "", linkClicks: c.linkClicks ?? leg.fbClicks ?? "",
                                 saves: c.saves || "", notableComments: c.notableComments || "", audienceQuestions: c.audienceQuestions || "",
-                                confusion: c.confusion || "", audienceLanguage: c.audienceLanguage || "", notes: c.notes || leg.notes || ""
+                                confusion: c.confusion || "", audienceLanguage: c.audienceLanguage || "", notes: c.notes || leg.notes || "",
+                                isMistake: c.isMistake ?? false,
+                                correctedAt: c.correctedAt || "",
+                                correctionNote: c.correctionNote || ""
                             };
                         };
+                        setFbSourceMetadata(pf.sourceMetadata || {});
                         fb24 = getFb("snap24h", snaps.snap24h || {});
                         fb7 = getFb("snap7d", snaps.snap7d || {});
                         fb30 = getFb("snap30d", snaps.snap30d || {});
@@ -735,7 +743,8 @@ export default function WritingStudioTab({
                         targetDate: decisionTargetDate,
                         notes: decisionNotes
                     },
-                    arborReview: reviewResult
+                    arborReview: reviewResult,
+                    sourceMetadata: fbSourceMetadata
                 }
             });
 
@@ -2421,20 +2430,32 @@ export default function WritingStudioTab({
                                             Facebook Snapshots (Post-Level Distribution)
                                         </h4>
                                         <div className="flex bg-theme-input rounded-lg p-0.5 border border-theme-border/30">
-                                            {(["24h", "7d", "30d", "90d"] as const).map((w) => (
-                                                <button
-                                                    key={w}
-                                                    type="button"
-                                                    onClick={() => setFbActiveSnap(w)}
-                                                    className={`px-2 py-1 text-[10px] font-black rounded-md transition-all ${
-                                                        fbActiveSnap === w
-                                                            ? "bg-theme-card text-blue-600 shadow-sm border border-theme-border/10"
-                                                            : "text-theme-muted hover:text-theme-primary"
-                                                    }`}
-                                                >
-                                                    {w}
-                                                </button>
-                                            ))}
+                                            {(["24h", "7d", "30d", "90d"] as const).map((w) => {
+                                                const isWinMistake = (() => {
+                                                    if (w === "24h") return fbSnap24h.isMistake;
+                                                    if (w === "7d") return fbSnap7d.isMistake;
+                                                    if (w === "30d") return fbSnap30d.isMistake;
+                                                    return fbSnap90d.isMistake;
+                                                })();
+
+                                                return (
+                                                    <button
+                                                        key={w}
+                                                        type="button"
+                                                        onClick={() => setFbActiveSnap(w)}
+                                                        className={`px-2 py-1 text-[10px] font-black rounded-md transition-all flex items-center gap-1.5 ${
+                                                            fbActiveSnap === w
+                                                                ? "bg-theme-card text-blue-600 shadow-sm border border-theme-border/10"
+                                                                : isWinMistake
+                                                                    ? "text-red-500 hover:text-red-600 font-bold"
+                                                                    : "text-theme-muted hover:text-theme-primary"
+                                                        }`}
+                                                    >
+                                                        {isWinMistake && <span className="w-1.5 h-1.5 bg-red-500 rounded-full inline-block shrink-0 animate-pulse" />}
+                                                        {w}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
@@ -2443,7 +2464,147 @@ export default function WritingStudioTab({
                                         const activeFbSetter = fbActiveSnap === "24h" ? setFbSnap24h : fbActiveSnap === "7d" ? setFbSnap7d : fbActiveSnap === "30d" ? setFbSnap30d : setFbSnap90d;
 
                                         return (
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                                            <div className="space-y-4">
+                                                {/* Mistake Alert Banner */}
+                                                {activeFb.isMistake && (
+                                                    <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-2xl text-[11px] text-red-700 dark:text-red-400 font-bold space-y-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[9px] font-black uppercase">MISTAKE</span>
+                                                            <span>สถิตินี้ถูกทำเครื่องหมายว่าผิดพลาด (Marked as Mistake)</span>
+                                                        </div>
+                                                        {activeFb.correctionNote && (
+                                                            <div><span className="text-theme-muted font-bold">สาเหตุ:</span> {activeFb.correctionNote}</div>
+                                                        )}
+                                                        {activeFb.correctedAt && (
+                                                            <div className="text-[10px] text-theme-muted font-medium">แก้ไขเมื่อ: {new Date(activeFb.correctedAt).toLocaleString("th-TH")}</div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Quick Action Buttons Row */}
+                                                <div className="flex flex-wrap items-center gap-2 p-3 bg-theme-input/40 border border-theme-border rounded-2xl">
+                                                    <span className="text-[10px] font-black text-theme-secondary uppercase tracking-wider mr-2">Snapshot Quick Actions:</span>
+                                                     
+                                                    {/* Correct Platform Quick Actions */}
+                                                    {(activeFb.platform === "facebook_page" || !activeFb.platform) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                activeFbSetter({ ...activeFb, platform: "facebook_group" });
+                                                                setFbSourceMetadata({ ...fbSourceMetadata, sourceType: "facebook_group_post" });
+                                                            }}
+                                                            className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 border border-blue-500/20 rounded-xl text-[10px] font-black transition-all"
+                                                        >
+                                                            Switch to Group
+                                                        </button>
+                                                    )}
+
+                                                    {activeFb.platform === "facebook_group" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                activeFbSetter({ ...activeFb, platform: "facebook_page" });
+                                                                setFbSourceMetadata({ ...fbSourceMetadata, sourceType: "facebook_page_post" });
+                                                            }}
+                                                            className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 border border-blue-500/20 rounded-xl text-[10px] font-black transition-all"
+                                                        >
+                                                            Switch to Page
+                                                        </button>
+                                                    )}
+
+                                                    {(activeFb.platform === "facebook_personal" || activeFb.platform === "personal_profile") && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    activeFbSetter({ ...activeFb, platform: "facebook_group" });
+                                                                    setFbSourceMetadata({ ...fbSourceMetadata, sourceType: "facebook_group_post" });
+                                                                }}
+                                                                className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 border border-blue-500/20 rounded-xl text-[10px] font-black transition-all"
+                                                            >
+                                                                Switch to Group
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    activeFbSetter({ ...activeFb, platform: "facebook_page" });
+                                                                    setFbSourceMetadata({ ...fbSourceMetadata, sourceType: "facebook_page_post" });
+                                                                }}
+                                                                className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 border border-blue-500/20 rounded-xl text-[10px] font-black transition-all"
+                                                            >
+                                                                Switch to Page
+                                                            </button>
+                                                        </>
+                                                    )}
+
+                                                    {/* Mark as Mistake Action */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (activeFb.isMistake) {
+                                                                activeFbSetter({
+                                                                    ...activeFb,
+                                                                    isMistake: false,
+                                                                    correctedAt: "",
+                                                                    correctionNote: ""
+                                                                });
+                                                            } else {
+                                                                    const note = window.prompt("กรุณาระบุสาเหตุหรือบันทึกการแก้ไข (Correction Note):", "กรอกประเภทช่องทางผิดพลาด");
+                                                                    if (note !== null) {
+                                                                        activeFbSetter({
+                                                                            ...activeFb,
+                                                                            isMistake: true,
+                                                                            correctedAt: new Date().toISOString(),
+                                                                            correctionNote: note
+                                                                        });
+                                                                    }
+                                                            }
+                                                        }}
+                                                        className={`px-2.5 py-1.5 border rounded-xl text-[10px] font-black transition-all ${
+                                                            activeFb.isMistake
+                                                                ? "bg-green-500/10 hover:bg-green-500/20 text-green-600 border-green-500/20"
+                                                                : "bg-red-500/10 hover:bg-red-500/20 text-red-600 border-red-500/20"
+                                                        }`}
+                                                    >
+                                                        {activeFb.isMistake ? "Unmark Mistake" : "Mark as Mistake"}
+                                                    </button>
+
+                                                    {/* Delete Snapshot Action */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const ok = window.confirm("คุณต้องการลบข้อมูลสถิติ Snapshot ช่วงเวลานี้หรือไม่? ข้อมูลสถิติของช่วงเวลานี้จะถูกเคลียร์ออก");
+                                                            if (ok) {
+                                                                activeFbSetter({
+                                                                    snapshotDate: "",
+                                                                    window: fbActiveSnap.replace("snap", ""),
+                                                                    platform: "facebook_page",
+                                                                    postUrl: "",
+                                                                    publishedDate: "",
+                                                                    reach: "",
+                                                                    reactions: "",
+                                                                    comments: "",
+                                                                    shares: "",
+                                                                    linkClicks: "",
+                                                                    saves: "",
+                                                                    notableComments: "",
+                                                                    audienceQuestions: "",
+                                                                    confusion: "",
+                                                                    audienceLanguage: "",
+                                                                    notes: "",
+                                                                    isMistake: false,
+                                                                    correctedAt: "",
+                                                                    correctionNote: ""
+                                                                });
+                                                            }
+                                                        }}
+                                                        className="px-2.5 py-1.5 bg-neutral-500/10 hover:bg-neutral-500/20 text-neutral-600 border border-neutral-500/20 rounded-xl text-[10px] font-black transition-all ml-auto"
+                                                    >
+                                                        Delete Snapshot
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                                                 <div className="space-y-1">
                                                     <label className="text-[9px] font-black text-theme-muted uppercase">Snapshot Date</label>
                                                     <input
@@ -2592,6 +2753,7 @@ export default function WritingStudioTab({
                                                     />
                                                 </div>
                                             </div>
+                                        </div>
                                         );
                                     })()}
                                 </div>
