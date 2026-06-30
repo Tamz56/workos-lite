@@ -42,6 +42,7 @@ export default function ArborInboxClient() {
     const [parsedResult, setParsedResult] = useState<any>(null);
     const [writingProjects, setWritingProjects] = useState<any[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+    const [manualProjectId, setManualProjectId] = useState<string>("");
 
     // Analytics import mode states
     const [analyticsText, setAnalyticsText] = useState("");
@@ -57,6 +58,7 @@ export default function ArborInboxClient() {
         const result = parseAnalyticsData(textToParse, writingProjects);
         setAnalyticsResult(result);
         setSelectedRowIndex(0);
+        setManualProjectId("");
 
         if (result.sourceType === "GA4") {
             setAnalyticsSource("GA4");
@@ -75,22 +77,83 @@ export default function ArborInboxClient() {
     };
 
     const handleGenerateAnalyticsPayload = () => {
-        if (!analyticsResult || analyticsResult.rows.length === 0) return;
+        setStatusMessage(null);
+
+        if (!analyticsResult || analyticsResult.rows.length === 0) {
+            setStatusMessage({ type: "error", text: "Please select a data row first. (กรุณาเลือกแถวข้อมูลนำเข้าก่อน)" });
+            return;
+        }
+
         const row = analyticsResult.rows[selectedRowIndex];
+        if (!row) {
+            setStatusMessage({ type: "error", text: "Please select a data row first. (กรุณาเลือกแถวข้อมูลนำเข้าก่อน)" });
+            return;
+        }
+
+        if (row.rowType === "summary") {
+            setStatusMessage({ type: "error", text: "Selected row is a summary row and cannot be imported. (ไม่สามารถนำเข้าแถวที่เป็นสรุปผลรวมได้)" });
+            return;
+        }
+
+        if (!analyticsWindow) {
+            setStatusMessage({ type: "error", text: "Snapshot window is missing. (กรุณาระบุช่วงเวลาสถิติ)" });
+            return;
+        }
+
+        if (!analyticsDate) {
+            setStatusMessage({ type: "error", text: "Snapshot date is missing. (กรุณาระบุวันที่บันทึกสถิติ)" });
+            return;
+        }
+
+        // Target project resolution priority:
+        // 1. autoMatch with High/Medium confidence
+        // 2. manualProjectId selected by user
+        // 3. autoMatch with Low confidence
+        let activeProjId = "";
+        let isManual = false;
+
+        const autoMatch = row.matchedProject;
+        if (autoMatch && (autoMatch.confidence === "High" || autoMatch.confidence === "Medium")) {
+            activeProjId = autoMatch.id;
+            isManual = false;
+        } else if (manualProjectId) {
+            activeProjId = manualProjectId;
+            isManual = true;
+        } else if (autoMatch) {
+            activeProjId = autoMatch.id;
+            isManual = false;
+        }
+
+        if (!activeProjId) {
+            setStatusMessage({ type: "error", text: "No target article matched. Please select Target Writing Project manually. (ไม่พบโครงการบทความเป้าหมาย กรุณาเลือกระบุโครงการปลายทางด้วยตนเอง)" });
+            return;
+        }
+
+        // Facebook group overview requires manual target selection
+        if (row.rowType === "facebook_group_overview" && !manualProjectId) {
+            setStatusMessage({ type: "error", text: "Facebook Group Overview snapshot requires manual Target Writing Project selection. (ข้อมูลสรุปกลุ่มจำเป็นต้องเลือกระบุโครงการปลายทางด้วยตนเอง)" });
+            return;
+        }
+
+        const hasMetrics = Object.keys(row.extractedData).some(key => {
+            const val = row.extractedData[key];
+            return typeof val === "number" && val > 0;
+        });
+        if (!hasMetrics) {
+            setStatusMessage({ type: "error", text: "No usable metrics were detected from this row. (ตรวจไม่พบตัวชี้วัดประสิทธิภาพใดๆ ในแถวที่เลือกนี้)" });
+            return;
+        }
 
         const rowToPack = { ...row };
-        const activeProjId = selectedProjectId || (row.matchedProject?.id);
-        if (activeProjId) {
-            const matched = writingProjects.find(p => p.id === activeProjId);
-            if (matched) {
-                rowToPack.matchedProject = {
-                    id: matched.id,
-                    title: matched.title,
-                    slug: matched.slug,
-                    method: selectedProjectId ? "manual_selection" : (row.matchedProject?.method || "manual_selection"),
-                    confidence: selectedProjectId ? "High" : (row.matchedProject?.confidence || "High")
-                };
-            }
+        const matched = writingProjects.find(p => p.id === activeProjId);
+        if (matched) {
+            rowToPack.matchedProject = {
+                id: matched.id,
+                title: matched.title,
+                slug: matched.slug,
+                method: isManual ? "manual" : (row.matchedProject?.method || "manual"),
+                confidence: isManual ? "Manual" : (row.matchedProject?.confidence || "Manual")
+            };
         }
 
         const metadata = {
@@ -98,10 +161,12 @@ export default function ArborInboxClient() {
             sourceType: analyticsSource,
             snapshotWindow: analyticsWindow,
             snapshotDate: analyticsDate,
-            importNote: analyticsNote
+            importNote: isManual 
+                ? `[Manual Target Selected] ${analyticsNote || ""}`.trim()
+                : (analyticsNote || "")
         };
 
-        const generatedPayload = generateSnapshotPayload(rowToPack, metadata);
+        const generatedPayload = generateSnapshotPayload(rowToPack, metadata, selectedRowIndex);
         setPayloadText(JSON.stringify(generatedPayload, null, 2));
         handleValidate(JSON.stringify(generatedPayload));
     };
@@ -615,8 +680,8 @@ export default function ArborInboxClient() {
                                         Manual Target Selector (เลือกระบุโครงการร่างปลายทาง)
                                     </label>
                                     <select
-                                        value={selectedProjectId}
-                                        onChange={(e) => setSelectedProjectId(e.target.value)}
+                                        value={manualProjectId}
+                                        onChange={(e) => setManualProjectId(e.target.value)}
                                         className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
                                     >
                                         <option value="">-- ไม่บังคับ (ใช้ค่าระบบเดาอัตโนมัติ) --</option>
@@ -717,43 +782,73 @@ export default function ArborInboxClient() {
                                             {analyticsResult.rows.map((row: any, idx: number) => {
                                                 const matched = row.matchedProject;
                                                 const isSelected = selectedRowIndex === idx;
+                                                const isSummaryRow = row.rowType === "summary";
+                                                const isGroupOverviewRow = row.rowType === "facebook_group_overview";
+
+                                                // Color styling for badges
+                                                let badgeClass = "bg-neutral-500/10 text-neutral-500 border border-neutral-500/20";
+                                                let badgeLabel = "Unknown";
+                                                if (row.rowType === "facebook_post") {
+                                                    badgeClass = "bg-green-500/10 text-green-600 border border-green-500/20";
+                                                    badgeLabel = "Post";
+                                                } else if (row.rowType === "facebook_group_overview") {
+                                                    badgeClass = "bg-blue-500/10 text-blue-600 border border-blue-500/20";
+                                                    badgeLabel = "Group Overview";
+                                                } else if (isSummaryRow) {
+                                                    badgeClass = "bg-amber-500/10 text-amber-600 border border-amber-500/20";
+                                                    badgeLabel = "Summary";
+                                                }
+
                                                 return (
                                                     <div 
                                                         key={idx}
                                                         onClick={() => {
                                                             setSelectedRowIndex(idx);
-                                                            if (matched) {
-                                                                setSelectedProjectId(matched.id);
-                                                            } else {
-                                                                setSelectedProjectId("");
-                                                            }
+                                                            setManualProjectId("");
                                                         }}
-                                                        className={`p-3 border rounded-2xl text-xs cursor-pointer transition-all flex items-start justify-between gap-3 ${
-                                                            isSelected
-                                                                ? "bg-blue-500/5 border-blue-600 text-theme-primary font-bold shadow-sm"
-                                                                : "bg-theme-card border-theme-border hover:border-theme-border/80 text-theme-secondary"
+                                                        className={`p-3 border rounded-2xl text-xs cursor-pointer transition-all flex flex-col gap-2 ${
+                                                            isSummaryRow 
+                                                                ? "opacity-55 bg-neutral-100 dark:bg-neutral-900/40 border-neutral-200 dark:border-neutral-800"
+                                                                : isSelected
+                                                                    ? "bg-blue-500/5 border-blue-600 text-theme-primary font-bold shadow-sm"
+                                                                    : "bg-theme-card border-theme-border hover:border-theme-border/80 text-theme-secondary"
                                                         }`}
                                                     >
-                                                        <div className="space-y-1 shrink-0 max-w-[75%]">
-                                                            <div className="font-semibold truncate">Row {idx + 1}: {row.rawLine.substring(0, 100)}</div>
-                                                            <div className="text-[10px] text-theme-muted">
-                                                                {Object.keys(row.extractedData).map(k => `${k}: ${row.extractedData[k]}`).join(" | ")}
+                                                        <div className="flex justify-between items-start gap-3 w-full">
+                                                            <div className="space-y-1 shrink-0 max-w-[65%]">
+                                                                <div className="font-semibold truncate">Row {idx + 1}: {row.rawLine.substring(0, 80)}</div>
+                                                                <div className="text-[10px] text-theme-muted">
+                                                                    {Object.keys(row.extractedData).map(k => `${k}: ${row.extractedData[k]}`).join(" | ")}
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right flex flex-col items-end gap-1">
+                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${badgeClass}`}>
+                                                                    {badgeLabel}
+                                                                </span>
+                                                                {matched ? (
+                                                                    <>
+                                                                        <span className="font-bold text-theme-primary truncate max-w-[120px] block">{matched.title}</span>
+                                                                        <span className="text-[9px] px-1 bg-green-500/10 border border-green-500/20 text-green-600 rounded">
+                                                                            Match: {matched.method} ({matched.confidence})
+                                                                        </span>
+                                                                    </>
+                                                                ) : isSummaryRow ? (
+                                                                    <span className="text-[9px] text-amber-500 font-bold">
+                                                                        ⚠️ แถวสรุปผลรวม (ห้ามนำเข้า)
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[9px] px-1 bg-red-500/10 border border-red-500/20 text-red-600 rounded font-black">
+                                                                        ⚠️ No Match (โปรดเลือกระบุโปรเจกต์เองด้านบน)
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                        <div className="text-right flex flex-col items-end gap-1">
-                                                            {matched ? (
-                                                                <>
-                                                                    <span className="font-bold text-theme-primary truncate max-w-[120px] block">{matched.title}</span>
-                                                                    <span className="text-[9px] px-1 bg-green-500/10 border border-green-500/20 text-green-600 rounded">
-                                                                        Match: {matched.method} ({matched.confidence})
-                                                                    </span>
-                                                                </>
-                                                            ) : (
-                                                                <span className="text-[9px] px-1 bg-red-500/10 border border-red-500/20 text-red-600 rounded font-black">
-                                                                    ⚠️ No Match
-                                                                </span>
-                                                            )}
-                                                        </div>
+
+                                                        {isGroupOverviewRow && (
+                                                            <div className="px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-400 rounded-lg text-[10px] font-bold">
+                                                                This appears to be group-level insight, not post-level performance. Manual target selection is required.
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -764,7 +859,6 @@ export default function ArborInboxClient() {
                                     <button
                                         onClick={handleGenerateAnalyticsPayload}
                                         className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-green-600/15"
-                                        disabled={!selectedProjectId && (!analyticsResult.rows[selectedRowIndex]?.matchedProject?.id)}
                                     >
                                         <CheckCircleIcon className="w-4 h-4" />
                                         Generate Snapshot Update Package

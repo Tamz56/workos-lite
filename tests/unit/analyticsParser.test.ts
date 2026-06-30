@@ -63,7 +63,53 @@ describe("Analytics CSV / Table Parser - Columns Detection", () => {
     });
 });
 
-describe("Analytics Parser - Article Matching & Selection Fallback", () => {
+describe("Analytics Parser - Facebook Insight Custom Mapping Patch", () => {
+    it("should parse Facebook Thai group daily overview row correctly", () => {
+        const raw = "วันที่,โพสต์,ความคิดเห็น,ความรู้สึก,เข้าร่วมแล้ว,โพสต์หรือแสดงความคิดเห็น,ดูแล้ว\n2026-07-01,12,85,120,40,150,1600";
+        const result = parseAnalyticsData(raw);
+
+        // Classified as FacebookGroupDaily because of headers like "เข้าร่วมแล้ว" or daily summary indicators, or headers score
+        expect(result.sourceType).toBe("FacebookGroupDaily");
+        expect(result.rows[0].rowType).toBe("facebook_group_overview");
+
+        // "โพสต์" column has numeric value "12", so it must be mapped to unsupported (ignored posts count), not postTitle
+        const postCol = result.columns.find(c => c.header === "โพสต์");
+        expect(postCol?.suggestedMapping).toBe("unsupported");
+        expect(result.rows[0].extractedData.postTitle).toBeUndefined();
+
+        // Mapped metrics checks
+        expect(result.rows[0].extractedData.reach).toBe(1600); // "ดูแล้ว" => reach
+        expect(result.rows[0].extractedData.comments).toBe(85); // "ความคิดเห็น" => comments
+        expect(result.rows[0].extractedData.reactions).toBe(120); // "ความรู้สึก" => reactions
+    });
+
+    it("should parse Facebook post-level row with text and postURL correctly", () => {
+        const raw = "โพสต์,ผู้โพสต์,ความคิดเห็น,ความรู้สึก,ดูแล้ว,ลิงก์โพสต์\nEP.10.3 Cytokinin,ตั้ม,15,45,350,https://facebook.com/posts/123";
+        const result = parseAnalyticsData(raw);
+
+        expect(result.sourceType).toBe("Facebook");
+        expect(result.rows[0].rowType).toBe("facebook_post");
+
+        // "โพสต์" column has text "EP.10.3 Cytokinin", so it must be mapped to postTitle
+        const postCol = result.columns.find(c => c.header === "โพสต์");
+        expect(postCol?.suggestedMapping).toBe("postTitle");
+        expect(result.rows[0].extractedData.postTitle).toBe("EP.10.3 Cytokinin");
+
+        expect(result.rows[0].extractedData.postUrl).toBe("https://facebook.com/posts/123");
+        expect(result.rows[0].extractedData.reach).toBe(350);
+    });
+
+    it("should detect Summary row correctly and flag rowType = summary", () => {
+        const raw = "โพสต์,ผู้โพสต์,ความคิดเห็น,ความรู้สึก,ดูแล้ว,ลิงก์โพสต์\nEP.10.3,ตั้ม,15,45,350,https://facebook.com/123\nรวมทั้งหมด,,15,45,350,";
+        const result = parseAnalyticsData(raw);
+
+        expect(result.rows).toHaveLength(2);
+        expect(result.rows[0].rowType).toBe("facebook_post");
+        expect(result.rows[1].rowType).toBe("summary");
+    });
+});
+
+describe("Analytics Parser - Manual Target Fallback & Snapshot Generation", () => {
     const projects = [
         { id: "proj_01", title: "Golden Pea Amino Acid Guide", slug: "golden-pea-amino-acid-guide", published_url: "https://greenfineness.com/library/golden-pea-amino-acid-guide" }
     ];
@@ -98,11 +144,79 @@ describe("Analytics Parser - Article Matching & Selection Fallback", () => {
         expect(result.rows[0].matchedProject?.method).toBe("title");
     });
 
-    it("should not match and remain undefined for unknown targets", () => {
-        const raw = "Page path\tViews\n/library/unknown-slug-xyz\t320";
+    it("should generate valid package with manual selection fallback when auto match fails", () => {
+        const raw = "โพสต์,ความรู้สึก,ดูแล้ว\nEP.10.3 Cytokinin,45,350";
         const result = parseAnalyticsData(raw, projects);
 
+        // Auto match fails
         expect(result.rows[0].matchedProject).toBeUndefined();
+
+        // Simulate manual project selection in frontend
+        const selectedProj = projects[0];
+        const rowWithManualTarget = {
+            ...result.rows[0],
+            matchedProject: {
+                id: selectedProj.id,
+                title: selectedProj.title,
+                slug: selectedProj.slug,
+                method: "manual" as const,
+                confidence: "Manual" as const
+            }
+        };
+
+        const metadata = {
+            sourceFileName: "Pasted Text",
+            sourceType: "Facebook",
+            snapshotWindow: "7d",
+            snapshotDate: "2026-07-02"
+        };
+
+        const payload = generateSnapshotPayload(rowWithManualTarget, metadata);
+
+        expect(payload.target.projectId).toBe("proj_01");
+        expect(payload.fields.performanceFeedback.sourceMetadata.matchedBy).toBe("manual");
+        expect(payload.fields.performanceFeedback.sourceMetadata.matchConfidence).toBe("Manual");
+
+        const validation = validatePayload(payload, []);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("should generate valid package for group overview row when manual target is supplied", () => {
+        const raw = "วันที่,โพสต์,ความคิดเห็น,ความรู้สึก,เข้าร่วมแล้ว,ดูแล้ว\n2026-07-01,12,85,120,40,1600";
+        const result = parseAnalyticsData(raw, projects);
+
+        expect(result.rows[0].rowType).toBe("facebook_group_overview");
+
+        const selectedProj = projects[0];
+        const rowWithManualTarget = {
+            ...result.rows[0],
+            matchedProject: {
+                id: selectedProj.id,
+                title: selectedProj.title,
+                slug: selectedProj.slug,
+                method: "manual" as const,
+                confidence: "Manual" as const
+            }
+        };
+
+        const metadata = {
+            sourceFileName: "Pasted Text",
+            sourceType: "FacebookGroupDaily",
+            snapshotWindow: "24h",
+            snapshotDate: "2026-07-01"
+        };
+
+        const payload = generateSnapshotPayload(rowWithManualTarget, metadata);
+
+        expect(payload.target.projectId).toBe("proj_01");
+        expect(payload.fields.performanceFeedback.sourceMetadata.sourceType).toBe("facebook_group_overview");
+        expect(payload.fields.performanceFeedback.sourceMetadata.matchedBy).toBe("manual");
+        expect(payload.fields.performanceFeedback.sourceMetadata.matchConfidence).toBe("Manual");
+        expect(payload.fields.performanceFeedback.sourceMetadata.rowType).toBe("facebook_group_overview");
+        expect(payload.fields.performanceFeedback.facebookSnapshots.snap24h.notes).toContain("Group Overview Import:");
+
+        const validation = validatePayload(payload, []);
+        expect(validation.valid).toBe(true);
     });
 });
 
