@@ -299,3 +299,77 @@ describe("Regressions - Schema & Markdown Parsers", () => {
         expect(result.fields.bodyContent).toContain("Main body text here.");
     });
 });
+
+describe("Manual Quick Post Snapshot Payload Validation", () => {
+    const SCHEMA_UPDATE_VERSION = "workos-writing-lab-update-v0.1";
+
+    it("should validate a valid quick snapshot payload successfully", () => {
+        const payload = {
+            schemaVersion: SCHEMA_UPDATE_VERSION,
+            source: "Arbor",
+            importBatchTitle: "Manual Snapshot - Facebook Group 24h",
+            action: "apply_update",
+            target: {
+                type: "writing_lab_project",
+                projectId: "proj_01",
+                projectSlug: "golden-pea"
+            },
+            fields: {
+                performanceFeedback: {
+                    facebookSnapshots: {
+                        snap24h: {
+                            snapshotDate: "2026-06-29",
+                            window: "24h",
+                            platform: "facebook_group",
+                            postUrl: "https://facebook.com/groups/posts/123",
+                            reach: 227,
+                            reactions: 11,
+                            comments: 0,
+                            shares: 3,
+                            linkClicks: 0,
+                            engagement: 14,
+                            notes: "Test quick snapshot"
+                        }
+                    },
+                    sourceMetadata: {
+                        sourceFileName: "Manual Input Form",
+                        sourceType: "facebook_group_post",
+                        snapshotWindow: "24h",
+                        snapshotDate: "2026-06-29",
+                        matchedBy: "manual",
+                        matchConfidence: "Manual",
+                        rowType: "manual_post_snapshot",
+                        rawSourceSummary: "Manual Quick Post: Views/Reach=227, Reactions=11, Shares=3",
+                        importNote: "Test quick snapshot"
+                    }
+                }
+            }
+        };
+
+        const validation = validatePayload(payload, []);
+        expect(validation.valid).toBe(true);
+        expect(validation.errors).toHaveLength(0);
+    });
+
+    it("should fail validation if schema version is incorrect", () => {
+        const payload = {
+            schemaVersion: "invalid-version",
+            source: "Arbor",
+            target: {
+                type: "writing_lab_project",
+                projectId: "proj_01",
+                projectSlug: "golden-pea"
+            },
+            fields: {
+                performanceFeedback: {
+                    sourceMetadata: {
+                        rowType: "manual_post_snapshot"
+                    }
+                }
+            }
+        };
+
+        const validation = validatePayload(payload, []);
+        expect(validation.valid).toBe(false);
+    });
+});

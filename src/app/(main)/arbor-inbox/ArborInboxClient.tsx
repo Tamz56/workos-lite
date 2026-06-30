@@ -37,12 +37,30 @@ export default function ArborInboxClient() {
     const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
     // Markdown import mode states
-    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics">("json");
+    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics" | "manual_snapshot">("json");
     const [markdownText, setMarkdownText] = useState("");
     const [parsedResult, setParsedResult] = useState<any>(null);
     const [writingProjects, setWritingProjects] = useState<any[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>("");
     const [manualProjectId, setManualProjectId] = useState<string>("");
+
+    // Manual Quick Post Snapshot states
+    const [quickProjectId, setQuickProjectId] = useState("");
+    const [quickSourceType, setQuickSourceType] = useState("Facebook Page");
+    const [quickWindow, setQuickWindow] = useState("24h");
+    const [quickDate, setQuickDate] = useState(() => new Date().toISOString().split("T")[0]);
+    const [quickViewsReach, setQuickViewsReach] = useState("");
+    const [quickPostTitle, setQuickPostTitle] = useState("");
+    const [quickPostUrl, setQuickPostUrl] = useState("");
+    const [quickPublishedDate, setQuickPublishedDate] = useState("");
+    const [quickEngagement, setQuickEngagement] = useState("");
+    const [quickReactions, setQuickReactions] = useState("");
+    const [quickComments, setQuickComments] = useState("");
+    const [quickShares, setQuickShares] = useState("");
+    const [quickLinkClicks, setQuickLinkClicks] = useState("");
+    const [quickPhotoViews, setQuickPhotoViews] = useState("");
+    const [quickOtherClicks, setQuickOtherClicks] = useState("");
+    const [quickNote, setQuickNote] = useState("");
 
     // Analytics import mode states
     const [analyticsText, setAnalyticsText] = useState("");
@@ -171,6 +189,129 @@ export default function ArborInboxClient() {
         handleValidate(JSON.stringify(generatedPayload));
     };
 
+    const handleGenerateQuickSnapshot = () => {
+        setStatusMessage(null);
+
+        if (!quickProjectId) {
+            setStatusMessage({ type: "error", text: "Target Writing Project is required. (กรุณาเลือกโครงการเขียนร่างเป้าหมาย)" });
+            return;
+        }
+        if (!quickWindow) {
+            setStatusMessage({ type: "error", text: "Snapshot Window is required. (กรุณาระบุรอบช่วงเวลาสถิติ)" });
+            return;
+        }
+        if (!quickDate) {
+            setStatusMessage({ type: "error", text: "Snapshot Date is required. (กรุณาระบุวันที่บันทึกสถิติ)" });
+            return;
+        }
+
+        const parseVal = (val: string): number => {
+            if (!val.trim()) return 0;
+            const parsed = parseInt(val, 10);
+            return isNaN(parsed) ? 0 : parsed;
+        };
+
+        const reach = parseVal(quickViewsReach);
+        const engagement = parseVal(quickEngagement);
+        const reactions = parseVal(quickReactions);
+        const comments = parseVal(quickComments);
+        const shares = parseVal(quickShares);
+        const linkClicks = parseVal(quickLinkClicks);
+        const photoViews = parseVal(quickPhotoViews);
+        const otherClicks = parseVal(quickOtherClicks);
+
+        // Required: at least one metric must be > 0
+        if (reach <= 0 && engagement <= 0 && reactions <= 0 && comments <= 0 && shares <= 0 && linkClicks <= 0) {
+            setStatusMessage({ type: "error", text: "At least one metric (Views/Reach, Engagement, Reactions, Comments, Shares, or Link Clicks) must be greater than 0. (กรุณากรอกตัวชี้วัดประสิทธิภาพหลักอย่างน้อยหนึ่งฟิลด์)" });
+            return;
+        }
+
+        // Validate no negative values
+        if (reach < 0 || engagement < 0 || reactions < 0 || comments < 0 || shares < 0 || linkClicks < 0 || photoViews < 0 || otherClicks < 0) {
+            setStatusMessage({ type: "error", text: "Metrics cannot be negative. (ตัวเลขสถิติตัวชี้วัดห้ามเป็นค่าติดลบ)" });
+            return;
+        }
+
+        const matched = writingProjects.find(p => p.id === quickProjectId);
+        if (!matched) {
+            setStatusMessage({ type: "error", text: "Target project not found. (ไม่พบโครงการที่ระบุ)" });
+            return;
+        }
+
+        let platform = "facebook_page";
+        let sourceType = "facebook_page_post";
+        if (quickSourceType === "Facebook Group") {
+            platform = "facebook_group";
+            sourceType = "facebook_group_post";
+        } else if (quickSourceType === "Personal Profile") {
+            platform = "facebook_personal";
+            sourceType = "personal_profile_post";
+        }
+
+        const windowKey = `snap${quickWindow}`;
+
+        const facebookSnapshots = {
+            [windowKey]: {
+                snapshotDate: quickDate,
+                window: quickWindow,
+                platform,
+                postUrl: quickPostUrl || "",
+                reach,
+                reactions,
+                comments,
+                shares,
+                linkClicks,
+                engagement,
+                photoViews,
+                otherClicks,
+                publishedDate: quickPublishedDate || "",
+                notes: quickNote || ""
+            }
+        };
+
+        const rawSummaryParts = [
+            `Views/Reach=${reach}`,
+            engagement > 0 ? `Engagement=${engagement}` : null,
+            reactions > 0 ? `Reactions=${reactions}` : null,
+            comments > 0 ? `Comments=${comments}` : null,
+            shares > 0 ? `Shares=${shares}` : null,
+            linkClicks > 0 ? `LinkClicks=${linkClicks}` : null
+        ].filter(Boolean);
+
+        const sourceMetadata = {
+            sourceFileName: "Manual Input Form",
+            sourceType,
+            snapshotWindow: quickWindow,
+            snapshotDate: quickDate,
+            matchedBy: "manual",
+            matchConfidence: "Manual",
+            rowType: "manual_post_snapshot",
+            rawSourceSummary: `Manual Quick Post: ${rawSummaryParts.join(", ")}`,
+            importNote: quickNote || ""
+        };
+
+        const generatedPayload = {
+            schemaVersion: "workos-writing-lab-update-v0.1",
+            source: "Arbor",
+            importBatchTitle: `Manual Snapshot - ${quickSourceType} ${quickWindow}`,
+            action: "apply_update",
+            target: {
+                type: "writing_lab_project",
+                projectId: matched.id,
+                projectSlug: matched.slug
+            },
+            fields: {
+                performanceFeedback: {
+                    facebookSnapshots,
+                    sourceMetadata
+                }
+            }
+        };
+
+        setPayloadText(JSON.stringify(generatedPayload, null, 2));
+        handleValidate(JSON.stringify(generatedPayload));
+    };
+
     useEffect(() => {
         fetch("/api/content/writing-lab/projects")
             .then(res => res.json())
@@ -295,7 +436,20 @@ export default function ArborInboxClient() {
             const data = await res.json();
             setIsValid(data.valid);
             setErrors(data.errors || []);
-            setWarnings(data.warnings || []);
+            
+            const fetchedWarnings = data.warnings || [];
+            if (parsed && parsed.fields?.performanceFeedback?.sourceMetadata?.rowType === "manual_post_snapshot") {
+                const fbSnaps = parsed.fields.performanceFeedback.facebookSnapshots || {};
+                const activeWin = Object.keys(fbSnaps)[0];
+                if (activeWin && fbSnaps[activeWin]) {
+                    const snap = fbSnaps[activeWin];
+                    if (!snap.reach || snap.reach <= 0) {
+                        fetchedWarnings.push("Views/Reach ว่างหรือเป็น 0 สำหรับการนำเข้ารอบเวลานี้ (Views/Reach is empty or zero for this snapshot)");
+                    }
+                }
+            }
+
+            setWarnings(fetchedWarnings);
             setPreview(data.preview || null);
             setParsedPayload(parsed);
             setValidationChecked(true);
@@ -490,6 +644,16 @@ export default function ArborInboxClient() {
                             }`}
                         >
                             Analytics CSV / Table
+                        </button>
+                        <button
+                            onClick={() => setImportMode("manual_snapshot")}
+                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                                importMode === "manual_snapshot"
+                                    ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
+                                    : "text-theme-muted hover:text-theme-primary"
+                            }`}
+                        >
+                            Quick Post Snapshot
                         </button>
                     </div>
 
@@ -865,6 +1029,254 @@ export default function ArborInboxClient() {
                                     </button>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {importMode === "manual_snapshot" && (
+                        <div className="space-y-4">
+                            <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-2xl text-[11px] text-blue-700 dark:text-blue-400 font-bold">
+                                ℹ️ ใช้สำหรับกรอกข้อมูลจากภาพ Screenshot หรือหน้า Facebook Insight แบบรวดเร็ว
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Target Writing Project (โครงการเขียนร่างเป้าหมาย) <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={quickProjectId}
+                                        onChange={(e) => setQuickProjectId(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                    >
+                                        <option value="">-- เลือกโครงการร่างเป้าหมาย --</option>
+                                        {writingProjects.map((proj) => (
+                                            <option key={proj.id} value={proj.id}>
+                                                {proj.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Data Source (แหล่งข้อมูลต้นทาง) <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={quickSourceType}
+                                        onChange={(e) => setQuickSourceType(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                    >
+                                        <option value="Facebook Page">Facebook Page</option>
+                                        <option value="Facebook Group">Facebook Group</option>
+                                        <option value="Personal Profile">Personal Profile</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Snapshot Window (ช่วงเวลาสถิติ) <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={quickWindow}
+                                        onChange={(e) => setQuickWindow(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                    >
+                                        <option value="24h">24 Hours (24 ชม. แรก)</option>
+                                        <option value="7d">7 Days (7 วันแรก)</option>
+                                        <option value="30d">30 Days (30 วันแรก)</option>
+                                        <option value="90d">90 Days (90 วันแรก)</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Snapshot Date (วันที่บันทึกสถิติ) <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={quickDate}
+                                        onChange={(e) => setQuickDate(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs text-theme-primary font-bold focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Views / Reach (จำนวนคนเข้าถึง) <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={quickViewsReach}
+                                        onChange={(e) => setQuickViewsReach(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Reactions (ยอดความรู้สึก)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={quickReactions}
+                                        onChange={(e) => setQuickReactions(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Comments (ยอดความคิดเห็น)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={quickComments}
+                                        onChange={(e) => setQuickComments(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Shares (ยอดแชร์)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={quickShares}
+                                        onChange={(e) => setQuickShares(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Link Clicks (จำนวนคลิกลิงก์)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={quickLinkClicks}
+                                        onChange={(e) => setQuickLinkClicks(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Engagement (การตอบสนองรวม)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={quickEngagement}
+                                        onChange={(e) => setQuickEngagement(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5 col-span-2 border-t border-theme-border/40 pt-3">
+                                    <h4 className="text-[11px] font-black text-theme-primary uppercase tracking-wider">
+                                        Post Details (รายละเอียดเพิ่มเติมของโพสต์)
+                                    </h4>
+                                </div>
+
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Post Title / Text (หัวข้อโพสต์หรือข้อความสรุป)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="หัวข้อโพสต์สั้นๆ..."
+                                        value={quickPostTitle}
+                                        onChange={(e) => setQuickPostTitle(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Post URL / Link (ที่อยู่ลิงก์โพสต์เฟซบุ๊ก)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="https://facebook.com/groups/posts/..."
+                                        value={quickPostUrl}
+                                        onChange={(e) => setQuickPostUrl(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Published Date (วันที่เริ่มโพสต์จริง)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={quickPublishedDate}
+                                        onChange={(e) => setQuickPublishedDate(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs text-theme-primary font-bold focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Photo Views (ยอดดูรูปภาพ)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={quickPhotoViews}
+                                        onChange={(e) => setQuickPhotoViews(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Other Clicks (จำนวนคลิกจุดอื่น)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={quickOtherClicks}
+                                        onChange={(e) => setQuickOtherClicks(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Import Note (หมายเหตุการนำเข้าสถิติ)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={quickNote}
+                                        onChange={(e) => setQuickNote(e.target.value)}
+                                        placeholder="ระบุข้อความบันทึกความจำสั้น..."
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleGenerateQuickSnapshot}
+                                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-green-600/15"
+                            >
+                                <CheckCircleIcon className="w-4 h-4" />
+                                Generate Quick Snapshot Package
+                            </button>
                         </div>
                     )}
 
