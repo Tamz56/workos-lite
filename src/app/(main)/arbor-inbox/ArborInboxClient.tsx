@@ -114,6 +114,397 @@ export default function ArborInboxClient() {
     const [analyticsResult, setAnalyticsResult] = useState<any>(null);
     const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
 
+    // Draft persistence states
+    const [restoredModes, setRestoredModes] = useState<string[]>([]);
+
+    // On mount: Restore draft state from localStorage
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const restoredList: string[] = [];
+
+        try {
+            // Restore active importMode preference
+            const savedMode = localStorage.getItem("workos.arborInbox.importMode");
+            if (savedMode) {
+                setImportMode(savedMode as any);
+            }
+
+            // JSON
+            const jsonDraft = localStorage.getItem("workos.arborInbox.draft.json");
+            if (jsonDraft) {
+                const parsed = JSON.parse(jsonDraft);
+                if (parsed.payloadText) {
+                    setPayloadText(parsed.payloadText);
+                    restoredList.push("JSON");
+                }
+            }
+
+            // Markdown
+            const mdDraft = localStorage.getItem("workos.arborInbox.draft.markdown");
+            if (mdDraft) {
+                const parsed = JSON.parse(mdDraft);
+                if (parsed.markdownText) {
+                    setMarkdownText(parsed.markdownText);
+                    restoredList.push("Markdown");
+                }
+                if (parsed.selectedProjectId) {
+                    setSelectedProjectId(parsed.selectedProjectId);
+                }
+            }
+
+            // Analytics
+            const anDraft = localStorage.getItem("workos.arborInbox.draft.analytics");
+            if (anDraft) {
+                const parsed = JSON.parse(anDraft);
+                if (parsed.analyticsText) {
+                    setAnalyticsText(parsed.analyticsText);
+                    restoredList.push("Analytics");
+                }
+                if (parsed.analyticsSource) setAnalyticsSource(parsed.analyticsSource);
+                if (parsed.analyticsWindow) setAnalyticsWindow(parsed.analyticsWindow);
+                if (parsed.analyticsDate) setAnalyticsDate(parsed.analyticsDate);
+                if (parsed.analyticsNote) setAnalyticsNote(parsed.analyticsNote);
+                if (parsed.selectedProjectId) setSelectedProjectId(parsed.selectedProjectId);
+            }
+
+            // Quick Post Snapshot
+            const qDraft = localStorage.getItem("workos.arborInbox.draft.quickSnapshot");
+            if (qDraft) {
+                const parsed = JSON.parse(qDraft);
+                if (parsed.quickPostTitle || parsed.quickPostUrl || parsed.quickViewsReach) {
+                    if (parsed.quickProjectId) setQuickProjectId(parsed.quickProjectId);
+                    if (parsed.quickSourceType) setQuickSourceType(parsed.quickSourceType);
+                    if (parsed.quickWindow) setQuickWindow(parsed.quickWindow);
+                    if (parsed.quickDate) setQuickDate(parsed.quickDate);
+                    if (parsed.quickViewsReach) setQuickViewsReach(parsed.quickViewsReach);
+                    if (parsed.quickPostTitle) setQuickPostTitle(parsed.quickPostTitle);
+                    if (parsed.quickPostUrl) setQuickPostUrl(parsed.quickPostUrl);
+                    if (parsed.quickPublishedDate) setQuickPublishedDate(parsed.quickPublishedDate);
+                    if (parsed.quickEngagement) setQuickEngagement(parsed.quickEngagement);
+                    if (parsed.quickReactions) setQuickReactions(parsed.quickReactions);
+                    if (parsed.quickComments) setQuickComments(parsed.quickComments);
+                    if (parsed.quickShares) setQuickShares(parsed.quickShares);
+                    if (parsed.quickLinkClicks) setQuickLinkClicks(parsed.quickLinkClicks);
+                    if (parsed.quickPhotoViews) setQuickPhotoViews(parsed.quickPhotoViews);
+                    if (parsed.quickOtherClicks) setQuickOtherClicks(parsed.quickOtherClicks);
+                    if (parsed.quickNote) setQuickNote(parsed.quickNote);
+                    restoredList.push("Quick Snapshot");
+                }
+            }
+
+            // Screenshot Snapshot
+            const ssDraft = localStorage.getItem("workos.arborInbox.draft.screenshot");
+            if (ssDraft) {
+                const parsed = JSON.parse(ssDraft);
+                if (parsed.ssGa4Title || parsed.ssFbTitle || parsed.ssProjectId) {
+                    if (parsed.ssProjectId) setSsProjectId(parsed.ssProjectId);
+                    if (parsed.screenshotType) setScreenshotType(parsed.screenshotType);
+                    if (parsed.ssWindow) setSsWindow(parsed.ssWindow);
+                    if (parsed.ssDate) setSsDate(parsed.ssDate);
+                    if (parsed.ssPublishedDate) setSsPublishedDate(parsed.ssPublishedDate);
+                    if (parsed.ssImportNote) setSsImportNote(parsed.ssImportNote);
+                    if (parsed.ssGa4Title) setSsGa4Title(parsed.ssGa4Title);
+                    if (parsed.ssGa4Path) setSsGa4Path(parsed.ssGa4Path);
+                    if (parsed.ssGa4Views) setSsGa4Views(parsed.ssGa4Views);
+                    if (parsed.ssGa4Users) setSsGa4Users(parsed.ssGa4Users);
+                    if (parsed.ssGa4EngTime) setSsGa4EngTime(parsed.ssGa4EngTime);
+                    if (parsed.ssGa4Events) setSsGa4Events(parsed.ssGa4Events);
+                    if (parsed.ssGa4Bounce) setSsGa4Bounce(parsed.ssGa4Bounce);
+                    if (parsed.ssGa4SrcMed) setSsGa4SrcMed(parsed.ssGa4SrcMed);
+                    if (parsed.ssFbTitle) setSsFbTitle(parsed.ssFbTitle);
+                    if (parsed.ssFbUrl) setSsFbUrl(parsed.ssFbUrl);
+                    if (parsed.ssFbViewsReach) setSsFbViewsReach(parsed.ssFbViewsReach);
+                    if (parsed.ssFbEngagement) setSsFbEngagement(parsed.ssFbEngagement);
+                    if (parsed.ssFbReactions) setSsFbReactions(parsed.ssFbReactions);
+                    if (parsed.ssFbComments) setSsFbComments(parsed.ssFbComments);
+                    if (parsed.ssFbShares) setSsFbShares(parsed.ssFbShares);
+                    if (parsed.ssFbClicks) setSsFbClicks(parsed.ssFbClicks);
+                    if (parsed.ssFbPhotoViews) setSsFbPhotoViews(parsed.ssFbPhotoViews);
+                    if (parsed.ssFbOtherClicks) setSsFbOtherClicks(parsed.ssFbOtherClicks);
+                    restoredList.push("Screenshot");
+                }
+            }
+
+            // GA4 Backfill
+            const bfDraft = localStorage.getItem("workos.arborInbox.draft.ga4Backfill");
+            if (bfDraft) {
+                const parsed = JSON.parse(bfDraft);
+                if (parsed.backfillRawText) {
+                    setBackfillRawText(parsed.backfillRawText);
+                    if (parsed.backfillWindow) setBackfillWindow(parsed.backfillWindow);
+                    if (parsed.backfillDate) setBackfillDate(parsed.backfillDate);
+                    if (parsed.backfillRowMappings) setBackfillRowMappings(parsed.backfillRowMappings);
+                    if (parsed.showExcludedRows !== undefined) setShowExcludedRows(parsed.showExcludedRows);
+                    restoredList.push("GA4 Backfill");
+                }
+            }
+
+            // Legacy Registry
+            const lrDraft = localStorage.getItem("workos.arborInbox.draft.legacyRegistry");
+            if (lrDraft) {
+                const parsed = JSON.parse(lrDraft);
+                if (parsed.legacyRawText) {
+                    setLegacyRawText(parsed.legacyRawText);
+                    if (parsed.showExcludedLegacy !== undefined) setShowExcludedLegacy(parsed.showExcludedLegacy);
+                    restoredList.push("Legacy Registry");
+                }
+            }
+
+            if (restoredList.length > 0) {
+                setRestoredModes(restoredList);
+            }
+        } catch (err) {
+            console.error("Failed to restore drafts", err);
+        }
+    }, []);
+
+    // Auto-save active Import Mode
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("workos.arborInbox.importMode", importMode);
+        }
+    }, [importMode]);
+
+    // JSON auto-save
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (payloadText) {
+                localStorage.setItem("workos.arborInbox.draft.json", JSON.stringify({ payloadText }));
+            } else {
+                localStorage.removeItem("workos.arborInbox.draft.json");
+            }
+        }
+    }, [payloadText]);
+
+    // Markdown auto-save
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (markdownText) {
+                localStorage.setItem("workos.arborInbox.draft.markdown", JSON.stringify({ markdownText, selectedProjectId }));
+            } else {
+                localStorage.removeItem("workos.arborInbox.draft.markdown");
+            }
+        }
+    }, [markdownText, selectedProjectId]);
+
+    // Analytics auto-save
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (analyticsText) {
+                localStorage.setItem("workos.arborInbox.draft.analytics", JSON.stringify({
+                    analyticsText, analyticsSource, analyticsWindow, analyticsDate, analyticsNote, selectedProjectId
+                }));
+            } else {
+                localStorage.removeItem("workos.arborInbox.draft.analytics");
+            }
+        }
+    }, [analyticsText, analyticsSource, analyticsWindow, analyticsDate, analyticsNote, selectedProjectId]);
+
+    // Quick Snapshot auto-save
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (quickPostTitle || quickViewsReach || quickPostUrl) {
+                localStorage.setItem("workos.arborInbox.draft.quickSnapshot", JSON.stringify({
+                    quickProjectId, quickSourceType, quickWindow, quickDate, quickViewsReach,
+                    quickPostTitle, quickPostUrl, quickPublishedDate, quickEngagement,
+                    quickReactions, quickComments, quickShares, quickLinkClicks, quickPhotoViews,
+                    quickOtherClicks, quickNote
+                }));
+            } else {
+                localStorage.removeItem("workos.arborInbox.draft.quickSnapshot");
+            }
+        }
+    }, [
+        quickProjectId, quickSourceType, quickWindow, quickDate, quickViewsReach,
+        quickPostTitle, quickPostUrl, quickPublishedDate, quickEngagement,
+        quickReactions, quickComments, quickShares, quickLinkClicks, quickPhotoViews,
+        quickOtherClicks, quickNote
+    ]);
+
+    // Screenshot Snapshot auto-save
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (ssGa4Title || ssFbTitle || ssProjectId) {
+                localStorage.setItem("workos.arborInbox.draft.screenshot", JSON.stringify({
+                    ssProjectId, screenshotType, ssWindow, ssDate, ssPublishedDate, ssImportNote,
+                    ssGa4Title, ssGa4Path, ssGa4Views, ssGa4Users, ssGa4EngTime, ssGa4Events, ssGa4Bounce, ssGa4SrcMed,
+                    ssFbTitle, ssFbUrl, ssFbViewsReach, ssFbEngagement, ssFbReactions, ssFbComments, ssFbShares,
+                    ssFbClicks, ssFbPhotoViews, ssFbOtherClicks
+                }));
+            } else {
+                localStorage.removeItem("workos.arborInbox.draft.screenshot");
+            }
+        }
+    }, [
+        ssProjectId, screenshotType, ssWindow, ssDate, ssPublishedDate, ssImportNote,
+        ssGa4Title, ssGa4Path, ssGa4Views, ssGa4Users, ssGa4EngTime, ssGa4Events, ssGa4Bounce, ssGa4SrcMed,
+        ssFbTitle, ssFbUrl, ssFbViewsReach, ssFbEngagement, ssFbReactions, ssFbComments, ssFbShares,
+        ssFbClicks, ssFbPhotoViews, ssFbOtherClicks
+    ]);
+
+    // GA4 Backfill auto-save
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (backfillRawText) {
+                localStorage.setItem("workos.arborInbox.draft.ga4Backfill", JSON.stringify({
+                    backfillRawText, backfillWindow, backfillDate, backfillRowMappings, showExcludedRows
+                }));
+            } else {
+                localStorage.removeItem("workos.arborInbox.draft.ga4Backfill");
+            }
+        }
+    }, [backfillRawText, backfillWindow, backfillDate, backfillRowMappings, showExcludedRows]);
+
+    // Legacy Registry auto-save
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (legacyRawText) {
+                localStorage.setItem("workos.arborInbox.draft.legacyRegistry", JSON.stringify({
+                    legacyRawText, showExcludedLegacy
+                }));
+            } else {
+                localStorage.removeItem("workos.arborInbox.draft.legacyRegistry");
+            }
+        }
+    }, [legacyRawText, showExcludedLegacy]);
+
+    const handleClearActiveDraft = () => {
+        const confirmClear = window.confirm(`คุณต้องการล้างข้อมูลร่าง (Draft) สำหรับโหมดนำเข้า "${importMode}" ใช่หรือไม่?`);
+        if (!confirmClear) return;
+
+        if (importMode === "json") {
+            setPayloadText("");
+            localStorage.removeItem("workos.arborInbox.draft.json");
+        } else if (importMode === "markdown") {
+            setMarkdownText("");
+            setSelectedProjectId("");
+            setParsedResult(null);
+            localStorage.removeItem("workos.arborInbox.draft.markdown");
+        } else if (importMode === "analytics") {
+            setAnalyticsText("");
+            setAnalyticsNote("");
+            setAnalyticsResult(null);
+            setSelectedProjectId("");
+            localStorage.removeItem("workos.arborInbox.draft.analytics");
+        } else if (importMode === "manual_snapshot") {
+            setQuickProjectId("");
+            setQuickSourceType("Facebook Page");
+            setQuickWindow("24h");
+            setQuickDate(new Date().toISOString().split("T")[0]);
+            setQuickViewsReach("");
+            setQuickPostTitle("");
+            setQuickPostUrl("");
+            setQuickPublishedDate("");
+            setQuickEngagement("");
+            setQuickReactions("");
+            setQuickComments("");
+            setQuickShares("");
+            setQuickLinkClicks("");
+            setQuickPhotoViews("");
+            setQuickOtherClicks("");
+            setQuickNote("");
+            localStorage.removeItem("workos.arborInbox.draft.quickSnapshot");
+        } else if (importMode === "screenshot") {
+            setSsProjectId("");
+            setScreenshotType("facebook_page_post");
+            setSsWindow("24h");
+            setSsDate(new Date().toISOString().split("T")[0]);
+            setSsPublishedDate("");
+            setSsImportNote("");
+            setSsGa4Title("");
+            setSsGa4Path("");
+            setSsGa4Views("");
+            setSsGa4Users("");
+            setSsGa4EngTime("");
+            setSsGa4Events("");
+            setSsGa4Bounce("");
+            setSsGa4SrcMed("");
+            setSsFbTitle("");
+            setSsFbUrl("");
+            setSsFbViewsReach("");
+            setSsFbEngagement("");
+            setSsFbReactions("");
+            setSsFbComments("");
+            setSsFbShares("");
+            setSsFbClicks("");
+            setSsFbPhotoViews("");
+            setSsFbOtherClicks("");
+            setScreenshotPreviewUrl("");
+            localStorage.removeItem("workos.arborInbox.draft.screenshot");
+        } else if (importMode === "ga4_backfill") {
+            setBackfillRawText("");
+            setBackfillResult(null);
+            setBackfillRowMappings({});
+            localStorage.removeItem("workos.arborInbox.draft.ga4Backfill");
+        } else if (importMode === "legacy_registry") {
+            setLegacyRawText("");
+            setLegacyResult(null);
+            localStorage.removeItem("workos.arborInbox.draft.legacyRegistry");
+        }
+
+        // Remove from restored list if present
+        setRestoredModes(prev => prev.filter(m => {
+            if (importMode === "json" && m === "JSON") return false;
+            if (importMode === "markdown" && m === "Markdown") return false;
+            if (importMode === "analytics" && m === "Analytics") return false;
+            if (importMode === "manual_snapshot" && m === "Quick Snapshot") return false;
+            if (importMode === "screenshot" && m === "Screenshot") return false;
+            if (importMode === "ga4_backfill" && m === "GA4 Backfill") return false;
+            if (importMode === "legacy_registry" && m === "Legacy Registry") return false;
+            return true;
+        }));
+
+        setStatusMessage({
+            type: "success",
+            text: `ล้างข้อมูลร่างโหมด "${importMode}" เรียบร้อยแล้ว`
+        });
+    };
+
+    const handleReParseDraft = () => {
+        if (importMode === "json") {
+            if (payloadText.trim()) {
+                handleValidate(payloadText);
+                setStatusMessage({ type: "success", text: "ตรวจวิเคราะห์ข้อมูล JSON เรียบร้อย" });
+            } else {
+                setStatusMessage({ type: "error", text: "ไม่มีข้อความ JSON ให้แสกน" });
+            }
+        } else if (importMode === "markdown") {
+            if (markdownText.trim()) {
+                handleParseMarkdown(markdownText);
+                setStatusMessage({ type: "success", text: "วิเคราะห์ข้อมูลร่างบทความเรียบร้อย" });
+            } else {
+                setStatusMessage({ type: "error", text: "ไม่มีข้อมูลร่างบทความ Markdown ให้แสกน" });
+            }
+        } else if (importMode === "analytics") {
+            if (analyticsText.trim()) {
+                handleParseAnalytics(analyticsText);
+                setStatusMessage({ type: "success", text: "วิเคราะห์ข้อมูลสถิติ CSV/Table เรียบร้อย" });
+            } else {
+                setStatusMessage({ type: "error", text: "ไม่มีข้อมูลสถิติ CSV/Table ให้แสกน" });
+            }
+        } else if (importMode === "ga4_backfill") {
+            if (backfillRawText.trim()) {
+                handleParseGA4Backfill(backfillRawText);
+                setStatusMessage({ type: "success", text: "วิเคราะห์ตารางรายงานบทความ GA4 เรียบร้อย" });
+            } else {
+                setStatusMessage({ type: "error", text: "ไม่มีข้อมูลรายงาน GA4 ให้แสกน" });
+            }
+        } else if (importMode === "legacy_registry") {
+            if (legacyRawText.trim()) {
+                handleParseLegacyRegistry(legacyRawText);
+                setStatusMessage({ type: "success", text: "วิเคราะห์รายการบทความเก่าเรียบร้อย" });
+            } else {
+                setStatusMessage({ type: "error", text: "ไม่มีข้อมูลรายการบทความเก่าให้แสกน" });
+            }
+        } else {
+            setStatusMessage({
+                type: "success",
+                text: "โหมดนี้ไม่มีขั้นตอน re-parse"
+            });
+        }
+    };
+
     const handleParseLegacyRegistry = (textToParse: string) => {
         if (!textToParse.trim()) return;
         const result = parseLegacyRegistryData(textToParse, writingProjects);
@@ -190,18 +581,26 @@ export default function ArborInboxClient() {
 
             setLegacyResult((prev: any) => {
                 if (!prev) return null;
+                const nextRows = prev.rows.map((r: any) => {
+                    if (r.index === row.index) {
+                        return {
+                            ...r,
+                            suggestedAction: "Already exists",
+                            matchedProjectId: data.id
+                        };
+                    }
+                    return r;
+                });
+                const remaining = nextRows.filter((r: any) => r.suggestedAction === "Create Shell").length;
+                if (remaining === 0) {
+                    setLegacyRawText("");
+                    if (typeof window !== "undefined") {
+                        localStorage.removeItem("workos.arborInbox.draft.legacyRegistry");
+                    }
+                }
                 return {
                     ...prev,
-                    rows: prev.rows.map((r: any) => {
-                        if (r.index === row.index) {
-                            return {
-                                ...r,
-                                suggestedAction: "Already exists",
-                                matchedProjectId: data.id
-                            };
-                        }
-                        return r;
-                    })
+                    rows: nextRows
                 };
             });
 
@@ -342,6 +741,15 @@ export default function ArborInboxClient() {
             type: successCount > 0 ? "success" : "error",
             text: `ดำเนินการสร้าง Shell สำเร็จ ${successCount} รายการ, ล้มเหลว ${failCount} รายการ`
         });
+
+        if (successCount === rowsToCreate.length) {
+            setLegacyRawText("");
+            setLegacyResult(null);
+            if (typeof window !== "undefined") {
+                localStorage.removeItem("workos.arborInbox.draft.legacyRegistry");
+            }
+            setRestoredModes(prev => prev.filter(m => m !== "Legacy Registry"));
+        }
     };
 
     const handleParseGA4Backfill = (textToParse: string) => {
@@ -546,6 +954,17 @@ export default function ArborInboxClient() {
             });
         
         loadLogs();
+        
+        if (successCount === rowsToApply.length) {
+            setBackfillRawText("");
+            setBackfillRowMappings({});
+            setBackfillResult(null);
+            if (typeof window !== "undefined") {
+                localStorage.removeItem("workos.arborInbox.draft.ga4Backfill");
+            }
+            setRestoredModes(prev => prev.filter(m => m !== "GA4 Backfill"));
+        }
+
         setStatusMessage({
             type: successCount > 0 ? "success" : "error",
             text: `ทำรายการ Backfill สำเร็จ ${successCount} รายการ, ล้มเหลว ${failCount} รายการ`
@@ -1269,8 +1688,80 @@ export default function ArborInboxClient() {
             
             // Reload logs and clear input
             loadLogs();
+            
+            // Clear current active importMode draft from localStorage and state
+            if (importMode === "json") {
+                setPayloadText("");
+                localStorage.removeItem("workos.arborInbox.draft.json");
+            } else if (importMode === "markdown") {
+                setMarkdownText("");
+                setSelectedProjectId("");
+                setParsedResult(null);
+                localStorage.removeItem("workos.arborInbox.draft.markdown");
+            } else if (importMode === "analytics") {
+                setAnalyticsText("");
+                setAnalyticsNote("");
+                setAnalyticsResult(null);
+                setSelectedProjectId("");
+                localStorage.removeItem("workos.arborInbox.draft.analytics");
+            } else if (importMode === "manual_snapshot") {
+                setQuickProjectId("");
+                setQuickSourceType("Facebook Page");
+                setQuickWindow("24h");
+                setQuickDate(new Date().toISOString().split("T")[0]);
+                setQuickViewsReach("");
+                setQuickPostTitle("");
+                setQuickPostUrl("");
+                setQuickPublishedDate("");
+                setQuickEngagement("");
+                setQuickReactions("");
+                setQuickComments("");
+                setQuickShares("");
+                setQuickLinkClicks("");
+                setQuickPhotoViews("");
+                setQuickOtherClicks("");
+                setQuickNote("");
+                localStorage.removeItem("workos.arborInbox.draft.quickSnapshot");
+            } else if (importMode === "screenshot") {
+                setSsProjectId("");
+                setScreenshotType("facebook_page_post");
+                setSsWindow("24h");
+                setSsDate(new Date().toISOString().split("T")[0]);
+                setSsPublishedDate("");
+                setSsImportNote("");
+                setSsGa4Title("");
+                setSsGa4Path("");
+                setSsGa4Views("");
+                setSsGa4Users("");
+                setSsGa4EngTime("");
+                setSsGa4Events("");
+                setSsGa4Bounce("");
+                setSsGa4SrcMed("");
+                setSsFbTitle("");
+                setSsFbUrl("");
+                setSsFbViewsReach("");
+                setSsFbEngagement("");
+                setSsFbReactions("");
+                setSsFbComments("");
+                setSsFbShares("");
+                setSsFbClicks("");
+                setSsFbPhotoViews("");
+                setSsFbOtherClicks("");
+                setScreenshotPreviewUrl("");
+                localStorage.removeItem("workos.arborInbox.draft.screenshot");
+            }
+
+            // Remove from restored list if present
+            setRestoredModes(prev => prev.filter(m => {
+                if (importMode === "json" && m === "JSON") return false;
+                if (importMode === "markdown" && m === "Markdown") return false;
+                if (importMode === "analytics" && m === "Analytics") return false;
+                if (importMode === "manual_snapshot" && m === "Quick Snapshot") return false;
+                if (importMode === "screenshot" && m === "Screenshot") return false;
+                return true;
+            }));
+
             // Reset state
-            setPayloadText("");
             setValidationChecked(false);
             setIsValid(false);
             setErrors([]);
@@ -1457,6 +1948,43 @@ export default function ArborInboxClient() {
                         >
                             Legacy Registry
                         </button>
+                    </div>
+
+                    {/* Draft Notice Banner */}
+                    <div className="bg-theme-input/50 border border-theme-border/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 font-black text-theme-primary">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                                </span>
+                                Browser Draft Active
+                            </div>
+                            <p className="text-theme-muted font-medium text-[11px]">
+                                ⚠️ Draft นี้ยังไม่ได้บันทึกจริง จนกว่าจะกด Create / Apply ด้านล่าง
+                            </p>
+                            {restoredModes.length > 0 && (
+                                <p className="text-green-600 dark:text-green-400 font-bold text-[10px]">
+                                    ✨ Restored {restoredModes.join(", ")} draft{restoredModes.length > 1 ? "s" : ""} from this browser
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleReParseDraft}
+                                className="px-3 py-1.5 bg-theme-input border border-theme-border/80 hover:bg-theme-border/40 text-theme-secondary hover:text-theme-primary font-black rounded-xl transition-all text-[10px]"
+                                title="Re-parse the active draft text inputs"
+                            >
+                                Re-parse Draft
+                            </button>
+                            <button
+                                onClick={handleClearActiveDraft}
+                                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-black rounded-xl transition-all text-[10px]"
+                                title="Clear current input draft fields"
+                            >
+                                Clear Draft
+                            </button>
+                        </div>
                     </div>
 
                     {importMode === "json" && (
@@ -3018,6 +3546,26 @@ export default function ArborInboxClient() {
                                                                         type: "success",
                                                                         text: `นำเข้าข้อมูลสำหรับ "${row.pageTitle || row.pagePath}" สำเร็จ!`
                                                                     });
+
+                                                                    // Update mappings: remove this row index mapping
+                                                                    setBackfillRowMappings(prev => {
+                                                                        const next = { ...prev };
+                                                                        delete next[row.index];
+                                                                        
+                                                                        // Check if no more active rows remain in backfillResult
+                                                                        const activeRows = backfillResult?.rows.filter((r: any) => r.status !== "Excluded") || [];
+                                                                        const remainingRows = activeRows.filter((r: any) => r.index !== row.index);
+                                                                        if (remainingRows.length === 0) {
+                                                                            setBackfillRawText("");
+                                                                            setBackfillResult(null);
+                                                                            if (typeof window !== "undefined") {
+                                                                                localStorage.removeItem("workos.arborInbox.draft.ga4Backfill");
+                                                                            }
+                                                                            setRestoredModes(prevRestored => prevRestored.filter(m => m !== "GA4 Backfill"));
+                                                                        }
+                                                                        return next;
+                                                                    });
+
                                                                     loadLogs();
                                                                     
                                                                     // Reload writing projects to update local copy notes state
