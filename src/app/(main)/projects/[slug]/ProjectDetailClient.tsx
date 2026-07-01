@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { Project, ProjectItem, ProjectRegistryStatus, ProjectProgressStage, ProjectRegistryMetadata, Note, ProjectDocBlockType, ProjectDocumentationBlock } from "@/lib/types";
+import { Project, ProjectItem, ProjectRegistryStatus, ProjectProgressStage, ProjectRegistryMetadata, Note, ProjectDocBlockType, ProjectDocumentationBlock, ProjectContentRoadmapStatus, ProjectContentType, ProjectContentLayer, ProjectContentRoadmapItem } from "@/lib/types";
 import { 
     MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, 
     Plus, CheckCircle2, Layout, Calendar, FileText, Info,
-    BookOpen, Sparkles, Search, LayoutGrid, Table, FileCode, Check, ExternalLink, RefreshCw
+    BookOpen, Sparkles, Search, LayoutGrid, Table, FileCode, Check, ExternalLink, RefreshCw,
+    Copy, Layers, Tv, Tag, PlusCircle, ArrowUp, ArrowDown
 } from "lucide-react";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { Toast } from "@/components/ui/Toast";
@@ -228,6 +229,238 @@ function saveStoredDocBlocks(blocks: ProjectDocumentationBlock[]) {
         console.error("Failed to save doc blocks", e);
     }
 }
+const ROADMAP_STORAGE_KEY = "workos_project_content_roadmap_v1";
+
+const ROADMAP_STATUS_LABELS: Record<ProjectContentRoadmapStatus, string> = {
+    idea: "Idea",
+    planned: "Planned",
+    drafting: "Drafting",
+    ready_to_publish: "Ready to Publish",
+    published: "Published",
+    tracking: "Tracking",
+    needs_update: "Needs Update",
+    paused: "Paused"
+};
+
+const ROADMAP_STATUS_COLORS: Record<ProjectContentRoadmapStatus, string> = {
+    idea: "bg-purple-50 text-purple-700 dark:bg-purple-950/20 dark:text-purple-300",
+    planned: "bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-300",
+    drafting: "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-300",
+    ready_to_publish: "bg-teal-50 text-teal-700 dark:bg-teal-950/20 dark:text-teal-300",
+    published: "bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-300",
+    tracking: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-300",
+    needs_update: "bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-300",
+    paused: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+};
+
+const CONTENT_TYPE_LABELS: Record<ProjectContentType, string> = {
+    narrative_article: "Narrative Article",
+    knowledge_article: "Knowledge Article",
+    group_post: "Group Post",
+    page_post: "Page Post",
+    personal_post: "Personal Post",
+    infographic: "Infographic",
+    short_video: "Short Video",
+    follow_up_post: "Follow-up Post",
+    supporting_article: "Supporting Article",
+    legacy_article: "Legacy Article"
+};
+
+const CONTENT_LAYER_LABELS: Record<ProjectContentLayer, string> = {
+    core_episode: "Core Episode",
+    supporting_article: "Supporting Article",
+    social_post: "Social Post",
+    performance_followup: "Performance Follow-up",
+    visual_asset: "Visual Asset",
+    video_asset: "Video Asset",
+    legacy_shell: "Legacy Shell"
+};
+
+function getStoredRoadmapItems(): ProjectContentRoadmapItem[] {
+    if (typeof window === "undefined") return [];
+    try {
+        const data = localStorage.getItem(ROADMAP_STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        console.error("Failed to load roadmap items", e);
+        return [];
+    }
+}
+
+function saveStoredRoadmapItems(items: ProjectContentRoadmapItem[]) {
+    if (typeof window === "undefined") return;
+    try {
+        localStorage.setItem(ROADMAP_STORAGE_KEY, JSON.stringify(items));
+    } catch (e) {
+        console.error("Failed to save roadmap items", e);
+    }
+}
+
+function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectContentRoadmapItem[] {
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+    const items: ProjectContentRoadmapItem[] = [];
+    const now = new Date().toISOString();
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Skip header line if it looks like one
+        if (i === 0 && (line.toLowerCase().includes("episode") || line.toLowerCase().includes("code") || line.toLowerCase().includes("title"))) {
+            continue;
+        }
+
+        // Try tab split first
+        let cols = line.split("\t").map(c => c.trim());
+        if (cols.length <= 1) {
+            // Try comma split
+            cols = line.split(",").map(c => c.trim());
+        }
+
+        let episodeCode = "";
+        let title = "";
+        let contentType: ProjectContentType = "knowledge_article";
+        let contentLayer: ProjectContentLayer = "core_episode";
+        let status: ProjectContentRoadmapStatus = "idea";
+        let priority: "high" | "medium" | "low" | "none" = "medium";
+        let relatedMainEpisode = "";
+        let notes = "";
+        let seriesOrTheme = "";
+
+        // Heuristic detection based on columns
+        if (cols.length >= 2) {
+            // First column is likely episodeCode if it matches pattern
+            const epMatch = cols[0].match(/^(EP[.\-_]?\d+[\w.\-_]*)/i);
+            if (epMatch) {
+                episodeCode = epMatch[1];
+                title = cols[1];
+            } else {
+                // If first col doesn't look like code, first column might be title, second is code?
+                const epMatchCol2 = cols[1].match(/^(EP[.\-_]?\d+[\w.\-_]*)/i);
+                if (epMatchCol2) {
+                    episodeCode = epMatchCol2[1];
+                    title = cols[0];
+                } else {
+                    episodeCode = `EP.Draft.${i + 1}`;
+                    title = cols[0];
+                }
+            }
+
+            // Other columns heuristic scan
+            for (let cidx = 2; cidx < cols.length; cidx++) {
+                const colVal = cols[cidx].toLowerCase();
+                if (!colVal) continue;
+
+                // Match contentType
+                if (colVal.includes("narrative")) contentType = "narrative_article";
+                else if (colVal.includes("knowledge")) contentType = "knowledge_article";
+                else if (colVal.includes("group")) contentType = "group_post";
+                else if (colVal.includes("page_post") || (colVal.includes("page") && colVal.includes("post"))) contentType = "page_post";
+                else if (colVal.includes("personal")) contentType = "personal_post";
+                else if (colVal.includes("infographic") || colVal.includes("info")) contentType = "infographic";
+                else if (colVal.includes("short_video") || colVal.includes("video")) contentType = "short_video";
+                else if (colVal.includes("follow_up")) contentType = "follow_up_post";
+                else if (colVal.includes("supporting")) contentType = "supporting_article";
+                else if (colVal.includes("legacy")) contentType = "legacy_article";
+
+                // Match contentLayer
+                if (colVal.includes("core")) contentLayer = "core_episode";
+                else if (colVal.includes("supporting")) contentLayer = "supporting_article";
+                else if (colVal.includes("social")) contentLayer = "social_post";
+                else if (colVal.includes("performance")) contentLayer = "performance_followup";
+                else if (colVal.includes("visual")) contentLayer = "visual_asset";
+                else if (colVal.includes("video_asset") || (colVal.includes("video") && colVal.includes("asset"))) contentLayer = "video_asset";
+                else if (colVal.includes("legacy_shell")) contentLayer = "legacy_shell";
+
+                // Match status
+                if (colVal === "idea") status = "idea";
+                else if (colVal.includes("plan")) status = "planned";
+                else if (colVal.includes("draft")) status = "drafting";
+                else if (colVal.includes("ready")) status = "ready_to_publish";
+                else if (colVal.includes("published") || colVal === "publish") status = "published";
+                else if (colVal.includes("tracking")) status = "tracking";
+                else if (colVal.includes("needs_update") || colVal.includes("update")) status = "needs_update";
+                else if (colVal === "paused") status = "paused";
+
+                // Match priority
+                if (colVal === "high") priority = "high";
+                else if (colVal === "medium") priority = "medium";
+                else if (colVal === "low") priority = "low";
+                else if (colVal === "none") priority = "none";
+
+                // If column has an EP pattern, it could be relatedMainEpisode
+                const relEpMatch = cols[cidx].match(/^(EP[.\-_]?\d+(\.\d+)?)/i);
+                if (relEpMatch && relEpMatch[1] !== episodeCode) {
+                    relatedMainEpisode = relEpMatch[1];
+                }
+            }
+        } else {
+            // Simple line parsing
+            const epMatch = line.match(/^(EP[.\-_]?\d+[\w.\-_]*)/i);
+            if (epMatch) {
+                episodeCode = epMatch[1];
+                title = line.substring(epMatch[0].length).replace(/^[:\s\t\-,]*/, "").trim();
+            } else {
+                episodeCode = `EP.Draft.${i + 1}`;
+                title = line;
+            }
+
+            // Heuristic detection from title text
+            const lowerTitle = title.toLowerCase();
+            if (lowerTitle.includes("narrative")) contentType = "narrative_article";
+            else if (lowerTitle.includes("infographic") || lowerTitle.includes("info")) contentType = "infographic";
+            else if (lowerTitle.includes("video")) contentType = "short_video";
+
+            if (lowerTitle.includes("draft")) status = "drafting";
+            else if (lowerTitle.includes("publish")) status = "published";
+            else if (lowerTitle.includes("planned")) status = "planned";
+        }
+
+        // Clean values
+        if (!title) {
+            title = `Draft Episode for ${episodeCode}`;
+        }
+
+        // relatedMainEpisode fallback: if episodeCode is EP.10.3-S1, main is EP.10.3
+        if (!relatedMainEpisode && episodeCode) {
+            const mainMatch = episodeCode.match(/^(EP[.\-_]?\d+\.\d+)/i);
+            if (mainMatch) {
+                relatedMainEpisode = mainMatch[1];
+            } else {
+                const mainMatchSimple = episodeCode.match(/^(EP[.\-_]?\d+)/i);
+                if (mainMatchSimple) {
+                    relatedMainEpisode = mainMatchSimple[1];
+                }
+            }
+        }
+
+        const id = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+
+        items.push({
+            id,
+            projectSlug,
+            episodeCode,
+            title,
+            contentType,
+            contentLayer,
+            seriesOrTheme: seriesOrTheme || "General",
+            status,
+            priority,
+            targetChannel: "Facebook / Website",
+            targetPublishDate: "",
+            relatedMainEpisode,
+            nextAction: "เตรียมยกร่างเนื้อหาตอน",
+            notes: notes || "นำเข้าข้อมูลจาก Arbor Assistant",
+            createdAt: now,
+            updatedAt: now,
+            
+            // new fields
+            sourceText: line,
+            sourceType: "arbor_parse"
+        });
+    }
+
+    return items;
+}
 
 export default function ProjectDetailClient() {
     const params = useParams();
@@ -288,7 +521,46 @@ export default function ProjectDetailClient() {
     const [arborSelectedType, setArborSelectedType] = useState<ProjectDocBlockType | "auto">("auto");
     const [arborDraftBlock, setArborDraftBlock] = useState<ProjectDocumentationBlock | null>(null);
     const [showArborPreview, setShowArborPreview] = useState(false);
+    // --- Content Roadmap State ---
+    const [roadmapItems, setRoadmapItems] = useState<ProjectContentRoadmapItem[]>([]);
+    const [roadmapSearch, setRoadmapSearch] = useState("");
+    const [roadmapStatusFilter, setRoadmapStatusFilter] = useState<string>("all");
+    const [roadmapTypeFilter, setRoadmapTypeFilter] = useState<string>("all");
+    const [roadmapPriorityFilter, setRoadmapPriorityFilter] = useState<string>("all");
+    const [roadmapViewMode, setRoadmapViewMode] = useState<"table" | "card">("table");
 
+    // Modal Control
+    const [isRoadmapModalOpen, setIsRoadmapModalOpen] = useState(false);
+    const [activeRoadmapItem, setActiveRoadmapItem] = useState<ProjectContentRoadmapItem | null>(null);
+    const [isDeleteRoadmapOpen, setIsDeleteRoadmapOpen] = useState(false);
+    const [roadmapToDelete, setRoadmapToDelete] = useState<string | null>(null);
+
+    // Form fields state
+    const [rmEpisodeCode, setRmEpisodeCode] = useState("");
+    const [rmTitle, setRmTitle] = useState("");
+    const [rmContentType, setRmContentType] = useState<ProjectContentType>("knowledge_article");
+    const [rmContentLayer, setRmContentLayer] = useState<ProjectContentLayer>("core_episode");
+    const [rmSeriesOrTheme, setRmSeriesOrTheme] = useState("General");
+    const [rmStatus, setRmStatus] = useState<ProjectContentRoadmapStatus>("idea");
+    const [rmPriority, setRmPriority] = useState<"high" | "medium" | "low" | "none">("medium");
+    const [rmTargetChannel, setRmTargetChannel] = useState("");
+    const [rmTargetPublishDate, setRmTargetPublishDate] = useState("");
+    const [rmRelatedMainEpisode, setRmRelatedMainEpisode] = useState("");
+    const [rmNextAction, setRmNextAction] = useState("");
+    const [rmNotes, setRmNotes] = useState("");
+    const [rmLinkedWritingProjectId, setRmLinkedWritingProjectId] = useState("");
+    const [rmLinkedPublishedUrl, setRmLinkedPublishedUrl] = useState("");
+    const [rmOrderIndex, setRmOrderIndex] = useState<number>(0);
+    const [rmContentGoal, setRmContentGoal] = useState("");
+    const [rmReviewNote, setRmReviewNote] = useState("");
+    const [rmSourceText, setRmSourceText] = useState("");
+    const [rmSourceType, setRmSourceType] = useState<"manual" | "sheet_paste" | "chat_paste" | "arbor_parse">("manual");
+
+    // Arbor Roadmap Assistant Dialog state
+    const [isArborRoadmapOpen, setIsArborRoadmapOpen] = useState(false);
+    const [arborRoadmapText, setArborRoadmapText] = useState("");
+    const [arborRoadmapDrafts, setArborRoadmapDrafts] = useState<ProjectContentRoadmapItem[]>([]);
+    const [showArborRoadmapPreview, setShowArborRoadmapPreview] = useState(false);
     // Default metadata helper
     const defaultMetadataForProject = useCallback((proj: Project): ProjectRegistryMetadata => {
         return {
@@ -337,10 +609,23 @@ export default function ProjectDetailClient() {
         setDocBlocks(projectBlocks);
     }, [slug]);
 
+    const loadRoadmapItems = useCallback(() => {
+        const allItems = getStoredRoadmapItems();
+        const projectItems = allItems.filter(item => item.projectSlug === slug);
+        // Sort by orderIndex ascending, then by createdAt ascending
+        projectItems.sort((a, b) => {
+            const orderCompare = (a.orderIndex || 0) - (b.orderIndex || 0);
+            if (orderCompare !== 0) return orderCompare;
+            return a.createdAt.localeCompare(b.createdAt);
+        });
+        setRoadmapItems(projectItems);
+    }, [slug]);
+
     useEffect(() => {
         loadData();
         loadDocBlocks();
-    }, [loadData, loadDocBlocks]);
+        loadRoadmapItems();
+    }, [loadData, loadDocBlocks, loadRoadmapItems]);
 
     // --- Doc Blocks Helpers ---
     const handleOpenAddManual = () => {
@@ -641,6 +926,274 @@ export default function ProjectDetailClient() {
             return matchSearch && matchType;
         });
     }, [docBlocks, docSearch, docTypeFilter]);
+
+    // --- Content Roadmap Helpers ---
+    const handleOpenAddRoadmap = () => {
+        setActiveRoadmapItem(null);
+        setRmEpisodeCode("");
+        setRmTitle("");
+        setRmContentType("knowledge_article");
+        setRmContentLayer("core_episode");
+        setRmSeriesOrTheme("General");
+        setRmStatus("idea");
+        setRmPriority("medium");
+        setRmTargetChannel("Facebook / Website");
+        setRmTargetPublishDate("");
+        setRmRelatedMainEpisode("");
+        setRmNextAction("เตรียมยกร่างเนื้อหาตอน");
+        setRmNotes("");
+        setRmLinkedWritingProjectId("");
+        setRmLinkedPublishedUrl("");
+        setRmOrderIndex(roadmapItems.length > 0 ? Math.max(...roadmapItems.map(r => r.orderIndex || 0)) + 10 : 10);
+        setRmContentGoal("");
+        setRmReviewNote("");
+        setRmSourceText("");
+        setRmSourceType("manual");
+        setIsRoadmapModalOpen(true);
+    };
+
+    const handleOpenEditRoadmap = (item: ProjectContentRoadmapItem) => {
+        setActiveRoadmapItem(item);
+        setRmEpisodeCode(item.episodeCode);
+        setRmTitle(item.title);
+        setRmContentType(item.contentType);
+        setRmContentLayer(item.contentLayer);
+        setRmSeriesOrTheme(item.seriesOrTheme || "General");
+        setRmStatus(item.status);
+        setRmPriority(item.priority);
+        setRmTargetChannel(item.targetChannel || "");
+        setRmTargetPublishDate(item.targetPublishDate || "");
+        setRmRelatedMainEpisode(item.relatedMainEpisode || "");
+        setRmNextAction(item.nextAction || "");
+        setRmNotes(item.notes || "");
+        setRmLinkedWritingProjectId(item.linkedWritingProjectId || "");
+        setRmLinkedPublishedUrl(item.linkedPublishedUrl || "");
+        setRmOrderIndex(item.orderIndex || 0);
+        setRmContentGoal(item.contentGoal || "");
+        setRmReviewNote(item.reviewNote || "");
+        setRmSourceText(item.sourceText || "");
+        setRmSourceType(item.sourceType || "manual");
+        setIsRoadmapModalOpen(true);
+    };
+
+    const handleSaveRoadmap = () => {
+        if (!rmEpisodeCode.trim() || !rmTitle.trim()) {
+            alert("กรุณากรอกรหัสตอนและหัวข้อคอนเทนต์");
+            return;
+        }
+
+        const allItems = getStoredRoadmapItems();
+        const now = new Date().toISOString();
+
+        if (activeRoadmapItem) {
+            // Update
+            const updated = allItems.map(item => {
+                if (item.id === activeRoadmapItem.id) {
+                    return {
+                        ...item,
+                        episodeCode: rmEpisodeCode.trim(),
+                        title: rmTitle.trim(),
+                        contentType: rmContentType,
+                        contentLayer: rmContentLayer,
+                        seriesOrTheme: rmSeriesOrTheme.trim() || "General",
+                        status: rmStatus,
+                        priority: rmPriority,
+                        targetChannel: rmTargetChannel.trim(),
+                        targetPublishDate: rmTargetPublishDate,
+                        relatedMainEpisode: rmRelatedMainEpisode.trim(),
+                        nextAction: rmNextAction.trim(),
+                        notes: rmNotes.trim(),
+                        linkedWritingProjectId: rmLinkedWritingProjectId.trim(),
+                        linkedPublishedUrl: rmLinkedPublishedUrl.trim(),
+                        orderIndex: Number(rmOrderIndex),
+                        contentGoal: rmContentGoal.trim(),
+                        reviewNote: rmReviewNote.trim(),
+                        updatedAt: now
+                    };
+                }
+                return item;
+            });
+            saveStoredRoadmapItems(updated);
+            setToastMessage("บันทึกการแก้ไขแผนงานคอนเทนต์เรียบร้อยแล้ว");
+        } else {
+            // Create
+            const newId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+            const newItem: ProjectContentRoadmapItem = {
+                id: newId,
+                projectSlug: slug,
+                episodeCode: rmEpisodeCode.trim(),
+                title: rmTitle.trim(),
+                contentType: rmContentType,
+                contentLayer: rmContentLayer,
+                seriesOrTheme: rmSeriesOrTheme.trim() || "General",
+                status: rmStatus,
+                priority: rmPriority,
+                targetChannel: rmTargetChannel.trim(),
+                targetPublishDate: rmTargetPublishDate,
+                relatedMainEpisode: rmRelatedMainEpisode.trim(),
+                nextAction: rmNextAction.trim(),
+                notes: rmNotes.trim(),
+                linkedWritingProjectId: rmLinkedWritingProjectId.trim(),
+                linkedPublishedUrl: rmLinkedPublishedUrl.trim(),
+                orderIndex: Number(rmOrderIndex),
+                contentGoal: rmContentGoal.trim(),
+                reviewNote: rmReviewNote.trim(),
+                sourceText: rmSourceText,
+                sourceType: rmSourceType,
+                createdAt: now,
+                updatedAt: now
+            };
+            allItems.push(newItem);
+            saveStoredRoadmapItems(allItems);
+            setToastMessage("เพิ่มแผนงานคอนเทนต์เรียบร้อยแล้ว");
+        }
+
+        setShowToast(true);
+        setIsRoadmapModalOpen(false);
+        loadRoadmapItems();
+    };
+
+    const handleDuplicateRoadmap = (item: ProjectContentRoadmapItem) => {
+        const allItems = getStoredRoadmapItems();
+        const now = new Date().toISOString();
+        const newId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        
+        const newOrder = (item.orderIndex || 0) + 5;
+
+        const clonedItem: ProjectContentRoadmapItem = {
+            ...item,
+            id: newId,
+            episodeCode: `${item.episodeCode}-Copy`,
+            title: `${item.title} (Copy)`,
+            orderIndex: newOrder,
+            createdAt: now,
+            updatedAt: now,
+            sourceType: "manual"
+        };
+
+        allItems.push(clonedItem);
+        saveStoredRoadmapItems(allItems);
+        setToastMessage(`คัดลอกแผนงาน ${item.episodeCode} สำเร็จ`);
+        setShowToast(true);
+        loadRoadmapItems();
+    };
+
+    const handleMarkAsPublished = (item: ProjectContentRoadmapItem) => {
+        const allItems = getStoredRoadmapItems();
+        const now = new Date().toISOString();
+        const updated = allItems.map(r => {
+            if (r.id === item.id) {
+                return {
+                    ...r,
+                    status: "published" as const,
+                    updatedAt: now
+                };
+            }
+            return r;
+        });
+        saveStoredRoadmapItems(updated);
+        setToastMessage(`เปลี่ยนสถานะเป็น Published สำหรับ ${item.episodeCode}`);
+        setShowToast(true);
+        loadRoadmapItems();
+    };
+
+    const handleMarkAsTracking = (item: ProjectContentRoadmapItem) => {
+        const allItems = getStoredRoadmapItems();
+        const now = new Date().toISOString();
+        const updated = allItems.map(r => {
+            if (r.id === item.id) {
+                return {
+                    ...r,
+                    status: "tracking" as const,
+                    updatedAt: now
+                };
+            }
+            return r;
+        });
+        saveStoredRoadmapItems(updated);
+        setToastMessage(`เปลี่ยนสถานะเป็น Tracking สำหรับ ${item.episodeCode}`);
+        setShowToast(true);
+        loadRoadmapItems();
+    };
+
+    const handleTriggerDeleteRoadmap = (id: string) => {
+        setRoadmapToDelete(id);
+        setIsDeleteRoadmapOpen(true);
+    };
+
+    const handleConfirmDeleteRoadmap = () => {
+        if (!roadmapToDelete) return;
+        const allItems = getStoredRoadmapItems();
+        const filtered = allItems.filter(item => item.id !== roadmapToDelete);
+        saveStoredRoadmapItems(filtered);
+        setToastMessage("ลบรายการแผนคอนเทนต์เรียบร้อยแล้ว");
+        setShowToast(true);
+        setIsDeleteRoadmapOpen(false);
+        setRoadmapToDelete(null);
+        loadRoadmapItems();
+    };
+
+    // --- Arbor Roadmap Importer ---
+    const handleOpenArborRoadmap = () => {
+        setArborRoadmapText("");
+        setArborRoadmapDrafts([]);
+        setShowArborRoadmapPreview(false);
+        setIsArborRoadmapOpen(true);
+    };
+
+    const handleGenerateArborRoadmap = () => {
+        if (!arborRoadmapText.trim()) {
+            alert("กรุณาวางข้อความแผนงานคอนเทนต์");
+            return;
+        }
+
+        const parsed = parseRoadmapTextToItems(arborRoadmapText, slug);
+        setArborRoadmapDrafts(parsed);
+        setShowArborRoadmapPreview(true);
+    };
+
+    const handleApplyArborRoadmap = () => {
+        if (arborRoadmapDrafts.length === 0) return;
+        const allItems = getStoredRoadmapItems();
+        
+        const merged = [...allItems, ...arborRoadmapDrafts];
+        saveStoredRoadmapItems(merged);
+        
+        setToastMessage(`นำเข้าแผนงานคอนเทนต์สำเร็จ ${arborRoadmapDrafts.length} รายการ`);
+        setShowToast(true);
+        setIsArborRoadmapOpen(false);
+        setArborRoadmapDrafts([]);
+        setShowArborRoadmapPreview(false);
+        loadRoadmapItems();
+    };
+
+    const handleUpdateDraftCell = (index: number, field: keyof ProjectContentRoadmapItem, value: any) => {
+        setArborRoadmapDrafts(prev => {
+            const copy = [...prev];
+            copy[index] = {
+                ...copy[index],
+                [field]: value
+            };
+            return copy;
+        });
+    };
+
+    // Filter & Search Roadmap Items
+    const filteredRoadmapItems = useMemo(() => {
+        return roadmapItems.filter(item => {
+            const matchSearch = 
+                item.episodeCode.toLowerCase().includes(roadmapSearch.toLowerCase()) ||
+                item.title.toLowerCase().includes(roadmapSearch.toLowerCase()) ||
+                (item.seriesOrTheme && item.seriesOrTheme.toLowerCase().includes(roadmapSearch.toLowerCase())) ||
+                (item.notes && item.notes.toLowerCase().includes(roadmapSearch.toLowerCase()));
+            
+            const matchStatus = roadmapStatusFilter === "all" || item.status === roadmapStatusFilter;
+            const matchType = roadmapTypeFilter === "all" || item.contentType === roadmapTypeFilter;
+            const matchPriority = roadmapPriorityFilter === "all" || item.priority === roadmapPriorityFilter;
+
+            return matchSearch && matchStatus && matchType && matchPriority;
+        });
+    }, [roadmapItems, roadmapSearch, roadmapStatusFilter, roadmapTypeFilter, roadmapPriorityFilter]);
 
     const activeMeta = useMemo(() => {
         if (!project) return null;
@@ -1032,6 +1585,292 @@ export default function ProjectDetailClient() {
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Content Roadmap / Episode Plan Section */}
+                    <section className="border-t border-neutral-200/60 dark:border-neutral-800/60 pt-10 space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-2">
+                            <div className="space-y-1">
+                                <h2 className="text-lg font-black tracking-tight text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                                    <Layers className="w-5 h-5 text-neutral-400" />
+                                    Content Roadmap & Episode Plan
+                                </h2>
+                                <p className="text-xs text-neutral-400 font-medium">แผนการจัดทำตอนคอนเทนต์ บทความ ซีรีส์ และการติดตามสถานะการเผยแพร่</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleOpenAddRoadmap}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-neutral-200 text-xs font-black uppercase tracking-wider hover:border-neutral-900 hover:text-black dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white dark:hover:border-neutral-700 shadow-sm active:scale-95 transition-all"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Add Item
+                                </button>
+                                <button
+                                    onClick={handleOpenArborRoadmap}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-black uppercase tracking-wider hover:opacity-90 shadow-lg active:scale-95 transition-all"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    Generate Roadmap
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Search and Filters Controls */}
+                        <div className="flex flex-col md:flex-row gap-3 bg-neutral-50 dark:bg-neutral-900/40 p-3.5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80">
+                            <div className="flex-1 relative">
+                                <input
+                                    type="text"
+                                    placeholder="ค้นหาตอน รหัสตอน ซีรีส์ หรือบันทึก..."
+                                    value={roadmapSearch}
+                                    onChange={e => setRoadmapSearch(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-xs font-semibold outline-none focus:border-neutral-400"
+                                />
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <select
+                                    value={roadmapStatusFilter}
+                                    onChange={e => setRoadmapStatusFilter(e.target.value)}
+                                    className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-2.5 py-2 text-xs font-bold outline-none focus:border-neutral-400"
+                                >
+                                    <option value="all">ทุกสถานะ (All Status)</option>
+                                    {Object.entries(ROADMAP_STATUS_LABELS).map(([k, label]) => (
+                                        <option key={k} value={k}>{label}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={roadmapTypeFilter}
+                                    onChange={e => setRoadmapTypeFilter(e.target.value)}
+                                    className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-2.5 py-2 text-xs font-bold outline-none focus:border-neutral-400"
+                                >
+                                    <option value="all">ทุกประเภทเนื้อหา (All Types)</option>
+                                    {Object.entries(CONTENT_TYPE_LABELS).map(([k, label]) => (
+                                        <option key={k} value={k}>{label}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={roadmapPriorityFilter}
+                                    onChange={e => setRoadmapPriorityFilter(e.target.value)}
+                                    className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-2.5 py-2 text-xs font-bold outline-none focus:border-neutral-400"
+                                >
+                                    <option value="all">ทุกระดับสำคัญ (All Priority)</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                    <option value="none">None</option>
+                                </select>
+
+                                <div className="flex border border-neutral-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 p-0.5 shadow-sm">
+                                    <button
+                                        onClick={() => setRoadmapViewMode("table")}
+                                        className={`p-1.5 rounded-lg transition-all ${roadmapViewMode === "table" ? "bg-neutral-100 text-black dark:bg-neutral-800 dark:text-white" : "text-neutral-400 hover:text-neutral-600"}`}
+                                        title="Table View"
+                                    >
+                                        <Table className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setRoadmapViewMode("card")}
+                                        className={`p-1.5 rounded-lg transition-all ${roadmapViewMode === "card" ? "bg-neutral-100 text-black dark:bg-neutral-800 dark:text-white" : "text-neutral-400 hover:text-neutral-600"}`}
+                                        title="Card View"
+                                    >
+                                        <LayoutGrid className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Roadmap items list */}
+                        {filteredRoadmapItems.length === 0 ? (
+                            <div className="text-center py-16 bg-neutral-50/50 dark:bg-neutral-900/10 rounded-3xl border border-dashed border-neutral-200/80">
+                                <Layers className="w-8 h-8 text-neutral-300 mx-auto mb-2.5" />
+                                <p className="text-neutral-400 font-medium italic text-sm dark:text-neutral-500">
+                                    {roadmapSearch || roadmapStatusFilter !== "all" || roadmapTypeFilter !== "all" || roadmapPriorityFilter !== "all"
+                                        ? "ไม่พบแผนตอนคอนเทนต์ที่สอดคล้องกับตัวกรอง"
+                                        : "ยังไม่มีรายการแผนคอนเทนต์ใด ๆ เริ่มเพิ่มตอนใหม่หรือใช้ Arbor เพื่อแปลงประวัติ"}
+                                </p>
+                            </div>
+                        ) : roadmapViewMode === "table" ? (
+                            <div className="bg-theme-card border border-neutral-200 rounded-3xl overflow-hidden shadow-sm dark:border-neutral-800">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-[11px] font-medium">
+                                        <thead>
+                                            <tr className="bg-neutral-50 dark:bg-neutral-900/60 border-b border-neutral-200 dark:border-neutral-800 text-neutral-400 font-bold uppercase tracking-wider text-[9px]">
+                                                <th className="px-3.5 py-3 w-10 text-center">#</th>
+                                                <th className="px-3.5 py-3">รหัส EP</th>
+                                                <th className="px-3.5 py-3 min-w-[180px]">หัวข้อตอน / เป้าหมาย</th>
+                                                <th className="px-3.5 py-3">ประเภทคอนเทนต์</th>
+                                                <th className="px-3.5 py-3">สถานะ</th>
+                                                <th className="px-3.5 py-3">ความสำคัญ</th>
+                                                <th className="px-3.5 py-3">เผยแพร่</th>
+                                                <th className="px-3.5 py-3 text-right min-w-[140px]">จัดการ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60 text-neutral-700 dark:text-neutral-300">
+                                            {filteredRoadmapItems.map(item => (
+                                                <tr key={item.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-900/20 transition-colors">
+                                                    <td className="px-3.5 py-3 text-center text-neutral-400 font-bold">{item.orderIndex || 0}</td>
+                                                    <td className="px-3.5 py-3 whitespace-nowrap">
+                                                        <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 dark:bg-neutral-850 dark:text-neutral-200 font-black font-mono">
+                                                            {item.episodeCode}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3.5 py-3 space-y-1">
+                                                        <div className="font-black text-neutral-900 dark:text-neutral-100 leading-snug">
+                                                            {item.title}
+                                                        </div>
+                                                        {item.contentGoal && (
+                                                            <div className="text-[10px] text-neutral-400 font-medium leading-relaxed italic">
+                                                                🎯 {item.contentGoal}
+                                                            </div>
+                                                        )}
+                                                        {item.reviewNote && (
+                                                            <div className="text-[9px] text-rose-500 font-semibold leading-relaxed">
+                                                                ⚠️ ระวัง: {item.reviewNote}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3.5 py-3 space-y-0.5 whitespace-nowrap">
+                                                        <div className="text-neutral-500 font-semibold flex items-center gap-1">
+                                                            <Tag className="w-3 h-3 text-neutral-400" />
+                                                            {CONTENT_TYPE_LABELS[item.contentType]}
+                                                        </div>
+                                                        <div className="text-[9px] text-neutral-400 flex items-center gap-1 font-mono">
+                                                            <Layers className="w-2.5 h-2.5" />
+                                                            {CONTENT_LAYER_LABELS[item.contentLayer]}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3.5 py-3 whitespace-nowrap">
+                                                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${ROADMAP_STATUS_COLORS[item.status]}`}>
+                                                            {ROADMAP_STATUS_LABELS[item.status]}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3.5 py-3 whitespace-nowrap">
+                                                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${PRIORITY_COLORS[item.priority]}`}>
+                                                            {item.priority}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3.5 py-3 whitespace-nowrap space-y-0.5 text-[10px] text-neutral-400">
+                                                        {item.targetChannel && (
+                                                            <div className="flex items-center gap-1">
+                                                                <Tv className="w-2.5 h-2.5 text-neutral-400" />
+                                                                {item.targetChannel}
+                                                            </div>
+                                                        )}
+                                                        {item.targetPublishDate && (
+                                                            <div className="font-semibold text-neutral-500">
+                                                                📅 {item.targetPublishDate}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3.5 py-3 whitespace-nowrap text-right space-x-1.5">
+                                                        <button 
+                                                            onClick={() => handleDuplicateRoadmap(item)} 
+                                                            className="text-neutral-400 hover:text-black dark:hover:text-white p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
+                                                            title="Duplicate"
+                                                        >
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        {item.status !== "published" && item.status !== "tracking" && (
+                                                            <button 
+                                                                onClick={() => handleMarkAsPublished(item)} 
+                                                                className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 p-1 rounded-md transition-colors font-black text-[9px] border border-green-200 dark:border-green-900/30 uppercase tracking-widest px-1.5"
+                                                                title="Mark as Published"
+                                                            >
+                                                                Publish
+                                                            </button>
+                                                        )}
+                                                        {item.status === "published" && (
+                                                            <button 
+                                                                onClick={() => handleMarkAsTracking(item)} 
+                                                                className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 p-1 rounded-md transition-colors font-black text-[9px] border border-blue-200 dark:border-blue-900/30 uppercase tracking-widest px-1.5"
+                                                                title="Mark as Tracking"
+                                                            >
+                                                                Track
+                                                            </button>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => handleOpenEditRoadmap(item)} 
+                                                            className="text-neutral-400 hover:text-black dark:hover:text-white p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
+                                                            title="Edit"
+                                                        >
+                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleTriggerDeleteRoadmap(item.id)} 
+                                                            className="text-neutral-400 hover:text-red-650 p-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {filteredRoadmapItems.map(item => (
+                                    <div key={item.id} className="bg-theme-card border border-neutral-200 rounded-3xl p-5 hover:shadow-md transition-all dark:border-neutral-800 flex flex-col justify-between text-left">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 dark:bg-neutral-850 dark:text-neutral-200 text-[10px] font-black font-mono">
+                                                    {item.episodeCode}
+                                                </span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${ROADMAP_STATUS_COLORS[item.status]}`}>
+                                                        {ROADMAP_STATUS_LABELS[item.status]}
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${PRIORITY_COLORS[item.priority]}`}>
+                                                        {item.priority}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="font-black text-sm text-neutral-900 dark:text-neutral-100 leading-snug">
+                                                    {item.title}
+                                                </h3>
+                                                {item.contentGoal && (
+                                                    <p className="text-[10px] text-neutral-400 font-medium leading-relaxed italic mt-1">
+                                                        🎯 {item.contentGoal}
+                                                    </p>
+                                                )}
+                                                {item.reviewNote && (
+                                                    <p className="text-[9px] text-rose-500 font-semibold leading-relaxed mt-1">
+                                                        ⚠️ ระวัง: {item.reviewNote}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex flex-wrap gap-2 text-[10px] text-neutral-500">
+                                                <span className="flex items-center gap-0.5 font-bold">
+                                                    <Tag className="w-3 h-3 text-neutral-400" />
+                                                    {CONTENT_TYPE_LABELS[item.contentType]}
+                                                </span>
+                                                <span className="text-neutral-300">•</span>
+                                                <span className="flex items-center gap-0.5 font-mono">
+                                                    <Layers className="w-3 h-3" />
+                                                    {CONTENT_LAYER_LABELS[item.contentLayer]}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-between items-center">
+                                            <span className="text-[10px] text-neutral-400">
+                                                {item.targetPublishDate ? `📅 ${item.targetPublishDate}` : "ยังไม่ได้กําหนดวัน"}
+                                            </span>
+                                            <div className="flex items-center gap-1.5">
+                                                <button onClick={() => handleDuplicateRoadmap(item)} className="p-1.5 text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-850" title="Duplicate"><Copy className="w-3.5 h-3.5" /></button>
+                                                <button onClick={() => handleOpenEditRoadmap(item)} className="p-1.5 text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-850" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>
+                                                <button onClick={() => handleTriggerDeleteRoadmap(item.id)} className="p-1.5 text-neutral-400 hover:text-red-650 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </section>
@@ -1636,6 +2475,413 @@ export default function ProjectDetailClient() {
                 onCancel={() => {
                     setIsDeleteDocOpen(false);
                     setDocToDelete(null);
+                }}
+            />
+
+            {/* Content Roadmap Add / Edit Modal */}
+            <Modal
+                isOpen={isRoadmapModalOpen}
+                onClose={() => setIsRoadmapModalOpen(false)}
+                title={activeRoadmapItem ? `แก้ไขแผนงานคอนเทนต์ (${rmEpisodeCode})` : "เพิ่มแผนงานคอนเทนต์ใหม่"}
+            >
+                <div className="space-y-4 text-left max-h-[85vh] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">รหัสตอน (Episode Code)*</label>
+                            <input
+                                type="text"
+                                value={rmEpisodeCode}
+                                onChange={e => setRmEpisodeCode(e.target.value)}
+                                placeholder="เช่น EP.10.3-S1"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400 font-mono"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ลำดับการเรียง (Order Index)</label>
+                            <input
+                                type="number"
+                                value={rmOrderIndex}
+                                onChange={e => setRmOrderIndex(Number(e.target.value))}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400 font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">หัวข้อคอนเทนต์ / ชื่อตอน (Title)*</label>
+                        <input
+                            type="text"
+                            value={rmTitle}
+                            onChange={e => setRmTitle(e.target.value)}
+                            placeholder="เช่น ทำไมตัดยอดแล้ว บางต้นแตกกิ่งดี แต่บางต้นไม่ค่อยแตก?"
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400"
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">เป้าหมายตอนนี้ (Content Goal)</label>
+                        <textarea
+                            value={rmContentGoal}
+                            onChange={e => setRmContentGoal(e.target.value)}
+                            rows={2}
+                            placeholder="อธิบายความสัมพันธ์เพื่อแก้ปัญหาพฤติกรรมตาข้างพืช..."
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ประเภทคอนเทนต์ (Content Type)</label>
+                            <select
+                                value={rmContentType}
+                                onChange={e => setRmContentType(e.target.value as ProjectContentType)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-neutral-400"
+                            >
+                                {Object.entries(CONTENT_TYPE_LABELS).map(([k, label]) => (
+                                    <option key={k} value={k}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ระดับชั้นของคอนเทนต์ (Content Layer)</label>
+                            <select
+                                value={rmContentLayer}
+                                onChange={e => setRmContentLayer(e.target.value as ProjectContentLayer)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-neutral-400"
+                            >
+                                {Object.entries(CONTENT_LAYER_LABELS).map(([k, label]) => (
+                                    <option key={k} value={k}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ซีรีส์ / ธีมหลัก (Theme/Series)</label>
+                            <input
+                                type="text"
+                                value={rmSeriesOrTheme}
+                                onChange={e => setRmSeriesOrTheme(e.target.value)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ระดับความสำคัญ (Priority)</label>
+                            <select
+                                value={rmPriority}
+                                onChange={e => setRmPriority(e.target.value as any)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                            >
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">สถานะของแผน (Status)</label>
+                            <select
+                                value={rmStatus}
+                                onChange={e => setRmStatus(e.target.value as ProjectContentRoadmapStatus)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                            >
+                                {Object.entries(ROADMAP_STATUS_LABELS).map(([k, label]) => (
+                                    <option key={k} value={k}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">เป้าหมายช่องทาง (Target Channel)</label>
+                            <input
+                                type="text"
+                                value={rmTargetChannel}
+                                onChange={e => setRmTargetChannel(e.target.value)}
+                                placeholder="เช่น Facebook Page, YouTube"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">วันเผยแพร่เป้าหมาย (Publish Date)</label>
+                            <input
+                                type="date"
+                                value={rmTargetPublishDate}
+                                onChange={e => setRmTargetPublishDate(e.target.value)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ตอนหลักที่อ้างอิง (Parent EP)</label>
+                            <input
+                                type="text"
+                                value={rmRelatedMainEpisode}
+                                onChange={e => setRmRelatedMainEpisode(e.target.value)}
+                                placeholder="เช่น EP.10.3"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">บันทึกข้อควรระวัง / รีวิว (Review Note - เคลม ปุ๋ย ฮอร์โมน ฯลฯ)</label>
+                        <input
+                            type="text"
+                            value={rmReviewNote}
+                            onChange={e => setRmReviewNote(e.target.value)}
+                            placeholder="เช่น ระวังเรื่องการโฆษณาเคลมฮอร์โมนเร่งรากเกินจริง..."
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-rose-450 text-rose-650"
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">แผนงานขั้นถัดไป (Next Action)</label>
+                        <input
+                            type="text"
+                            value={rmNextAction}
+                            onChange={e => setRmNextAction(e.target.value)}
+                            placeholder="เช่น จัดหาภาพประกอบ, ลงมือเขียนดราฟต์"
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Writing Project ID / Slug (แมนนวล)</label>
+                            <input
+                                type="text"
+                                value={rmLinkedWritingProjectId}
+                                onChange={e => setRmLinkedWritingProjectId(e.target.value)}
+                                placeholder="เช่น green-fineness-auxin-recomm"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none font-mono"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ลิงก์บทความที่เผยแพร่แล้ว (Published URL)</label>
+                            <input
+                                type="text"
+                                value={rmLinkedPublishedUrl}
+                                onChange={e => setRmLinkedPublishedUrl(e.target.value)}
+                                placeholder="https://..."
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">บันทึกเพิ่มเติม (Notes)</label>
+                        <textarea
+                            value={rmNotes}
+                            onChange={e => setRmNotes(e.target.value)}
+                            rows={3}
+                            placeholder="รายละเอียดสั้น ๆ เพิ่มเติมสำหรับแผนคอนเทนต์นี้"
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                        <button
+                            type="button"
+                            onClick={() => setIsRoadmapModalOpen(false)}
+                            className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95"
+                        >
+                            ยกเลิก
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSaveRoadmap}
+                            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl text-xs font-black transition-all active:scale-95 shadow-sm"
+                        >
+                            บันทึกแผนงาน (Save Roadmap)
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Arbor Roadmap Assistant Modal */}
+            <Modal
+                isOpen={isArborRoadmapOpen}
+                onClose={() => setIsArborRoadmapOpen(false)}
+                title="✨ Arbor Content Roadmap Assistant"
+            >
+                <div className="space-y-4 text-left max-h-[85vh] overflow-y-auto pr-1">
+                    {!showArborRoadmapPreview ? (
+                        <>
+                            <div className="p-3.5 bg-purple-50/50 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/20 rounded-2xl space-y-1">
+                                <span className="text-[10px] font-black uppercase text-purple-600 tracking-wider flex items-center gap-1">
+                                    <Info className="w-3.5 h-3.5" />
+                                    Arbor Roadmap Auto-Parser
+                                </span>
+                                <p className="text-xs text-neutral-500 leading-normal font-medium dark:text-neutral-400">
+                                    วางข้อความดิบของคุณ เช่น รายละเอียดแผนงานคัดลอกจาก Google Sheets, บรรทัดสรุปแผนจากห้องแชท หรือ Markdown Roadmap เพื่อให้ผู้ช่วยดึงรายแถวและวิเคราะห์ประเภท ตอนเป้าหมาย และข้อมูลเบื้องต้น
+                                </p>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">วางแถวข้อมูล (Source Rows - แยกตามบรรทัด)</label>
+                                <textarea
+                                    value={arborRoadmapText}
+                                    onChange={e => setArborRoadmapText(e.target.value)}
+                                    rows={14}
+                                    placeholder="EP.10.3-S1   ตาข้างพืชและออกซิน   group_post   drafting&#10;EP.10.4-S1   เคล็ดลับการแตกยอด   infographic   planned"
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400 font-mono"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsArborRoadmapOpen(false)}
+                                    className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleGenerateArborRoadmap}
+                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black transition-all active:scale-95 shadow-md"
+                                >
+                                    วิเคราะห์แผนงาน (Generate Roadmap Draft)
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/20 rounded-2xl space-y-0.5">
+                                <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider flex items-center gap-1">
+                                    <Check className="w-3.5 h-3.5" />
+                                    Arbor Parse Roadmap Results ({arborRoadmapDrafts.length} แถว)
+                                </span>
+                                <p className="text-xs text-neutral-500 font-medium dark:text-neutral-400">
+                                    ตรวจสอบผลการวิเคราะห์ข้อมูลและแก้ไขช่องต่าง ๆ ในตารางได้โดยตรงก่อนกดยืนยัน (Apply Roadmap)
+                                </p>
+                            </div>
+
+                            <div className="border border-neutral-200 rounded-2xl overflow-hidden dark:border-neutral-800">
+                                <div className="overflow-x-auto max-h-[350px]">
+                                    <table className="w-full text-left border-collapse text-[10px]">
+                                        <thead>
+                                            <tr className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 text-neutral-400 font-bold uppercase tracking-wider">
+                                                <th className="px-3 py-2 w-14">รหัส EP</th>
+                                                <th className="px-3 py-2 min-w-[120px]">หัวข้อ</th>
+                                                <th className="px-3 py-2">ประเภท</th>
+                                                <th className="px-3 py-2">ระดับชั้น</th>
+                                                <th className="px-3 py-2">สถานะ</th>
+                                                <th className="px-3 py-2">Parent EP</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60 text-neutral-700 dark:text-neutral-300">
+                                            {arborRoadmapDrafts.map((draft, idx) => (
+                                                <tr key={idx} className="hover:bg-neutral-50/30">
+                                                    <td className="px-2 py-1.5">
+                                                        <input
+                                                            type="text"
+                                                            value={draft.episodeCode}
+                                                            onChange={e => handleUpdateDraftCell(idx, "episodeCode", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1.5 py-1 text-[10px] font-mono font-bold"
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <input
+                                                            type="text"
+                                                            value={draft.title}
+                                                            onChange={e => handleUpdateDraftCell(idx, "title", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1.5 py-1 text-[10px]"
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <select
+                                                            value={draft.contentType}
+                                                            onChange={e => handleUpdateDraftCell(idx, "contentType", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1 py-1 text-[10px]"
+                                                        >
+                                                            {Object.entries(CONTENT_TYPE_LABELS).map(([k, label]) => (
+                                                                <option key={k} value={k}>{label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <select
+                                                            value={draft.contentLayer}
+                                                            onChange={e => handleUpdateDraftCell(idx, "contentLayer", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1 py-1 text-[10px]"
+                                                        >
+                                                            {Object.entries(CONTENT_LAYER_LABELS).map(([k, label]) => (
+                                                                <option key={k} value={k}>{label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <select
+                                                            value={draft.status}
+                                                            onChange={e => handleUpdateDraftCell(idx, "status", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1 py-1 text-[10px]"
+                                                        >
+                                                            {Object.entries(ROADMAP_STATUS_LABELS).map(([k, label]) => (
+                                                                <option key={k} value={k}>{label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <input
+                                                            type="text"
+                                                            value={draft.relatedMainEpisode || ""}
+                                                            onChange={e => handleUpdateDraftCell(idx, "relatedMainEpisode", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1.5 py-1 text-[10px] font-mono"
+                                                            placeholder="EP.10.3"
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowArborRoadmapPreview(false)}
+                                    className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                                >
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                    ย้อนกลับไปแก้ไข Source Text
+                                </button>
+                                <div className="flex gap-2 justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsArborRoadmapOpen(false)}
+                                        className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleApplyArborRoadmap}
+                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all active:scale-95 shadow-md flex items-center justify-center gap-1.5"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        ยืนยันบันทึก (Apply Roadmap)
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </Modal>
+
+            {/* Confirm Delete Roadmap Dialog */}
+            <ConfirmDialog
+                isOpen={isDeleteRoadmapOpen}
+                title="ลบรายการแผนคอนเทนต์ (Delete Roadmap Item)"
+                message="คุณแน่ใจหรือไม่ว่าต้องการลบรายการแผนคอนเทนต์นี้? ข้อมูลจะไม่สามารถกู้คืนกลับมาได้"
+                confirmText="ยืนยันการลบ"
+                onConfirm={handleConfirmDeleteRoadmap}
+                onCancel={() => {
+                    setIsDeleteRoadmapOpen(false);
+                    setRoadmapToDelete(null);
                 }}
             />
 

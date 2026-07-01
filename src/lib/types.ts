@@ -220,3 +220,62 @@ export interface ProjectDocumentationBlock {
     reviewedByUser?: boolean;
     appliedAt?: string;
 }
+
+export type ProjectContentRoadmapStatus =
+  | "idea"
+  | "planned"
+  | "drafting"
+  | "ready_to_publish"
+  | "published"
+  | "tracking"
+  | "needs_update"
+  | "paused";
+
+export type ProjectContentType =
+  | "narrative_article"
+  | "knowledge_article"
+  | "group_post"
+  | "page_post"
+  | "personal_post"
+  | "infographic"
+  | "short_video"
+  | "follow_up_post"
+  | "supporting_article"
+  | "legacy_article";
+
+export type ProjectContentLayer =
+  | "core_episode"
+  | "supporting_article"
+  | "social_post"
+  | "performance_followup"
+  | "visual_asset"
+  | "video_asset"
+  | "legacy_shell";
+
+export interface ProjectContentRoadmapItem {
+    id: string;
+    projectSlug: string;
+    episodeCode: string;
+    title: string;
+    contentType: ProjectContentType;
+    contentLayer: ProjectContentLayer;
+    seriesOrTheme?: string;
+    status: ProjectContentRoadmapStatus;
+    priority: "high" | "medium" | "low" | "none";
+    targetChannel?: string;
+    targetPublishDate?: string;
+    relatedMainEpisode?: string;
+    nextAction?: string;
+    notes?: string;
+    linkedWritingProjectId?: string;
+    linkedPublishedUrl?: string;
+    createdAt: string;
+    updatedAt: string;
+
+    // Additional optional fields for WORKOS-OPS-001C
+    orderIndex?: number;
+    contentGoal?: string;
+    reviewNote?: string;
+    sourceText?: string;
+    sourceType?: "manual" | "sheet_paste" | "chat_paste" | "arbor_parse";
+}
