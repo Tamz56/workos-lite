@@ -492,6 +492,7 @@ export interface GA4BackfillParseResult {
     dateRangeEnd: string;
     snapshotDate: string;
     rows: GA4BackfillRow[];
+    warning?: string;
 }
 
 export function normalizeBounceRate(raw: string): string {
@@ -658,14 +659,26 @@ export function parseGA4BackfillData(rawText: string, writingProjects: any[] = [
     let headerIdx = -1;
     let detectedHeaders: string[] = [];
 
+    const dimensionKeywords = [
+        "ชื่อหน้าเว็บ", "page title", "หน้าจอ", "screen class", "เส้นทางหน้าเว็บ", "page path", "page location"
+    ];
+
     const targetKeywords = [
-        "ชื่อหน้าเว็บ", "page title", "หน้าจอ", "screen class", "เส้นทางหน้าเว็บ", "page path",
+        "ชื่อหน้าเว็บ", "page title", "หน้าจอ", "screen class", "เส้นทางหน้าเว็บ", "page path", "page location",
         "จำนวนการดู", "views", "ผู้ใช้ที่ใช้งานอยู่", "active users", "จำนวนเหตุการณ์", "event count", "อัตราตีกลับ", "bounce rate"
     ];
 
     for (let i = 0; i < lines.length; i++) {
         if (!lines[i]) continue;
         const cells = parseLineToCells(lines[i]);
+        
+        const hasDimension = cells.some(c => {
+            const val = c.toLowerCase();
+            return dimensionKeywords.some(kw => val.includes(kw));
+        });
+
+        if (!hasDimension) continue;
+
         let matchCount = 0;
         cells.forEach(c => {
             const val = c.toLowerCase();
@@ -681,7 +694,10 @@ export function parseGA4BackfillData(rawText: string, writingProjects: any[] = [
         }
     }
 
-    if (headerIdx === -1) return result;
+    if (headerIdx === -1) {
+        result.warning = "ไม่พบตารางบทความ กรุณาวาง section ที่เริ่มจาก ชื่อหน้าเว็บและคลาสหน้าจอ";
+        return result;
+    }
 
     // 3. Map Columns
     const ga4Mappings = {
@@ -783,6 +799,173 @@ export function parseGA4BackfillData(rawText: string, writingProjects: any[] = [
         }
 
         result.rows.push(row);
+    }
+
+    return result;
+}
+
+export interface LegacyArticleRow {
+    index: number;
+    title: string;
+    slug: string;
+    publishedUrl: string;
+    contentType: "knowledge" | "narrative" | "supporting" | "unknown";
+    publishedDate: string;
+    sourceLocation: "website" | "workarea" | "old_system" | "manual";
+    suggestedAction: "Already exists" | "Create Shell" | "Needs review" | "Excluded";
+    matchedProjectId?: string;
+    rawLine: string;
+}
+
+export interface LegacyArticleParseResult {
+    rows: LegacyArticleRow[];
+}
+
+export function extractAndNormalizeSlug(rawUrl: string): string {
+    let clean = (rawUrl || "").trim();
+    clean = clean.split("?")[0].split("#")[0];
+    clean = clean.replace(/^https?:\/\/(www\.)?greenfineness\.com/, "");
+    clean = clean.replace(/^\/library/, "").replace(/^library/, "");
+    clean = clean.replace(/^\/|\/$/g, "");
+    return clean;
+}
+
+export function isLegacyExcluded(slug: string, url: string): boolean {
+    const s = (slug || "").trim().toLowerCase();
+    const u = (url || "").trim().toLowerCase();
+    if (!s || s === "/" || s === "library") return true;
+    
+    const exKeywords = ["contact", "about", "admin", "collection", "404", "preview", "draft"];
+    if (exKeywords.some(kw => s.includes(kw) || u.includes(kw))) return true;
+    
+    return false;
+}
+
+function findExistingMatch(title: string, slug: string, url: string, writingProjects: any[]) {
+    if (!writingProjects || writingProjects.length === 0) return null;
+    
+    const tLower = title.trim().toLowerCase();
+    const sLower = slug.trim().toLowerCase();
+    const uLower = url.trim().toLowerCase();
+    
+    return writingProjects.find(p => {
+        const pTitle = p.title?.trim().toLowerCase();
+        const pSlug = p.slug?.trim().toLowerCase();
+        const pKSlug = p.knowledge_slug?.trim().toLowerCase();
+        const pNSlug = p.narrative_slug?.trim().toLowerCase();
+        
+        let pUrl = "";
+        if (p.notes) {
+            try {
+                const parsed = JSON.parse(p.notes);
+                pUrl = (parsed.published_url || "").trim().toLowerCase();
+            } catch {}
+        }
+        
+        return (
+            (tLower && pTitle === tLower) ||
+            (sLower && pSlug === sLower) ||
+            (sLower && pKSlug === sLower) ||
+            (sLower && pNSlug === sLower) ||
+            (uLower && pUrl === uLower)
+        );
+    });
+}
+
+export function parseLegacyRegistryData(rawText: string, writingProjects: any[] = []): LegacyArticleParseResult {
+    const result: LegacyArticleParseResult = { rows: [] };
+    if (!rawText || !rawText.trim()) return result;
+
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith("#"));
+    
+    let startIdx = 0;
+    if (lines.length > 0) {
+        const firstCells = parseLineToCells(lines[0]);
+        const isHeader = firstCells.some(c => {
+            const val = c.toLowerCase();
+            return val.includes("title") || val.includes("slug") || val.includes("url") || val.includes("ลิงก์") || val.includes("ชื่อ");
+        });
+        if (isHeader) startIdx = 1;
+    }
+
+    for (let i = startIdx; i < lines.length; i++) {
+        const rawLine = lines[i];
+        if (!rawLine || rawLine.startsWith("#")) continue;
+
+        const cells = parseLineToCells(rawLine);
+        if (cells.length === 0 || cells.every(c => !c.trim())) continue;
+
+        let title = "";
+        let rawUrl = "";
+        let slug = "";
+        let contentType: "knowledge" | "narrative" | "supporting" | "unknown" = "unknown";
+        let publishedDate = "";
+
+        if (cells.length === 1) {
+            const val = cells[0].trim();
+            if (val.startsWith("/") || val.startsWith("http") || val.includes(".")) {
+                rawUrl = val;
+                slug = extractAndNormalizeSlug(val);
+                title = slug.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+            } else {
+                title = val;
+                slug = extractAndNormalizeSlug(val);
+            }
+        } else {
+            title = cells[0] || "";
+            const val1 = cells[1] || "";
+            if (val1.startsWith("/") || val1.startsWith("http") || val1.includes("/")) {
+                rawUrl = val1;
+                slug = extractAndNormalizeSlug(val1);
+            } else {
+                slug = extractAndNormalizeSlug(val1 || title);
+            }
+
+            if (cells.length > 2 && cells[2]) {
+                const typeVal = cells[2].toLowerCase();
+                if (typeVal.includes("know") || typeVal.includes("ความรู้")) {
+                    contentType = "knowledge";
+                } else if (typeVal.includes("narr") || typeVal.includes("เล่าเรื่อง")) {
+                    contentType = "narrative";
+                } else if (typeVal.includes("supp") || typeVal.includes("สนับสนุน")) {
+                    contentType = "supporting";
+                }
+            }
+
+            if (cells.length > 3 && cells[3]) {
+                publishedDate = cells[3];
+            }
+        }
+
+        const isExcluded = isLegacyExcluded(slug, rawUrl);
+        
+        let suggestedAction: LegacyArticleRow["suggestedAction"] = "Create Shell";
+        let matchedProjectId: string | undefined = undefined;
+
+        if (isExcluded) {
+            suggestedAction = "Excluded";
+        } else {
+            const match = findExistingMatch(title, slug, rawUrl, writingProjects);
+            if (match) {
+                suggestedAction = "Already exists";
+                matchedProjectId = match.id;
+            } else if (!title || !slug) {
+                suggestedAction = "Needs review";
+            }
+        }
+
+        result.rows.push({
+            index: i,
+            title,
+            slug,
+            publishedUrl: rawUrl || `/library/${slug}`,
+            contentType,
+            publishedDate,
+            sourceLocation: "website",
+            suggestedAction,
+            matchedProjectId,
+            rawLine
+        });
     }
 
     return result;

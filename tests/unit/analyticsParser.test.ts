@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAnalyticsData, generateSnapshotPayload, parseGA4BackfillData, normalizeBounceRate } from "@/lib/analyticsParser";
+import { parseAnalyticsData, generateSnapshotPayload, parseGA4BackfillData, normalizeBounceRate, parseLegacyRegistryData, extractAndNormalizeSlug, isLegacyExcluded } from "@/lib/analyticsParser";
 import { validatePayload, SUPPORTED_SCHEMA_VERSION, SCHEMA_UPDATE_VERSION } from "@/lib/arborInboxSchema";
 import { parseArticleMarkdown } from "@/lib/articleParser";
 
@@ -564,6 +564,85 @@ Total	รวมทั้งหมด	9570	8559	17128	0.45	35
             expect(normalizeBounceRate("28.5%")).toBe("28.5%");
             expect(normalizeBounceRate("28.5")).toBe("28.5%");
             expect(normalizeBounceRate("0.285")).toBe("28.5%");
+        });
+
+        it("should parse report with a summary block before the article table and skip summary rows", () => {
+            const reportWithSummaryBlock = `
+# GA4 Report
+วันที่เริ่มต้น: 2026-06-01
+วันที่สิ้นสุด: 2026-06-30
+
+ผู้ใช้ที่ใช้งานอยู่	ผู้ใช้ใหม่	จำนวนเหตุการณ์
+500	450	1200
+
+ชื่อหน้าเว็บและคลาสหน้าจอ	เส้นทางหน้าเว็บ	จำนวนการดู	ผู้ใช้ที่ใช้งานอยู่	จำนวนเหตุการณ์	อัตราตีกลับ
+คลังความรู้ | ไซโตไคนินคืออะไร	/library/cytokinin-guide	10	10	28	0.9
+`;
+            const result = parseGA4BackfillData(reportWithSummaryBlock, mockProjects);
+            expect(result.warning).toBeUndefined();
+            expect(result.rows).toHaveLength(1);
+            expect(result.rows[0].pageTitle).toBe("คลังความรู้ | ไซโตไคนินคืออะไร");
+        });
+
+        it("should return 0 rows and warning when the report has only summary block and no article table", () => {
+            const reportWithOnlySummary = `
+# GA4 Report
+วันที่เริ่มต้น: 2026-06-01
+วันที่สิ้นสุด: 2026-06-30
+
+ผู้ใช้ที่ใช้งานอยู่	ผู้ใช้ใหม่	จำนวนเหตุการณ์
+500	450	1200
+`;
+            const result = parseGA4BackfillData(reportWithOnlySummary, mockProjects);
+            expect(result.rows).toHaveLength(0);
+            expect(result.warning).toBe("ไม่พบตารางบทความ กรุณาวาง section ที่เริ่มจาก ชื่อหน้าเว็บและคลาสหน้าจอ");
+        });
+    });
+
+    describe("Legacy Article Registry Importer", () => {
+        const mockProjects = [
+            { id: "PROJ-1", title: "ไซโตไคนิน Guide", slug: "plant-cytokinin-guide", notes: JSON.stringify({ published_url: "https://greenfineness.com/library/plant-cytokinin-guide" }) },
+            { id: "PROJ-2", title: "สารอาหารพืช", slug: "plant-nutrients", knowledge_slug: "plant-nutrients" }
+        ];
+
+        it("should parse legacy article rows from URL list", () => {
+            const raw = `
+https://greenfineness.com/library/plant-cytokinin-guide
+/library/plant-hormones-intro
+            `;
+            const result = parseLegacyRegistryData(raw, mockProjects);
+            expect(result.rows).toHaveLength(2);
+            expect(result.rows[0].slug).toBe("plant-cytokinin-guide");
+            expect(result.rows[0].suggestedAction).toBe("Already exists");
+            expect(result.rows[0].matchedProjectId).toBe("PROJ-1");
+
+            expect(result.rows[1].slug).toBe("plant-hormones-intro");
+            expect(result.rows[1].suggestedAction).toBe("Create Shell");
+        });
+
+        it("should extract slug from /library/... URL", () => {
+            expect(extractAndNormalizeSlug("https://greenfineness.com/library/some-cool-article?query=1#hash")).toBe("some-cool-article");
+            expect(extractAndNormalizeSlug("/library/another-cool-article/")).toBe("another-cool-article");
+        });
+
+        it("should exclude non-article paths", () => {
+            expect(isLegacyExcluded("contact", "https://greenfineness.com/contact")).toBe(true);
+            expect(isLegacyExcluded("about-us", "/about-us")).toBe(true);
+            expect(isLegacyExcluded("draft-preview", "/library/draft-preview")).toBe(true);
+            expect(isLegacyExcluded("real-article", "/library/real-article")).toBe(false);
+        });
+
+        it("should parse multi-column CSV data correctly", () => {
+            const csv = `
+title,url,type,date
+บทความพืชใหม่,/library/new-plant-article,knowledge,2026-06-01
+            `;
+            const result = parseLegacyRegistryData(csv, mockProjects);
+            expect(result.rows).toHaveLength(1);
+            expect(result.rows[0].title).toBe("บทความพืชใหม่");
+            expect(result.rows[0].slug).toBe("new-plant-article");
+            expect(result.rows[0].contentType).toBe("knowledge");
+            expect(result.rows[0].publishedDate).toBe("2026-06-01");
         });
     });
 });

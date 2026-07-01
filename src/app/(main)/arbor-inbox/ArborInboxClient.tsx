@@ -16,7 +16,7 @@ import {
 import { PreviewData, ImportPayload } from "@/lib/arborInboxSchema";
 import { ImportLog } from "@/lib/arborInboxStore";
 import { parseArticleMarkdown, generateUpdatePayload } from "@/lib/articleParser";
-import { parseAnalyticsData, generateSnapshotPayload, parseGA4BackfillData } from "@/lib/analyticsParser";
+import { parseAnalyticsData, generateSnapshotPayload, parseGA4BackfillData, parseLegacyRegistryData } from "@/lib/analyticsParser";
 
 export default function ArborInboxClient() {
     const [payloadText, setPayloadText] = useState("");
@@ -37,7 +37,11 @@ export default function ArborInboxClient() {
     const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
     // Markdown import mode states
-    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics" | "manual_snapshot" | "screenshot" | "ga4_backfill">("json");
+    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics" | "manual_snapshot" | "screenshot" | "ga4_backfill" | "legacy_registry">("json");
+    const [legacyRawText, setLegacyRawText] = useState("");
+    const [legacyResult, setLegacyResult] = useState<any>(null);
+    const [showExcludedLegacy, setShowExcludedLegacy] = useState(false);
+    const [batchLegacyProgress, setBatchLegacyProgress] = useState<{ current: number; total: number; active: boolean; log: string[] } | null>(null);
     const [markdownText, setMarkdownText] = useState("");
     const [parsedResult, setParsedResult] = useState<any>(null);
     const [writingProjects, setWritingProjects] = useState<any[]>([]);
@@ -109,6 +113,236 @@ export default function ArborInboxClient() {
     const [analyticsNote, setAnalyticsNote] = useState("");
     const [analyticsResult, setAnalyticsResult] = useState<any>(null);
     const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
+
+    const handleParseLegacyRegistry = (textToParse: string) => {
+        if (!textToParse.trim()) return;
+        const result = parseLegacyRegistryData(textToParse, writingProjects);
+        setLegacyResult(result);
+        setStatusMessage({
+            type: "success",
+            text: `สแกนพบแถวบทความเก่า ${result.rows.length} รายการ (พร้อมนำเข้า: ${result.rows.filter(r => r.suggestedAction === "Create Shell").length} รายการ)`
+        });
+    };
+
+    const handleCreateLegacyShell = async (row: any) => {
+        if (row.suggestedAction === "Already exists") {
+            setStatusMessage({ type: "error", text: "บทความนี้มีอยู่ในระบบแล้ว" });
+            return false;
+        }
+
+        setLoading(true);
+        setStatusMessage(null);
+
+        const notesObj = {
+            legacySource: true,
+            migrationStatus: "shell_created",
+            sourceLocation: "website",
+            originalSlug: row.slug,
+            originalPublishedUrl: row.publishedUrl,
+            bodyMigrationStatus: "not_migrated",
+            published_url: row.publishedUrl,
+            performanceFeedback: {
+                publishingRecord: {
+                    publishedUrl: row.publishedUrl,
+                    publishedDate: row.publishedDate || new Date().toISOString().split("T")[0]
+                }
+            }
+        };
+
+        const postBody: Record<string, any> = {
+            title: row.title,
+            slug: row.slug,
+            writing_mode: "knowledge_article",
+            status: "legacy_published",
+            notes: JSON.stringify(notesObj)
+        };
+
+        if (row.contentType === "knowledge") {
+            postBody.knowledge_title = row.title;
+            postBody.knowledge_slug = row.slug;
+            postBody.knowledge_status = "legacy_published";
+        } else if (row.contentType === "narrative") {
+            postBody.narrative_title = row.title;
+            postBody.narrative_slug = row.slug;
+            postBody.narrative_status = "legacy_published";
+        } else {
+            postBody.knowledge_title = row.title;
+            postBody.knowledge_slug = row.slug;
+            postBody.knowledge_status = "legacy_published";
+        }
+
+        try {
+            const res = await fetch("/api/content/writing-lab/projects", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(postBody)
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to create legacy shell project");
+            }
+
+            const updatedProjects = await fetch("/api/content/writing-lab/projects").then(r => r.json());
+            if (Array.isArray(updatedProjects)) {
+                setWritingProjects(updatedProjects);
+            }
+
+            setLegacyResult((prev: any) => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    rows: prev.rows.map((r: any) => {
+                        if (r.index === row.index) {
+                            return {
+                                ...r,
+                                suggestedAction: "Already exists",
+                                matchedProjectId: data.id
+                            };
+                        }
+                        return r;
+                    })
+                };
+            });
+
+            setStatusMessage({
+                type: "success",
+                text: `สร้าง Shell Project สำหรับ "${row.title}" สำเร็จ! ID: ${data.id}`
+            });
+            return true;
+        } catch (err: any) {
+            setStatusMessage({
+                type: "error",
+                text: `เกิดข้อผิดพลาดในการสร้าง Shell: ${err.message}`
+            });
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBatchCreateLegacyShells = async () => {
+        if (!legacyResult || legacyResult.rows.length === 0) return;
+
+        const rowsToCreate = legacyResult.rows.filter((row: any) => row.suggestedAction === "Create Shell");
+        if (rowsToCreate.length === 0) {
+            setStatusMessage({
+                type: "error",
+                text: "ไม่มีบทความสถานะ Create Shell ในขณะนี้"
+            });
+            return;
+        }
+
+        setBatchLegacyProgress({
+            current: 0,
+            total: rowsToCreate.length,
+            active: true,
+            log: ["เริ่มการสร้าง Shell Projects แบบกลุ่ม..."]
+        });
+
+        setStatusMessage(null);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < rowsToCreate.length; i++) {
+            const row = rowsToCreate[i];
+            
+            const notesObj = {
+                legacySource: true,
+                migrationStatus: "shell_created",
+                sourceLocation: "website",
+                originalSlug: row.slug,
+                originalPublishedUrl: row.publishedUrl,
+                bodyMigrationStatus: "not_migrated",
+                published_url: row.publishedUrl,
+                performanceFeedback: {
+                    publishingRecord: {
+                        publishedUrl: row.publishedUrl,
+                        publishedDate: row.publishedDate || new Date().toISOString().split("T")[0]
+                    }
+                }
+            };
+
+            const postBody: Record<string, any> = {
+                title: row.title,
+                slug: row.slug,
+                writing_mode: "knowledge_article",
+                status: "legacy_published",
+                notes: JSON.stringify(notesObj)
+            };
+
+            if (row.contentType === "knowledge") {
+                postBody.knowledge_title = row.title;
+                postBody.knowledge_slug = row.slug;
+                postBody.knowledge_status = "legacy_published";
+            } else if (row.contentType === "narrative") {
+                postBody.narrative_title = row.title;
+                postBody.narrative_slug = row.slug;
+                postBody.narrative_status = "legacy_published";
+            } else {
+                postBody.knowledge_title = row.title;
+                postBody.knowledge_slug = row.slug;
+                postBody.knowledge_status = "legacy_published";
+            }
+
+            try {
+                const res = await fetch("/api/content/writing-lab/projects", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(postBody)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed");
+
+                successCount++;
+                setBatchLegacyProgress(prev => prev ? {
+                    ...prev,
+                    current: i + 1,
+                    log: [...prev.log, `✅ สร้าง Shell "${row.title}" สำเร็จ`]
+                } : null);
+
+                setLegacyResult((prev: any) => {
+                    if (!prev) return null;
+                    return {
+                        ...prev,
+                        rows: prev.rows.map((r: any) => {
+                            if (r.index === row.index) {
+                                return {
+                                    ...r,
+                                    suggestedAction: "Already exists",
+                                    matchedProjectId: data.id
+                                };
+                            }
+                            return r;
+                        })
+                    };
+                });
+            } catch (err: any) {
+                failCount++;
+                setBatchLegacyProgress(prev => prev ? {
+                    ...prev,
+                    current: i + 1,
+                    log: [...prev.log, `❌ สร้าง Shell "${row.title}" ล้มเหลว (${err.message})`]
+                } : null);
+            }
+        }
+
+        setBatchLegacyProgress(prev => prev ? {
+            ...prev,
+            active: false,
+            log: [...prev.log, `🎉 เสร็จสิ้นการสร้างแบบกลุ่ม: สำเร็จ ${successCount} รายการ, ล้มเหลว ${failCount} รายการ`]
+        } : null);
+
+        const updatedProjects = await fetch("/api/content/writing-lab/projects").then(r => r.json());
+        if (Array.isArray(updatedProjects)) {
+            setWritingProjects(updatedProjects);
+        }
+
+        setStatusMessage({
+            type: successCount > 0 ? "success" : "error",
+            text: `ดำเนินการสร้าง Shell สำเร็จ ${successCount} รายการ, ล้มเหลว ${failCount} รายการ`
+        });
+    };
 
     const handleParseGA4Backfill = (textToParse: string) => {
         if (!textToParse.trim()) return;
@@ -1213,6 +1447,16 @@ export default function ArborInboxClient() {
                         >
                             GA4 Backfill
                         </button>
+                        <button
+                            onClick={() => setImportMode("legacy_registry")}
+                            className={`flex-1 min-w-[120px] py-1.5 text-xs font-black rounded-xl transition-all ${
+                                importMode === "legacy_registry"
+                                    ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
+                                    : "text-theme-muted hover:text-theme-primary"
+                            }`}
+                        >
+                            Legacy Registry
+                        </button>
                     </div>
 
                     {importMode === "json" && (
@@ -1974,87 +2218,71 @@ export default function ArborInboxClient() {
                                 </div>
 
                                 {screenshotType === "ga4_article" ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Page Title (หัวข้อโพสต์/เพจ)</label>
-                                            <input
-                                                type="text"
-                                                value={ssGa4Title}
-                                                onChange={(e) => setSsGa4Title(e.target.value)}
-                                                placeholder="เช่น EP.10.3 Cytokinin guide"
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
-                                            />
+                                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(520px,_1.1fr)_minmax(460px,_0.9fr)] gap-8 items-start">
+                                        <div className="space-y-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-theme-muted uppercase">Page Title (หัวข้อโพสต์/เพจ)</label>
+                                                <input
+                                                    type="text"
+                                                    value={ssGa4Title}
+                                                    onChange={(e) => setSsGa4Title(e.target.value)}
+                                                    placeholder="เช่น EP.10.3 Cytokinin guide"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-theme-muted uppercase">Page Path / URL (ลิงก์บทความ)</label>
+                                                <input
+                                                    type="text"
+                                                    value={ssGa4Path}
+                                                    onChange={(e) => setSsGa4Path(e.target.value)}
+                                                    placeholder="/library/..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Page Path / URL (ลิงก์บทความ)</label>
-                                            <input
-                                                type="text"
-                                                value={ssGa4Path}
-                                                onChange={(e) => setSsGa4Path(e.target.value)}
-                                                placeholder="/library/..."
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold text-theme-primary outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Views (จำนวนการดู)</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={ssGa4Views}
-                                                onChange={(e) => setSsGa4Views(e.target.value)}
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Active Users (ผู้ใช้ที่ใช้งานอยู่)</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={ssGa4Users}
-                                                onChange={(e) => setSsGa4Users(e.target.value)}
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Average Engagement Time (เวลาเฉลี่ยวินาที)</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="any"
-                                                value={ssGa4EngTime}
-                                                onChange={(e) => setSsGa4EngTime(e.target.value)}
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Event Count (จำนวนเหตุการณ์)</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={ssGa4Events}
-                                                onChange={(e) => setSsGa4Events(e.target.value)}
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Bounce Rate (อัตราการตีกลับ - %)</label>
-                                            <input
-                                                type="text"
-                                                placeholder="เช่น 28.5"
-                                                value={ssGa4Bounce}
-                                                onChange={(e) => setSsGa4Bounce(e.target.value)}
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Source / Medium (แหล่งที่มา/สื่อ)</label>
-                                            <input
-                                                type="text"
-                                                placeholder="เช่น organic / google"
-                                                value={ssGa4SrcMed}
-                                                onChange={(e) => setSsGa4SrcMed(e.target.value)}
-                                                className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
-                                            />
+                                        <div className="grid grid-cols-2 gap-4 text-xs">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-theme-muted uppercase">Views</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={ssGa4Views}
+                                                    onChange={(e) => setSsGa4Views(e.target.value)}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-theme-muted uppercase">Active Users</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={ssGa4Users}
+                                                    onChange={(e) => setSsGa4Users(e.target.value)}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-theme-muted uppercase">Avg Engagement Time</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="any"
+                                                    value={ssGa4EngTime}
+                                                    onChange={(e) => setSsGa4EngTime(e.target.value)}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-theme-muted uppercase">Event Count</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={ssGa4Events}
+                                                    onChange={(e) => setSsGa4Events(e.target.value)}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-medium focus:outline-none"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
@@ -2078,7 +2306,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Reach / Views (คนเข้าถึง)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Reach / Views</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -2088,7 +2316,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Engagement (ยอดมีส่วนร่วม)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Engagement</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -2098,7 +2326,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Reactions (ความรู้สึก)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Reactions</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -2108,7 +2336,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Comments (ความคิดเห็น)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Comments</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -2118,7 +2346,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Shares (ยอดแชร์)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Shares</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -2128,7 +2356,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Link Clicks (คลิกลิงก์)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Link Clicks</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -2138,7 +2366,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Photo Views (ดูรูป)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Photo Views</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -2148,7 +2376,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Other Clicks (คลิกอื่น)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Other Clicks</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -2158,7 +2386,7 @@ export default function ArborInboxClient() {
                                             />
                                         </div>
                                         <div className="space-y-1 col-span-2">
-                                            <label className="text-[9px] font-black text-theme-muted uppercase">Published Date (วันที่โพสต์)</label>
+                                            <label className="text-[9px] font-black text-theme-muted uppercase">Published Date</label>
                                             <input
                                                 type="date"
                                                 value={ssPublishedDate}
@@ -2254,6 +2482,38 @@ export default function ArborInboxClient() {
                             >
                                 <ArrowPathIcon className="w-4 h-4" />
                                 Parse & Preview GA4 Report
+                            </button>
+                        </div>
+                    )}
+
+                    {importMode === "legacy_registry" && (
+                        <div className="space-y-4">
+                            <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-2xl text-[11px] text-blue-700 dark:text-blue-400 font-bold space-y-1">
+                                <div>ℹ️ Legacy Article Registry</div>
+                                <div className="text-[10px] text-theme-muted font-medium">
+                                    ใช้สำหรับขึ้นทะเบียนรายการบทความเดิมในระบบ เพื่อปูทางสร้าง Shell Projects ไว้จับคู่รายงานประสิทธิภาพ
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                    Pasted Articles list (วางหัวเรื่อง / URL / CSV ที่นี่) <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={legacyRawText}
+                                    onChange={(e) => setLegacyRawText(e.target.value)}
+                                    rows={8}
+                                    placeholder="ตัวอย่าง:&#10;/library/plant-cytokinin-guide&#10;หรือในรูปแบบ CSV:&#10;ไซโตไคนินคืออะไร,/library/plant-cytokinin-guide,knowledge,2026-06-01"
+                                    className="w-full bg-theme-input border border-theme-border rounded-2xl p-4 text-xs font-mono text-theme-primary outline-none focus:border-theme-primary/30 transition-all resize-y"
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => handleParseLegacyRegistry(legacyRawText)}
+                                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/15"
+                            >
+                                <ArrowPathIcon className="w-4 h-4" />
+                                Parse & Preview Legacy Articles
                             </button>
                         </div>
                     )}
@@ -2532,6 +2792,9 @@ export default function ArborInboxClient() {
                             <p className="text-xs text-theme-muted mt-1">
                                 ช่วงเวลาข้อมูล: {backfillResult.dateRangeStart || "ไม่ระบุ"} ถึง {backfillResult.dateRangeEnd || "ไม่ระบุ"} (Snapshot Date: {backfillDate})
                             </p>
+                            <p className="text-xs text-blue-600 dark:text-blue-400 font-bold mt-1.5 flex items-center gap-1">
+                                💡 Tip: หากพบแถวขึ้นเตือน "Needs Target" เป็นจำนวนมาก แนะนำให้ลงทะเบียนบทความเก่าในเมนู <strong>Legacy Registry</strong> ก่อนนำเข้าสถิติ
+                            </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-4">
                             <label className="flex items-center gap-2 text-xs font-bold text-theme-secondary cursor-pointer">
@@ -2779,6 +3042,131 @@ export default function ArborInboxClient() {
                                                             Apply
                                                         </button>
                                                     </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {importMode === "legacy_registry" && legacyResult && (
+                <div className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm flex flex-col gap-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-theme-border/40 pb-4">
+                        <div>
+                            <h2 className="text-lg font-black text-theme-primary">
+                                รายชื่อบทความเดิมเตรียมขึ้นทะเบียน (Legacy Article Registry Preview)
+                            </h2>
+                            <p className="text-xs text-theme-muted mt-1">
+                                ตรวจพบทั้งหมด {legacyResult.rows.length} รายการ (พร้อมลงทะเบียนสร้าง Shell: {legacyResult.rows.filter((r: any) => r.suggestedAction === "Create Shell").length} รายการ)
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <label className="flex items-center gap-2 text-xs font-bold text-theme-secondary cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={showExcludedLegacy}
+                                    onChange={(e) => setShowExcludedLegacy(e.target.checked)}
+                                    className="rounded border-theme-border text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                />
+                                Show Excluded / Already Exists (แสดงส่วนที่ข้าม/มีอยู่แล้ว)
+                            </label>
+                            
+                            <button
+                                onClick={handleBatchCreateLegacyShells}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/15"
+                                disabled={batchLegacyProgress?.active}
+                            >
+                                <CheckCircleIcon className="w-4 h-4" />
+                                Batch Create Shells (สร้าง Shell ทั้งหมดที่เลือก)
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Batch Legacy Import Progress Bar Console */}
+                    {batchLegacyProgress && (
+                        <div className="p-4 bg-theme-input/40 border border-theme-border rounded-2xl space-y-3 font-mono text-xs">
+                            <div className="flex items-center justify-between font-bold">
+                                <span className={batchLegacyProgress.active ? "text-blue-500 animate-pulse" : "text-green-500"}>
+                                    {batchLegacyProgress.active ? "กำลังสร้าง Shell Projects..." : "ดำเนินการเสร็จสิ้น"}
+                                </span>
+                                <span>{batchLegacyProgress.current} / {batchLegacyProgress.total}</span>
+                            </div>
+                            <div className="w-full bg-theme-border/40 h-2.5 rounded-full overflow-hidden">
+                                <div 
+                                    className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                                    style={{ width: `${(batchLegacyProgress.current / batchLegacyProgress.total) * 100}%` }}
+                                />
+                            </div>
+                            <div className="max-h-[150px] overflow-y-auto bg-theme-card border border-theme-border p-3.5 rounded-xl space-y-1.5 custom-scrollbar text-[11px] font-mono leading-relaxed font-bold">
+                                {batchLegacyProgress.log.map((logLine: string, idx: number) => (
+                                    <div key={idx} className={logLine.startsWith("❌") ? "text-red-500" : logLine.startsWith("✅") ? "text-green-500" : "text-theme-secondary"}>
+                                        {logLine}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="overflow-x-auto select-none max-w-full">
+                        <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr className="border-b border-theme-border text-theme-muted font-black uppercase tracking-wider">
+                                    <th className="py-3 px-3">Title (หัวเรื่อง)</th>
+                                    <th className="py-3 px-3">Slug (สลักบทความ)</th>
+                                    <th className="py-3 px-3">Published URL (ลิงก์เผยแพร่)</th>
+                                    <th className="py-3 px-3">Content Type (ประเภท)</th>
+                                    <th className="py-3 px-3">Suggested Action</th>
+                                    <th className="py-3 px-3 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-theme-border/30 text-theme-secondary font-medium">
+                                {legacyResult.rows
+                                    .filter((row: any) => {
+                                        if (showExcludedLegacy) return true;
+                                        return row.suggestedAction === "Create Shell" || row.suggestedAction === "Needs review";
+                                    })
+                                    .map((row: any) => {
+                                        const actionColor = 
+                                            row.suggestedAction === "Already exists"
+                                                ? "bg-green-500/10 text-green-600 border border-green-500/20"
+                                                : row.suggestedAction === "Create Shell"
+                                                ? "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                                                : row.suggestedAction === "Needs review"
+                                                ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                                                : "bg-neutral-500/10 text-neutral-500 border border-neutral-500/20";
+
+                                        return (
+                                            <tr key={row.index} className="hover:bg-theme-input/10 transition-colors">
+                                                <td className="py-3 px-3 font-bold text-theme-primary max-w-xs truncate" title={row.title}>
+                                                    {row.title || <span className="italic text-theme-muted">(ไม่มีหัวข้อ)</span>}
+                                                </td>
+                                                <td className="py-3 px-3 font-mono text-[11px] truncate max-w-[200px]" title={row.slug}>
+                                                    {row.slug || <span className="italic text-theme-muted">(ไม่มี slug)</span>}
+                                                </td>
+                                                <td className="py-3 px-3 font-mono text-[11px] text-theme-muted truncate max-w-[250px]" title={row.publishedUrl}>
+                                                    {row.publishedUrl}
+                                                </td>
+                                                <td className="py-3 px-3">
+                                                    <span className="px-2 py-0.5 rounded-lg border border-theme-border bg-theme-input/50 text-[10px] font-bold text-theme-secondary uppercase">
+                                                        {row.contentType}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-3">
+                                                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase ${actionColor}`}>
+                                                        {row.suggestedAction}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-3 text-center">
+                                                    <button
+                                                        onClick={() => handleCreateLegacyShell(row)}
+                                                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors text-[10px] disabled:bg-theme-border disabled:text-theme-muted"
+                                                        disabled={row.suggestedAction !== "Create Shell" || loading}
+                                                    >
+                                                        Create Shell
+                                                    </button>
                                                 </td>
                                             </tr>
                                         );
