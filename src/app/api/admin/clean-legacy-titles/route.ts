@@ -13,32 +13,52 @@ export async function POST(req: Request) {
         const changes: any[] = [];
 
         for (const project of projects) {
-            const match = project.title.match(prefixRegex);
-            if (match) {
-                const legacyId = match[1];
-                const cleanTitle = project.title.replace(prefixRegex, "");
-
-                let parsedNotes: any = {};
-                if (project.notes) {
-                    try {
-                        parsedNotes = JSON.parse(project.notes);
-                    } catch (e) {
-                        parsedNotes = { legacyNotesText: project.notes };
-                    }
+            let parsedNotes: any = {};
+            if (project.notes) {
+                try {
+                    parsedNotes = JSON.parse(project.notes);
+                } catch (e) {
+                    parsedNotes = { legacyNotesText: project.notes };
                 }
+            }
+
+            const titleMatch = project.title.match(prefixRegex);
+            const origTitleMatch = typeof parsedNotes.originalTitle === "string" ? parsedNotes.originalTitle.match(prefixRegex) : null;
+            const dispTitleMatch = typeof parsedNotes.displayTitle === "string" ? parsedNotes.displayTitle.match(prefixRegex) : null;
+            const canonTitleMatch = typeof parsedNotes.canonicalTitle === "string" ? parsedNotes.canonicalTitle.match(prefixRegex) : null;
+            const epCodeMatch = typeof parsedNotes.episodeCode === "string" ? parsedNotes.episodeCode.match(prefixRegex) : null;
+
+            const hasPrefix = titleMatch || origTitleMatch || dispTitleMatch || canonTitleMatch || epCodeMatch;
+
+            if (hasPrefix) {
+                const legacyId = (titleMatch || origTitleMatch || dispTitleMatch || canonTitleMatch || epCodeMatch)![1];
+                const cleanTitle = project.title.replace(prefixRegex, "");
 
                 const updatedNotes = {
                     ...parsedNotes,
                     legacyId: parsedNotes.legacyId || legacyId,
-                    originalTitle: parsedNotes.originalTitle || project.title
+                    originalTitle: typeof parsedNotes.originalTitle === "string" ? parsedNotes.originalTitle.replace(prefixRegex, "") : undefined,
+                    displayTitle: typeof parsedNotes.displayTitle === "string" ? parsedNotes.displayTitle.replace(prefixRegex, "") : undefined,
+                    canonicalTitle: typeof parsedNotes.canonicalTitle === "string" ? parsedNotes.canonicalTitle.replace(prefixRegex, "") : undefined,
+                    episodeCode: typeof parsedNotes.episodeCode === "string" ? parsedNotes.episodeCode.replace(prefixRegex, "") : undefined,
                 };
+
+                if (updatedNotes.originalTitle === undefined) delete updatedNotes.originalTitle;
+                if (updatedNotes.displayTitle === undefined) delete updatedNotes.displayTitle;
+                if (updatedNotes.canonicalTitle === undefined) delete updatedNotes.canonicalTitle;
+                if (updatedNotes.episodeCode === undefined) delete updatedNotes.episodeCode;
+
+                if (!updatedNotes.originalTitle) {
+                    updatedNotes.originalTitle = project.title;
+                }
 
                 changes.push({
                     projectId: project.id,
                     oldTitle: project.title,
                     newTitle: cleanTitle,
                     legacyId,
-                    updatedNotes
+                    updatedNotes,
+                    isTitlePrefixed: !!titleMatch
                 });
             }
         }

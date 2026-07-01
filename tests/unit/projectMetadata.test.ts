@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { parseProjectMetadata } from "../../src/lib/projectMetadata";
+import { 
+    parseProjectMetadata, 
+    getCleanDisplayTitle, 
+    getEpisodeCode, 
+    getAssetType, 
+    getLegacyId 
+} from "../../src/lib/projectMetadata";
 
-describe("parseProjectMetadata", () => {
+describe("parseProjectMetadata and Helpers", () => {
     it("should handle clean projects without episode or metadata notes", () => {
         const project = {
             title: "ไซโตไคนินและจิ๊บเบอเรลลิน",
@@ -23,6 +29,29 @@ describe("parseProjectMetadata", () => {
         const meta = parseProjectMetadata(project);
         expect(meta.episodeCode).toBe("EP.7");
         expect(meta.displayTitle).toBe("EP.7 — ไซโตไคนินและจิ๊บเบอเรลลิน");
+    });
+
+    it("should NOT extract episodeCode from hash/legacy IDs (length > 2)", () => {
+        const project = {
+            title: "EP.9.2 เมื่อใบสร้างอาหารผ่านปากใบ",
+            writing_mode: "knowledge_article",
+            episode_id: "EP-DFE07090"
+        };
+        const epCode = getEpisodeCode(project);
+        expect(epCode).toBeUndefined();
+        
+        const cleanTitle = getCleanDisplayTitle(project);
+        expect(cleanTitle).toBe("EP.9.2 เมื่อใบสร้างอาหารผ่านปากใบ");
+    });
+
+    it("should extract legacyId from hash/legacy IDs (length > 2)", () => {
+        const project = {
+            title: "EP.9.2 เมื่อใบสร้างอาหารผ่านปากใบ",
+            writing_mode: "knowledge_article",
+            id: "EP-DFE07090"
+        };
+        const legacyId = getLegacyId(project);
+        expect(legacyId).toBe("07090");
     });
 
     it("should parse legacy IDs and clean visible titles with numeric prefixes", () => {

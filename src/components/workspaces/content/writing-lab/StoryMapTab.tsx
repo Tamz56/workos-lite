@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { ChevronRight, Layers, FileText, Share2, Plus, MoreVertical, Archive, Trash2, Eye, EyeOff } from "lucide-react";
 import CreateEpisodeModal from "./CreateEpisodeModal";
+import { getCleanDisplayTitle, getLegacyId } from "@/lib/projectMetadata";
 
 interface StoryMapTabProps {
     storySets: any[];
@@ -11,17 +12,9 @@ interface StoryMapTabProps {
     onSelectEpisode: (id: string) => void;
 }
 
-// Helper to format title to "07 — Title" if it doesn't already start with numbering
+// Helper to format title cleanly
 const formatEpisodeTitle = (id: string, title: string) => {
-    const prefixRegex = /^(\d+)\s*—\s*/;
-    let cleanTitle = title.replace(prefixRegex, "");
-
-    if (/^\d+/.test(cleanTitle)) return cleanTitle;
-    const match = id.match(/E(\d+)$/i) || id.match(/(\d+)$/);
-    if (match) {
-        return `${Number(match[1])} — ${cleanTitle}`;
-    }
-    return cleanTitle;
+    return getCleanDisplayTitle({ id, title });
 };
 
 export default function StoryMapTab({ storySets, loading, onRefresh, onSelectEpisode }: StoryMapTabProps) {
@@ -133,9 +126,16 @@ export default function StoryMapTab({ storySets, loading, onRefresh, onSelectEpi
                                                       <span className={`text-xs font-bold truncate ${ep.role === 'core_episode' ? 'text-theme-primary' : 'text-theme-secondary'} ${ep.status === 'archived' ? 'opacity-50 italic' : ''}`}>
                                                          {formatEpisodeTitle(ep.id, ep.title)} {ep.status === 'archived' && "(Archived)"}
                                                       </span>
-                                                      {ep.role !== 'core_episode' && (
-                                                         <span className="text-[9px] text-theme-muted uppercase font-black tracking-tight">{ep.role.replace(/_/g, ' ')}</span>
-                                                      )}
+                                                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                                           {ep.role !== 'core_episode' && (
+                                                              <span className="text-[9px] text-theme-muted uppercase font-black tracking-tight">{ep.role.replace(/_/g, ' ')}</span>
+                                                           )}
+                                                           {getLegacyId(ep) && (
+                                                               <span className="text-[8px] text-theme-muted font-mono font-bold bg-neutral-100 dark:bg-slate-800/60 px-1 py-0.5 rounded border border-theme-border/30">
+                                                                   ID: {getLegacyId(ep)}
+                                                               </span>
+                                                           )}
+                                                       </div>
                                                  </div>
                                                  <div className="flex items-center gap-2 opacity-0 group-hover/ep:opacity-100 transition-opacity relative">
                                                       <button 

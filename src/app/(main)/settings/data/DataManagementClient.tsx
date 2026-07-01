@@ -29,10 +29,17 @@ export default function DataManagementClient() {
             if (!res.ok) throw new Error(data.error || "Failed to scan");
 
             setProposedChanges(data.proposedChanges || []);
-            setMigrationMessage({
-                type: "success",
-                text: `การแสกนพบคงเหลือแถวที่มีเลขนำหน้า: ${data.proposedChanges.length} รายการ`
-            });
+            if (!data.proposedChanges || data.proposedChanges.length === 0) {
+                setMigrationMessage({
+                    type: "success",
+                    text: "No stored title cleanup needed. Remaining numeric prefixes are display-source issues."
+                });
+            } else {
+                setMigrationMessage({
+                    type: "success",
+                    text: `การแสกนพบคงเหลือแถวที่มีเลขนำหน้า: ${data.proposedChanges.length} รายการ`
+                });
+            }
         } catch (err: any) {
             setMigrationMessage({ type: "error", text: err.message });
         } finally {

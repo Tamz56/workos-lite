@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { validatePayload } from "@/lib/arborInboxSchema";
 import ArticleCommandPanel from "@/components/workspaces/content/writing-lab/ArticleCommandPanel";
-import { parseProjectMetadata, ASSET_TYPE_LABELS, ASSET_TYPE_COLORS } from "@/lib/projectMetadata";
+import { parseProjectMetadata, ASSET_TYPE_LABELS, ASSET_TYPE_COLORS, getCleanDisplayTitle } from "@/lib/projectMetadata";
 
 interface WritingProject {
     id: string;
@@ -324,7 +324,8 @@ export default function WritingStudioTab({
     // Sync state when activeProject changes
     useEffect(() => {
         if (activeProject) {
-            setWorkingTitle(activeProject.title || "");
+            const meta = parseProjectMetadata(activeProject);
+            setWorkingTitle(meta.canonicalTitle || activeProject.title || "");
             setSlug(activeProject.slug || "");
             setShortSummary(activeProject.summary || "");
             setMetaTitle(activeProject.meta_title || "");
@@ -339,7 +340,6 @@ export default function WritingStudioTab({
             setNarrativeBody(activeProject.narrative_body || "");
             setKnowledgeBody(activeProject.knowledge_body || "");
 
-            const meta = parseProjectMetadata(activeProject);
             setEpisodeCode(meta.episodeCode || "");
             setCanonicalTitle(meta.canonicalTitle || meta.originalTitle || "");
             setAssetType(meta.assetType || "unknown");
@@ -1454,7 +1454,7 @@ export default function WritingStudioTab({
                                 placeholder="Edit working title..."
                             />
                         ) : activeEpisode ? (
-                            <h2 className="text-xl font-black text-theme-primary">{activeEpisode.title}</h2>
+                            <h2 className="text-xl font-black text-theme-primary">{getCleanDisplayTitle(activeEpisode)}</h2>
                         ) : (
                             <h2 className="text-xl font-black text-theme-primary italic">Select an episode to edit</h2>
                         )}
@@ -1465,9 +1465,14 @@ export default function WritingStudioTab({
                             </span>
                         )}
                     </div>
-                    {activeEpisode && (
-                        <p className="text-xs text-theme-muted font-bold">
-                            Original: {activeEpisode.title} · Story Set: {activeEpisode.story_set_title}
+                    {activeProject && (
+                        <p className="text-[10px] text-theme-muted font-mono font-bold mt-1">
+                            Project ID: {activeProject.id} {legacyId && `· Legacy ID: ${legacyId}`} {sourceLocation && `· Source: ${sourceLocation}`}
+                        </p>
+                    )}
+                    {activeEpisode && !activeProject && (
+                        <p className="text-xs text-theme-muted font-bold mt-1">
+                            Original: {getCleanDisplayTitle(activeEpisode)} · Story Set: {activeEpisode.story_set_title}
                         </p>
                     )}
                 </div>
@@ -1482,7 +1487,7 @@ export default function WritingStudioTab({
                         >
                             <option value="">Select Episode...</option>
                             {allEpisodes.map(ep => (
-                                <option key={ep.id} value={ep.id}>{ep.title}</option>
+                                <option key={ep.id} value={ep.id}>{getCleanDisplayTitle(ep)}</option>
                             ))}
                         </select>
                         <ChevronDown className="w-3.5 h-3.5 text-theme-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />

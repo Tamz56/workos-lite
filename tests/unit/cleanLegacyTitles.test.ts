@@ -13,23 +13,25 @@ describe("clean-legacy-titles prefix matching and metadata update logic", () => 
         expect(cleanTitle).toBe("EP.9.2 Cytokinin Guide");
     });
 
-    it("should merge extracted legacyId and originalTitle into notes JSON", () => {
-        const title = "5773 — EP.10.1 Auxin Guide";
-        const legacyId = "5773";
-        const cleanTitle = title.replace(prefixRegex, "");
-        
-        const existingNotes = {
-            someKey: "someValue"
+    it("should scan and clean multiple notes fields like displayTitle, canonicalTitle, and episodeCode", () => {
+        const parsedNotes = {
+            legacyId: "5773",
+            displayTitle: "5773 — EP.10.1 Auxin Guide",
+            canonicalTitle: "5773 — EP.10.1 Auxin Guide",
+            episodeCode: "5773 — EP.10.1"
         };
 
         const updatedNotes = {
-            ...existingNotes,
-            legacyId,
-            originalTitle: title
+            ...parsedNotes,
+            originalTitle: "5773 — EP.10.1 Auxin Guide",
+            displayTitle: parsedNotes.displayTitle.replace(prefixRegex, ""),
+            canonicalTitle: parsedNotes.canonicalTitle.replace(prefixRegex, ""),
+            episodeCode: parsedNotes.episodeCode.replace(prefixRegex, "")
         };
 
-        expect(updatedNotes.legacyId).toBe("5773");
+        expect(updatedNotes.displayTitle).toBe("EP.10.1 Auxin Guide");
+        expect(updatedNotes.canonicalTitle).toBe("EP.10.1 Auxin Guide");
+        expect(updatedNotes.episodeCode).toBe("EP.10.1");
         expect(updatedNotes.originalTitle).toBe("5773 — EP.10.1 Auxin Guide");
-        expect(updatedNotes.someKey).toBe("someValue");
     });
 });

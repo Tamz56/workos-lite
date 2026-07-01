@@ -39,6 +39,100 @@ export const ASSET_TYPE_COLORS: Record<string, string> = {
     unknown: "bg-neutral-50 text-neutral-500 border-neutral-150 dark:bg-neutral-500/10 dark:text-neutral-400 dark:border-neutral-500/25"
 };
 
+export function getEpisodeCode(project: any): string | undefined {
+    if (!project) return undefined;
+    let notesData: any = {};
+    if (project.notes) {
+        try {
+            notesData = JSON.parse(project.notes);
+        } catch (e) {}
+    }
+    if (notesData.episodeCode) return notesData.episodeCode;
+
+    const epId = project.episode_id || project.id;
+    if (epId) {
+        // Match short digits at the end (1 or 2 digits)
+        const match = epId.match(/E0?(\d{1,2})$/i);
+        if (match) {
+            return `EP.${match[1]}`;
+        }
+    }
+    return undefined;
+}
+
+export function getAssetType(project: any): "episode" | "knowledge_article" | "narrative_article" | "group_post" | "page_post" | "personal_post" | "social_image" | "ga4_snapshot" | "facebook_snapshot" | "legacy_shell" | "unknown" {
+    if (!project) return "unknown";
+    let notesData: any = {};
+    if (project.notes) {
+        try {
+            notesData = JSON.parse(project.notes);
+        } catch (e) {}
+    }
+    let assetType = notesData.assetType || "unknown";
+    if (assetType === "unknown" || !assetType) {
+        if (project.writing_mode === "knowledge_article") {
+            assetType = "knowledge_article";
+        } else if (project.writing_mode === "journey_chapter" || project.writing_mode === "knowledge_journey_article") {
+            assetType = "narrative_article";
+        } else if (project.writing_mode === "social_story_copy") {
+            assetType = "group_post";
+        }
+    }
+    if (notesData.legacySource) {
+        assetType = "legacy_shell";
+    }
+    return assetType;
+}
+
+export function getCleanDisplayTitle(project: any): string {
+    if (!project) return "";
+    let notesData: any = {};
+    if (project.notes) {
+        try {
+            notesData = JSON.parse(project.notes);
+        } catch (e) {}
+    }
+
+    const prefixRegex = /^(\d+)\s*—\s*/;
+
+    // 1. notes.displayTitle if it exists
+    if (notesData.displayTitle) {
+        return notesData.displayTitle.replace(prefixRegex, "");
+    }
+
+    // 2. notes.episodeCode + notes.canonicalTitle
+    const epCode = getEpisodeCode(project);
+    const rawTitle = project.title || "";
+    let canonicalTitle = notesData.canonicalTitle || rawTitle;
+    canonicalTitle = canonicalTitle.replace(prefixRegex, "");
+
+    if (epCode) {
+        return `${epCode} — ${canonicalTitle}`;
+    }
+
+    return canonicalTitle;
+}
+export function getLegacyId(project: any): string | undefined {
+    if (!project) return undefined;
+    let notesData: any = {};
+    if (project.notes) {
+        try {
+            notesData = JSON.parse(project.notes);
+        } catch (e) {}
+    }
+    if (notesData.legacyId) return notesData.legacyId;
+
+    const epId = project.episode_id || project.id;
+    if (epId) {
+        // Match 3 or more digits at the end of the id
+        const hashMatch = epId.match(/(?:EP-|E)(\d{3,})$/i) || epId.match(/(\d{4,})$/);
+        if (hashMatch) {
+            return hashMatch[1];
+        }
+    }
+    return undefined;
+}
+
 export function parseProjectMetadata(project: any): ProjectMetadata {
     if (!project) {
         return {
@@ -57,51 +151,19 @@ export function parseProjectMetadata(project: any): ProjectMetadata {
         }
     }
 
-    // 1. Asset Type matching
-    let assetType = notesData.assetType || "unknown";
-    if (assetType === "unknown" || !assetType) {
-        if (project.writing_mode === "knowledge_article") {
-            assetType = "knowledge_article";
-        } else if (project.writing_mode === "journey_chapter" || project.writing_mode === "knowledge_journey_article") {
-            assetType = "narrative_article";
-        } else if (project.writing_mode === "social_story_copy") {
-            assetType = "group_post";
-        }
-    }
+    const assetType = getAssetType(project);
+    const episodeCode = getEpisodeCode(project);
+    const displayTitle = getCleanDisplayTitle(project);
 
-    if (notesData.legacySource) {
-        assetType = "legacy_shell";
-    }
-
-    // 2. Episode Code extraction
-    let episodeCode = notesData.episodeCode;
-    if (!episodeCode && project.episode_id) {
-        const match = project.episode_id.match(/E0?(\d+)/);
-        if (match) {
-            episodeCode = `EP.${match[1]}`;
-        }
-    }
-
-    // 3. Legacy ID parsing & title clean up on the fly
-    let legacyId = notesData.legacyId;
+    const prefixRegex = /^(\d+)\s*—\s*/;
     const rawTitle = project.title || "";
     let canonicalTitle = notesData.canonicalTitle || rawTitle;
+    canonicalTitle = canonicalTitle.replace(prefixRegex, "");
 
-    // Detect numeric prefixes like "07090 — " or "5773 — " or "42713867 — "
-    const prefixRegex = /^(\d+)\s*—\s*/;
-    const matchPrefix = canonicalTitle.match(prefixRegex);
+    let legacyId = getLegacyId(project);
+    const matchPrefix = (notesData.canonicalTitle || rawTitle).match(prefixRegex);
     if (matchPrefix) {
         legacyId = legacyId || matchPrefix[1];
-        canonicalTitle = canonicalTitle.replace(prefixRegex, "");
-    }
-
-    // Strip prefix from raw title for displaying title nicely
-    const cleanRawTitle = rawTitle.replace(prefixRegex, "");
-
-    // 4. Formatting Display Title
-    let displayTitle = cleanRawTitle;
-    if (episodeCode) {
-        displayTitle = `${episodeCode} — ${cleanRawTitle}`;
     }
 
     return {
