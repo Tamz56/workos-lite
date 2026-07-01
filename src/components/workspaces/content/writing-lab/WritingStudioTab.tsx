@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { validatePayload } from "@/lib/arborInboxSchema";
 import ArticleCommandPanel from "@/components/workspaces/content/writing-lab/ArticleCommandPanel";
+import { parseProjectMetadata, ASSET_TYPE_LABELS, ASSET_TYPE_COLORS } from "@/lib/projectMetadata";
 
 interface WritingProject {
     id: string;
@@ -137,8 +138,18 @@ export default function WritingStudioTab({
     const [metaDescription, setMetaDescription] = useState("");
     const [keywords, setKeywords] = useState("");
 
+    // Standard Metadata states
+    const [episodeCode, setEpisodeCode] = useState("");
+    const [canonicalTitle, setCanonicalTitle] = useState("");
+    const [assetType, setAssetType] = useState<string>("unknown");
+    const [contentFamily, setContentFamily] = useState("");
+    const [contentLayer, setContentLayer] = useState("");
+    const [legacyId, setLegacyId] = useState("");
+    const [sourceLocation, setSourceLocation] = useState("");
+    const [migrationStatus, setMigrationStatus] = useState("");
+
     // Horizontal tab selector
-    const [seoMode, setSeoMode] = useState<"narrative" | "knowledge">("narrative");
+    const [seoMode, setSeoMode] = useState<"narrative" | "knowledge" | "metadata">("narrative");
 
     // Narrative SEO states
     const [narrativeTitle, setNarrativeTitle] = useState("");
@@ -327,6 +338,16 @@ export default function WritingStudioTab({
             setHashtags(activeProject.hashtags || "");
             setNarrativeBody(activeProject.narrative_body || "");
             setKnowledgeBody(activeProject.knowledge_body || "");
+
+            const meta = parseProjectMetadata(activeProject);
+            setEpisodeCode(meta.episodeCode || "");
+            setCanonicalTitle(meta.canonicalTitle || meta.originalTitle || "");
+            setAssetType(meta.assetType || "unknown");
+            setContentFamily(meta.contentFamily || "");
+            setContentLayer(meta.contentLayer || "");
+            setLegacyId(meta.legacyId || "");
+            setSourceLocation(meta.sourceLocation || "");
+            setMigrationStatus(meta.migrationStatus || "");
 
             let legacyHeroSub = "";
             let pubUrl = "";
@@ -633,6 +654,14 @@ export default function WritingStudioTab({
                 hero_subtitle: heroSubtitle,
                 published_url: publishedUrl,
                 campaign_name: campaignName,
+                episodeCode: episodeCode || undefined,
+                canonicalTitle: canonicalTitle || undefined,
+                assetType: assetType || undefined,
+                contentFamily: contentFamily || undefined,
+                contentLayer: contentLayer || undefined,
+                legacyId: legacyId || undefined,
+                sourceLocation: sourceLocation || undefined,
+                migrationStatus: migrationStatus || undefined,
                 
                 performanceFeedback: {
                     publishingRecord: {
@@ -1404,6 +1433,18 @@ export default function WritingStudioTab({
                             {resolvedEpisodeId || "No Episode"}
                         </span>
                         
+                        {episodeCode && (
+                            <span className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-blue-100/30 shrink-0">
+                                {episodeCode}
+                            </span>
+                        )}
+
+                        {assetType && assetType !== "unknown" && (
+                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border shrink-0 ${ASSET_TYPE_COLORS[assetType] || "bg-neutral-50 text-neutral-500 border-neutral-150"}`}>
+                                {ASSET_TYPE_LABELS[assetType] || assetType}
+                            </span>
+                        )}
+                        
                         {activeProject ? (
                             <input 
                                 type="text"
@@ -1872,6 +1913,17 @@ export default function WritingStudioTab({
                                             >
                                                 Knowledge Article (ความรู้)
                                             </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSeoMode("metadata")}
+                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                                                    seoMode === "metadata" 
+                                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary shadow-sm" 
+                                                        : "text-theme-secondary hover:bg-theme-hover"
+                                                }`}
+                                            >
+                                                Asset Metadata (ข้อมูลมาตรฐาน)
+                                            </button>
                                         </div>
                                     </div>
                                     <button
@@ -2048,7 +2100,7 @@ export default function WritingStudioTab({
                                                 />
                                             </div>
                                         </div>
-                                    ) : (
+                                    ) : seoMode === "knowledge" ? (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {/* Helper text */}
                                             <div className="col-span-12 md:col-span-2 bg-blue-50/40 dark:bg-blue-950/10 border border-blue-100/30 p-3.5 rounded-2xl">
@@ -2223,6 +2275,112 @@ export default function WritingStudioTab({
                                                     onChange={(e) => setKnowledgeSchemaJsonld(e.target.value)}
                                                     placeholder='{ "@context": "https://schema.org", "@type": "NewsArticle", ... }'
                                                     className="w-full min-h-[140px] bg-theme-input border border-theme-border rounded-xl p-3 text-xs font-mono mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="col-span-12 md:col-span-2 bg-indigo-50/40 dark:bg-indigo-950/10 border border-indigo-100/30 p-3.5 rounded-2xl">
+                                                <p className="text-[10px] font-bold text-indigo-800 dark:text-indigo-300">
+                                                    💡 <strong>Asset Metadata Mode:</strong> กำหนดและแก้ไขข้อมูลระบุเอกลักษณ์ของชิ้นงานตามมาตรฐาน Content Naming
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Episode Code</label>
+                                                <input
+                                                    type="text"
+                                                    value={episodeCode}
+                                                    onChange={(e) => setEpisodeCode(e.target.value)}
+                                                    placeholder="e.g. EP.9.2"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Canonical Title</label>
+                                                <input
+                                                    type="text"
+                                                    value={canonicalTitle}
+                                                    onChange={(e) => setCanonicalTitle(e.target.value)}
+                                                    placeholder="ชื่อชิ้นงานหลัก (Clean Title)..."
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Asset Type</label>
+                                                <select
+                                                    value={assetType}
+                                                    onChange={(e) => setAssetType(e.target.value)}
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80 appearance-none font-sans"
+                                                >
+                                                    <option value="unknown">Unknown</option>
+                                                    <option value="episode">Episode</option>
+                                                    <option value="knowledge_article">Knowledge Article (บทความเว็บ)</option>
+                                                    <option value="narrative_article">Narrative Article (เรื่องเล่า)</option>
+                                                    <option value="group_post">Group Post (โพสต์กลุ่ม)</option>
+                                                    <option value="page_post">Page Post (โพสต์เพจ)</option>
+                                                    <option value="personal_post">Personal Post (โพสต์ส่วนตัว)</option>
+                                                    <option value="social_image">Social Image (รูปภาพโซเชียล)</option>
+                                                    <option value="ga4_snapshot">GA4 Snapshot (สถิติ GA4)</option>
+                                                    <option value="facebook_snapshot">Facebook Snapshot (สถิติ Facebook)</option>
+                                                    <option value="legacy_shell">Legacy Shell (โครงร่างเก่า)</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Content Family</label>
+                                                <input
+                                                    type="text"
+                                                    value={contentFamily}
+                                                    onChange={(e) => setContentFamily(e.target.value)}
+                                                    placeholder="e.g. GF Content Hub, ArborDesk"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Content Layer</label>
+                                                <input
+                                                    type="text"
+                                                    value={contentLayer}
+                                                    onChange={(e) => setContentLayer(e.target.value)}
+                                                    placeholder="e.g. knowledge_article, narrative_article"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Legacy ID</label>
+                                                <input
+                                                    type="text"
+                                                    value={legacyId}
+                                                    onChange={(e) => setLegacyId(e.target.value)}
+                                                    placeholder="e.g. 07090, 5773"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Source Location</label>
+                                                <input
+                                                    type="text"
+                                                    value={sourceLocation}
+                                                    onChange={(e) => setSourceLocation(e.target.value)}
+                                                    placeholder="e.g. Google Sheets, csv-upload"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-theme-muted tracking-wider ml-1">Migration Status</label>
+                                                <input
+                                                    type="text"
+                                                    value={migrationStatus}
+                                                    onChange={(e) => setMigrationStatus(e.target.value)}
+                                                    placeholder="e.g. shell_created, migrated"
+                                                    className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs font-bold mt-1 text-theme-primary outline-none focus:border-theme-border/80"
                                                 />
                                             </div>
                                         </div>

@@ -13,6 +13,8 @@ import {
     EyeOff
 } from "lucide-react";
 
+import { parseProjectMetadata, ASSET_TYPE_LABELS, ASSET_TYPE_COLORS } from "@/lib/projectMetadata";
+
 const ROLE_COLORS: Record<string, string> = {
     core_episode: "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
     supporting_article: "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
@@ -101,19 +103,20 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
                     <thead>
                         <tr className="bg-theme-panel/50 border-b border-theme-border">
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Title</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Topic ID</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Episode Role</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Writing Mode</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Journey Stage</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Episode Code</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Asset Type</th>
+                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Content Layer</th>
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Status</th>
-                            <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Narrative Status</th>
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted">Updated At</th>
                             <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-theme-muted text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-theme-border/50">
                         {filteredProjects.map(project => {
-                            const roleColor = ROLE_COLORS[project.episode_role] || "bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-theme-panel dark:text-theme-muted dark:border-theme-border";
+                            const parsedMeta = parseProjectMetadata(project);
+                            const badgeColor = ASSET_TYPE_COLORS[parsedMeta.assetType] || "bg-neutral-50 text-neutral-500 border-neutral-150";
+                            const badgeLabel = ASSET_TYPE_LABELS[parsedMeta.assetType] || parsedMeta.assetType;
+
                             return (
                             <tr 
                                 key={project.id} 
@@ -121,41 +124,29 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
                                 className="hover:bg-theme-hover transition-colors group cursor-pointer"
                             >
                                 <td className="px-5 py-4">
-                                    <div className="font-bold text-theme-primary truncate max-w-[200px] group-hover:text-black dark:group-hover:text-white transition-colors">{project.title}</div>
+                                    <div className="font-bold text-theme-primary truncate max-w-[280px] group-hover:text-black dark:group-hover:text-white transition-colors">
+                                        {parsedMeta.displayTitle}
+                                    </div>
                                     <div className="text-[10px] text-theme-muted mt-0.5 font-mono">{project.id}</div>
                                 </td>
                                 <td className="px-5 py-4">
-                                    <div className="text-xs font-mono text-theme-secondary">{project.topic_id || "—"}</div>
+                                    <div className="text-xs font-bold text-theme-secondary">{parsedMeta.episodeCode || "—"}</div>
                                 </td>
                                 <td className="px-5 py-4">
-                                    {project.episode_role ? (
-                                        <span className={`text-[9px] font-black uppercase tracking-tight px-2 py-0.5 rounded-full border ${roleColor}`}>
-                                            {project.episode_role.replace(/_/g, ' ')}
-                                        </span>
-                                    ) : (
-                                        <span className="text-[10px] text-theme-muted/40">—</span>
-                                    )}
-                                </td>
-                                <td className="px-5 py-4">
-                                    <span className="text-[9px] font-black uppercase tracking-tight px-2 py-0.5 rounded-full bg-theme-panel text-theme-muted border border-theme-border">
-                                        {project.writing_mode?.replace(/_/g, ' ')}
+                                    <span className={`text-[9px] font-black uppercase tracking-tight px-2 py-0.5 rounded-full border ${badgeColor}`}>
+                                        {badgeLabel}
                                     </span>
                                 </td>
                                 <td className="px-5 py-4">
-                                    <div className="text-xs font-medium text-theme-secondary uppercase">{project.journey_stage || "—"}</div>
+                                    <span className="text-[9px] font-black uppercase tracking-tight px-2 py-0.5 rounded-full bg-theme-panel text-theme-muted border border-theme-border">
+                                        {parsedMeta.contentLayer?.replace(/_/g, ' ')}
+                                    </span>
                                 </td>
                                 <td className="px-5 py-4">
                                     <div className="flex items-center gap-1.5">
                                         <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'published' ? 'bg-emerald-500' : project.status === 'draft' ? 'bg-amber-400' : project.status === 'archived' ? 'bg-theme-muted/50' : 'bg-blue-500'}`} />
                                         <span className="text-[10px] font-bold text-theme-muted uppercase">{project.status}</span>
                                     </div>
-                                </td>
-                                <td className="px-5 py-4">
-                                    {project.narrative_status ? (
-                                        <span className="text-[10px] font-bold text-theme-muted uppercase">{project.narrative_status.replace(/_/g, ' ')}</span>
-                                    ) : (
-                                        <span className="text-[10px] text-theme-muted/40">—</span>
-                                    )}
                                 </td>
                                 <td className="px-5 py-4">
                                     <div className="flex items-center gap-1.5 text-theme-muted">

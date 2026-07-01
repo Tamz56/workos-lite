@@ -13,12 +13,15 @@ interface StoryMapTabProps {
 
 // Helper to format title to "07 — Title" if it doesn't already start with numbering
 const formatEpisodeTitle = (id: string, title: string) => {
-    if (/^\d+/.test(title)) return title;
+    const prefixRegex = /^(\d+)\s*—\s*/;
+    let cleanTitle = title.replace(prefixRegex, "");
+
+    if (/^\d+/.test(cleanTitle)) return cleanTitle;
     const match = id.match(/E(\d+)$/i) || id.match(/(\d+)$/);
     if (match) {
-        return `${match[1]} — ${title}`;
+        return `${Number(match[1])} — ${cleanTitle}`;
     }
-    return title;
+    return cleanTitle;
 };
 
 export default function StoryMapTab({ storySets, loading, onRefresh, onSelectEpisode }: StoryMapTabProps) {

@@ -526,6 +526,8 @@ export default function ArborInboxClient() {
 
         const notesObj = {
             legacySource: true,
+            assetType: "legacy_shell",
+            contentLayer: row.contentType === "knowledge" ? "knowledge_article" : "unknown",
             migrationStatus: "shell_created",
             sourceLocation: "website",
             originalSlug: row.slug,
@@ -648,6 +650,8 @@ export default function ArborInboxClient() {
             
             const notesObj = {
                 legacySource: true,
+                assetType: "legacy_shell",
+                contentLayer: row.contentType === "knowledge" ? "knowledge_article" : "unknown",
                 migrationStatus: "shell_created",
                 sourceLocation: "website",
                 originalSlug: row.slug,
