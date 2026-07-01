@@ -1112,7 +1112,7 @@ export default function ArborInboxClient() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-6 py-8 min-h-[calc(100vh-64px)] flex flex-col gap-8">
+        <div className="max-w-[1800px] w-full mx-auto px-6 py-8 min-h-[calc(100vh-64px)] flex flex-col gap-8">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -1149,7 +1149,7 @@ export default function ArborInboxClient() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(520px,_1.1fr)_minmax(460px,_0.9fr)] gap-8 items-start">
                 {/* Left panel: Input Area */}
                 <div className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm flex flex-col gap-4">
                     <div className="flex flex-wrap bg-theme-input rounded-2xl p-1 border border-theme-border/40 mb-2 gap-1">
@@ -2307,7 +2307,7 @@ export default function ArborInboxClient() {
                 </div>
 
                 {/* Right panel: Preview & Confirm */}
-                <div className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm flex flex-col gap-6">
+                <div className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm flex flex-col gap-6 xl:sticky xl:top-8">
                     <div className="flex items-center justify-between">
                         <h2 className="text-sm font-black uppercase tracking-wider text-theme-secondary">Preview Area</h2>
                         {isValid && preview && (
