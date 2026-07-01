@@ -407,7 +407,7 @@ describe("Screenshot-assisted Snapshot Payload Validation", () => {
                     },
                     sourceMetadata: {
                         sourceFileName: "Screenshot Upload",
-                        sourceType: "GA4",
+                        sourceType: "ga4_article",
                         snapshotWindow: "24h",
                         snapshotDate: "2026-06-29",
                         matchedBy: "manual",

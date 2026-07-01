@@ -46,7 +46,7 @@ export default function ArborInboxClient() {
 
     // Screenshot Snapshot states
     const [screenshotPreviewUrl, setScreenshotPreviewUrl] = useState("");
-    const [screenshotType, setScreenshotType] = useState("Facebook Page");
+    const [screenshotType, setScreenshotType] = useState("facebook_page_post");
     const [ssProjectId, setSsProjectId] = useState("");
     const [ssWindow, setSsWindow] = useState("24h");
     const [ssDate, setSsDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -369,10 +369,41 @@ export default function ArborInboxClient() {
         }
     };
 
+    const handleScreenshotTypeChange = (newType: string) => {
+        setScreenshotType(newType);
+        // Clear unrelated fields to prevent bleed
+        if (newType === "ga4_article") {
+            setSsFbTitle("");
+            setSsFbUrl("");
+            setSsFbViewsReach("");
+            setSsFbEngagement("");
+            setSsFbReactions("");
+            setSsFbComments("");
+            setSsFbShares("");
+            setSsFbClicks("");
+            setSsFbPhotoViews("");
+            setSsFbOtherClicks("");
+            setSsPublishedDate("");
+        } else {
+            setSsGa4Title("");
+            setSsGa4Path("");
+            setSsGa4Views("");
+            setSsGa4Users("");
+            setSsGa4EngTime("");
+            setSsGa4Events("");
+            setSsGa4Bounce("");
+            setSsGa4SrcMed("");
+        }
+
+        if (screenshotPreviewUrl) {
+            handleSimulateScreenshotExtraction(newType);
+        }
+    };
+
     const handleSimulateScreenshotExtraction = (typeSelected: string) => {
         setSsAnalyzing(true);
         setTimeout(() => {
-            if (typeSelected === "GA4") {
+            if (typeSelected === "ga4_article") {
                 setSsGa4Title("EP.10.3 Cytokinin guide - Green Fineness");
                 setSsGa4Path("/library/cytokinin-guide");
                 setSsGa4Views("350");
@@ -392,6 +423,7 @@ export default function ArborInboxClient() {
                 setSsFbClicks("5");
                 setSsFbPhotoViews("0");
                 setSsFbOtherClicks("0");
+                setSsPublishedDate("2026-06-22");
             }
             setSsAnalyzing(false);
             setStatusMessage({
@@ -431,19 +463,19 @@ export default function ArborInboxClient() {
 
         let generatedPayload: any = null;
 
-        if (screenshotType === "GA4") {
+        if (screenshotType === "ga4_article") {
             const views = parseVal(ssGa4Views);
             const activeUsers = parseVal(ssGa4Users);
             const averageEngagementTime = parseVal(ssGa4EngTime);
             const events = parseVal(ssGa4Events);
             const bounceRate = parseVal(ssGa4Bounce);
 
-            if (views <= 0 && activeUsers <= 0 && averageEngagementTime <= 0 && events <= 0 && bounceRate <= 0) {
-                setStatusMessage({ type: "error", text: "At least one GA4 metric must be greater than 0. (กรุณากรอกตัวชี้วัดประสิทธิภาพของ GA4 อย่างน้อยหนึ่งฟิลด์)" });
+            if (views <= 0 && activeUsers <= 0 && events <= 0) {
+                setStatusMessage({ type: "error", text: "At least one GA4 metric (Views, Active Users, or Event Count) must be greater than 0. (กรุณากรอกตัวชี้วัดประสิทธิภาพหลักของ GA4 อย่างน้อยหนึ่งฟิลด์ เช่น จำนวนการดู, ผู้ใช้, หรือจำนวนเหตุการณ์)" });
                 return;
             }
 
-            if (views < 0 || activeUsers < 0 || averageEngagementTime < 0 || events < 0 || bounceRate < 0) {
+            if (views < 0 || activeUsers < 0 || averageEngagementTime < 0 || events < 0) {
                 setStatusMessage({ type: "error", text: "Metrics cannot be negative. (ตัวเลขสถิติตัวชี้วัดห้ามเป็นค่าติดลบ)" });
                 return;
             }
@@ -478,7 +510,7 @@ export default function ArborInboxClient() {
 
             const sourceMetadata = {
                 sourceFileName: "Screenshot Upload",
-                sourceType: "GA4",
+                sourceType: "ga4_article",
                 snapshotWindow: ssWindow,
                 snapshotDate: ssDate,
                 matchedBy: "manual",
@@ -528,10 +560,10 @@ export default function ArborInboxClient() {
 
             let platform = "facebook_page";
             let sourceType = "facebook_page_post";
-            if (screenshotType === "Facebook Group Post") {
+            if (screenshotType === "facebook_group_post") {
                 platform = "facebook_group";
                 sourceType = "facebook_group_post";
-            } else if (screenshotType === "Personal Profile Post") {
+            } else if (screenshotType === "personal_profile_post") {
                 platform = "facebook_personal";
                 sourceType = "personal_profile_post";
             }
@@ -1639,18 +1671,13 @@ export default function ArborInboxClient() {
                                         </label>
                                         <select
                                             value={screenshotType}
-                                            onChange={(e) => {
-                                                setScreenshotType(e.target.value);
-                                                if (screenshotPreviewUrl) {
-                                                    handleSimulateScreenshotExtraction(e.target.value);
-                                                }
-                                            }}
+                                            onChange={(e) => handleScreenshotTypeChange(e.target.value)}
                                             className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
                                         >
-                                            <option value="GA4">GA4 Article</option>
-                                            <option value="Facebook Page Post">Facebook Page Post</option>
-                                            <option value="Facebook Group Post">Facebook Group Post</option>
-                                            <option value="Personal Profile Post">Personal Profile Post</option>
+                                            <option value="ga4_article">GA4 Article</option>
+                                            <option value="facebook_page_post">Facebook Page Post</option>
+                                            <option value="facebook_group_post">Facebook Group Post</option>
+                                            <option value="personal_profile_post">Personal Profile Post</option>
                                         </select>
                                     </div>
 
@@ -1712,14 +1739,14 @@ export default function ArborInboxClient() {
                             <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-3xl space-y-4 mt-3">
                                 <div className="flex items-center justify-between border-b border-theme-border/40 pb-2">
                                     <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary">
-                                        Verify & Edit Metrics (กรุณาตรวจและแก้ไขค่าตัวเลขด้วยตนเอง)
+                                        {screenshotType === "ga4_article" ? "Verify & Edit GA4 Article Metrics" : "Verify & Edit Facebook Post Metrics"}
                                     </h4>
                                     <span className="text-[9px] font-bold text-yellow-600 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/10 uppercase">
                                         Check required
                                     </span>
                                 </div>
 
-                                {screenshotType === "GA4" ? (
+                                {screenshotType === "ga4_article" ? (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                                         <div className="space-y-1">
                                             <label className="text-[9px] font-black text-theme-muted uppercase">Page Title (หัวข้อโพสต์/เพจ)</label>
