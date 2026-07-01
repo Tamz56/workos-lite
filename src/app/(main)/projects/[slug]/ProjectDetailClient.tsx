@@ -1,16 +1,233 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 
-import { Project, ProjectItem } from "@/lib/types";
-import { MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, Plus, CheckCircle2, Layout, Calendar, FileText } from "lucide-react";
+import { Project, ProjectItem, ProjectRegistryStatus, ProjectProgressStage, ProjectRegistryMetadata, Note, ProjectDocBlockType, ProjectDocumentationBlock } from "@/lib/types";
+import { 
+    MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, 
+    Plus, CheckCircle2, Layout, Calendar, FileText, Info,
+    BookOpen, Sparkles, Search, LayoutGrid, Table, FileCode, Check, ExternalLink, RefreshCw
+} from "lucide-react";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+
+const STATUS_LABELS: Record<ProjectRegistryStatus, string> = {
+    idea: "Idea",
+    planning: "Planning",
+    active: "Active",
+    in_development: "In Dev",
+    testing: "Testing",
+    in_use: "In Use",
+    maintenance: "Maintenance",
+    paused: "Paused",
+    completed: "Completed"
+};
+
+const STATUS_COLORS: Record<ProjectRegistryStatus, string> = {
+    idea: "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300",
+    planning: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+    active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+    in_development: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300",
+    testing: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+    in_use: "bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300",
+    maintenance: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300",
+    paused: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
+    completed: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+    high: "bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-900/30",
+    medium: "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/30",
+    low: "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/50",
+    none: "bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-500"
+};
+
+const METADATA_KEY = "workos_projects_metadata_v1";
+const DOCS_STORAGE_KEY = "workos_projects_docs_v1";
+
+const BLOCK_TYPE_LABELS: Record<ProjectDocBlockType, string> = {
+    brief: "Project Brief",
+    process_note: "Process Note",
+    sop: "SOP / Manual",
+    structure: "System Structure",
+    decision: "Decision Log",
+    milestone: "Milestone",
+    issue_fix: "Issue / Fix Log",
+    publish: "Publish Log",
+    qa_review: "QA / Review Log"
+};
+
+const BLOCK_TYPE_COLORS: Record<ProjectDocBlockType, string> = {
+    brief: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900/30",
+    process_note: "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/50",
+    sop: "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950/30 dark:text-teal-300 dark:border-teal-900/30",
+    structure: "bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-300 dark:border-cyan-900/30",
+    decision: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-900/30",
+    milestone: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-900/30",
+    issue_fix: "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-900/30",
+    publish: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/30",
+    qa_review: "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-900/30"
+};
+
+const DOC_TEMPLATES: Record<ProjectDocBlockType, { summary: string; details: string }> = {
+    brief: {
+        summary: "สรุปเป้าหมาย ขอบเขตงาน และแนวทางหลักของโครงการ",
+        details: `## 1. Goal & Objectives
+- [ระบุเป้าหมายของโครงการ]
+
+## 2. Target Audience
+- [ระบุกลุ่มเป้าหมายหรือผู้ใช้งาน]
+
+## 3. Scope of Work (SOW)
+- [ขอบเขตสิ่งที่ต้องทำ]
+
+## 4. Key Metrics (KPIs)
+- [ตัววัดความสำเร็จ]`
+    },
+    sop: {
+        summary: "ขั้นตอนการทำงานมาตรฐาน (Standard Operating Procedure)",
+        details: `## SOP: [ชื่อขั้นตอนการทำงาน]
+
+### 1. Prerequisites (สิ่งที่ต้องเตรียม)
+- [เครื่องมือ ซอฟต์แวร์ หรือสิทธิ์การเข้าถึง]
+
+### 2. Step-by-Step Procedure
+1. [ขั้นตอนที่ 1]
+2. [ขั้นตอนที่ 2]
+3. [ขั้นตอนที่ 3]
+
+### 3. Verification & Troubleshooting
+- [วิธีการตรวจสอบว่าทำงานถูกต้อง]
+- [วิธีแก้ไขเมื่อเกิดปัญหาเบื้องต้น]`
+    },
+    decision: {
+        summary: "บันทึกการตัดสินใจเชิงสถาปัตยกรรมและกลยุทธ์สำคัญ",
+        details: `## Decision: [หัวข้อการตัดสินใจ]
+
+### 1. Context (บริบทและปัญหา)
+- [บริบท ปัญหา หรือสิ่งที่จำเป็นต้องเลือก]
+
+### 2. Options Considered (ตัวเลือกที่พิจารณา)
+- **Option A:** [ข้อดี / ข้อเสีย]
+- **Option B:** [ข้อดี / ข้อเสีย]
+
+### 3. Chosen Option & Rationale (ตัวเลือกที่เลือกและเหตุผล)
+- **ตัวเลือกที่เลือก:** [ระบุตัวเลือก]
+- **เหตุผล:** [ทำไมจึงเลือกตัวเลือกนี้]
+
+### 4. Consequences (ผลที่ตามมา)
+- [ผลกระทบ ข้อจำกัด หรือสิ่งที่ทีมต้องรู้หลังจากนี้]`
+    },
+    milestone: {
+        summary: "ประวัติการบรรลุเป้าหมายสำคัญหรือเฟสหลักของโครงการ",
+        details: `## Phase/Milestone: [ชื่อไมล์สโตน]
+
+### 1. Key Deliverables (ผลงานหลัก)
+- [ ] [ผลงาน 1]
+- [ ] [ผลงาน 2]
+
+### 2. Status & Sign-off
+- **สถานะ:** [ ] Planning / [ ] In Progress / [ ] Completed`
+    },
+    issue_fix: {
+        summary: "บันทึกการแก้ไขปัญหา บั๊ก หรือการบำรุงรักษาเชิงลึก",
+        details: `## Issue: [หัวข้อปัญหาหรือบั๊กที่พบ]
+
+### 1. Symptoms & Context (อาการและผลกระทบ)
+- [อาการ ปัญหาที่เกิด และผลกระทบต่อผู้ใช้งาน]
+
+### 2. Root Cause (สาเหตุของปัญหา)
+- [ทำไมปัญหานี้ถึงเกิดขึ้น และชิ้นส่วนโค้ดที่เกี่ยวข้อง]
+
+### 3. Solution (วิธีการแก้ไข)
+- [แก้ไขโค้ดอย่างไร ไฟล์ใดบ้าง]
+
+### 4. Verification Check
+- [ ] ทำการทดสอบ Build ผ่านแล้ว
+- [ ] ตรวจสอบว่าระบบทำงานได้ปกติ`
+    },
+    process_note: {
+        summary: "บันทึกทั่วไป ข้อมูลความรู้ หรือข้อมูลดิบระหว่างการพัฒนา",
+        details: `## Note: [หัวข้อบันทึก]
+- [รายละเอียดบันทึกทั่วไปหรือข้อมูลที่ต้องการจดจำ]`
+    },
+    structure: {
+        summary: "โครงสร้างระบบ ฐานข้อมูล หรือการออกแบบโมดูล",
+        details: `## System Structure: [ชื่อโมดูล/ระบบ]
+
+### 1. Architecture Overview
+- [คำอธิบายการไหลของข้อมูลและโมดูล]
+
+### 2. Component/Data Design
+- [รายละเอียดโครงสร้างฐานข้อมูล หรือ Component Hierarchy]`
+    },
+    publish: {
+        summary: "บันทึกการนำงานขึ้นระบบ สถิติการเผยแพร่ หรือการโปรโมท",
+        details: `## Publish Log: [ชื่องาน/เนื้อหาที่เผยแพร่]
+
+### 1. Publication Details
+- **ช่องทาง:** [Facebook / YouTube / Website / Medium]
+- **วันที่เผยแพร่:** [ระบุวันที่]
+- **ลิงก์ปลายทาง:** [ระบุลิงก์]`
+    },
+    qa_review: {
+        summary: "รายงานผลการทดสอบ สอบทานคุณภาพ หรือผลลัพธ์การรีวิว",
+        details: `## QA Report: [หัวข้อการทดสอบ]
+
+### 1. Test Scope (ขอบเขตการทดสอบ)
+- [รายการของฟีเจอร์หรือโค้ดที่รันการทดสอบ]
+
+### 2. Test Results (ผลการทดสอบ)
+- [ ] Unit Tests: Pass/Fail
+- [ ] Integration: Pass/Fail
+- [ ] Lint & Build: Pass/Fail`
+    }
+};
+
+function getStoredMetadata(): Record<string, ProjectRegistryMetadata> {
+    if (typeof window === "undefined") return {};
+    try {
+        const data = localStorage.getItem(METADATA_KEY);
+        return data ? JSON.parse(data) : {};
+    } catch (e) {
+        console.error("Failed to load metadata", e);
+        return {};
+    }
+}
+
+function saveStoredMetadata(metadata: Record<string, ProjectRegistryMetadata>) {
+    if (typeof window === "undefined") return;
+    try {
+        localStorage.setItem(METADATA_KEY, JSON.stringify(metadata));
+    } catch (e) {
+        console.error("Failed to save metadata", e);
+    }
+}
+
+function getStoredDocBlocks(): ProjectDocumentationBlock[] {
+    if (typeof window === "undefined") return [];
+    try {
+        const data = localStorage.getItem(DOCS_STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        console.error("Failed to load doc blocks", e);
+        return [];
+    }
+}
+
+function saveStoredDocBlocks(blocks: ProjectDocumentationBlock[]) {
+    if (typeof window === "undefined") return;
+    try {
+        localStorage.setItem(DOCS_STORAGE_KEY, JSON.stringify(blocks));
+    } catch (e) {
+        console.error("Failed to save doc blocks", e);
+    }
+}
 
 export default function ProjectDetailClient() {
     const params = useParams();
@@ -18,17 +235,74 @@ export default function ProjectDetailClient() {
     const slug = params.slug as string;
 
     const [project, setProject] = useState<Project | null>(null);
+    const [metadata, setMetadata] = useState<Record<string, ProjectRegistryMetadata>>({});
     const [items, setItems] = useState<ProjectItem[]>([]);
     const [newItemTitle, setNewItemTitle] = useState("");
     const [loading, setLoading] = useState(true);
 
     // Actions state
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-    const [isRenameOpen, setIsRenameOpen] = useState(false);
-    const [newName, setNewName] = useState("");
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [isRegistryEditOpen, setIsRegistryEditOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
+
+    // Editing states for registry metadata
+    const [editName, setEditName] = useState("");
+    const [editCategory, setEditCategory] = useState("");
+    const [editStatus, setEditStatus] = useState<ProjectRegistryStatus>("planning");
+    const [editPriority, setEditPriority] = useState<"high" | "medium" | "low" | "none">("medium");
+    const [editCurrentGoal, setEditCurrentGoal] = useState("");
+    const [editProgressStage, setEditProgressStage] = useState<ProjectProgressStage>("Concept");
+    const [editNextAction, setEditNextAction] = useState("");
+    const [editCadence, setEditCadence] = useState("Weekly");
+    const [editRiskOrBlockedBy, setEditRiskOrBlockedBy] = useState("None");
+
+    // --- Documentation Blocks State ---
+    const [docBlocks, setDocBlocks] = useState<ProjectDocumentationBlock[]>([]);
+    const [docSearch, setDocSearch] = useState("");
+    const [docTypeFilter, setDocTypeFilter] = useState<string>("all");
+    const [docViewMode, setDocViewMode] = useState<"card" | "table">("card");
+
+    // Modal Forms control
+    const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+    const [activeDocBlock, setActiveDocBlock] = useState<ProjectDocumentationBlock | null>(null);
+    const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
+    const [docToDelete, setDocToDelete] = useState<string | null>(null);
+
+    // Form fields state
+    const [formTitle, setFormTitle] = useState("");
+    const [formDate, setFormDate] = useState("");
+    const [formType, setFormType] = useState<ProjectDocBlockType>("brief");
+    const [formSummary, setFormSummary] = useState("");
+    const [formDetails, setFormDetails] = useState("");
+    const [formEvidence, setFormEvidence] = useState(""); 
+    const [formFiles, setFormFiles] = useState("");       
+    const [formNextAction, setFormNextAction] = useState("");
+    const [formStatus, setFormStatus] = useState("active");
+
+    // Arbor Assistant Dialog state
+    const [isArborModalOpen, setIsArborModalOpen] = useState(false);
+    const [arborSourceText, setArborSourceText] = useState("");
+    const [arborSelectedType, setArborSelectedType] = useState<ProjectDocBlockType | "auto">("auto");
+    const [arborDraftBlock, setArborDraftBlock] = useState<ProjectDocumentationBlock | null>(null);
+    const [showArborPreview, setShowArborPreview] = useState(false);
+
+    // Default metadata helper
+    const defaultMetadataForProject = useCallback((proj: Project): ProjectRegistryMetadata => {
+        return {
+            category: "Other",
+            status: proj.status === "done" ? "completed" : "planning",
+            priority: "medium",
+            currentGoal: "โปรเจกต์เพื่อการติดตามงานส่วนบุคคล",
+            progressStage: proj.status === "done" ? "In Use" : "Concept",
+            nextAction: "วางแผนขั้นตอนถัดไป",
+            cadence: "Weekly",
+            riskOrBlockedBy: "ไม่มี",
+            lastUpdated: proj.updated_at || new Date().toISOString()
+        };
+    }, []);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -37,19 +311,344 @@ export default function ProjectDetailClient() {
                 fetch(`/api/projects/${slug}`),
                 fetch(`/api/projects/${slug}/items`)
             ]);
-            if (projRes.ok) setProject(await projRes.json());
+            if (projRes.ok) {
+                const projData: Project = await projRes.json();
+                setProject(projData);
+                
+                // Load metadata from localStorage
+                const storedMeta = getStoredMetadata();
+                setMetadata(storedMeta);
+            }
             if (itemsRes.ok) setItems(await itemsRes.json());
         } finally {
             setLoading(false);
         }
     }, [slug]);
 
+    const loadDocBlocks = useCallback(() => {
+        const allBlocks = getStoredDocBlocks();
+        const projectBlocks = allBlocks.filter(b => b.projectSlug === slug);
+        // Sort by date descending, then by createdAt descending
+        projectBlocks.sort((a, b) => {
+            const dateCompare = b.date.localeCompare(a.date);
+            if (dateCompare !== 0) return dateCompare;
+            return b.createdAt.localeCompare(a.createdAt);
+        });
+        setDocBlocks(projectBlocks);
+    }, [slug]);
+
     useEffect(() => {
         loadData();
-    }, [loadData]);
+        loadDocBlocks();
+    }, [loadData, loadDocBlocks]);
+
+    // --- Doc Blocks Helpers ---
+    const handleOpenAddManual = () => {
+        setActiveDocBlock(null);
+        setFormTitle("");
+        setFormDate(new Date().toISOString().split("T")[0]);
+        setFormType("brief");
+        setFormSummary("");
+        setFormDetails("");
+        setFormEvidence("");
+        setFormFiles("");
+        setFormNextAction("");
+        setFormStatus("active");
+        setIsDocModalOpen(true);
+    };
+
+    const handleLoadTemplate = (type: ProjectDocBlockType) => {
+        const template = DOC_TEMPLATES[type];
+        if (template) {
+            setFormSummary(template.summary);
+            setFormDetails(template.details);
+        }
+    };
+
+    const handleOpenEdit = (block: ProjectDocumentationBlock) => {
+        setActiveDocBlock(block);
+        setFormTitle(block.title);
+        setFormDate(block.date);
+        setFormType(block.type);
+        setFormSummary(block.summary);
+        setFormDetails(block.details);
+        setFormEvidence(block.evidenceLinks ? block.evidenceLinks.join("\n") : "");
+        setFormFiles(block.relatedFiles ? block.relatedFiles.join("\n") : "");
+        setFormNextAction(block.nextAction || "");
+        setFormStatus(block.status);
+        setIsDocModalOpen(true);
+    };
+
+    const handleSaveBlock = () => {
+        if (!formTitle.trim()) {
+            alert("กรุณากรอกหัวข้อ");
+            return;
+        }
+
+        const evidenceLinks = formEvidence
+            .split(/[\n,]/)
+            .map(s => s.trim())
+            .filter(Boolean);
+
+        const relatedFiles = formFiles
+            .split(/[\n,]/)
+            .map(s => s.trim())
+            .filter(Boolean);
+
+        const allBlocks = getStoredDocBlocks();
+        const now = new Date().toISOString();
+
+        if (activeDocBlock) {
+            // Update
+            const updated = allBlocks.map(b => {
+                if (b.id === activeDocBlock.id) {
+                    return {
+                        ...b,
+                        title: formTitle.trim(),
+                        date: formDate,
+                        type: formType,
+                        summary: formSummary.trim(),
+                        details: formDetails.trim(),
+                        evidenceLinks,
+                        relatedFiles,
+                        nextAction: formNextAction.trim(),
+                        status: formStatus,
+                        updatedAt: now
+                    };
+                }
+                return b;
+            });
+            saveStoredDocBlocks(updated);
+            setToastMessage("บันทึกการแก้ไขเอกสารเรียบร้อยแล้ว");
+        } else {
+            // Create
+            const newId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+            const newBlock: ProjectDocumentationBlock = {
+                id: newId,
+                projectSlug: slug,
+                type: formType,
+                title: formTitle.trim(),
+                date: formDate,
+                summary: formSummary.trim(),
+                details: formDetails.trim(),
+                evidenceLinks,
+                relatedFiles,
+                nextAction: formNextAction.trim(),
+                status: formStatus,
+                createdAt: now,
+                updatedAt: now
+            };
+            allBlocks.push(newBlock);
+            saveStoredDocBlocks(allBlocks);
+            setToastMessage("สร้างบล็อกเอกสารเรียบร้อยแล้ว");
+        }
+
+        setShowToast(true);
+        setIsDocModalOpen(false);
+        loadDocBlocks();
+    };
+
+    const handleTriggerDelete = (id: string) => {
+        setDocToDelete(id);
+        setIsDeleteDocOpen(true);
+    };
+
+    const handleConfirmDeleteBlock = () => {
+        if (!docToDelete) return;
+        const allBlocks = getStoredDocBlocks();
+        const filtered = allBlocks.filter(b => b.id !== docToDelete);
+        saveStoredDocBlocks(filtered);
+        setToastMessage("ลบบล็อกเอกสารเรียบร้อยแล้ว");
+        setShowToast(true);
+        setIsDeleteDocOpen(false);
+        setDocToDelete(null);
+        loadDocBlocks();
+    };
+
+    // --- Arbor Assistant Parser Engine & Methods ---
+    const handleOpenArbor = () => {
+        setArborSourceText("");
+        setArborSelectedType("auto");
+        setArborDraftBlock(null);
+        setShowArborPreview(false);
+        setIsArborModalOpen(true);
+    };
+
+    const handleGenerateArborDraft = () => {
+        if (!arborSourceText.trim()) {
+            alert("กรุณาวางข้อความดิบ");
+            return;
+        }
+
+        const cleanText = arborSourceText.trim();
+        
+        // 1. Detect Type
+        let detectedType: ProjectDocBlockType = "process_note";
+        if (arborSelectedType === "auto") {
+            const lowerText = cleanText.toLowerCase();
+            if (lowerText.includes("walkthrough") || lowerText.includes("fixed") || lowerText.includes("bug") || lowerText.includes("issue") || lowerText.includes("fix log") || lowerText.includes("error") || lowerText.includes("debug")) {
+                detectedType = "issue_fix";
+            } else if (lowerText.includes("publish") || lowerText.includes("deploy") || lowerText.includes("released") || lowerText.includes("live") || lowerText.includes("post log")) {
+                detectedType = "publish";
+            } else if (lowerText.includes("qa") || lowerText.includes("review") || lowerText.includes("lint") || lowerText.includes("test") || lowerText.includes("checklist")) {
+                detectedType = "qa_review";
+            } else if (lowerText.includes("decision") || lowerText.includes("decided") || lowerText.includes("chose") || lowerText.includes("architecture decision")) {
+                detectedType = "decision";
+            } else if (lowerText.includes("milestone") || lowerText.includes("phase") || lowerText.includes("milestones")) {
+                detectedType = "milestone";
+            } else if (lowerText.includes("sop") || lowerText.includes("manual") || lowerText.includes("guide") || lowerText.includes("how to")) {
+                detectedType = "sop";
+            } else if (lowerText.includes("structure") || lowerText.includes("schema") || lowerText.includes("db configuration")) {
+                detectedType = "structure";
+            } else if (lowerText.includes("brief") || lowerText.includes("scope") || lowerText.includes("objectives")) {
+                detectedType = "brief";
+            }
+        } else {
+            detectedType = arborSelectedType;
+        }
+
+        // 2. Extract Evidence Links
+        const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/gi;
+        const urls = cleanText.match(urlRegex) || [];
+        const hashRegex = /\b([a-f0-9]{40}|[a-f0-9]{7})\b/gi;
+        const hashes = cleanText.match(hashRegex) || [];
+        const evidenceLinks = Array.from(new Set([...urls, ...hashes.map(h => `commit: ${h}`)]));
+
+        // 3. Extract Related Files
+        const fileRegex = /\b([\w\-./]+\.(?:tsx|ts|sql|js|jsx|json|css|md|html))\b/gi;
+        const rawFiles = cleanText.match(fileRegex) || [];
+        const relatedFiles = Array.from(new Set(
+            rawFiles
+                .map(f => f.replace(/^file:\/\/\//, ""))
+                .filter(f => !f.startsWith("http") && (f.includes("/") || f.includes("src/")))
+        ));
+
+        // 4. Extract Next Action
+        let nextAction = "";
+        const lines = cleanText.split("\n");
+        const nextActionLine = lines.find(l => {
+            const lowerLine = l.toLowerCase();
+            return lowerLine.includes("todo") || 
+                   lowerLine.includes("next step") || 
+                   lowerLine.includes("next action") || 
+                   lowerLine.includes("future work") ||
+                   lowerLine.includes("todo list");
+        });
+        if (nextActionLine) {
+            nextAction = nextActionLine.replace(/^[-\s*]*[Tt]odo:?/i, "")
+                                      .replace(/^[-\s*]*[Nn]ext\s+[Ss]tep:?/i, "")
+                                      .replace(/^[-\s*]*[Nn]ext\s+[Aa]ction:?/i, "")
+                                      .trim();
+        }
+
+        // 5. Title
+        let title = "";
+        const firstLine = lines.find(l => l.trim().length > 0) || "";
+        title = firstLine.replace(/^[#\s-]*/, "")
+                         .replace(/^[Goal|Title|Brief|Walkthrough|Fixed|Issue|Bug|SOP]+:/i, "")
+                         .trim();
+        if (title.length > 80) {
+            title = title.substring(0, 77) + "...";
+        }
+        if (!title) {
+            title = `Arbor Auto-Draft: ${BLOCK_TYPE_LABELS[detectedType]}`;
+        }
+
+        // 6. Summary
+        let summary = "";
+        const firstFewLines = lines
+            .filter(l => l.trim().length > 0 && !l.startsWith("#"))
+            .slice(0, 3)
+            .join(" ")
+            .replace(/[*_`#]/g, "")
+            .trim();
+        if (firstFewLines.length > 150) {
+            summary = firstFewLines.substring(0, 147) + "...";
+        } else {
+            summary = firstFewLines || `Auto-generated draft for ${BLOCK_TYPE_LABELS[detectedType]}`;
+        }
+
+        const now = new Date().toISOString();
+        const draftId = activeDocBlock ? activeDocBlock.id : (Math.random().toString(36).substring(2, 15) + Date.now().toString(36));
+
+        const draft: ProjectDocumentationBlock = {
+            id: draftId,
+            projectSlug: slug,
+            type: detectedType,
+            title,
+            date: now.split("T")[0],
+            summary,
+            details: cleanText,
+            evidenceLinks,
+            relatedFiles,
+            nextAction: nextAction || "ตรวจสอบความถูกต้องของฟีเจอร์",
+            status: "active",
+            createdAt: activeDocBlock ? activeDocBlock.createdAt : now,
+            updatedAt: now,
+            
+            // source metadata
+            sourceText: cleanText,
+            sourceExcerpt: cleanText.length > 300 ? cleanText.substring(0, 297) + "..." : cleanText,
+            sourceType: cleanText.toLowerCase().includes("walkthrough") ? "walkthrough" : 
+                        cleanText.toLowerCase().includes("commit") ? "commit_log" : 
+                        cleanText.toLowerCase().includes("qa") ? "qa_report" : "manual_paste",
+            generatedBy: "arbor",
+            reviewedByUser: true,
+            appliedAt: now
+        };
+
+        setArborDraftBlock(draft);
+        setShowArborPreview(true);
+    };
+
+    const handleApplyArborDraft = () => {
+        if (!arborDraftBlock) return;
+        
+        const allBlocks = getStoredDocBlocks();
+        
+        if (activeDocBlock) {
+            // Edit existing block
+            const updated = allBlocks.map(b => {
+                if (b.id === activeDocBlock.id) {
+                    return arborDraftBlock;
+                }
+                return b;
+            });
+            saveStoredDocBlocks(updated);
+            setToastMessage("อัปเดตบล็อกเอกสารด้วย Arbor สำเร็จ");
+        } else {
+            // New block
+            allBlocks.push(arborDraftBlock);
+            saveStoredDocBlocks(allBlocks);
+            setToastMessage("สร้างบล็อกเอกสารด้วย Arbor สำเร็จ");
+        }
+
+        setShowToast(true);
+        setIsArborModalOpen(false);
+        setArborDraftBlock(null);
+        setShowArborPreview(false);
+        setActiveDocBlock(null);
+        loadDocBlocks();
+    };
+
+    // Filter & Search computation
+    const filteredDocBlocks = useMemo(() => {
+        return docBlocks.filter(b => {
+            const matchSearch = b.title.toLowerCase().includes(docSearch.toLowerCase()) || 
+                                b.summary.toLowerCase().includes(docSearch.toLowerCase()) ||
+                                b.details.toLowerCase().includes(docSearch.toLowerCase());
+            const matchType = docTypeFilter === "all" || b.type === docTypeFilter;
+            return matchSearch && matchType;
+        });
+    }, [docBlocks, docSearch, docTypeFilter]);
+
+    const activeMeta = useMemo(() => {
+        if (!project) return null;
+        return metadata[project.slug] || defaultMetadataForProject(project);
+    }, [project, metadata, defaultMetadataForProject]);
 
     const handleArchive = async () => {
-        if (!project || !confirm(`Archive "${project.name}"?`)) return;
+        if (!project) return;
         setActionLoading(true);
         try {
             const res = await fetch(`/api/projects/${slug}`, {
@@ -58,8 +657,23 @@ export default function ProjectDetailClient() {
                 body: JSON.stringify({ status: "done" })
             });
             if (res.ok) {
+                // Update detailed status in local storage to completed
+                const currentMeta = metadata[project.slug] || defaultMetadataForProject(project);
+                const updatedMeta = {
+                    ...metadata,
+                    [project.slug]: {
+                        ...currentMeta,
+                        status: "completed" as const,
+                        progressStage: "In Use" as const,
+                        lastUpdated: new Date().toISOString()
+                    }
+                };
+                setMetadata(updatedMeta);
+                saveStoredMetadata(updatedMeta);
+
                 setToastMessage(`Project "${project.name}" archived successfully`);
                 setShowToast(true);
+                setIsArchiveOpen(false);
                 loadData();
             }
         } finally {
@@ -67,21 +681,76 @@ export default function ProjectDetailClient() {
         }
     };
 
-    const handleRename = async () => {
-        if (!project || !newName.trim()) return;
+    const openRegistryEdit = () => {
+        if (!project || !activeMeta) return;
+        setEditName(project.name);
+        setEditCategory(activeMeta.category);
+        setEditStatus(activeMeta.status);
+        setEditPriority(activeMeta.priority);
+        setEditCurrentGoal(activeMeta.currentGoal);
+        setEditProgressStage(activeMeta.progressStage);
+        setEditNextAction(activeMeta.nextAction);
+        setEditCadence(activeMeta.cadence);
+        setEditRiskOrBlockedBy(activeMeta.riskOrBlockedBy);
+        setIsRegistryEditOpen(true);
+    };
+
+    const handleSaveRegistryMetadata = async () => {
+        if (!project) return;
         setActionLoading(true);
         try {
-            const res = await fetch(`/api/projects/${slug}`, {
+            // Update name in DB if changed
+            if (editName.trim() !== project.name) {
+                await fetch(`/api/projects/${project.slug}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: editName.trim() })
+                });
+            }
+
+            // Sync with SQLite status
+            let dbStatus: "inbox" | "planned" | "done" = "planned";
+            if (editStatus === "completed") {
+                dbStatus = "done";
+            } else if (editStatus === "idea") {
+                dbStatus = "inbox";
+            }
+
+            await fetch(`/api/projects/${project.slug}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: newName.trim() })
+                body: JSON.stringify({ status: dbStatus })
             });
-            if (res.ok) {
-                setToastMessage("Project renamed successfully");
-                setShowToast(true);
-                setIsRenameOpen(false);
-                loadData();
-            }
+
+            // Update metadata store
+            const newMeta: ProjectRegistryMetadata = {
+                category: editCategory.trim() || "Other",
+                status: editStatus,
+                priority: editPriority,
+                currentGoal: editCurrentGoal.trim(),
+                progressStage: editProgressStage,
+                nextAction: editNextAction.trim(),
+                cadence: editCadence.trim() || "Weekly",
+                riskOrBlockedBy: editRiskOrBlockedBy.trim() || "None",
+                lastUpdated: new Date().toISOString()
+            };
+
+            const updatedMetadata = {
+                ...metadata,
+                [project.slug]: newMeta
+            };
+
+            setMetadata(updatedMetadata);
+            saveStoredMetadata(updatedMetadata);
+
+            setToastMessage("บันทึกการปรับปรุงโปรเจกต์สำเร็จ");
+            setShowToast(true);
+            setIsRegistryEditOpen(false);
+            loadData();
+        } catch (e) {
+            console.error("Error updating project metadata:", e);
+            setToastMessage("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+            setShowToast(true);
         } finally {
             setActionLoading(false);
         }
@@ -113,39 +782,43 @@ export default function ProjectDetailClient() {
 
     return (
         <PageShell>
-            <div className="flex items-center gap-2 mb-6 text-neutral-400 hover:text-black transition-colors cursor-pointer group w-fit" onClick={() => router.push("/projects")}>
+            <div className="flex items-center gap-2 mb-6 text-neutral-400 hover:text-black dark:hover:text-white transition-colors cursor-pointer group w-fit" onClick={() => router.push("/projects")}>
                 <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span className="text-xs font-black uppercase tracking-widest">Projects</span>
+                <span className="text-xs font-black uppercase tracking-widest">Back to Project Registry</span>
             </div>
 
             <PageHeader
                 title={project.name}
                 subtitle={`${slug} • ${project.status}`}
                 rightMeta={
-                    <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                        project.status === 'done' ? 'bg-green-100 text-green-700' : 
-                        project.status === 'planned' ? 'bg-blue-100 text-blue-700' : 
-                        'bg-neutral-100 text-neutral-600'
-                    }`}>
-                        {project.status === 'done' ? 'Archived' : project.status}
-                    </span>
+                    activeMeta && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                                {activeMeta.category}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${STATUS_COLORS[activeMeta.status]}`}>
+                                {STATUS_LABELS[activeMeta.status]}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${PRIORITY_COLORS[activeMeta.priority]}`}>
+                                {activeMeta.priority}
+                            </span>
+                        </div>
+                    )
                 }
                 actions={
                     <div className="flex items-center gap-2">
                         <button 
-                            onClick={() => {
-                                setNewName(project.name);
-                                setIsRenameOpen(true);
-                            }}
-                            className="p-2.5 rounded-2xl bg-white border border-neutral-200 text-neutral-400 hover:text-neutral-900 hover:border-neutral-300 transition-all active:scale-95 shadow-sm"
-                            title="Rename Project"
+                            onClick={openRegistryEdit}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 rounded-xl text-xs font-black hover:opacity-90 transition-all shadow-sm active:scale-95"
+                            title="Edit Project Registry Info"
                         >
-                            <Edit2 className="w-4 h-4" />
+                            <Edit2 className="w-3.5 h-3.5" />
+                            แก้ไข Registry
                         </button>
                         <button 
-                            onClick={handleArchive}
-                            className={`p-2.5 rounded-2xl bg-white border border-neutral-200 transition-all active:scale-95 shadow-sm ${
-                                project.status === 'done' ? "text-green-600 border-green-200 bg-green-50" : "text-neutral-400 hover:text-neutral-900 hover:border-neutral-300"
+                            onClick={() => setIsArchiveOpen(true)}
+                            className={`p-2.5 rounded-xl bg-white border border-neutral-200 transition-all active:scale-95 shadow-sm dark:bg-neutral-900 dark:border-neutral-800 ${
+                                project.status === 'done' ? "text-green-600 border-green-200 bg-green-50 dark:bg-green-950/20" : "text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                             }`}
                             disabled={project.status === 'done'}
                             title="Archive Project"
@@ -154,7 +827,7 @@ export default function ProjectDetailClient() {
                         </button>
                         <button 
                             onClick={() => setIsDeleteOpen(true)}
-                            className="p-2.5 rounded-2xl bg-white border border-neutral-200 text-neutral-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all active:scale-95 shadow-sm"
+                            className="p-2.5 rounded-xl bg-white border border-neutral-200 text-neutral-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 dark:bg-neutral-900 dark:border-neutral-800 transition-all active:scale-95 shadow-sm"
                             title="Delete Project"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -163,68 +836,434 @@ export default function ProjectDetailClient() {
                 }
             />
 
-            <div className="max-w-5xl mx-auto space-y-10 mt-8">
-                {/* Project Items Form */}
-                <div className="bg-theme-panel p-4 rounded-3xl border border-neutral-200 shadow-sm focus-within:shadow-md transition-shadow">
-                    <form onSubmit={handleAddItem} className="flex gap-2">
-                        <div className="flex-1 relative">
-                            <input
-                                type="text"
-                                value={newItemTitle}
-                                onChange={e => setNewItemTitle(e.target.value)}
-                                placeholder="Add a project deliverable or item..."
-                                className="w-full pl-10 pr-4 py-3 bg-theme-card border-transparent focus:bg-white focus:border-neutral-200 rounded-2xl text-base transition-all outline-none font-medium"
-                            />
-                            <Plus className="absolute left-3.5 top-3.5 h-5 w-5 text-neutral-400" />
+            {/* Main content grid */}
+            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8 pb-12">
+                
+                {/* Main Deliverables & Milestones (Left side) */}
+                <div className="lg:col-span-8 space-y-10">
+                    
+                    {/* Project Items Form */}
+                    <div className="bg-theme-panel p-4 rounded-3xl border border-neutral-200 shadow-sm focus-within:shadow-md transition-shadow">
+                        <form onSubmit={handleAddItem} className="flex gap-2">
+                            <div className="flex-1 relative">
+                                <input
+                                    type="text"
+                                    value={newItemTitle}
+                                    onChange={e => setNewItemTitle(e.target.value)}
+                                    placeholder="Add a project deliverable or item..."
+                                    className="w-full pl-10 pr-4 py-3 bg-theme-card border-transparent focus:bg-white focus:border-neutral-200 rounded-2xl text-base transition-all outline-none font-medium text-theme-primary"
+                                />
+                                <Plus className="absolute left-3.5 top-3.5 h-5 w-5 text-neutral-400" />
+                            </div>
+                            <button 
+                                type="submit" 
+                                disabled={!newItemTitle.trim()}
+                                className="bg-black text-white dark:bg-white dark:text-black px-6 py-3 rounded-2xl text-sm font-black disabled:opacity-50 transition-all hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-lg active:scale-95"
+                            >
+                                Add Item
+                            </button>
+                        </form>
+                    </div>
+
+                    {milestones.length > 0 && (
+                        <section>
+                            <div className="flex items-center gap-2 mb-4 px-2">
+                                <Target className="w-4 h-4 text-orange-500" />
+                                <h2 className="text-xs font-black uppercase tracking-widest text-neutral-500">Major Milestones</h2>
+                            </div>
+                            <div className="space-y-3">
+                                {milestones.map(item => (
+                                    <ItemCard key={item.id} item={item} />
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    <section>
+                        <div className="flex items-center justify-between mb-4 px-2">
+                            <div className="flex items-center gap-2">
+                                <Layout className="w-4 h-4 text-neutral-400" />
+                                <h2 className="text-xs font-black uppercase tracking-widest text-neutral-500">Project Backlog / Deliverables</h2>
+                            </div>
+                            <span className="text-[10px] font-black text-neutral-300 uppercase">{otherItems.length} Items</span>
                         </div>
-                        <button 
-                            type="submit" 
-                            disabled={!newItemTitle.trim()}
-                            className="bg-black text-white px-6 py-3 rounded-2xl text-sm font-black disabled:opacity-50 transition-all hover:bg-neutral-800 shadow-lg shadow-black/10 active:scale-95"
-                        >
-                            Add Item
-                        </button>
-                    </form>
+                        
+                        {otherItems.length === 0 ? (
+                            <div className="text-center py-20 bg-neutral-50/50 dark:bg-neutral-900/10 rounded-3xl border border-dashed border-neutral-200">
+                                <p className="text-neutral-400 font-medium italic text-sm">No items yet. Quick add above to start building.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {otherItems.map(item => (
+                                    <ItemCard key={item.id} item={item} />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    <RelatedNotesSection projectId={project.id} />
+
+                    {/* Project Documentation Blocks Section */}
+                    <section className="border-t border-neutral-200/60 dark:border-neutral-800/60 pt-10 space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-2">
+                            <div className="space-y-1">
+                                <h2 className="text-lg font-black tracking-tight text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                                    <BookOpen className="w-5 h-5 text-neutral-400" />
+                                    Project Documentation & Logs
+                                </h2>
+                                <p className="text-xs text-neutral-400 font-medium">บันทึกขั้นตอนการทำงาน ประวัติการตัดสินใจ ข้อตกลง และประวัติระบบ</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleOpenAddManual}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-neutral-200 text-xs font-black uppercase tracking-wider hover:border-neutral-900 hover:text-black dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white dark:hover:border-neutral-700 shadow-sm active:scale-95 transition-all"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Add Block
+                                </button>
+                                <button
+                                    onClick={handleOpenArbor}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-black uppercase tracking-wider hover:opacity-90 shadow-lg active:scale-95 transition-all"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    Arbor Assistant
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Search and Filters Controls */}
+                        <div className="flex flex-col md:flex-row gap-3 bg-neutral-50 dark:bg-neutral-900/40 p-3.5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80">
+                            <div className="flex-1 relative">
+                                <input
+                                    type="text"
+                                    placeholder="ค้นหาในประวัติ/เอกสาร..."
+                                    value={docSearch}
+                                    onChange={e => setDocSearch(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-xs font-semibold outline-none focus:border-neutral-400"
+                                />
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+                            </div>
+                            <div className="flex gap-2">
+                                <select
+                                    value={docTypeFilter}
+                                    onChange={e => setDocTypeFilter(e.target.value)}
+                                    className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-neutral-400"
+                                >
+                                    <option value="all">ทุกประเภท (All types)</option>
+                                    {Object.entries(BLOCK_TYPE_LABELS).map(([k, label]) => (
+                                        <option key={k} value={k}>{label}</option>
+                                    ))}
+                                </select>
+                                <div className="flex border border-neutral-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 p-0.5 shadow-sm">
+                                    <button
+                                        onClick={() => setDocViewMode("card")}
+                                        className={`p-1.5 rounded-lg transition-all ${docViewMode === "card" ? "bg-neutral-100 text-black dark:bg-neutral-800 dark:text-white" : "text-neutral-400 hover:text-neutral-600"}`}
+                                        title="Card View"
+                                    >
+                                        <LayoutGrid className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setDocViewMode("table")}
+                                        className={`p-1.5 rounded-lg transition-all ${docViewMode === "table" ? "bg-neutral-100 text-black dark:bg-neutral-800 dark:text-white" : "text-neutral-400 hover:text-neutral-600"}`}
+                                        title="Table View"
+                                    >
+                                        <Table className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Blocks list */}
+                        {filteredDocBlocks.length === 0 ? (
+                            <div className="text-center py-16 bg-neutral-50/50 dark:bg-neutral-900/10 rounded-3xl border border-dashed border-neutral-200/80">
+                                <BookOpen className="w-8 h-8 text-neutral-300 mx-auto mb-2.5" />
+                                <p className="text-neutral-400 font-medium italic text-sm dark:text-neutral-500">
+                                    {docSearch || docTypeFilter !== "all" 
+                                        ? "ไม่พบบล็อกเอกสารที่สอดคล้องกับตัวกรอง"
+                                        : "ยังไม่มีประวัติหรือบล็อกเอกสารใด ๆ เริ่มเพิ่มข้อมูลหรือให้ Arbor ช่วยถอดความ"}
+                                </p>
+                            </div>
+                        ) : docViewMode === "card" ? (
+                            <div className="grid grid-cols-1 gap-4">
+                                {filteredDocBlocks.map(block => (
+                                    <DocBlockCard key={block.id} block={block} onEdit={handleOpenEdit} onDelete={handleTriggerDelete} />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-theme-card border border-neutral-200 rounded-3xl overflow-hidden shadow-sm dark:border-neutral-800">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr className="bg-neutral-50 dark:bg-neutral-900/60 border-b border-neutral-200 dark:border-neutral-800 text-neutral-400 font-bold uppercase tracking-wider">
+                                                <th className="px-4 py-3">วันที่</th>
+                                                <th className="px-4 py-3">ประเภท</th>
+                                                <th className="px-4 py-3">หัวข้อ</th>
+                                                <th className="px-4 py-3">สรุปย่อ</th>
+                                                <th className="px-4 py-3">สถานะ</th>
+                                                <th className="px-4 py-3 text-right">จัดการ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60">
+                                            {filteredDocBlocks.map(block => (
+                                                <tr key={block.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-900/20 font-medium text-neutral-700 dark:text-neutral-300 transition-colors">
+                                                    <td className="px-4 py-3 whitespace-nowrap text-neutral-400 font-semibold">{block.date}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${BLOCK_TYPE_COLORS[block.type]}`}>
+                                                            {BLOCK_TYPE_LABELS[block.type]}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 font-black text-neutral-900 dark:text-neutral-100 max-w-[200px] truncate">{block.title}</td>
+                                                    <td className="px-4 py-3 max-w-[250px] truncate text-neutral-500 dark:text-neutral-400">{block.summary}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase ${block.status === "active" ? "bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400" : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800"}`}>
+                                                            {block.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
+                                                        <button onClick={() => handleOpenEdit(block)} className="text-neutral-400 hover:text-black dark:hover:text-white inline-block p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-colors" title="แก้ไข">
+                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button onClick={() => handleTriggerDelete(block.id)} className="text-neutral-400 hover:text-red-600 inline-block p-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors" title="ลบ">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </section>
                 </div>
 
-                {milestones.length > 0 && (
-                    <section>
-                        <div className="flex items-center gap-2 mb-4 px-2">
-                            <Target className="w-4 h-4 text-orange-500" />
-                            <h2 className="text-xs font-black uppercase tracking-widest text-neutral-500">Major Milestones</h2>
-                        </div>
-                        <div className="space-y-3">
-                            {milestones.map(item => (
-                                <ItemCard key={item.id} item={item} />
-                            ))}
-                        </div>
-                    </section>
-                )}
+                {/* Project Registry Metadata side panel (Right side) */}
+                <div className="lg:col-span-4 space-y-6">
+                    {activeMeta && (
+                        <div className="bg-theme-card border border-neutral-200 rounded-[32px] p-6 shadow-sm space-y-6">
+                            <div className="flex justify-between items-center pb-4 border-b border-neutral-200/50">
+                                <h3 className="font-black text-base text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                                    <Info className="w-4 h-4 text-neutral-400" />
+                                    Project Registry Info
+                                </h3>
+                                <button
+                                    onClick={openRegistryEdit}
+                                    className="p-1.5 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-950 text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-all"
+                                    title="Edit Metadata"
+                                >
+                                    <Edit2 className="w-4 h-4" />
+                                </button>
+                            </div>
 
-                <section>
-                    <div className="flex items-center justify-between mb-4 px-2">
-                        <div className="flex items-center gap-2">
-                            <Layout className="w-4 h-4 text-neutral-400" />
-                            <h2 className="text-xs font-black uppercase tracking-widest text-neutral-500">Project Backlog / Deliverables</h2>
-                        </div>
-                        <span className="text-[10px] font-black text-neutral-300 uppercase">{otherItems.length} Items</span>
-                    </div>
-                    
-                    {otherItems.length === 0 ? (
-                        <div className="text-center py-20 bg-neutral-50/50 rounded-3xl border border-dashed border-neutral-200">
-                            <p className="text-neutral-400 font-medium italic text-sm">No items yet. Quick add above to start building.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {otherItems.map(item => (
-                                <ItemCard key={item.id} item={item} />
-                            ))}
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">หมวดหมู่</div>
+                                        <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{activeMeta.category}</div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">อัปเดต (Cadence)</div>
+                                        <div className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{activeMeta.cadence}</div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">ขั้นตอนการทำงาน</div>
+                                        <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{activeMeta.progressStage}</div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">ความสำคัญ (Priority)</div>
+                                        <span className={`inline-block px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${PRIORITY_COLORS[activeMeta.priority]}`}>
+                                            {activeMeta.priority}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1 pt-2 border-t border-neutral-100 dark:border-neutral-900/50">
+                                    <div className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">เป้าหมายโครงการปัจจุบัน</div>
+                                    <div className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed bg-neutral-50 dark:bg-neutral-950/20 p-3 rounded-xl border border-neutral-100 dark:border-neutral-900/30">
+                                        {activeMeta.currentGoal}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <div className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">Next Action</div>
+                                    <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200 leading-relaxed bg-blue-50/20 dark:bg-blue-950/10 p-3 rounded-xl border-l-4 border-blue-500">
+                                        {activeMeta.nextAction}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <div className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">ความเสี่ยง / อุปสรรค</div>
+                                    <div className={`text-xs p-3 rounded-xl border ${
+                                        activeMeta.riskOrBlockedBy !== "None" && activeMeta.riskOrBlockedBy !== "ไม่มี"
+                                            ? "bg-rose-50/30 border-rose-200 text-rose-700 dark:bg-rose-950/10 dark:border-rose-900/20 dark:text-rose-300"
+                                            : "bg-neutral-50 dark:bg-neutral-950/20 border-neutral-100 dark:border-neutral-900/30 text-neutral-500"
+                                    }`}>
+                                        {activeMeta.riskOrBlockedBy}
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-neutral-100 dark:border-neutral-900/50 flex justify-between items-center text-[9px] text-neutral-400 font-medium">
+                                    <span>Last Updated:</span>
+                                    <span>{new Date(activeMeta.lastUpdated).toLocaleString()}</span>
+                                </div>
+                            </div>
                         </div>
                     )}
-                </section>
-
-                <RelatedNotesSection projectId={project.id} />
+                </div>
             </div>
+
+            {/* Registry Edit Panel Modal */}
+            <Modal isOpen={isRegistryEditOpen} onClose={() => setIsRegistryEditOpen(false)} title="แก้ไขข้อมูลโครงการ (Project Registry)">
+                <div className="p-3 space-y-5 max-h-[82vh] overflow-y-auto">
+                    
+                    {/* Project Name */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">ชื่อโครงการ (Project Name)</label>
+                        <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400"
+                            placeholder="กรอกชื่อโครงการ..."
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Category */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">หมวดหมู่ (Category)</label>
+                            <input
+                                type="text"
+                                value={editCategory}
+                                onChange={(e) => setEditCategory(e.target.value)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400"
+                                placeholder="Core, Green Fineness, Personal..."
+                            />
+                        </div>
+
+                        {/* Cadence */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">ความถี่การอัปเดต (Cadence)</label>
+                            <input
+                                type="text"
+                                value={editCadence}
+                                onChange={(e) => setEditCadence(e.target.value)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400"
+                                placeholder="Weekly, Bi-weekly, Monthly..."
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                        {/* Status */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">สถานะละเอียด (Status)</label>
+                            <select
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400"
+                                value={editStatus}
+                                onChange={(e) => setEditStatus(e.target.value as ProjectRegistryStatus)}
+                            >
+                                {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                                    <option key={k} value={k}>{v}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Progress Stage */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">ขั้นตอนหลัก (Stage)</label>
+                            <select
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400"
+                                value={editProgressStage}
+                                onChange={(e) => setEditProgressStage(e.target.value as ProjectProgressStage)}
+                            >
+                                <option value="Concept">Concept</option>
+                                <option value="Spec Ready">Spec Ready</option>
+                                <option value="Dev Ready">Dev Ready</option>
+                                <option value="In Dev">In Dev</option>
+                                <option value="QA">QA</option>
+                                <option value="Committed">Committed</option>
+                                <option value="In Use">In Use</option>
+                                <option value="Needs Improvement">Needs Improvement</option>
+                                <option value="Paused">Paused</option>
+                            </select>
+                        </div>
+
+                        {/* Priority */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">ความสำคัญ (Priority)</label>
+                            <select
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400"
+                                value={editPriority}
+                                onChange={(e) => setEditPriority(e.target.value as "high" | "medium" | "low" | "none")}
+                            >
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Current Goal */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">เป้าหมายปัจจุบัน (Current Goal)</label>
+                        <textarea
+                            value={editCurrentGoal}
+                            onChange={(e) => setEditCurrentGoal(e.target.value)}
+                            rows={2}
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400 resize-none"
+                            placeholder="อธิบายสิ่งที่เป็นความพยายามหรือเป้าหมายหลักในเฟสนี้..."
+                        />
+                    </div>
+
+                    {/* Next Action */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Next Action (สิ่งที่ต้องทำถัดไป)</label>
+                        <textarea
+                            value={editNextAction}
+                            onChange={(e) => setEditNextAction(e.target.value)}
+                            rows={2}
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400 resize-none"
+                            placeholder="การปฏิบัติที่เจาะจงที่จำเป็นเป็นลำดับถัดไป..."
+                        />
+                    </div>
+
+                    {/* Risk or Blocked by */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">ความเสี่ยง / อุปสรรค (Risks / Blocked By)</label>
+                        <input
+                            type="text"
+                            value={editRiskOrBlockedBy}
+                            onChange={(e) => setEditRiskOrBlockedBy(e.target.value)}
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400"
+                            placeholder="ระบุความเสี่ยง หรืออุปสรรคคอขวด (เช่น บล็อกเกอร์ หรือต้องการข้อมูลเพิ่ม)..."
+                        />
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="flex gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+                        <button 
+                            type="button" 
+                            onClick={() => setIsRegistryEditOpen(false)} 
+                            className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all"
+                        >
+                            ยกเลิก
+                        </button>
+                        <button 
+                            type="button" 
+                            onClick={handleSaveRegistryMetadata} 
+                            disabled={actionLoading || !editName.trim()}
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black text-sm font-black hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all disabled:opacity-50 shadow-md"
+                        >
+                            {actionLoading ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <DeleteProjectDialog
                 isOpen={isDeleteOpen}
@@ -234,30 +1273,371 @@ export default function ProjectDetailClient() {
                 projectName={project.name}
             />
 
-            <Modal isOpen={isRenameOpen} onClose={() => setIsRenameOpen(false)} title="Rename Project">
-                <div className="p-2 space-y-6">
-                    <div className="space-y-2">
-                        <label className="text-xs font-black text-neutral-400 uppercase tracking-widest ml-1">New Project Name</label>
+            <ConfirmDialog
+                isOpen={isArchiveOpen}
+                title="Archive Project"
+                message={`คุณแน่ใจหรือไม่ว่าต้องการจัดเก็บโปรเจกต์ "${project.name}"? โครงการจะถูกเปลี่ยนสถานะเป็น Completed และจัดเก็บลงแฟ้มเอกสารเก่า`}
+                confirmText="จัดเก็บโครงการ"
+                onConfirm={handleArchive}
+                onCancel={() => setIsArchiveOpen(false)}
+            />
+
+            {/* Manual Add / Edit Block Modal */}
+            <Modal
+                isOpen={isDocModalOpen}
+                onClose={() => setIsDocModalOpen(false)}
+                title={activeDocBlock ? "แก้ไขบล็อกเอกสาร (Edit Block)" : "เพิ่มบล็อกเอกสาร (Add Block Manually)"}
+            >
+                <div className="space-y-4 text-left max-h-[80vh] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ประเภทเอกสาร (Type)</label>
+                            <select
+                                value={formType}
+                                onChange={e => {
+                                    const val = e.target.value as ProjectDocBlockType;
+                                    setFormType(val);
+                                }}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-neutral-400"
+                            >
+                                {Object.entries(BLOCK_TYPE_LABELS).map(([k, label]) => (
+                                    <option key={k} value={k}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-1 flex items-end pb-0.5">
+                            <button
+                                type="button"
+                                onClick={() => handleLoadTemplate(formType)}
+                                className="px-3 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 border border-neutral-200 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-850 dark:text-neutral-300 rounded-xl text-xs font-bold w-full transition-all active:scale-95 flex items-center justify-center gap-1"
+                            >
+                                📋 โหลด Template โครงร่าง
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">หัวข้อเอกสาร (Title)</label>
                         <input
                             type="text"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-base font-medium outline-none focus:bg-white focus:border-neutral-900 transition-all font-display"
-                            placeholder="Enter new name..."
+                            value={formTitle}
+                            onChange={e => setFormTitle(e.target.value)}
+                            placeholder="ระบุหัวข้อบล็อกเอกสาร เช่น Project Kickoff Brief, System Architecture"
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-neutral-400"
                         />
                     </div>
-                    <div className="flex gap-3">
-                        <button onClick={() => setIsRenameOpen(false)} className="flex-1 px-4 py-3 rounded-xl border border-neutral-200 text-sm font-bold hover:bg-neutral-50 transition-all">Cancel</button>
-                        <button 
-                            onClick={handleRename} 
-                            className="flex-1 px-4 py-3 rounded-xl bg-black text-white text-sm font-black hover:bg-neutral-800 transition-all disabled:opacity-50 shadow-lg shadow-black/10"
-                            disabled={actionLoading || !newName.trim() || newName === project.name}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">วันที่บันทึก (Date)</label>
+                            <input
+                                type="date"
+                                value={formDate}
+                                onChange={e => setFormDate(e.target.value)}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">สถานะ (Status)</label>
+                            <input
+                                type="text"
+                                value={formStatus}
+                                onChange={e => setFormStatus(e.target.value)}
+                                placeholder="เช่น active, completed, archive"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">สรุปย่อสั้น ๆ (Summary)</label>
+                        <input
+                            type="text"
+                            value={formSummary}
+                            onChange={e => setFormSummary(e.target.value)}
+                            placeholder="สรุป 1-2 ประโยคสั้น ๆ สำหรับการแสดงผลแบบย่อ"
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400"
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">รายละเอียดเชิงลึก (Details - Markdown Supported)</label>
+                        <textarea
+                            value={formDetails}
+                            onChange={e => setFormDetails(e.target.value)}
+                            rows={8}
+                            placeholder="กรอกเนื้อหา โครงสร้าง คู่มือ หรือคำอธิบายแบบสมบูรณ์"
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400 font-mono"
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">กิจกรรมถัดไป (Next Action)</label>
+                        <input
+                            type="text"
+                            value={formNextAction}
+                            onChange={e => setFormNextAction(e.target.value)}
+                            placeholder="เช่น แก้ไขโมเดลข้อมูล, หรือทดสอบบน Staging"
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ลิงก์หลักฐาน / Commits (แยกด้วยขึ้นบรรทัดใหม่)</label>
+                            <textarea
+                                value={formEvidence}
+                                onChange={e => setFormEvidence(e.target.value)}
+                                rows={2}
+                                placeholder="วางลิงก์เว็บ หรือ commit hash (บรรทัดละ 1 ลิงก์)"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400 font-mono"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ไฟล์ที่เกี่ยวข้อง (แยกด้วยขึ้นบรรทัดใหม่)</label>
+                            <textarea
+                                value={formFiles}
+                                onChange={e => setFormFiles(e.target.value)}
+                                rows={2}
+                                placeholder="เช่น src/app/projects/page.tsx (บรรทัดละ 1 ไฟล์)"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400 font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                        <button
+                            type="button"
+                            onClick={() => setIsDocModalOpen(false)}
+                            className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95"
                         >
-                            {actionLoading ? "Saving..." : "Save Changes"}
+                            ยกเลิก
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSaveBlock}
+                            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl text-xs font-black transition-all active:scale-95 shadow-sm"
+                        >
+                            บันทึกบล็อก (Save Block)
                         </button>
                     </div>
                 </div>
             </Modal>
+
+            {/* Arbor Assistant Modal */}
+            <Modal
+                isOpen={isArborModalOpen}
+                onClose={() => setIsArborModalOpen(false)}
+                title="✨ Arbor Documentation Assistant"
+            >
+                <div className="space-y-4 text-left max-h-[80vh] overflow-y-auto pr-1">
+                    {!showArborPreview ? (
+                        <>
+                            <div className="p-3.5 bg-purple-50/50 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/20 rounded-2xl space-y-1">
+                                <span className="text-[10px] font-black uppercase text-purple-600 tracking-wider flex items-center gap-1">
+                                    <Info className="w-3.5 h-3.5" />
+                                    Arbor Auto-Parser
+                                </span>
+                                <p className="text-xs text-neutral-500 leading-normal font-medium dark:text-neutral-400">
+                                    วางข้อความดิบของคุณ เช่น walkthrough รายละเอียด PRD, commit log, ผลการทดสอบ (QA) หรือบันทึกข้อตกลงเพื่อแปลงเป็นบล็อกเอกสารโครงการอย่างรวดเร็ว
+                                </p>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ประเภทเอกสารปลายทาง</label>
+                                <select
+                                    value={arborSelectedType}
+                                    onChange={e => setArborSelectedType(e.target.value as any)}
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-neutral-400"
+                                >
+                                    <option value="auto">ตรวจจับอัตโนมัติ (Auto Detect Type)</option>
+                                    {Object.entries(BLOCK_TYPE_LABELS).map(([k, label]) => (
+                                        <option key={k} value={k}>{label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">วางข้อความดิบ (Source Text)</label>
+                                <textarea
+                                    value={arborSourceText}
+                                    onChange={e => setArborSourceText(e.target.value)}
+                                    rows={12}
+                                    placeholder="วางข้อความสำหรับวิเคราะห์ที่นี่..."
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400 font-mono"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsArborModalOpen(false)}
+                                    className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleGenerateArborDraft}
+                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black transition-all active:scale-95 shadow-md"
+                                >
+                                    วิเคราะห์ข้อความ (Generate Draft)
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/20 rounded-2xl space-y-0.5">
+                                <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider flex items-center gap-1">
+                                    <Check className="w-3.5 h-3.5" />
+                                    Draft Ready for Review
+                                </span>
+                                <p className="text-xs text-neutral-500 font-medium dark:text-neutral-400">
+                                    ตรวจสอบผลการวิเคราะห์ข้อมูลและกดยืนยัน (Apply Draft) เพื่อบันทึกข้อมูล
+                                </p>
+                            </div>
+
+                            {activeDocBlock ? (
+                                <div className="space-y-3">
+                                    <div className="text-xs font-bold text-neutral-400 uppercase tracking-wider pb-1 border-b border-neutral-200 dark:border-neutral-800">
+                                        Old vs Proposed Comparison (เปรียบเทียบการแก้ไข)
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 space-y-2">
+                                            <span className="text-[9px] font-black text-red-500 uppercase tracking-widest block">ดั้งเดิม (Old)</span>
+                                            <div className="font-black text-xs text-neutral-900 dark:text-neutral-100">{activeDocBlock.title}</div>
+                                            <div className="text-[9px] font-bold text-neutral-400">{activeDocBlock.date} ({BLOCK_TYPE_LABELS[activeDocBlock.type]})</div>
+                                            <p className="text-[11px] text-neutral-500 italic line-clamp-3 leading-relaxed mt-1">{activeDocBlock.summary}</p>
+                                        </div>
+                                        <div className="bg-emerald-50/20 dark:bg-emerald-950/5 border border-emerald-100/50 dark:border-emerald-900/25 rounded-2xl p-4 space-y-2">
+                                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block">นำเสนอ (Proposed)</span>
+                                            <div className="font-black text-xs text-neutral-900 dark:text-neutral-100">{arborDraftBlock?.title}</div>
+                                            <div className="text-[9px] font-bold text-neutral-400">{arborDraftBlock?.date} ({arborDraftBlock && BLOCK_TYPE_LABELS[arborDraftBlock.type]})</div>
+                                            <p className="text-[11px] text-neutral-500 italic line-clamp-3 leading-relaxed mt-1">{arborDraftBlock?.summary}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {arborDraftBlock && (
+                                <div className="space-y-3.5 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 bg-neutral-50/20 dark:bg-neutral-900/10">
+                                    <div className="flex items-center justify-between">
+                                        <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${BLOCK_TYPE_COLORS[arborDraftBlock.type]}`}>
+                                            {BLOCK_TYPE_LABELS[arborDraftBlock.type]}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-neutral-400">{arborDraftBlock.date}</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider block">หัวข้อ (Title)</span>
+                                        <input
+                                            type="text"
+                                            value={arborDraftBlock.title}
+                                            onChange={e => setArborDraftBlock({ ...arborDraftBlock, title: e.target.value })}
+                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider block">สรุปย่อ (Summary)</span>
+                                        <input
+                                            type="text"
+                                            value={arborDraftBlock.summary}
+                                            onChange={e => setArborDraftBlock({ ...arborDraftBlock, summary: e.target.value })}
+                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider block">รายละเอียดเชิงลึก (Details)</span>
+                                        <textarea
+                                            value={arborDraftBlock.details}
+                                            onChange={e => setArborDraftBlock({ ...arborDraftBlock, details: e.target.value })}
+                                            rows={6}
+                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none font-mono"
+                                        />
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-medium">
+                                        <div className="space-y-1">
+                                            <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider block">Evidence Links (บรรทัดละ 1 ลิงก์)</span>
+                                            <textarea
+                                                value={arborDraftBlock.evidenceLinks.join("\n")}
+                                                onChange={e => setArborDraftBlock({ 
+                                                    ...arborDraftBlock, 
+                                                    evidenceLinks: e.target.value.split("\n").map(s => s.trim()).filter(Boolean) 
+                                                })}
+                                                rows={2}
+                                                className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs outline-none font-mono"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider block">Related Files (บรรทัดละ 1 ไฟล์)</span>
+                                            <textarea
+                                                value={arborDraftBlock.relatedFiles.join("\n")}
+                                                onChange={e => setArborDraftBlock({ 
+                                                    ...arborDraftBlock, 
+                                                    relatedFiles: e.target.value.split("\n").map(s => s.trim()).filter(Boolean) 
+                                                })}
+                                                rows={2}
+                                                className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs outline-none font-mono"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider block">งานถัดไป (Next Action)</span>
+                                        <input
+                                            type="text"
+                                            value={arborDraftBlock.nextAction}
+                                            onChange={e => setArborDraftBlock({ ...arborDraftBlock, nextAction: e.target.value })}
+                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowArborPreview(false)}
+                                    className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                                >
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                    ย้อนกลับไปแก้ไข Source
+                                </button>
+                                <div className="flex gap-2 justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsArborModalOpen(false)}
+                                        className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleApplyArborDraft}
+                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all active:scale-95 shadow-md flex items-center justify-center gap-1.5"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        ยืนยันบันทึก (Apply Draft)
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </Modal>
+
+            {/* Confirm Delete Doc Block Dialog */}
+            <ConfirmDialog
+                isOpen={isDeleteDocOpen}
+                title="ลบบล็อกเอกสาร (Delete Block)"
+                message="คุณแน่ใจหรือไม่ว่าต้องการลบบล็อกเอกสารนี้? การดำเนินการนี้จะไม่สามารถกู้คืนข้อมูลกลับมาได้"
+                confirmText="ยืนยันการลบ"
+                onConfirm={handleConfirmDeleteBlock}
+                onCancel={() => {
+                    setIsDeleteDocOpen(false);
+                    setDocToDelete(null);
+                }}
+            />
 
             <Toast 
                 isVisible={showToast} 
@@ -268,22 +1648,163 @@ export default function ProjectDetailClient() {
     );
 }
 
+function DocBlockCard({ 
+    block, 
+    onEdit, 
+    onDelete 
+}: { 
+    block: ProjectDocumentationBlock; 
+    onEdit: (b: ProjectDocumentationBlock) => void;
+    onDelete: (id: string) => void;
+}) {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    return (
+        <div className="bg-theme-card border border-neutral-200 rounded-3xl p-5 hover:shadow-md transition-all dark:border-neutral-800 text-left">
+            <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${BLOCK_TYPE_COLORS[block.type]}`}>
+                            {BLOCK_TYPE_LABELS[block.type]}
+                        </span>
+                        <span className="text-[10px] font-bold text-neutral-400">{block.date}</span>
+                        {block.generatedBy === "arbor" && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-300 text-[9px] font-black uppercase tracking-widest border border-purple-100/50 dark:border-purple-900/30">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                Arbor Draft
+                            </span>
+                        )}
+                        {block.status && (
+                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase ${block.status === 'active' ? 'bg-neutral-50 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400' : 'bg-green-50 text-green-600'}`}>
+                                {block.status}
+                            </span>
+                        )}
+                    </div>
+                    <h3 className="font-black text-base text-neutral-900 dark:text-neutral-100 tracking-tight pt-1">
+                        {block.title}
+                    </h3>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                    <button 
+                        onClick={() => onEdit(block)}
+                        className="p-2 rounded-xl text-neutral-400 hover:text-black hover:bg-neutral-50 dark:hover:bg-neutral-850 transition-all active:scale-95"
+                        title="Edit Documentation Block"
+                    >
+                        <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button 
+                        onClick={() => onDelete(block.id)}
+                        className="p-2 rounded-xl text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all active:scale-95"
+                        title="Delete Documentation Block"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 mt-2 line-clamp-2 leading-relaxed">
+                {block.summary}
+            </p>
+
+            {/* Expandable Details */}
+            {isExpanded ? (
+                <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-800 space-y-4">
+                    <div className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium whitespace-pre-wrap font-mono bg-neutral-50/50 dark:bg-neutral-900/20 p-4 rounded-2xl border border-neutral-200/50 dark:border-neutral-800/50 max-h-[400px] overflow-y-auto">
+                        {block.details}
+                    </div>
+
+                    {block.nextAction && (
+                        <div className="p-3.5 bg-orange-50/30 dark:bg-orange-950/10 border border-orange-100 dark:border-orange-900/20 rounded-2xl">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-orange-600 dark:text-orange-400 block mb-0.5">Next Action</span>
+                            <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{block.nextAction}</span>
+                        </div>
+                    )}
+
+                    {/* Metadata Lists */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-medium pt-2">
+                        {block.evidenceLinks && block.evidenceLinks.length > 0 && (
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider flex items-center gap-1">
+                                    <ExternalLink className="w-3 h-3" />
+                                    Evidence Links / Commits
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {block.evidenceLinks.map((link, idx) => (
+                                        <a 
+                                            key={idx} 
+                                            href={link.startsWith("http") ? link : undefined} 
+                                            target={link.startsWith("http") ? "_blank" : undefined}
+                                            rel="noopener noreferrer"
+                                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold truncate max-w-[200px] ${link.startsWith("http") ? "bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400 hover:underline" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"}`}
+                                            title={link}
+                                        >
+                                            {link.startsWith("http") ? (link.replace(/^https?:\/\/(www\.)?/, "").substring(0, 20) + "...") : link}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {block.relatedFiles && block.relatedFiles.length > 0 && (
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider flex items-center gap-1">
+                                    <FileCode className="w-3 h-3" />
+                                    Related Files
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {block.relatedFiles.map((file, idx) => (
+                                        <span 
+                                            key={idx} 
+                                            className="px-2 py-0.5 rounded-lg bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[10px] text-neutral-600 dark:text-neutral-400 font-bold"
+                                        >
+                                            {file}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Source tracking details */}
+                    {block.sourceType && (
+                        <div className="text-[9px] font-semibold text-neutral-400 dark:text-neutral-500 pt-2 flex items-center gap-1 border-t border-neutral-100 dark:border-neutral-800/60 w-fit">
+                            <span>Source: {block.sourceType}</span>
+                            <span>•</span>
+                            <span>Generated: {block.appliedAt ? new Date(block.appliedAt).toLocaleString() : block.updatedAt}</span>
+                        </div>
+                    )}
+                </div>
+            ) : null}
+
+            <div className="mt-3 flex justify-end">
+                <button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-black dark:hover:text-white transition-all flex items-center gap-1"
+                >
+                    {isExpanded ? "Collapse Details" : "Expand Details"}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 function ItemCard({ item }: { item: ProjectItem }) {
     return (
         <div className="bg-theme-card border border-neutral-200 rounded-3xl p-5 flex justify-between items-center hover:shadow-xl hover:border-neutral-300 transition-all group active:scale-[0.99] cursor-default">
             <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${
-                    item.status === 'done' ? 'bg-green-100 text-green-600' : 'bg-neutral-50 text-neutral-400 group-hover:bg-neutral-900 group-hover:text-white'
+                    item.status === 'done' ? 'bg-green-100 text-green-600' : 'bg-neutral-50 text-neutral-400 group-hover:bg-neutral-900 group-hover:text-white dark:bg-neutral-800 dark:text-neutral-500'
                 }`}>
                     {item.status === 'done' ? <CheckCircle2 className="w-6 h-6" /> : <Layout className="w-5 h-5" />}
                 </div>
                 <div>
-                    <div className={`font-black tracking-tight ${item.status === 'done' ? 'line-through text-neutral-400' : 'text-neutral-900 text-lg'}`}>
+                    <div className={`font-black tracking-tight ${item.status === 'done' ? 'line-through text-neutral-400' : 'text-neutral-900 dark:text-neutral-100 text-lg'}`}>
                         {item.title}
                     </div>
                     <div className="flex items-center gap-3 mt-1">
                         {item.workstream && (
-                            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-100">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 dark:bg-orange-950/20 dark:text-orange-400 px-2 py-0.5 rounded-lg border border-orange-100 dark:border-orange-900/30">
                                 {item.workstream}
                             </span>
                         )}
@@ -299,9 +1820,9 @@ function ItemCard({ item }: { item: ProjectItem }) {
             <div className="flex items-center gap-6">
                 <div className="flex flex-col items-end">
                     <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                        item.status === 'inbox' ? 'bg-neutral-100 text-neutral-500' : 
-                        item.status === 'planned' ? 'bg-blue-100 text-blue-700' : 
-                        'bg-green-100 text-green-700'
+                        item.status === 'inbox' ? 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400' : 
+                        item.status === 'planned' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' : 
+                        'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300'
                     }`}>
                         {item.status}
                     </span>
@@ -321,7 +1842,7 @@ function ItemCard({ item }: { item: ProjectItem }) {
 
 function RelatedNotesSection({ projectId }: { projectId: string }) {
     const router = useRouter();
-    const [notes, setNotes] = useState<any[]>([]);
+    const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
 
     const loadNotes = useCallback(async () => {
@@ -351,7 +1872,7 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
                 const data = await res.json();
                 router.push(`/docs/${data.doc.id}`);
             }
-        } catch (e) {
+        } catch {
             alert("Failed to create note");
         }
     }
@@ -365,7 +1886,7 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
                 </div>
                 <button 
                     onClick={handleCreateNote}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-neutral-200 text-[10px] font-black uppercase tracking-widest hover:border-neutral-900 transition-all shadow-sm active:scale-95"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-neutral-200 text-[10px] font-black uppercase tracking-widest hover:border-neutral-900 transition-all shadow-sm active:scale-95 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:border-neutral-700"
                 >
                     <Plus className="w-3 h-3" />
                     Create Note
@@ -375,7 +1896,7 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
             {loading ? (
                 <div className="text-center py-10 text-neutral-400 italic text-xs font-medium">Loading related bytes...</div>
             ) : notes.length === 0 ? (
-                <div className="text-center py-10 bg-neutral-50/50 rounded-3xl border border-dashed border-neutral-200">
+                <div className="text-center py-10 bg-neutral-50/50 dark:bg-neutral-900/10 rounded-3xl border border-dashed border-neutral-200">
                     <p className="text-neutral-400 font-medium italic text-xs">No linked notes. Document your process.</p>
                 </div>
             ) : (
@@ -384,9 +1905,9 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
                         <div 
                             key={note.id} 
                             onClick={() => router.push(`/docs/${note.id}`)}
-                            className="bg-theme-card border border-neutral-200 rounded-2xl p-4 hover:border-neutral-900 transition-all group cursor-pointer shadow-sm hover:shadow-md active:scale-[0.98]"
+                            className="bg-theme-card border border-neutral-200 rounded-2xl p-4 hover:border-neutral-900 transition-all group cursor-pointer shadow-sm hover:shadow-md active:scale-[0.98] dark:border-neutral-800 dark:hover:border-neutral-700"
                         >
-                            <div className="font-bold text-neutral-900 line-clamp-1 group-hover:text-black">{note.title || "Untitled"}</div>
+                            <div className="font-bold text-neutral-900 dark:text-neutral-100 line-clamp-1 group-hover:text-black dark:group-hover:text-white">{note.title || "Untitled"}</div>
                             <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest mt-1">
                                 Modified {new Date(note.updated_at).toLocaleDateString()}
                             </div>

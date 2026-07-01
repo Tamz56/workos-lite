@@ -96,6 +96,40 @@ export interface Project {
     updated_at: string;
 }
 
+export type ProjectRegistryStatus =
+    | "idea"
+    | "planning"
+    | "active"
+    | "in_development"
+    | "testing"
+    | "in_use"
+    | "maintenance"
+    | "paused"
+    | "completed";
+
+export type ProjectProgressStage =
+    | "Concept"
+    | "Spec Ready"
+    | "Dev Ready"
+    | "In Dev"
+    | "QA"
+    | "Committed"
+    | "In Use"
+    | "Needs Improvement"
+    | "Paused";
+
+export interface ProjectRegistryMetadata {
+    category: string;
+    status: ProjectRegistryStatus;
+    priority: "high" | "medium" | "low" | "none";
+    currentGoal: string;
+    progressStage: ProjectProgressStage;
+    nextAction: string;
+    cadence: string;
+    riskOrBlockedBy: string;
+    lastUpdated: string;
+}
+
 export interface ProjectItem {
     id: string;
     project_id: string;
@@ -142,4 +176,47 @@ export interface NoteLink {
     linked_entity_type: "task" | "project";
     linked_entity_id: string;
     created_at: string;
+}
+
+export type ProjectDocBlockType = 
+    | "brief"
+    | "process_note"
+    | "sop"
+    | "structure"
+    | "decision"
+    | "milestone"
+    | "issue_fix"
+    | "publish"
+    | "qa_review";
+
+export type DocBlockSourceType = 
+    | "manual_paste" 
+    | "walkthrough" 
+    | "commit_log" 
+    | "qa_report" 
+    | "publish_log" 
+    | "chat_summary";
+
+export interface ProjectDocumentationBlock {
+    id: string;
+    projectSlug: string;
+    type: ProjectDocBlockType;
+    title: string;
+    date: string;
+    summary: string;
+    details: string;
+    evidenceLinks: string[]; // URLs or Commit hashes
+    relatedFiles: string[];  // File names/paths
+    nextAction?: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+
+    // Source tracking & Arbor Assistant
+    sourceText?: string;
+    sourceExcerpt?: string;
+    sourceType?: DocBlockSourceType;
+    generatedBy?: "arbor";
+    reviewedByUser?: boolean;
+    appliedAt?: string;
 }
