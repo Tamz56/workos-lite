@@ -16,7 +16,7 @@ import {
 import { PreviewData, ImportPayload } from "@/lib/arborInboxSchema";
 import { ImportLog } from "@/lib/arborInboxStore";
 import { parseArticleMarkdown, generateUpdatePayload } from "@/lib/articleParser";
-import { parseAnalyticsData, generateSnapshotPayload } from "@/lib/analyticsParser";
+import { parseAnalyticsData, generateSnapshotPayload, parseGA4BackfillData } from "@/lib/analyticsParser";
 
 export default function ArborInboxClient() {
     const [payloadText, setPayloadText] = useState("");
@@ -37,7 +37,7 @@ export default function ArborInboxClient() {
     const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
     // Markdown import mode states
-    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics" | "manual_snapshot" | "screenshot">("json");
+    const [importMode, setImportMode] = useState<"json" | "markdown" | "analytics" | "manual_snapshot" | "screenshot" | "ga4_backfill">("json");
     const [markdownText, setMarkdownText] = useState("");
     const [parsedResult, setParsedResult] = useState<any>(null);
     const [writingProjects, setWritingProjects] = useState<any[]>([]);
@@ -92,6 +92,15 @@ export default function ArborInboxClient() {
     const [quickOtherClicks, setQuickOtherClicks] = useState("");
     const [quickNote, setQuickNote] = useState("");
 
+    // GA4 Backfill states
+    const [backfillRawText, setBackfillRawText] = useState("");
+    const [backfillResult, setBackfillResult] = useState<any>(null);
+    const [backfillWindow, setBackfillWindow] = useState("CustomRange");
+    const [backfillDate, setBackfillDate] = useState(() => new Date().toISOString().split("T")[0]);
+    const [backfillRowMappings, setBackfillRowMappings] = useState<Record<number, string>>({}); // rowIndex -> projectId
+    const [showExcludedRows, setShowExcludedRows] = useState(false);
+    const [batchApplyProgress, setBatchApplyProgress] = useState<{ current: number; total: number; active: boolean; log: string[] } | null>(null);
+
     // Analytics import mode states
     const [analyticsText, setAnalyticsText] = useState("");
     const [analyticsWindow, setAnalyticsWindow] = useState("24h");
@@ -100,6 +109,214 @@ export default function ArborInboxClient() {
     const [analyticsNote, setAnalyticsNote] = useState("");
     const [analyticsResult, setAnalyticsResult] = useState<any>(null);
     const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
+
+    const handleParseGA4Backfill = (textToParse: string) => {
+        if (!textToParse.trim()) return;
+        const result = parseGA4BackfillData(textToParse, writingProjects);
+        setBackfillResult(result);
+        if (result.snapshotDate) {
+            setBackfillDate(result.snapshotDate);
+        }
+        
+        // Setup initial mappings
+        const initialMappings: Record<number, string> = {};
+        result.rows.forEach(row => {
+            if (row.matchedProject?.id) {
+                initialMappings[row.index] = row.matchedProject.id;
+            }
+        });
+        setBackfillRowMappings(initialMappings);
+        setStatusMessage({
+            type: "success",
+            text: `สแกนพบแถวข้อมูล ${result.rows.length} แถว (ตรวจพบช่วงเวลาสถิติ: ${result.dateRangeStart || "ไม่ระบุ"} ถึง ${result.dateRangeEnd || "ไม่ระบุ"})`
+        });
+    };
+
+    const handleGenerateBackfillRowPayload = (row: any, overrideProjectId?: string) => {
+        setStatusMessage(null);
+        
+        const finalProjectId = overrideProjectId || backfillRowMappings[row.index] || row.matchedProject?.id;
+        if (!finalProjectId) {
+            setStatusMessage({
+                type: "error",
+                text: `กรุณาระบุ Target Writing Project สำหรับหน้า "${row.pageTitle || row.pagePath}"`
+            });
+            return null;
+        }
+
+        const matched = writingProjects.find(p => p.id === finalProjectId);
+        if (!matched) {
+            setStatusMessage({ type: "error", text: "ไม่พบโครงการเป้าหมายในระบบ" });
+            return null;
+        }
+
+        const windowKey = `snap${backfillWindow}`;
+        
+        const sourceMetadata = {
+            sourceFileName: "GA4 Sheet Backfill",
+            sourceType: "ga4_article",
+            snapshotWindow: backfillWindow,
+            snapshotDate: backfillDate,
+            matchedBy: overrideProjectId ? "manual" : (row.matchedProject?.method || "manual"),
+            matchConfidence: overrideProjectId ? "Manual" : (row.matchedProject?.confidence || "Manual"),
+            rowType: "ga4_backfill_row",
+            importMethod: "ga4_sheet_backfill",
+            dateRangeStart: backfillResult?.dateRangeStart || "",
+            dateRangeEnd: backfillResult?.dateRangeEnd || "",
+            rawSourceSummary: `GA4 Backfill Row: Views=${row.views}, Users=${row.activeUsers}, Events=${row.eventCount}`,
+            importNote: `GA4 backfill import for range ${backfillResult?.dateRangeStart || ""} - ${backfillResult?.dateRangeEnd || ""}`
+        };
+
+        const ga4Snapshots = {
+            [windowKey]: {
+                snapshotDate: backfillDate,
+                window: backfillWindow,
+                publishedUrl: row.pagePath || "",
+                pageTitle: row.pageTitle || "",
+                views: row.views,
+                activeUsers: row.activeUsers,
+                events: row.eventCount,
+                averageEngagementTime: row.averageEngagementTime,
+                bounceRate: row.bounceRate || "",
+                sourceMedium: row.sourceMedium || "",
+                notes: `GA4 Backfill Range: ${backfillResult?.dateRangeStart || ""} to ${backfillResult?.dateRangeEnd || ""}`
+            }
+        };
+
+        const payload = {
+            schemaVersion: "workos-writing-lab-update-v0.1",
+            source: "Arbor",
+            importBatchTitle: `GA4 Backfill - ${matched.title} (${backfillWindow})`,
+            action: "apply_update",
+            target: {
+                type: "writing_lab_project",
+                projectId: matched.id,
+                projectSlug: matched.slug || ""
+            },
+            fields: {
+                performanceFeedback: {
+                    ga4Snapshots,
+                    sourceMetadata
+                }
+            }
+        };
+
+        return payload;
+    };
+
+    const handleBatchApplyBackfill = async () => {
+        if (!backfillResult || backfillResult.rows.length === 0) return;
+
+        const rowsToApply = backfillResult.rows.filter((row: any) => {
+            const pId = backfillRowMappings[row.index] || row.matchedProject?.id;
+            return row.status !== "Excluded" && pId;
+        });
+
+        if (rowsToApply.length === 0) {
+            setStatusMessage({
+                type: "error",
+                text: "ไม่มีบทความในสถานะพร้อม (Ready) สำหรับการนำเข้าแบบกลุ่ม"
+            });
+            return;
+        }
+
+        // Show duplicate warnings
+        const duplicateRows = rowsToApply.filter((row: any) => {
+            const pId = backfillRowMappings[row.index] || row.matchedProject?.id;
+            const proj = writingProjects.find(p => p.id === pId);
+            if (proj && proj.notes) {
+                try {
+                    const parsed = JSON.parse(proj.notes);
+                    const snapKey = `snap${backfillWindow}`;
+                    return !!(parsed?.performanceFeedback?.ga4Snapshots?.[snapKey]);
+                } catch {
+                    return false;
+                }
+            }
+            return false;
+        });
+
+        if (duplicateRows.length > 0) {
+            const confirmBatch = window.confirm(
+                `คำเตือน: ตรวจพบสถิติซ้ำในรอบช่วงเวลา ${backfillWindow} จำนวน ${duplicateRows.length} รายการ\nการกดดำเนินการต่อจะเขียนทับข้อมูลเดิมที่บันทึกไว้ ท่านต้องการยืนยันการนำเข้าทับข้อมูลหรือไม่?`
+            );
+            if (!confirmBatch) return;
+        }
+
+        setBatchApplyProgress({
+            current: 0,
+            total: rowsToApply.length,
+            active: true,
+            log: ["เริ่มการนำเข้าข้อมูลสถิติย้อนหลังแบบกลุ่ม..."]
+        });
+
+        setStatusMessage(null);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < rowsToApply.length; i++) {
+            const row = rowsToApply[i];
+            const pId = backfillRowMappings[row.index] || row.matchedProject?.id;
+            const payload = handleGenerateBackfillRowPayload(row, pId);
+            const proj = writingProjects.find(p => p.id === pId);
+
+            if (!payload) {
+                failCount++;
+                setBatchApplyProgress(prev => prev ? {
+                    ...prev,
+                    current: i + 1,
+                    log: [...prev.log, `❌ แถวที่ ${row.index}: ดึงตัวแมตช์ล้มเหลว`]
+                } : null);
+                continue;
+            }
+
+            try {
+                const res = await fetch("/api/arbor-inbox", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "apply_update", payload })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || "API failure");
+                }
+
+                successCount++;
+                setBatchApplyProgress(prev => prev ? {
+                    ...prev,
+                    current: i + 1,
+                    log: [...prev.log, `✅ แถวที่ ${row.index}: อัปเดต "${proj?.title || 'N/A'}" สำเร็จ`]
+                } : null);
+            } catch (err: any) {
+                failCount++;
+                setBatchApplyProgress(prev => prev ? {
+                    ...prev,
+                    current: i + 1,
+                    log: [...prev.log, `❌ แถวที่ ${row.index}: อัปเดต "${proj?.title || 'N/A'}" ล้มเหลว (${err.message})`]
+                } : null);
+            }
+        }
+
+        setBatchApplyProgress(prev => prev ? {
+            ...prev,
+            active: false,
+            log: [...prev.log, `🎉 นำเข้าเสร็จสิ้น: สำเร็จ ${successCount} รายการ, ล้มเหลว ${failCount} รายการ`]
+        } : null);
+
+        // Reload writing projects
+        fetch("/api/content/writing-lab/projects")
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) setWritingProjects(data);
+            });
+        
+        loadLogs();
+        setStatusMessage({
+            type: successCount > 0 ? "success" : "error",
+            text: `ทำรายการ Backfill สำเร็จ ${successCount} รายการ, ล้มเหลว ${failCount} รายการ`
+        });
+    };
 
     const handleParseAnalytics = (textToParse: string) => {
         if (!textToParse.trim()) return;
@@ -935,10 +1152,10 @@ export default function ArborInboxClient() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 {/* Left panel: Input Area */}
                 <div className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm flex flex-col gap-4">
-                    <div className="flex bg-theme-input rounded-2xl p-1 border border-theme-border/40 mb-2">
+                    <div className="flex flex-wrap bg-theme-input rounded-2xl p-1 border border-theme-border/40 mb-2 gap-1">
                         <button
                             onClick={() => setImportMode("json")}
-                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                            className={`flex-1 min-w-[80px] py-1.5 text-xs font-black rounded-xl transition-all ${
                                 importMode === "json"
                                     ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
                                     : "text-theme-muted hover:text-theme-primary"
@@ -948,7 +1165,7 @@ export default function ArborInboxClient() {
                         </button>
                         <button
                             onClick={() => setImportMode("markdown")}
-                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                            className={`flex-1 min-w-[130px] py-1.5 text-xs font-black rounded-xl transition-all ${
                                 importMode === "markdown"
                                     ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
                                     : "text-theme-muted hover:text-theme-primary"
@@ -958,7 +1175,7 @@ export default function ArborInboxClient() {
                         </button>
                         <button
                             onClick={() => setImportMode("analytics")}
-                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                            className={`flex-1 min-w-[110px] py-1.5 text-xs font-black rounded-xl transition-all ${
                                 importMode === "analytics"
                                     ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
                                     : "text-theme-muted hover:text-theme-primary"
@@ -968,7 +1185,7 @@ export default function ArborInboxClient() {
                         </button>
                         <button
                             onClick={() => setImportMode("manual_snapshot")}
-                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                            className={`flex-1 min-w-[110px] py-1.5 text-xs font-black rounded-xl transition-all ${
                                 importMode === "manual_snapshot"
                                     ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
                                     : "text-theme-muted hover:text-theme-primary"
@@ -978,13 +1195,23 @@ export default function ArborInboxClient() {
                         </button>
                         <button
                             onClick={() => setImportMode("screenshot")}
-                            className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${
+                            className={`flex-1 min-w-[110px] py-1.5 text-xs font-black rounded-xl transition-all ${
                                 importMode === "screenshot"
                                     ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
                                     : "text-theme-muted hover:text-theme-primary"
                             }`}
                         >
                             Screenshot Snapshot
+                        </button>
+                        <button
+                            onClick={() => setImportMode("ga4_backfill")}
+                            className={`flex-1 min-w-[90px] py-1.5 text-xs font-black rounded-xl transition-all ${
+                                importMode === "ga4_backfill"
+                                    ? "bg-theme-card text-theme-primary shadow-sm border border-theme-border/10"
+                                    : "text-theme-muted hover:text-theme-primary"
+                            }`}
+                        >
+                            GA4 Backfill
                         </button>
                     </div>
 
@@ -1966,6 +2193,71 @@ export default function ArborInboxClient() {
                         </div>
                     )}
 
+                    {importMode === "ga4_backfill" && (
+                        <div className="space-y-4">
+                            <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-2xl text-[11px] text-blue-700 dark:text-blue-400 font-bold space-y-1">
+                                <div>ℹ️ GA4 Article-level Backfill Tool</div>
+                                <div className="text-[10px] text-theme-muted font-medium">
+                                    ใช้สำหรับนำเข้า GA4 article-level data เท่านั้น ไม่ใช่ภาพรวมทั้งเว็บไซต์
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                    Pasted Report Table / TSV (วางตารางรายงาน GA4 ที่นี่) <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={backfillRawText}
+                                    onChange={(e) => setBackfillRawText(e.target.value)}
+                                    rows={8}
+                                    placeholder="วางข้อมูลตารางรายงานจาก GA4..."
+                                    className="w-full bg-theme-input border border-theme-border rounded-2xl p-4 text-xs font-mono text-theme-primary outline-none focus:border-theme-primary/30 transition-all resize-y"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Snapshot Window (รอบช่วงเวลาสถิติ) <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={backfillWindow}
+                                        onChange={(e) => setBackfillWindow(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2.5 text-xs text-theme-primary font-bold focus:outline-none"
+                                    >
+                                        <option value="SincePublished">Since Published (ตั้งแต่เผยแพร่)</option>
+                                        <option value="CustomRange">Custom Range (รอบเวลาอื่น/กำหนดเอง)</option>
+                                        <option value="15d">15 Days (15 วันแรก)</option>
+                                        <option value="30d">30 Days (30 วันแรก)</option>
+                                        <option value="90d">90 Days (90 วันแรก)</option>
+                                        <option value="24h">24 Hours (24 ชม. แรก)</option>
+                                        <option value="7d">7 Days (7 วันแรก)</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-theme-secondary uppercase tracking-wider block">
+                                        Snapshot Date (วันที่บันทึกสถิติ) <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={backfillDate}
+                                        onChange={(e) => setBackfillDate(e.target.value)}
+                                        className="w-full bg-theme-input border border-theme-border rounded-xl px-3 py-2 text-xs text-theme-primary font-bold focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => handleParseGA4Backfill(backfillRawText)}
+                                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/15"
+                            >
+                                <ArrowPathIcon className="w-4 h-4" />
+                                Parse & Preview GA4 Report
+                            </button>
+                        </div>
+                    )}
+
                     {/* Validation Feedback Panel */}
                     {validationChecked && (
                         <div className={`p-4 rounded-2xl border ${
@@ -2229,6 +2521,273 @@ export default function ArborInboxClient() {
                     )}
                 </div>
             </div>
+
+            {importMode === "ga4_backfill" && backfillResult && (
+                <div className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm flex flex-col gap-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-theme-border/40 pb-4">
+                        <div>
+                            <h2 className="text-lg font-black text-theme-primary">
+                                รายชื่อหน้าบทความที่ตรวจพบ (GA4 Backfill Row Preview)
+                            </h2>
+                            <p className="text-xs text-theme-muted mt-1">
+                                ช่วงเวลาข้อมูล: {backfillResult.dateRangeStart || "ไม่ระบุ"} ถึง {backfillResult.dateRangeEnd || "ไม่ระบุ"} (Snapshot Date: {backfillDate})
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <label className="flex items-center gap-2 text-xs font-bold text-theme-secondary cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={showExcludedRows}
+                                    onChange={(e) => setShowExcludedRows(e.target.checked)}
+                                    className="rounded border-theme-border text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                />
+                                Show Excluded Rows (แสดงบรรทัดที่ข้าม)
+                            </label>
+                            
+                            <button
+                                onClick={handleBatchApplyBackfill}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/15"
+                                disabled={batchApplyProgress?.active}
+                            >
+                                <CheckCircleIcon className="w-4 h-4" />
+                                Batch Apply Selected
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Batch Progress Log UI */}
+                    {batchApplyProgress && (
+                        <div className="p-4 bg-theme-input border border-theme-border rounded-2xl space-y-3">
+                            <div className="flex items-center justify-between text-xs font-bold">
+                                <span className="text-theme-secondary">
+                                    {batchApplyProgress.active ? "กำลังดำเนินการ..." : "ดำเนินการเสร็จสิ้น"}
+                                </span>
+                                <span className="text-theme-primary">
+                                    {batchApplyProgress.current} / {batchApplyProgress.total} รายการ
+                                </span>
+                            </div>
+                            <div className="w-full bg-theme-border/30 rounded-full h-2 overflow-hidden">
+                                <div 
+                                    className="bg-blue-600 h-full transition-all duration-300"
+                                    style={{ width: `${(batchApplyProgress.current / batchApplyProgress.total) * 100}%` }}
+                                />
+                            </div>
+                            <div className="bg-theme-card/60 rounded-xl p-3 text-[10px] font-mono text-theme-muted max-h-32 overflow-y-auto space-y-1 border border-theme-border/40">
+                                {batchApplyProgress.log.map((logLine, idx) => (
+                                    <div key={idx}>{logLine}</div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-left text-xs">
+                            <thead>
+                                <tr className="border-b border-theme-border text-theme-muted font-bold text-[10px] uppercase">
+                                    <th className="py-2.5 px-3">Status</th>
+                                    <th className="py-2.5 px-3">Page Title / Path</th>
+                                    <th className="py-2.5 px-3 text-right">Views</th>
+                                    <th className="py-2.5 px-3 text-right">Active Users</th>
+                                    <th className="py-2.5 px-3 text-right">Events</th>
+                                    <th className="py-2.5 px-3 text-right">Bounce Rate</th>
+                                    <th className="py-2.5 px-3">Target Writing Project</th>
+                                    <th className="py-2.5 px-3">Confidence</th>
+                                    <th className="py-2.5 px-3 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {backfillResult.rows
+                                    .filter((row: any) => showExcludedRows || row.status !== "Excluded")
+                                    .map((row: any) => {
+                                        const pId = backfillRowMappings[row.index] || "";
+                                        const status = row.status;
+                                        
+                                        // Check duplicate warning
+                                        let hasDuplicate = false;
+                                        if (pId) {
+                                            const proj = writingProjects.find(p => p.id === pId);
+                                            if (proj && proj.notes) {
+                                                try {
+                                                    const parsed = JSON.parse(proj.notes);
+                                                    const snapKey = `snap${backfillWindow}`;
+                                                    hasDuplicate = !!(parsed?.performanceFeedback?.ga4Snapshots?.[snapKey]);
+                                                } catch {}
+                                            }
+                                        }
+
+                                        return (
+                                            <tr 
+                                                key={row.index} 
+                                                className={`border-b border-theme-border/40 hover:bg-theme-input/40 transition-colors ${
+                                                    status === "Excluded" ? "opacity-50" : ""
+                                                }`}
+                                            >
+                                                {/* Status Column */}
+                                                <td className="py-3 px-3">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                        status === "Ready" 
+                                                            ? "bg-green-500/10 text-green-600" 
+                                                            : status === "Needs manual target" 
+                                                            ? "bg-amber-500/10 text-amber-600" 
+                                                            : "bg-theme-border text-theme-muted"
+                                                    }`}>
+                                                        {status === "Ready" ? "Ready" : status === "Needs manual target" ? "Needs Target" : "Excluded"}
+                                                    </span>
+                                                </td>
+
+                                                {/* Page Title & Path Column */}
+                                                <td className="py-3 px-3 max-w-[280px]">
+                                                    <div className="font-bold text-theme-primary truncate" title={row.pageTitle}>
+                                                        {row.pageTitle || "Untitled"}
+                                                    </div>
+                                                    <div className="text-[10px] text-theme-muted truncate" title={row.pagePath}>
+                                                        {row.pagePath}
+                                                    </div>
+                                                </td>
+
+                                                {/* Metrics Columns */}
+                                                <td className="py-3 px-3 text-right font-bold text-theme-primary">
+                                                    {row.views.toLocaleString()}
+                                                </td>
+                                                <td className="py-3 px-3 text-right text-theme-secondary">
+                                                    {row.activeUsers.toLocaleString()}
+                                                </td>
+                                                <td className="py-3 px-3 text-right text-theme-muted">
+                                                    {row.eventCount.toLocaleString()}
+                                                </td>
+                                                <td className="py-3 px-3 text-right text-theme-muted">
+                                                    {row.bounceRate || "-"}
+                                                </td>
+
+                                                {/* Project Match Target Dropdown */}
+                                                <td className="py-3 px-3">
+                                                    <select
+                                                        value={pId}
+                                                        onChange={(e) => {
+                                                            const newProjectId = e.target.value;
+                                                            setBackfillRowMappings(prev => ({
+                                                                ...prev,
+                                                                [row.index]: newProjectId
+                                                            }));
+                                                            
+                                                            // Dynamically recalculate row status
+                                                            if (newProjectId) {
+                                                                row.status = "Ready";
+                                                            } else if (row.status !== "Excluded") {
+                                                                row.status = "Needs manual target";
+                                                            }
+                                                        }}
+                                                        className="w-full bg-theme-input border border-theme-border rounded-lg px-2 py-1 text-xs text-theme-primary focus:outline-none"
+                                                        disabled={status === "Excluded" && !showExcludedRows}
+                                                    >
+                                                        <option value="">-- Select Project --</option>
+                                                        {writingProjects.map((p) => (
+                                                            <option key={p.id} value={p.id}>
+                                                                {p.title}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+
+                                                {/* Confidence Column */}
+                                                <td className="py-3 px-3">
+                                                    {row.matchedProject && (
+                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                                                            row.matchedProject.confidence === "High"
+                                                                ? "bg-green-500/10 text-green-600"
+                                                                : row.matchedProject.confidence === "Medium"
+                                                                ? "bg-blue-500/10 text-blue-600"
+                                                                : "bg-amber-500/10 text-amber-600"
+                                                        }`}>
+                                                            {row.matchedProject.confidence}
+                                                        </span>
+                                                    )}
+                                                </td>
+
+                                                {/* Action buttons Column */}
+                                                <td className="py-3 px-3 text-center">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        {hasDuplicate && (
+                                                            <span 
+                                                                className="text-amber-500 hover:text-amber-600 cursor-help"
+                                                                title="สถิติรอบเวลานี้มีข้อมูลอยู่แล้ว การกดนำเข้าจะเขียนทับข้อมูลเดิม"
+                                                            >
+                                                                <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            onClick={() => {
+                                                                const payload = handleGenerateBackfillRowPayload(row, pId);
+                                                                if (payload) {
+                                                                    setPayloadText(JSON.stringify(payload, null, 2));
+                                                                    handleValidate(JSON.stringify(payload));
+                                                                }
+                                                            }}
+                                                            className="px-2 py-1 bg-theme-input hover:bg-theme-border/40 text-theme-secondary hover:text-theme-primary font-bold rounded-lg transition-colors text-[10px]"
+                                                            disabled={!pId}
+                                                            title="Preview payload for this row"
+                                                        >
+                                                            Preview
+                                                        </button>
+                                                        <button
+                                                            onClick={async () => {
+                                                                const payload = handleGenerateBackfillRowPayload(row, pId);
+                                                                if (!payload) return;
+                                                                
+                                                                if (hasDuplicate) {
+                                                                    const confirmSingle = window.confirm(
+                                                                        "คำเตือน: ข้อมูลรอบเวลานี้มีอยู่แล้ว คุณต้องการยืนยันการนำเขียนทับหรือไม่?"
+                                                                    );
+                                                                    if (!confirmSingle) return;
+                                                                }
+
+                                                                setLoading(true);
+                                                                try {
+                                                                    const res = await fetch("/api/arbor-inbox", {
+                                                                        method: "POST",
+                                                                        headers: { "Content-Type": "application/json" },
+                                                                        body: JSON.stringify({ action: "apply_update", payload })
+                                                                    });
+                                                                    const data = await res.json();
+                                                                    if (!res.ok) throw new Error(data.error || "Failed to update");
+                                                                    
+                                                                    setStatusMessage({
+                                                                        type: "success",
+                                                                        text: `นำเข้าข้อมูลสำหรับ "${row.pageTitle || row.pagePath}" สำเร็จ!`
+                                                                    });
+                                                                    loadLogs();
+                                                                    
+                                                                    // Reload writing projects to update local copy notes state
+                                                                    fetch("/api/content/writing-lab/projects")
+                                                                        .then(res => res.json())
+                                                                        .then(data => {
+                                                                            if (Array.isArray(data)) setWritingProjects(data);
+                                                                        });
+                                                                } catch (err: any) {
+                                                                    setStatusMessage({
+                                                                        type: "error",
+                                                                        text: `อัปเดตล้มเหลว: ${err.message}`
+                                                                    });
+                                                                } finally {
+                                                                    setLoading(false);
+                                                                }
+                                                            }}
+                                                            className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors text-[10px]"
+                                                            disabled={!pId}
+                                                            title="Apply update for this row"
+                                                        >
+                                                            Apply
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* Bottom section: Import Log history */}
             <div className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm flex flex-col gap-4">

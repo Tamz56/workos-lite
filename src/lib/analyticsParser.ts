@@ -465,3 +465,325 @@ export function generateSnapshotPayload(
         }
     };
 }
+
+export interface GA4BackfillRow {
+    index: number;
+    pageTitle: string;
+    pagePath: string;
+    views: number;
+    activeUsers: number;
+    eventCount: number;
+    bounceRate: string;
+    averageEngagementTime: number;
+    sourceMedium: string;
+    matchedProject?: {
+        id: string;
+        title: string;
+        slug: string;
+        confidence: "High" | "Medium" | "Low" | "Manual";
+        method: "title" | "slug" | "partial_title" | "manual";
+    };
+    status: "Ready" | "Needs manual target" | "Excluded";
+    rawLine: string;
+}
+
+export interface GA4BackfillParseResult {
+    dateRangeStart: string;
+    dateRangeEnd: string;
+    snapshotDate: string;
+    rows: GA4BackfillRow[];
+}
+
+export function normalizeBounceRate(raw: string): string {
+    const trimmed = (raw || "").trim();
+    if (!trimmed) return "";
+    
+    // Strip trailing % if there
+    const clean = trimmed.endsWith("%") ? trimmed.slice(0, -1) : trimmed;
+    const parsed = parseFloat(clean);
+    if (isNaN(parsed)) return trimmed;
+    
+    // If raw = 0.9 or between 0 and 1, convert to 90.0%
+    if (parsed > 0 && parsed < 1.0) {
+        return `${(parsed * 100).toFixed(1)}%`;
+    }
+    
+    // Format to 1 decimal place with %
+    return `${parsed.toFixed(1)}%`;
+}
+
+function parseDateString(dateStr: string): string {
+    const clean = dateStr.trim();
+    if (clean.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return clean;
+    }
+    if (clean.match(/^\d{8}$/)) {
+        return `${clean.substring(0, 4)}-${clean.substring(4, 6)}-${clean.substring(6, 8)}`;
+    }
+    const slashMatch = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+        const mm = slashMatch[2].padStart(2, "0");
+        const dd = slashMatch[1].padStart(2, "0");
+        return `${slashMatch[3]}-${mm}-${dd}`;
+    }
+    return clean;
+}
+
+function isArticleRow(pageTitle: string, pagePath: string, writingProjects: any[]): boolean {
+    const title = (pageTitle || "").trim();
+    const path = (pagePath || "").trim().toLowerCase();
+    const titleLower = title.toLowerCase();
+
+    // 1. Excludes
+    if (path === "/" || path === "" || titleLower === "home" || title === "หน้าแรก" || titleLower === "green fineness") return false;
+    if (path === "/library" || path === "/library/" || title === "คลังความรู้ | Green Fineness") return false;
+    
+    const exKeywords = [
+        "page not found", "404", "ไม่พบหน้า", "about", "เกี่ยวกับเรา", "contact", "ติดต่อเรา",
+        "admin", "ผู้ดูแลระบบ", "preview", "พรีวิว", "draft", "ร่าง", "/admin", "/draft", "/preview",
+        "/about", "/contact", "/tag/", "/category/", "/author/", "/index"
+    ];
+    if (exKeywords.some(kw => titleLower.includes(kw) || path.includes(kw))) return false;
+
+    // 2. Includes
+    if (title.includes("คลังความรู้")) return true;
+    if (titleLower.includes("plant journey")) return true;
+    if (path.includes("/library/")) return true;
+
+    // Matches any Writing Lab project title / slug
+    if (writingProjects && writingProjects.length > 0) {
+        const matchFound = writingProjects.some(p => {
+            const pTitle = p.title.toLowerCase();
+            const pSlug = p.slug?.toLowerCase();
+            return (
+                titleLower.includes(pTitle) ||
+                pTitle.includes(titleLower) ||
+                (pSlug && path.includes(pSlug))
+            );
+        });
+        if (matchFound) return true;
+    }
+
+    return false;
+}
+
+function matchWritingProject(pageTitle: string, pagePath: string, writingProjects: any[]) {
+    if (!writingProjects || writingProjects.length === 0) return null;
+
+    const title = (pageTitle || "").trim().toLowerCase();
+    const path = (pagePath || "").trim().toLowerCase();
+
+    // Clean common prefixes
+    let cleanRowTitle = title;
+    if (cleanRowTitle.startsWith("คลังความรู้")) {
+        cleanRowTitle = cleanRowTitle.replace(/^คลังความรู้\s*\|\s*/, "").replace(/^คลังความรู้\s*/, "").trim();
+    }
+
+    // 1. Exact Title Match
+    let matched = writingProjects.find(p => p.title.trim().toLowerCase() === cleanRowTitle || p.title.trim().toLowerCase() === title);
+    if (matched) {
+        return { project: matched, confidence: "High" as const, method: "title" as const };
+    }
+
+    // 2. Exact Slug / Path match
+    if (path) {
+        const cleanPath = path.replace(/^\/|\/$/g, "");
+        matched = writingProjects.find(p => p.slug && p.slug.trim().toLowerCase() === cleanPath);
+        if (matched) {
+            return { project: matched, confidence: "High" as const, method: "slug" as const };
+        }
+    }
+
+    // 3. Partial Title match
+    const partialTitleCandidates = writingProjects.filter(p => {
+        const pTitle = p.title.trim().toLowerCase();
+        return pTitle.length > 3 && (
+            cleanRowTitle.includes(pTitle) ||
+            pTitle.includes(cleanRowTitle) ||
+            (pTitle.substring(0, 4) === cleanRowTitle.substring(0, 4))
+        );
+    });
+    
+    if (partialTitleCandidates.length === 1) {
+        return { project: partialTitleCandidates[0], confidence: "Medium" as const, method: "partial_title" as const };
+    } else if (partialTitleCandidates.length > 1) {
+        return { project: partialTitleCandidates[0], confidence: "Low" as const, method: "partial_title" as const, ambiguous: true };
+    }
+
+    // 4. Partial path / slug match
+    if (path) {
+        const partialSlugCandidates = writingProjects.filter(p => p.slug && p.slug.length > 3 && path.includes(p.slug.trim().toLowerCase()));
+        if (partialSlugCandidates.length === 1) {
+            return { project: partialSlugCandidates[0], confidence: "Medium" as const, method: "slug" as const };
+        } else if (partialSlugCandidates.length > 1) {
+            return { project: partialSlugCandidates[0], confidence: "Low" as const, method: "slug" as const, ambiguous: true };
+        }
+    }
+
+    return null;
+}
+
+export function parseGA4BackfillData(rawText: string, writingProjects: any[] = []): GA4BackfillParseResult {
+    const result: GA4BackfillParseResult = {
+        dateRangeStart: "",
+        dateRangeEnd: "",
+        snapshotDate: "",
+        rows: []
+    };
+
+    if (!rawText || !rawText.trim()) return result;
+
+    const lines = rawText.split(/\r?\n/).map(l => l.trim());
+    
+    // 1. Extract Date Range from metadata/header rows
+    lines.forEach(line => {
+        const lower = line.toLowerCase();
+        if (lower.includes("start date") || lower.includes("วันที่เริ่มต้น")) {
+            const match = line.match(/\d{4}-\d{2}-\d{2}/) || line.match(/\d{8}/) || line.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
+            if (match) {
+                result.dateRangeStart = parseDateString(match[0]);
+            }
+        }
+        if (lower.includes("end date") || lower.includes("วันที่สิ้นสุด")) {
+            const match = line.match(/\d{4}-\d{2}-\d{2}/) || line.match(/\d{8}/) || line.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
+            if (match) {
+                result.dateRangeEnd = parseDateString(match[0]);
+            }
+        }
+    });
+
+    result.snapshotDate = result.dateRangeEnd || new Date().toISOString().split("T")[0];
+
+    // 2. Locate Table Headers Row
+    let headerIdx = -1;
+    let detectedHeaders: string[] = [];
+
+    const targetKeywords = [
+        "ชื่อหน้าเว็บ", "page title", "หน้าจอ", "screen class", "เส้นทางหน้าเว็บ", "page path",
+        "จำนวนการดู", "views", "ผู้ใช้ที่ใช้งานอยู่", "active users", "จำนวนเหตุการณ์", "event count", "อัตราตีกลับ", "bounce rate"
+    ];
+
+    for (let i = 0; i < lines.length; i++) {
+        if (!lines[i]) continue;
+        const cells = parseLineToCells(lines[i]);
+        let matchCount = 0;
+        cells.forEach(c => {
+            const val = c.toLowerCase();
+            if (targetKeywords.some(kw => val.includes(kw))) {
+                matchCount++;
+            }
+        });
+
+        if (matchCount >= 2) {
+            headerIdx = i;
+            detectedHeaders = cells;
+            break;
+        }
+    }
+
+    if (headerIdx === -1) return result;
+
+    // 3. Map Columns
+    const ga4Mappings = {
+        pageTitle: ["ชื่อหน้าเว็บและคลาสหน้าจอ", "ชื่อหน้า", "page title", "page_title", "title"],
+        pagePath: ["เส้นทางหน้าเว็บ", "page path", "url", "path", "ลิงก์", "link"],
+        views: ["จำนวนการดู", "views", "pageviews", "ยอดวิว"],
+        activeUsers: ["ผู้ใช้ที่ใช้งานอยู่", "active users", "users", "ผู้ใช้"],
+        eventCount: ["จำนวนเหตุการณ์", "event count", "events", "event_count"],
+        bounceRate: ["อัตราตีกลับ", "bounce rate", "bounce_rate"],
+        averageEngagementTime: ["เวลาในการมีส่วนร่วมเฉลี่ย", "average engagement time", "avg engagement time"],
+        sourceMedium: ["แหล่งที่มา", "source / medium", "source_medium", "source", "medium"]
+    };
+
+    const colMap: Record<string, number> = {};
+    detectedHeaders.forEach((h, idx) => {
+        const val = h.toLowerCase();
+        for (const [field, aliases] of Object.entries(ga4Mappings)) {
+            if (aliases.some(alias => val.includes(alias.toLowerCase()))) {
+                if (colMap[field] === undefined) {
+                    colMap[field] = idx;
+                }
+            }
+        }
+    });
+
+    const parseVal = (val: string): number => {
+        if (!val) return 0;
+        const clean = val.replace(/,/g, "").trim();
+        const parsed = parseFloat(clean);
+        return isNaN(parsed) ? 0 : parsed;
+    };
+
+    // 4. Parse Data Rows
+    for (let i = headerIdx + 1; i < lines.length; i++) {
+        const rawLine = lines[i];
+        if (!rawLine || rawLine.startsWith("#")) continue;
+
+        const cells = parseLineToCells(rawLine);
+        if (cells.length === 0 || cells.every(c => !c.trim())) continue;
+
+        // Skip obvious summary lines
+        const isSummary = cells.some(cell => {
+            const val = cell.trim().toLowerCase();
+            return (
+                val === "total" || val === "summary" || val === "รวม" || 
+                val === "เฉลี่ย" || val === "average" || val === "ผลรวม" ||
+                val.includes("รวมทั้งหมด") || val.includes("ค่าเฉลี่ย")
+            );
+        });
+        if (isSummary) continue;
+
+        const pageTitle = colMap.pageTitle !== undefined ? (cells[colMap.pageTitle] || "") : "";
+        const pagePath = colMap.pagePath !== undefined ? (cells[colMap.pagePath] || "") : "";
+
+        if (!pageTitle && !pagePath) continue;
+
+        const views = colMap.views !== undefined ? parseVal(cells[colMap.views]) : 0;
+        const activeUsers = colMap.activeUsers !== undefined ? parseVal(cells[colMap.activeUsers]) : 0;
+        const eventCount = colMap.eventCount !== undefined ? parseVal(cells[colMap.eventCount]) : 0;
+        const bounceRateRaw = colMap.bounceRate !== undefined ? (cells[colMap.bounceRate] || "") : "";
+        const bounceRate = normalizeBounceRate(bounceRateRaw);
+        const averageEngagementTime = colMap.averageEngagementTime !== undefined ? parseVal(cells[colMap.averageEngagementTime]) : 0;
+        const sourceMedium = colMap.sourceMedium !== undefined ? (cells[colMap.sourceMedium] || "") : "";
+
+        const isArticle = isArticleRow(pageTitle, pagePath, writingProjects);
+        const matchResult = matchWritingProject(pageTitle, pagePath, writingProjects);
+
+        let status: GA4BackfillRow["status"] = "Excluded";
+        if (isArticle) {
+            if (matchResult && matchResult.confidence !== "Low") {
+                status = "Ready";
+            } else {
+                status = "Needs manual target";
+            }
+        }
+
+        const row: GA4BackfillRow = {
+            index: i,
+            pageTitle,
+            pagePath,
+            views,
+            activeUsers,
+            eventCount,
+            bounceRate,
+            averageEngagementTime,
+            sourceMedium,
+            status,
+            rawLine
+        };
+
+        if (matchResult) {
+            row.matchedProject = {
+                id: matchResult.project.id,
+                title: matchResult.project.title,
+                slug: matchResult.project.slug || "",
+                confidence: matchResult.confidence,
+                method: matchResult.method
+            };
+        }
+
+        result.rows.push(row);
+    }
+
+    return result;
+}

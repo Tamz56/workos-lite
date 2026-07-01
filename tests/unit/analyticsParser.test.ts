@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAnalyticsData, generateSnapshotPayload } from "@/lib/analyticsParser";
+import { parseAnalyticsData, generateSnapshotPayload, parseGA4BackfillData, normalizeBounceRate } from "@/lib/analyticsParser";
 import { validatePayload, SUPPORTED_SCHEMA_VERSION, SCHEMA_UPDATE_VERSION } from "@/lib/arborInboxSchema";
 import { parseArticleMarkdown } from "@/lib/articleParser";
 
@@ -476,5 +476,94 @@ describe("Screenshot-assisted Snapshot Payload Validation", () => {
         const validation = validatePayload(payload, []);
         expect(validation.valid).toBe(true);
         expect(validation.errors).toHaveLength(0);
+    });
+
+    describe("GA4 Article Backfill Parser", () => {
+        const mockProjects = [
+            { id: "proj_01", title: "ไซโตไคนินคืออะไร", slug: "cytokinin-guide" },
+            { id: "proj_02", title: "Plant Journey เมล็ดพันธุ์", slug: "plant-journey-seeds" },
+            { id: "proj_03", title: "การดูแลต้นไม้", slug: "tree-care" },
+            { id: "proj_04", title: "ไซโตไคนินเพื่อการเติบโต", slug: "cytokinin-growth" }
+        ];
+
+        const rawReport = `
+# GA4 Report Export
+วันที่เริ่มต้น: 2026-06-01
+วันที่สิ้นสุด: 2026-06-30
+ผู้ใช้รวมทั้งเว็บ: 10,000
+
+ชื่อหน้าเว็บและคลาสหน้าจอ	เส้นทางหน้าเว็บ	จำนวนการดู	ผู้ใช้ที่ใช้งานอยู่	จำนวนเหตุการณ์	อัตราตีกลับ	เวลาในการมีส่วนร่วมเฉลี่ย
+คลังความรู้ | ไซโตไคนินคืออะไร	/library/cytokinin-guide	10	10	28	0.9	45
+คลังความรู้ | Green Fineness	/library	4500	4000	9000	0.4	60
+Home	/	5000	4500	8000	0.3	10
+Page not found	/404	12	10	15	0.95	5
+ติดต่อเรา | Green Fineness	/contact	25	22	40	0.5	30
+Plant Journey เมล็ดพันธุ์พิเศษ	/library/plant-journey-seeds	15	12	35	28.5%	50
+การดูแลพืชใบ	/library/tree-care-tips	8	8	16	0.8	40
+ไซโตไคนินบทความย่อย	/library/cytokinin-sub	5	5	10	0.7	25
+Total	รวมทั้งหมด	9570	8559	17128	0.45	35
+`;
+
+        it("should extract date range from metadata correctly", () => {
+            const result = parseGA4BackfillData(rawReport, mockProjects);
+            expect(result.dateRangeStart).toBe("2026-06-01");
+            expect(result.dateRangeEnd).toBe("2026-06-30");
+            expect(result.snapshotDate).toBe("2026-06-30");
+        });
+
+        it("should detect article table section and skip headers & summaries", () => {
+            const result = parseGA4BackfillData(rawReport, mockProjects);
+            expect(result.rows).toHaveLength(8);
+        });
+
+        it("should include only article-like rows and exclude home, index, admin, 404, about, contact pages", () => {
+            const result = parseGA4BackfillData(rawReport, mockProjects);
+
+            const homeRow = result.rows.find(r => r.pageTitle.includes("Home"));
+            expect(homeRow?.status).toBe("Excluded");
+
+            const libraryIndexRow = result.rows.find(r => r.pageTitle === "คลังความรู้ | Green Fineness");
+            expect(libraryIndexRow?.status).toBe("Excluded");
+
+            const notFoundRow = result.rows.find(r => r.pageTitle.includes("Page not found"));
+            expect(notFoundRow?.status).toBe("Excluded");
+
+            const contactRow = result.rows.find(r => r.pageTitle.includes("ติดต่อเรา"));
+            expect(contactRow?.status).toBe("Excluded");
+
+            const cytokininRow = result.rows.find(r => r.pageTitle.includes("ไซโตไคนินคืออะไร"));
+            expect(cytokininRow?.status).toBe("Ready");
+            expect(cytokininRow?.matchedProject?.id).toBe("proj_01");
+
+            const plantJourneyRow = result.rows.find(r => r.pageTitle.includes("Plant Journey"));
+            expect(plantJourneyRow?.status).toBe("Ready");
+            expect(plantJourneyRow?.matchedProject?.id).toBe("proj_02");
+        });
+
+        it("should map Thai columns and normalize bounce rate correctly", () => {
+            const result = parseGA4BackfillData(rawReport, mockProjects);
+            const cytokininRow = result.rows.find(r => r.pageTitle.includes("ไซโตไคนินคืออะไร"));
+            
+            expect(cytokininRow).toBeDefined();
+            expect(cytokininRow?.views).toBe(10);
+            expect(cytokininRow?.activeUsers).toBe(10);
+            expect(cytokininRow?.eventCount).toBe(28);
+            expect(cytokininRow?.bounceRate).toBe("90.0%");
+        });
+
+        it("should mark low-confidence or ambiguous matches as Needs manual target", () => {
+            const result = parseGA4BackfillData(rawReport, mockProjects);
+            const cytokininSubRow = result.rows.find(r => r.pageTitle === "ไซโตไคนินบทความย่อย");
+            expect(cytokininSubRow).toBeDefined();
+            expect(cytokininSubRow?.status).toBe("Needs manual target");
+            expect(cytokininSubRow?.matchedProject?.confidence).toBe("Low");
+        });
+
+        it("should correctly format bounce rates that are already formatted or percentage decimals", () => {
+            expect(normalizeBounceRate("0.9")).toBe("90.0%");
+            expect(normalizeBounceRate("28.5%")).toBe("28.5%");
+            expect(normalizeBounceRate("28.5")).toBe("28.5%");
+            expect(normalizeBounceRate("0.285")).toBe("28.5%");
+        });
     });
 });
