@@ -25,6 +25,7 @@ const TaskCreate = z.object({
     notes: z.string().nullable().optional(),
     doc_id_ref: z.string().optional(),
     doc_id: z.string().nullable().optional(),
+    project_id: z.string().nullable().optional(), // OPS-002C: link task to project backlog
 });
 
 const TaskUpdate = z.object({
@@ -246,12 +247,50 @@ export async function POST(req: NextRequest) {
                         });
                     }
 
+                    // OPS-002C: Resolve project_id from data field or notes metadata
+                    let projectIdResolved: string | null = null;
+                    if (t.project_id) {
+                        projectIdResolved = t.project_id;
+                    } else if (t.notes) {
+                        const pidMatch = t.notes.match(/project_id:\s*([a-zA-Z0-9_-]+)/);
+                        if (pidMatch) projectIdResolved = pidMatch[1];
+                    }
+
+                    // OPS-002C: Create parallel project_items record when project_id is resolved
+                    if (projectIdResolved && !isDryRun) {
+                        const piId = nanoid();
+                        const piStatus = t.status === "done" ? "done" : (t.status === "planned" ? "planned" : "inbox");
+                        db.prepare(`
+                            INSERT INTO project_items (
+                                id, project_id, title, status, priority,
+                                schedule_bucket, notes, is_milestone
+                            ) VALUES (
+                                @id, @project_id, @title, @status, @priority,
+                                @schedule_bucket, @notes, @is_milestone
+                            )
+                        `).run({
+                            id: piId,
+                            project_id: projectIdResolved,
+                            title: t.title,
+                            status: piStatus,
+                            priority: priority,
+                            schedule_bucket: bucket,
+                            notes: `[agent:source_task_id=${id}]\n${t.notes ?? ""}`.trim(),
+                            is_milestone: 0,
+                        });
+                        result.project_item_id = piId;
+                    }
+
                     if (a.saveAs) refMap.set(a.saveAs, id);
                     result.id = id;
                     if (isDryRun) {
                         result.doc_id_resolved = docIdResolved;
                         result.schedule_bucket_resolved = bucket;
                         result.priority_resolved = priority;
+                        result.project_id_resolved = projectIdResolved;
+                        if (projectIdResolved) {
+                            result.project_item_created_preview = true;
+                        }
                     }
                 }
 

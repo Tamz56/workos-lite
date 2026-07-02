@@ -536,6 +536,7 @@ function buildGFContentOperatingCenterTemplate(): AgentPayload {
       workspace: "content",
       status: "planned" as const,
       doc_id_ref: task.docRef,
+      project_id: GF_OPERATING_CENTER_PROJECT_ID,
       notes: `---
 template_key: green_fineness_content_operating_center
 project_id: ${GF_OPERATING_CENTER_PROJECT_ID}
