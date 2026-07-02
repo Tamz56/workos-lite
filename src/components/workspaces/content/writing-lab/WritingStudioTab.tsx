@@ -261,10 +261,11 @@ export default function WritingStudioTab({
     const [snapshot7d, setSnapshot7d] = useState(createEmptySnapshot());
     const [snapshot30d, setSnapshot30d] = useState(createEmptySnapshot());
 
-    const [fbActiveSnap, setFbActiveSnap] = useState<"24h" | "7d" | "30d" | "90d">("24h");
-    const [ga4ActiveSnap, setGa4ActiveSnap] = useState<"24h" | "7d" | "30d" | "90d">("24h");
+    const [fbActiveSnap, setFbActiveSnap] = useState<"12h" | "24h" | "7d" | "30d" | "90d">("12h");
+    const [ga4ActiveSnap, setGa4ActiveSnap] = useState<"12h" | "24h" | "7d" | "30d" | "90d">("12h");
 
     // New Facebook Snapshots
+    const [fbSnap12h, setFbSnap12h] = useState(createEmptyFacebookSnapshot("12h"));
     const [fbSnap24h, setFbSnap24h] = useState(createEmptyFacebookSnapshot("24h"));
     const [fbSnap7d, setFbSnap7d] = useState(createEmptyFacebookSnapshot("7d"));
     const [fbSnap30d, setFbSnap30d] = useState(createEmptyFacebookSnapshot("30d"));
@@ -272,6 +273,7 @@ export default function WritingStudioTab({
     const [fbSourceMetadata, setFbSourceMetadata] = useState<any>({});
 
     // New GA4 Snapshots
+    const [ga4Snap12h, setGa4Snap12h] = useState(createEmptyGA4Snapshot("12h"));
     const [ga4Snap24h, setGa4Snap24h] = useState(createEmptyGA4Snapshot("24h"));
     const [ga4Snap7d, setGa4Snap7d] = useState(createEmptyGA4Snapshot("7d"));
     const [ga4Snap30d, setGa4Snap30d] = useState(createEmptyGA4Snapshot("30d"));
@@ -368,10 +370,12 @@ export default function WritingStudioTab({
             let nextDec = { decision: "No action", priority: "Medium", targetDate: "", notes: "" };
             let reviewRes: any = null;
 
+            let fb12 = createEmptyFacebookSnapshot("12h");
             let fb24 = createEmptyFacebookSnapshot("24h");
             let fb7 = createEmptyFacebookSnapshot("7d");
             let fb30 = createEmptyFacebookSnapshot("30d");
             let fb90 = createEmptyFacebookSnapshot("90d");
+            let ga12 = createEmptyGA4Snapshot("12h");
             let ga24 = createEmptyGA4Snapshot("24h");
             let ga7 = createEmptyGA4Snapshot("7d");
             let ga30 = createEmptyGA4Snapshot("30d");
@@ -405,39 +409,126 @@ export default function WritingStudioTab({
                         if (pf.arborReview) reviewRes = pf.arborReview;
 
                         const fbSnaps = pf.facebookSnapshots || {};
+                        
+                        // Resolve latest Facebook snapshot as a fallback
+                        let latestFbFallback: any = null;
+                        let latestFbDate = "";
+                        Object.keys(fbSnaps).forEach(k => {
+                            const snap = fbSnaps[k];
+                            if (snap && snap.snapshotDate && (!latestFbDate || snap.snapshotDate > latestFbDate)) {
+                                latestFbDate = snap.snapshotDate;
+                                latestFbFallback = snap;
+                            }
+                        });
+                        if (!latestFbFallback && snaps) {
+                            Object.keys(snaps).forEach(k => {
+                                const snap = snaps[k];
+                                if (snap && snap.snapshotDate && (!latestFbDate || snap.snapshotDate > latestFbDate)) {
+                                    latestFbDate = snap.snapshotDate;
+                                    latestFbFallback = {
+                                        snapshotDate: snap.snapshotDate,
+                                        platform: snap.platform || "facebook_page",
+                                        reach: snap.fbReach,
+                                        reactions: snap.fbReactions,
+                                        comments: snap.fbComments,
+                                        shares: snap.fbShares,
+                                        linkClicks: snap.fbClicks,
+                                        notes: snap.notes
+                                    };
+                                }
+                            });
+                        }
+
                         const getFb = (w: string, leg: any) => {
-                            const c = fbSnaps[w] || {};
+                            const c = fbSnaps[w];
+                            const hasExact = !!c && (c.reach !== undefined || c.reactions !== undefined || c.comments !== undefined || c.shares !== undefined);
+                            const source = hasExact ? c : (latestFbFallback || {});
                             return {
-                                snapshotDate: c.snapshotDate || leg.snapshotDate || "", window: w.replace("snap", ""),
-                                platform: c.platform || "facebook_page", postUrl: c.postUrl || fbPageUrl || "",
-                                publishedDate: c.publishedDate || pubDate || "", reach: c.reach ?? leg.fbReach ?? "",
-                                reactions: c.reactions ?? leg.fbReactions ?? "", comments: c.comments ?? leg.fbComments ?? "",
-                                shares: c.shares ?? leg.fbShares ?? "", linkClicks: c.linkClicks ?? leg.fbClicks ?? "",
-                                saves: c.saves || "", notableComments: c.notableComments || "", audienceQuestions: c.audienceQuestions || "",
-                                confusion: c.confusion || "", audienceLanguage: c.audienceLanguage || "", notes: c.notes || leg.notes || "",
-                                isMistake: c.isMistake ?? false,
-                                correctedAt: c.correctedAt || "",
-                                correctionNote: c.correctionNote || ""
+                                snapshotDate: source.snapshotDate || leg.snapshotDate || "", 
+                                window: w.replace("snap", ""),
+                                platform: source.platform || "facebook_page", 
+                                postUrl: source.postUrl || fbPageUrl || "",
+                                publishedDate: source.publishedDate || pubDate || "", 
+                                reach: source.reach ?? leg.fbReach ?? "",
+                                reactions: source.reactions ?? leg.fbReactions ?? "", 
+                                comments: source.comments ?? leg.fbComments ?? "",
+                                shares: source.shares ?? leg.fbShares ?? "", 
+                                linkClicks: source.linkClicks ?? leg.fbClicks ?? "",
+                                saves: source.saves || "", 
+                                notableComments: source.notableComments || "", 
+                                audienceQuestions: source.audienceQuestions || "",
+                                confusion: source.confusion || "", 
+                                audienceLanguage: source.audienceLanguage || "", 
+                                notes: source.notes || leg.notes || "",
+                                isMistake: source.isMistake ?? false,
+                                correctedAt: source.correctedAt || "",
+                                correctionNote: source.correctionNote || "",
+                                isFallback: !hasExact && !!latestFbFallback,
+                                fallbackWindow: !hasExact && latestFbFallback ? (latestFbFallback.window || "") : ""
                             };
                         };
+
                         setFbSourceMetadata(pf.sourceMetadata || {});
+                        fb12 = getFb("snap12h", snaps.snap12h || {});
                         fb24 = getFb("snap24h", snaps.snap24h || {});
                         fb7 = getFb("snap7d", snaps.snap7d || {});
                         fb30 = getFb("snap30d", snaps.snap30d || {});
                         fb90 = getFb("snap90d", {});
 
                         const ga4Snaps = pf.ga4Snapshots || {};
+                        
+                        // Resolve latest GA4 snapshot as a fallback
+                        let latestGa4Fallback: any = null;
+                        let latestGa4Date = "";
+                        Object.keys(ga4Snaps).forEach(k => {
+                            const snap = ga4Snaps[k];
+                            if (snap && snap.snapshotDate && (!latestGa4Date || snap.snapshotDate > latestGa4Date)) {
+                                latestGa4Date = snap.snapshotDate;
+                                latestGa4Fallback = snap;
+                            }
+                        });
+                        if (!latestGa4Fallback && snaps) {
+                            Object.keys(snaps).forEach(k => {
+                                const snap = snaps[k];
+                                if (snap && snap.snapshotDate && (!latestGa4Date || snap.snapshotDate > latestGa4Date)) {
+                                    latestGa4Date = snap.snapshotDate;
+                                    latestGa4Fallback = {
+                                        snapshotDate: snap.snapshotDate,
+                                        views: snap.views,
+                                        activeUsers: snap.users,
+                                        events: snap.events,
+                                        averageEngagementTime: snap.engagementTime,
+                                        sourceMedium: snap.sourceMedium,
+                                        notes: snap.notes
+                                    };
+                                }
+                            });
+                        }
+
                         const getGa4 = (w: string, leg: any) => {
-                            const c = ga4Snaps[w] || {};
+                            const c = ga4Snaps[w];
+                            const hasExact = !!c && (c.views !== undefined || c.activeUsers !== undefined || c.events !== undefined || c.averageEngagementTime !== undefined);
+                            const source = hasExact ? c : (latestGa4Fallback || {});
                             return {
-                                snapshotDate: c.snapshotDate || leg.snapshotDate || "", window: w.replace("snap", ""),
-                                publishedUrl: c.publishedUrl || pubUrl || "", pageTitle: c.pageTitle || activeProject.title || "",
-                                views: c.views ?? leg.views ?? "", activeUsers: c.activeUsers ?? leg.users ?? "",
-                                events: c.events ?? leg.events ?? "", averageEngagementTime: c.averageEngagementTime ?? leg.engagementTime ?? "",
-                                bounceRate: c.bounceRate || "", sourceMedium: c.sourceMedium || leg.sourceMedium || "",
-                                organicUsers: c.organicUsers || "", referralUsers: c.referralUsers || "", notes: c.notes || leg.notes || ""
+                                snapshotDate: source.snapshotDate || leg.snapshotDate || "", 
+                                window: w.replace("snap", ""),
+                                publishedUrl: source.publishedUrl || pubUrl || "", 
+                                pageTitle: source.pageTitle || activeProject.title || "",
+                                views: source.views ?? leg.views ?? "", 
+                                activeUsers: source.activeUsers ?? leg.users ?? "",
+                                events: source.events ?? leg.events ?? "", 
+                                averageEngagementTime: source.averageEngagementTime ?? leg.engagementTime ?? "",
+                                bounceRate: source.bounceRate || "", 
+                                sourceMedium: source.sourceMedium || leg.sourceMedium || "",
+                                organicUsers: source.organicUsers || "", 
+                                referralUsers: source.referralUsers || "", 
+                                notes: source.notes || leg.notes || "",
+                                isFallback: !hasExact && !!latestGa4Fallback,
+                                fallbackWindow: !hasExact && latestGa4Fallback ? (latestGa4Fallback.window || "") : ""
                             };
                         };
+
+                        ga12 = getGa4("snap12h", snaps.snap12h || {});
                         ga24 = getGa4("snap24h", snaps.snap24h || {});
                         ga7 = getGa4("snap7d", snaps.snap7d || {});
                         ga30 = getGa4("snap30d", snaps.snap30d || {});
@@ -475,11 +566,13 @@ export default function WritingStudioTab({
             setSnapshot7d(s7);
             setSnapshot30d(s30);
 
+            setFbSnap12h(fb12);
             setFbSnap24h(fb24);
             setFbSnap7d(fb7);
             setFbSnap30d(fb30);
             setFbSnap90d(fb90);
 
+            setGa4Snap12h(ga12);
             setGa4Snap24h(ga24);
             setGa4Snap7d(ga7);
             setGa4Snap30d(ga30);
@@ -674,6 +767,20 @@ export default function WritingStudioTab({
                         publishStatus: publishStatus
                     },
                     snapshots: {
+                        snap12h: {
+                            snapshotDate: ga4Snap12h.snapshotDate || fbSnap12h.snapshotDate || "",
+                            views: ga4Snap12h.views || "",
+                            users: ga4Snap12h.activeUsers || "",
+                            events: ga4Snap12h.events || "",
+                            engagementTime: ga4Snap12h.averageEngagementTime || "",
+                            sourceMedium: ga4Snap12h.sourceMedium || "",
+                            fbReach: fbSnap12h.reach || "",
+                            fbReactions: fbSnap12h.reactions || "",
+                            fbComments: fbSnap12h.comments || "",
+                            fbShares: fbSnap12h.shares || "",
+                            fbClicks: fbSnap12h.linkClicks || "",
+                            notes: ga4Snap12h.notes || fbSnap12h.notes || ""
+                        },
                         snap24h: {
                             snapshotDate: ga4Snap24h.snapshotDate || fbSnap24h.snapshotDate || "",
                             views: ga4Snap24h.views || "",
@@ -719,6 +826,7 @@ export default function WritingStudioTab({
                     },
                     facebookSnapshots: {
                         ...(parsedExistingNotes.performanceFeedback?.facebookSnapshots || {}),
+                        snap12h: fbSnap12h,
                         snap24h: fbSnap24h,
                         snap7d: fbSnap7d,
                         snap30d: fbSnap30d,
@@ -726,6 +834,7 @@ export default function WritingStudioTab({
                     },
                     ga4Snapshots: {
                         ...(parsedExistingNotes.performanceFeedback?.ga4Snapshots || {}),
+                        snap12h: ga4Snap12h,
                         snap24h: ga4Snap24h,
                         snap7d: ga4Snap7d,
                         snap30d: ga4Snap30d,
@@ -1343,12 +1452,14 @@ export default function WritingStudioTab({
         
         prompt += `--- สรุปตัวชี้วัดปัจจุบัน (Current Metrics Summary) ---\n`;
         prompt += `[Facebook Snapshots]\n`;
+        prompt += `- 12h: Reach ${fbSnap12h.reach || 0} | Reactions ${fbSnap12h.reactions || 0} | Comments ${fbSnap12h.comments || 0} | Clicks ${fbSnap12h.linkClicks || 0}\n`;
         prompt += `- 24h: Reach ${fbSnap24h.reach || 0} | Reactions ${fbSnap24h.reactions || 0} | Comments ${fbSnap24h.comments || 0} | Clicks ${fbSnap24h.linkClicks || 0}\n`;
         prompt += `- 7d: Reach ${fbSnap7d.reach || 0} | Reactions ${fbSnap7d.reactions || 0} | Comments ${fbSnap7d.comments || 0} | Clicks ${fbSnap7d.linkClicks || 0}\n`;
         prompt += `- 30d: Reach ${fbSnap30d.reach || 0} | Reactions ${fbSnap30d.reactions || 0} | Comments ${fbSnap30d.comments || 0} | Clicks ${fbSnap30d.linkClicks || 0}\n`;
         prompt += `- 90d: Reach ${fbSnap90d.reach || 0} | Reactions ${fbSnap90d.reactions || 0} | Comments ${fbSnap90d.comments || 0} | Clicks ${fbSnap90d.linkClicks || 0}\n\n`;
         
         prompt += `[GA4 Snapshots]\n`;
+        prompt += `- 12h: Views ${ga4Snap12h.views || 0} | Users ${ga4Snap12h.activeUsers || 0} | Avg Time ${ga4Snap12h.averageEngagementTime || 0}s\n`;
         prompt += `- 24h: Views ${ga4Snap24h.views || 0} | Users ${ga4Snap24h.activeUsers || 0} | Avg Time ${ga4Snap24h.averageEngagementTime || 0}s\n`;
         prompt += `- 7d: Views ${ga4Snap7d.views || 0} | Users ${ga4Snap7d.activeUsers || 0} | Avg Time ${ga4Snap7d.averageEngagementTime || 0}s\n`;
         prompt += `- 30d: Views ${ga4Snap30d.views || 0} | Users ${ga4Snap30d.activeUsers || 0} | Avg Time ${ga4Snap30d.averageEngagementTime || 0}s\n`;
@@ -2595,8 +2706,9 @@ export default function WritingStudioTab({
                                             Facebook Snapshots (Post-Level Distribution)
                                         </h4>
                                         <div className="flex bg-theme-input rounded-lg p-0.5 border border-theme-border/30">
-                                            {(["24h", "7d", "30d", "90d"] as const).map((w) => {
+                                            {(["12h", "24h", "7d", "30d", "90d"] as const).map((w) => {
                                                 const isWinMistake = (() => {
+                                                    if (w === "12h") return fbSnap12h.isMistake;
                                                     if (w === "24h") return fbSnap24h.isMistake;
                                                     if (w === "7d") return fbSnap7d.isMistake;
                                                     if (w === "30d") return fbSnap30d.isMistake;
@@ -2625,11 +2737,18 @@ export default function WritingStudioTab({
                                     </div>
 
                                     {(() => {
-                                        const activeFb = fbActiveSnap === "24h" ? fbSnap24h : fbActiveSnap === "7d" ? fbSnap7d : fbActiveSnap === "30d" ? fbSnap30d : fbSnap90d;
-                                        const activeFbSetter = fbActiveSnap === "24h" ? setFbSnap24h : fbActiveSnap === "7d" ? setFbSnap7d : fbActiveSnap === "30d" ? setFbSnap30d : setFbSnap90d;
+                                        const activeFb = fbActiveSnap === "12h" ? fbSnap12h : fbActiveSnap === "24h" ? fbSnap24h : fbActiveSnap === "7d" ? fbSnap7d : fbActiveSnap === "30d" ? fbSnap30d : fbSnap90d;
+                                        const activeFbSetter = fbActiveSnap === "12h" ? setFbSnap12h : fbActiveSnap === "24h" ? setFbSnap24h : fbActiveSnap === "7d" ? setFbSnap7d : fbActiveSnap === "30d" ? setFbSnap30d : setFbSnap90d;
 
                                         return (
                                             <div className="space-y-4">
+                                                {/* Fallback Warning Notice */}
+                                                {activeFb.isFallback && (
+                                                    <div className="p-2.5 bg-blue-500/5 dark:bg-blue-950/10 border border-blue-500/20 rounded-2xl text-[10px] text-blue-700 dark:text-blue-400 font-semibold flex items-center gap-2">
+                                                        <span className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[8px] font-black uppercase">Fallback</span>
+                                                        <span>ระบบไม่พบข้อมูลสถิติ {fbActiveSnap} จึงนำสถิติล่าสุด ณ ช่วงเวลา {activeFb.fallbackWindow} มาแสดงให้เห็นก่อนชั่วคราว (สถิตินี้จะไม่บันทึกทับจนกว่าคุณจะกด Save)</span>
+                                                    </div>
+                                                )}
                                                 {/* Mistake Alert Banner */}
                                                 {activeFb.isMistake && (
                                                     <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-2xl text-[11px] text-red-700 dark:text-red-400 font-bold space-y-1">
@@ -2930,7 +3049,7 @@ export default function WritingStudioTab({
                                             GA4 Snapshots (Article-Level Website Metrics)
                                         </h4>
                                         <div className="flex bg-theme-input rounded-lg p-0.5 border border-theme-border/30">
-                                            {(["24h", "7d", "30d", "90d"] as const).map((w) => (
+                                            {(["12h", "24h", "7d", "30d", "90d"] as const).map((w) => (
                                                 <button
                                                     key={w}
                                                     type="button"
@@ -2948,11 +3067,19 @@ export default function WritingStudioTab({
                                     </div>
 
                                     {(() => {
-                                        const activeGa4 = ga4ActiveSnap === "24h" ? ga4Snap24h : ga4ActiveSnap === "7d" ? ga4Snap7d : ga4ActiveSnap === "30d" ? ga4Snap30d : ga4Snap90d;
-                                        const activeGa4Setter = ga4ActiveSnap === "24h" ? setGa4Snap24h : ga4ActiveSnap === "7d" ? setGa4Snap7d : ga4ActiveSnap === "30d" ? setGa4Snap30d : setGa4Snap90d;
+                                        const activeGa4 = ga4ActiveSnap === "12h" ? ga4Snap12h : ga4ActiveSnap === "24h" ? ga4Snap24h : ga4ActiveSnap === "7d" ? ga4Snap7d : ga4ActiveSnap === "30d" ? ga4Snap30d : ga4Snap90d;
+                                        const activeGa4Setter = ga4ActiveSnap === "12h" ? setGa4Snap12h : ga4ActiveSnap === "24h" ? setGa4Snap24h : ga4ActiveSnap === "7d" ? setGa4Snap7d : ga4ActiveSnap === "30d" ? setGa4Snap30d : setGa4Snap90d;
 
                                         return (
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                                            <div className="space-y-4">
+                                                {/* Fallback Warning Notice */}
+                                                {activeGa4.isFallback && (
+                                                    <div className="p-2.5 bg-blue-500/5 dark:bg-blue-950/10 border border-blue-500/20 rounded-2xl text-[10px] text-blue-700 dark:text-blue-400 font-semibold flex items-center gap-2">
+                                                        <span className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[8px] font-black uppercase">Fallback</span>
+                                                        <span>ระบบไม่พบข้อมูล GA4 {ga4ActiveSnap} จึงนำสถิติล่าสุด ณ ช่วงเวลา {activeGa4.fallbackWindow} มาแสดงให้เห็นก่อนชั่วคราว (สถิตินี้จะไม่บันทึกทับจนกว่าคุณจะกด Save)</span>
+                                                    </div>
+                                                )}
+                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                                                 <div className="space-y-1">
                                                     <label className="text-[9px] font-black text-theme-muted uppercase">Snapshot Date</label>
                                                     <input
@@ -3069,6 +3196,7 @@ export default function WritingStudioTab({
                                                         placeholder="ข้อสังเกตเพิ่มเติมสำหรับ GA4 Snapshot Window นี้..."
                                                         className="w-full bg-theme-input border border-theme-border rounded-xl p-2.5 text-xs font-medium text-theme-primary outline-none h-16 resize-y"
                                                     />
+                                                </div>
                                                 </div>
                                             </div>
                                         );

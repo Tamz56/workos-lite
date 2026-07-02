@@ -323,8 +323,8 @@ function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectCont
         let status: ProjectContentRoadmapStatus = "idea";
         let priority: "high" | "medium" | "low" | "none" = "medium";
         let relatedMainEpisode = "";
-        let notes = "";
-        let seriesOrTheme = "";
+        const notes = "";
+        const seriesOrTheme = "";
 
         // Heuristic detection based on columns
         if (cols.length >= 2) {
