@@ -226,6 +226,7 @@ export type ProjectContentRoadmapStatus =
   | "idea"
   | "planned"
   | "drafting"
+  | "review"
   | "ready_to_publish"
   | "published"
   | "tracking"

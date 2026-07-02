@@ -235,6 +235,7 @@ const ROADMAP_STATUS_LABELS: Record<ProjectContentRoadmapStatus, string> = {
     idea: "Idea",
     planned: "Planned",
     drafting: "Drafting",
+    review: "Review",
     ready_to_publish: "Ready to Publish",
     published: "Published",
     tracking: "Tracking",
@@ -246,6 +247,7 @@ const ROADMAP_STATUS_COLORS: Record<ProjectContentRoadmapStatus, string> = {
     idea: "bg-purple-50 text-purple-700 dark:bg-purple-950/20 dark:text-purple-300",
     planned: "bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-300",
     drafting: "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-300",
+    review: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/20 dark:text-cyan-300",
     ready_to_publish: "bg-teal-50 text-teal-700 dark:bg-teal-950/20 dark:text-teal-300",
     published: "bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-300",
     tracking: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-300",
@@ -300,12 +302,116 @@ function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectCont
     const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
     const items: ProjectContentRoadmapItem[] = [];
     const now = new Date().toISOString();
+    const normalizeStatus = (value: string, fallback: ProjectContentRoadmapStatus): ProjectContentRoadmapStatus => {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "planned") return "planned";
+        if (normalized === "idea") return "idea";
+        if (normalized === "drafting") return "drafting";
+        if (normalized === "review") return "review";
+        return fallback;
+    };
+    const normalizeContentType = (value: string, fallback: ProjectContentType): ProjectContentType => {
+        const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+        if (normalized === "narrative_article") return "narrative_article";
+        if (normalized === "knowledge_article") return "knowledge_article";
+        if (normalized === "group_post") return "group_post";
+        if (normalized === "page_post") return "page_post";
+        if (normalized === "personal_post") return "personal_post";
+        if (normalized === "infographic") return "infographic";
+        if (normalized === "short_video") return "short_video";
+        if (normalized === "follow_up_post") return "follow_up_post";
+        if (normalized === "supporting_article") return "supporting_article";
+        if (normalized === "legacy_article") return "legacy_article";
+        return fallback;
+    };
+    const normalizeContentLayer = (value: string, fallback: ProjectContentLayer): ProjectContentLayer => {
+        const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+        if (normalized === "core_episode") return "core_episode";
+        if (normalized === "supporting_article") return "supporting_article";
+        if (normalized === "social_post") return "social_post";
+        if (normalized === "performance_followup") return "performance_followup";
+        if (normalized === "visual_asset") return "visual_asset";
+        if (normalized === "video_asset") return "video_asset";
+        if (normalized === "legacy_shell") return "legacy_shell";
+        return fallback;
+    };
+    const normalizePriority = (value: string, fallback: "high" | "medium" | "low" | "none"): "high" | "medium" | "low" | "none" => {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "high") return "high";
+        if (normalized === "medium") return "medium";
+        if (normalized === "low") return "low";
+        return fallback;
+    };
+    const inferParentEpisode = (episodeCode: string) => {
+        const match = episodeCode.match(/^(EP[.\-_]?\d+)(?:[.\-_]\d+.*)?$/i);
+        return match ? match[1] : "";
+    };
+    const createRoadmapItem = (line: string, item: {
+        episodeCode: string;
+        title: string;
+        contentType: ProjectContentType;
+        contentLayer: ProjectContentLayer;
+        seriesOrTheme: string;
+        status: ProjectContentRoadmapStatus;
+        priority: "high" | "medium" | "low" | "none";
+        targetChannel: string;
+        relatedMainEpisode: string;
+        nextAction: string;
+        notes?: string;
+    }): ProjectContentRoadmapItem => ({
+        id: Math.random().toString(36).substring(2, 15) + Date.now().toString(36),
+        projectSlug,
+        episodeCode: item.episodeCode,
+        title: item.title || `Draft Episode for ${item.episodeCode}`,
+        contentType: item.contentType,
+        contentLayer: item.contentLayer,
+        seriesOrTheme: item.seriesOrTheme || "General",
+        status: item.status,
+        priority: item.priority,
+        targetChannel: item.targetChannel,
+        targetPublishDate: "",
+        relatedMainEpisode: item.relatedMainEpisode,
+        nextAction: item.nextAction,
+        notes: item.notes || "นำเข้าข้อมูลจาก Arbor Assistant",
+        createdAt: now,
+        updatedAt: now,
+        sourceText: line,
+        sourceType: "arbor_parse"
+    });
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        const isPipeRow = line.includes("|");
         
         // Skip header line if it looks like one
-        if (i === 0 && (line.toLowerCase().includes("episode") || line.toLowerCase().includes("code") || line.toLowerCase().includes("title"))) {
+        if (i === 0 && isPipeRow) {
+            const firstCol = line.split("|")[0].trim().toLowerCase();
+            const isHeader = ["episode_code", "title", "content_type"].includes(firstCol) || firstCol.includes("รหัส");
+            const isEpCode = /^EP\.\d+(\.\d+)?$/i.test(firstCol);
+            if (isHeader && !isEpCode) {
+                continue;
+            }
+        } else if (i === 0 && (line.toLowerCase().includes("episode") || line.toLowerCase().includes("code") || line.toLowerCase().includes("title"))) {
+            continue;
+        }
+
+        if (isPipeRow) {
+            const cols = line.split("|").map(c => c.trim());
+            const episodeCode = cols[0] || `EP.Draft.${i + 1}`;
+            const relatedMainEpisode = cols[8] || inferParentEpisode(episodeCode);
+
+            items.push(createRoadmapItem(line, {
+                episodeCode,
+                title: cols[1] || "",
+                contentType: normalizeContentType(cols[2] || "", "knowledge_article"),
+                contentLayer: normalizeContentLayer(cols[3] || "", "core_episode"),
+                seriesOrTheme: cols[4] || "",
+                priority: normalizePriority(cols[5] || "", "medium"),
+                status: normalizeStatus(cols[6] || "", "planned"),
+                targetChannel: cols[7] || "Facebook / Website",
+                relatedMainEpisode,
+                nextAction: cols[9] || "เตรียมยกร่างเนื้อหาตอน"
+            }));
             continue;
         }
 
@@ -324,7 +430,9 @@ function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectCont
         let priority: "high" | "medium" | "low" | "none" = "medium";
         let relatedMainEpisode = "";
         const notes = "";
-        const seriesOrTheme = "";
+        let seriesOrTheme = "";
+        let targetChannel = "Facebook / Website";
+        let nextAction = "เตรียมยกร่างเนื้อหาตอน";
 
         // Heuristic detection based on columns
         if (cols.length >= 2) {
@@ -433,30 +541,19 @@ function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectCont
             }
         }
 
-        const id = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-
-        items.push({
-            id,
-            projectSlug,
+        items.push(createRoadmapItem(line, {
             episodeCode,
             title,
             contentType,
             contentLayer,
-            seriesOrTheme: seriesOrTheme || "General",
+            seriesOrTheme,
             status,
             priority,
-            targetChannel: "Facebook / Website",
-            targetPublishDate: "",
+            targetChannel,
             relatedMainEpisode,
-            nextAction: "เตรียมยกร่างเนื้อหาตอน",
-            notes: notes || "นำเข้าข้อมูลจาก Arbor Assistant",
-            createdAt: now,
-            updatedAt: now,
-            
-            // new fields
-            sourceText: line,
-            sourceType: "arbor_parse"
-        });
+            nextAction,
+            notes
+        }));
     }
 
     return items;
@@ -3156,8 +3253,8 @@ ${suggestedNextStr}`;
                                     <table className="w-full text-left border-collapse text-[10px]">
                                         <thead>
                                             <tr className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 text-neutral-400 font-bold uppercase tracking-wider">
-                                                <th className="px-3 py-2 w-14">รหัส EP</th>
-                                                <th className="px-3 py-2 min-w-[120px]">หัวข้อ</th>
+                                                <th className="px-3 py-2 min-w-[92px]">รหัส EP</th>
+                                                <th className="px-3 py-2 min-w-[280px]">หัวข้อ</th>
                                                 <th className="px-3 py-2">ประเภท</th>
                                                 <th className="px-3 py-2">ระดับชั้น</th>
                                                 <th className="px-3 py-2">สถานะ</th>
