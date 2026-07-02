@@ -524,6 +524,9 @@ export default function ProjectDetailClient() {
     const [arborSelectedType, setArborSelectedType] = useState<ProjectDocBlockType | "auto">("auto");
     const [arborDraftBlock, setArborDraftBlock] = useState<ProjectDocumentationBlock | null>(null);
     const [showArborPreview, setShowArborPreview] = useState(false);
+    // OPS-002D: Project Context Summary state
+    const [projectDocs, setProjectDocs] = useState<Note[]>([]);
+    const [isContextSummaryOpen, setIsContextSummaryOpen] = useState(false);
     // --- Content Roadmap State ---
     const [roadmapItems, setRoadmapItems] = useState<ProjectContentRoadmapItem[]>([]);
     const [roadmapSearch, setRoadmapSearch] = useState("");
@@ -607,6 +610,15 @@ export default function ProjectDetailClient() {
                 // Load metadata from localStorage
                 const storedMeta = getStoredMetadata();
                 setMetadata(storedMeta);
+
+                // OPS-002D: Load project-linked docs for context summary
+                try {
+                    const docsRes = await fetch(`/api/docs?project_id=${projData.id}`);
+                    if (docsRes.ok) {
+                        const docsData = await docsRes.json();
+                        setProjectDocs(docsData.docs || []);
+                    }
+                } catch { /* ignore docs fetch failure */ }
             }
             if (itemsRes.ok) setItems(await itemsRes.json());
         } finally {
@@ -1097,6 +1109,9 @@ ${publishLogsStr}
 
 # Open Questions
 ${openQuestionsStr}
+
+# Related Notes & Knowledge (Project Docs)
+${projectDocs.length > 0 ? projectDocs.map(d => `- **${d.title}** (updated: ${new Date(d.updated_at).toLocaleDateString()})`).join("\n") : "N/A"}
 
 # Suggested Next Actions
 ${suggestedNextStr}`;
@@ -1807,6 +1822,13 @@ ${suggestedNextStr}`;
                                 >
                                     <Sparkles className="w-3.5 h-3.5" />
                                     Arbor Assistant
+                                </button>
+                                <button
+                                    onClick={() => setIsContextSummaryOpen(true)}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 text-white text-xs font-black uppercase tracking-wider hover:bg-purple-700 shadow-lg active:scale-95 transition-all"
+                                >
+                                    <Copy className="w-3.5 h-3.5" />
+                                    Project Context
                                 </button>
                             </div>
                         </div>
@@ -3410,6 +3432,52 @@ ${suggestedNextStr}`;
                     setDelToDelete(null);
                 }}
             />
+
+            {/* Project Context Summary Modal */}
+            <Modal
+                isOpen={isContextSummaryOpen}
+                onClose={() => setIsContextSummaryOpen(false)}
+                title="✨ Project Context Summary"
+            >
+                <div className="space-y-4 text-left max-h-[80vh] overflow-y-auto pr-1">
+                    <div className="p-3.5 bg-purple-50/50 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/20 rounded-2xl space-y-1">
+                        <span className="text-[10px] font-black uppercase text-purple-600 tracking-wider flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                            Arbor Project Context Reader
+                        </span>
+                        <p className="text-xs text-neutral-500 leading-normal font-medium dark:text-neutral-400">
+                            นี่คือข้อมูลสรุปของโปรเจกต์ปัจจุบันสำหรับส่งต่อให้ Arbor นำไปใช้ทำงานต่อ (คัดลอกโดยปุ่มด้านล่าง)
+                        </p>
+                    </div>
+
+                    <div className="relative">
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(generateArborContextMarkdown());
+                                setToastMessage("คัดลอก Arbor Project Context สำเร็จแล้ว!");
+                                setShowToast(true);
+                            }}
+                            className="absolute top-2 right-2 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[10px] font-black transition-all active:scale-95 shadow-sm"
+                        >
+                            <Copy className="w-3 h-3" />
+                            Copy Context
+                        </button>
+                        <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 max-h-[50vh] overflow-y-auto font-mono text-[11px] leading-relaxed text-neutral-800 dark:text-neutral-300 whitespace-pre-wrap select-all">
+                            {generateArborContextMarkdown()}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                        <button
+                            type="button"
+                            onClick={() => setIsContextSummaryOpen(false)}
+                            className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95"
+                        >
+                            ปิดหน้าต่าง
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <Toast 
                 isVisible={showToast} 
