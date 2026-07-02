@@ -45,6 +45,8 @@ const TaskUpdate = z.object({
 const DocCreate = z.object({
     title: z.string().min(1),
     content_md: z.string().optional().default(""),
+    project_id: z.string().nullable().optional(),
+    workspace: z.string().nullable().optional(),
 });
 
 const DocUpdate = z.object({
@@ -299,12 +301,14 @@ export async function POST(req: NextRequest) {
 
                     if (!isDryRun) {
                         db.prepare(`
-              INSERT INTO docs (id, title, content_md, created_at, updated_at)
-              VALUES (@id, @title, @content_md, @created_at, @updated_at)
+              INSERT INTO docs (id, title, content_md, project_id, workspace, created_at, updated_at)
+              VALUES (@id, @title, @content_md, @project_id, @workspace, @created_at, @updated_at)
             `).run({
                             id,
                             title: d.title,
                             content_md: d.content_md ?? "",
+                            project_id: d.project_id ?? null,
+                            workspace: d.workspace ?? null,
                             created_at: now,
                             updated_at: now,
                         });
