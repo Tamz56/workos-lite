@@ -561,6 +561,20 @@ export default function ProjectDetailClient() {
     const [arborRoadmapText, setArborRoadmapText] = useState("");
     const [arborRoadmapDrafts, setArborRoadmapDrafts] = useState<ProjectContentRoadmapItem[]>([]);
     const [showArborRoadmapPreview, setShowArborRoadmapPreview] = useState(false);
+
+    // --- Deliverable / Backlog Edit State ---
+    const [isDelModalOpen, setIsDelModalOpen] = useState(false);
+    const [activeDelItem, setActiveDelItem] = useState<ProjectItem | null>(null);
+    const [delTitle, setDelTitle] = useState("");
+    const [delStatus, setDelStatus] = useState<"inbox" | "planned" | "done">("inbox");
+    const [delIsMilestone, setDelIsMilestone] = useState(false);
+    const [delWorkstream, setDelWorkstream] = useState("");
+    const [delScheduleBucket, setDelScheduleBucket] = useState<"morning" | "afternoon" | "evening" | "none">("none");
+    const [delStartDate, setDelStartDate] = useState("");
+    const [delEndDate, setDelEndDate] = useState("");
+    const [delNotes, setDelNotes] = useState("");
+    const [isDeleteDelOpen, setIsDeleteDelOpen] = useState(false);
+    const [delToDelete, setDelToDelete] = useState<string | null>(null);
     // Default metadata helper
     const defaultMetadataForProject = useCallback((proj: Project): ProjectRegistryMetadata => {
         return {
@@ -1133,6 +1147,121 @@ export default function ProjectDetailClient() {
         loadRoadmapItems();
     };
 
+    const handleRoadmapItemClick = useCallback((item: ProjectContentRoadmapItem) => {
+        if (item.linkedPublishedUrl) {
+            const url = item.linkedPublishedUrl.trim();
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                window.open(url, "_blank", "noopener,noreferrer");
+                return;
+            }
+        }
+
+        if (item.linkedWritingProjectId) {
+            const val = item.linkedWritingProjectId.trim();
+            if (val.startsWith("http://") || val.startsWith("https://")) {
+                window.open(val, "_blank", "noopener,noreferrer");
+                return;
+            }
+            if (slug === "green-fineness-content") {
+                router.push(`/workspaces/content/writing-desk-lite?draft_id=${val}`);
+            } else {
+                router.push(`/workspaces/content/writing-lab?project_id=${val}`);
+            }
+            return;
+        }
+
+        // Fallback: Open edit modal
+        handleOpenEditRoadmap(item);
+    }, [slug, router]);
+
+    // --- Deliverable / Backlog Helpers ---
+    const handleOpenEditDeliverable = (item: ProjectItem) => {
+        setActiveDelItem(item);
+        setDelTitle(item.title);
+        setDelStatus(item.status as any);
+        setDelIsMilestone(item.is_milestone === 1);
+        setDelWorkstream(item.workstream || "");
+        setDelScheduleBucket(item.schedule_bucket as any || "none");
+        setDelStartDate(item.start_date || "");
+        setDelEndDate(item.end_date || "");
+        setDelNotes(item.notes || "");
+        setIsDelModalOpen(true);
+    };
+
+    const handleSaveDeliverable = async () => {
+        if (!activeDelItem) return;
+        if (!delTitle.trim()) {
+            alert("กรุณากรอกชื่อ Deliverable");
+            return;
+        }
+
+        setActionLoading(true);
+        try {
+            const res = await fetch(`/api/project_items/${activeDelItem.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: delTitle.trim(),
+                    status: delStatus,
+                    is_milestone: delIsMilestone ? 1 : 0,
+                    workstream: delWorkstream.trim() || null,
+                    schedule_bucket: delScheduleBucket === "none" ? null : delScheduleBucket,
+                    start_date: delStartDate || null,
+                    end_date: delEndDate || null,
+                    notes: delNotes.trim() || null
+                })
+            });
+
+            if (res.ok) {
+                setToastMessage("บันทึกการแก้ไข Deliverable เรียบร้อยแล้ว");
+                setShowToast(true);
+                setIsDelModalOpen(false);
+                loadData();
+            } else {
+                setToastMessage("ไม่สามารถบันทึกข้อมูลได้");
+                setShowToast(true);
+            }
+        } catch (e) {
+            console.error("Error updating deliverable", e);
+            setToastMessage("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+            setShowToast(true);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleTriggerDeleteDeliverable = (id: string) => {
+        setDelToDelete(id);
+        setIsDeleteDelOpen(true);
+    };
+
+    const handleConfirmDeleteDeliverable = async () => {
+        if (!delToDelete) return;
+        setActionLoading(true);
+        try {
+            const res = await fetch(`/api/project_items/${delToDelete}`, {
+                method: "DELETE"
+            });
+            if (res.ok) {
+                setToastMessage("ลบ Deliverable เรียบร้อยแล้ว");
+                setShowToast(true);
+                setIsDeleteDelOpen(false);
+                setDelToDelete(null);
+                setIsDelModalOpen(false); // Close edit modal too just in case
+                loadData();
+            } else {
+                setToastMessage("ไม่สามารถลบข้อมูลได้");
+                setShowToast(true);
+            }
+        } catch (e) {
+            console.error("Error deleting deliverable", e);
+            setToastMessage("เกิดข้อผิดพลาดในการลบข้อมูล");
+            setShowToast(true);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     // --- Arbor Roadmap Importer ---
     const handleOpenArborRoadmap = () => {
         setArborRoadmapText("");
@@ -1426,7 +1555,7 @@ export default function ProjectDetailClient() {
                             </div>
                             <div className="space-y-3">
                                 {milestones.map(item => (
-                                    <ItemCard key={item.id} item={item} />
+                                    <ItemCard key={item.id} item={item} onEdit={handleOpenEditDeliverable} />
                                 ))}
                             </div>
                         </section>
@@ -1448,7 +1577,7 @@ export default function ProjectDetailClient() {
                         ) : (
                             <div className="space-y-3">
                                 {otherItems.map(item => (
-                                    <ItemCard key={item.id} item={item} />
+                                    <ItemCard key={item.id} item={item} onEdit={handleOpenEditDeliverable} />
                                 ))}
                             </div>
                         )}
@@ -1565,7 +1694,16 @@ export default function ProjectDetailClient() {
                                                             {BLOCK_TYPE_LABELS[block.type]}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3 font-black text-neutral-900 dark:text-neutral-100 max-w-[200px] truncate">{block.title}</td>
+                                                    <td className="px-4 py-3 max-w-[200px] truncate">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleOpenEdit(block)} 
+                                                            className="font-black text-neutral-900 dark:text-neutral-100 hover:text-black dark:hover:text-white hover:underline cursor-pointer transition-colors text-left outline-none focus:underline"
+                                                            title={`ดู/แก้ไขเอกสาร ${block.title}`}
+                                                        >
+                                                            {block.title}
+                                                        </button>
+                                                    </td>
                                                     <td className="px-4 py-3 max-w-[250px] truncate text-neutral-500 dark:text-neutral-400">{block.summary}</td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase ${block.status === "active" ? "bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400" : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800"}`}>
@@ -1712,13 +1850,25 @@ export default function ProjectDetailClient() {
                                                 <tr key={item.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-900/20 transition-colors">
                                                     <td className="px-3.5 py-3 text-center text-neutral-400 font-bold">{item.orderIndex || 0}</td>
                                                     <td className="px-3.5 py-3 whitespace-nowrap">
-                                                        <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 dark:bg-neutral-850 dark:text-neutral-200 font-black font-mono">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRoadmapItemClick(item)}
+                                                            className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 dark:bg-neutral-850 dark:text-neutral-200 font-black font-mono hover:bg-neutral-200 dark:hover:bg-neutral-750 transition-colors cursor-pointer outline-none"
+                                                            title={`เข้าถึงงาน / แก้ไขตอน ${item.episodeCode}`}
+                                                        >
                                                             {item.episodeCode}
-                                                        </span>
+                                                        </button>
                                                     </td>
                                                     <td className="px-3.5 py-3 space-y-1">
                                                         <div className="font-black text-neutral-900 dark:text-neutral-100 leading-snug">
-                                                            {item.title}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRoadmapItemClick(item)}
+                                                                className="hover:underline hover:text-black dark:hover:text-white transition-colors cursor-pointer text-left outline-none focus:underline font-black"
+                                                                title={`เข้าถึงงาน / แก้ไขตอน ${item.title}`}
+                                                            >
+                                                                {item.title}
+                                                            </button>
                                                         </div>
                                                         {item.contentGoal && (
                                                             <div className="text-[10px] text-neutral-400 font-medium leading-relaxed italic">
@@ -1817,9 +1967,14 @@ export default function ProjectDetailClient() {
                                     <div key={item.id} className="bg-theme-card border border-neutral-200 rounded-3xl p-5 hover:shadow-md transition-all dark:border-neutral-800 flex flex-col justify-between text-left">
                                         <div className="space-y-2">
                                             <div className="flex items-center justify-between">
-                                                <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 dark:bg-neutral-850 dark:text-neutral-200 text-[10px] font-black font-mono">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRoadmapItemClick(item)}
+                                                    className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 dark:bg-neutral-850 dark:text-neutral-200 text-[10px] font-black font-mono hover:bg-neutral-200 dark:hover:bg-neutral-750 transition-colors cursor-pointer outline-none"
+                                                    title={`เข้าถึงงาน / แก้ไขตอน ${item.episodeCode}`}
+                                                >
                                                     {item.episodeCode}
-                                                </span>
+                                                </button>
                                                 <div className="flex items-center gap-1.5">
                                                     <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${ROADMAP_STATUS_COLORS[item.status]}`}>
                                                         {ROADMAP_STATUS_LABELS[item.status]}
@@ -1832,7 +1987,14 @@ export default function ProjectDetailClient() {
 
                                             <div>
                                                 <h3 className="font-black text-sm text-neutral-900 dark:text-neutral-100 leading-snug">
-                                                    {item.title}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRoadmapItemClick(item)}
+                                                        className="hover:underline hover:text-black dark:hover:text-white transition-colors cursor-pointer text-left outline-none focus:underline font-black"
+                                                        title={`เข้าถึงงาน / แก้ไขตอน ${item.title}`}
+                                                    >
+                                                        {item.title}
+                                                    </button>
                                                 </h3>
                                                 {item.contentGoal && (
                                                     <p className="text-[10px] text-neutral-400 font-medium leading-relaxed italic mt-1">
@@ -2885,6 +3047,162 @@ export default function ProjectDetailClient() {
                 }}
             />
 
+            {/* Deliverable / Backlog Edit Modal */}
+            <Modal 
+                isOpen={isDelModalOpen} 
+                onClose={() => setIsDelModalOpen(false)}
+                title="แก้ไข Deliverable / Backlog Item"
+            >
+                <div className="p-6 space-y-6">
+                    <div className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">หัวข้อภารกิจ (Title) *</label>
+                            <input
+                                type="text"
+                                value={delTitle}
+                                onChange={(e) => setDelTitle(e.target.value)}
+                                className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
+                                placeholder="เช่น พัฒนาหน้าลงทะเบียน..."
+                                required
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">สถานะ (Status)</label>
+                                <select
+                                    value={delStatus}
+                                    onChange={(e) => setDelStatus(e.target.value as any)}
+                                    className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
+                                >
+                                    <option value="inbox">Inbox</option>
+                                    <option value="planned">Planned</option>
+                                    <option value="done">Completed</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">หมวดงาน (Workstream)</label>
+                                <input
+                                    type="text"
+                                    value={delWorkstream}
+                                    onChange={(e) => setDelWorkstream(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
+                                    placeholder="เช่น UI/UX, Dev, Docs"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">ช่วงเวลาประจำวัน (Schedule Bucket)</label>
+                                <select
+                                    value={delScheduleBucket}
+                                    onChange={(e) => setDelScheduleBucket(e.target.value as any)}
+                                    className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
+                                >
+                                    <option value="none">None / ไม่ระบุ</option>
+                                    <option value="morning">Morning (เช้า)</option>
+                                    <option value="afternoon">Afternoon (บ่าย)</option>
+                                    <option value="evening">Evening (เย็น)</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-center pt-5">
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={delIsMilestone}
+                                        onChange={(e) => setDelIsMilestone(e.target.checked)}
+                                        className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900"
+                                    />
+                                    <span className="text-xs font-black uppercase text-neutral-500 tracking-wider">เป็น Milestone สำคัญ</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">วันที่เริ่มงาน (Start Date)</label>
+                                <input
+                                    type="date"
+                                    value={delStartDate}
+                                    onChange={(e) => setDelStartDate(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">วันที่สิ้นสุด (End Date)</label>
+                                <input
+                                    type="date"
+                                    value={delEndDate}
+                                    onChange={(e) => setDelEndDate(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">บันทึก / รายละเอียดเพิ่มเติม (Notes)</label>
+                            <textarea
+                                value={delNotes}
+                                onChange={(e) => setDelNotes(e.target.value)}
+                                rows={3}
+                                className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
+                                placeholder="รายละเอียด ขอบเขตงาน หรือลิงก์ที่เกี่ยวข้อง..."
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                        <div>
+                            {activeDelItem && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleTriggerDeleteDeliverable(activeDelItem.id)}
+                                    className="px-4 py-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all font-bold text-xs flex items-center gap-1 hover:underline"
+                                    title="ลบรายการนี้"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    ลบรายการ
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsDelModalOpen(false)}
+                                className="px-5 py-2.5 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 rounded-xl text-xs font-bold transition-all active:scale-95"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveDeliverable}
+                                disabled={actionLoading}
+                                className="px-5 py-2.5 bg-neutral-900 hover:bg-black dark:bg-neutral-100 dark:hover:bg-white text-white dark:text-black rounded-xl text-xs font-black transition-all active:scale-95 shadow-md flex items-center justify-center gap-1.5"
+                            >
+                                {actionLoading ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Confirm Delete Deliverable Dialog */}
+            <ConfirmDialog
+                isOpen={isDeleteDelOpen}
+                title="ลบรายการ Deliverable"
+                message="คุณแน่ใจหรือไม่ว่าต้องการลบ Deliverable รายการนี้? ข้อมูลทั้งหมดจะถูกลบจากประวัติและไม่สามารถกู้คืนได้"
+                confirmText="ยืนยันการลบ"
+                onConfirm={handleConfirmDeleteDeliverable}
+                onCancel={() => {
+                    setIsDeleteDelOpen(false);
+                    setDelToDelete(null);
+                }}
+            />
+
             <Toast 
                 isVisible={showToast} 
                 message={toastMessage} 
@@ -2927,7 +3245,14 @@ function DocBlockCard({
                         )}
                     </div>
                     <h3 className="font-black text-base text-neutral-900 dark:text-neutral-100 tracking-tight pt-1">
-                        {block.title}
+                        <button 
+                            type="button"
+                            onClick={() => onEdit(block)} 
+                            className="hover:underline hover:text-black dark:hover:text-white transition-colors text-left outline-none cursor-pointer focus:underline"
+                            title={`ดู/แก้ไขเอกสาร ${block.title}`}
+                        >
+                            {block.title}
+                        </button>
                     </h3>
                 </div>
 
@@ -3035,7 +3360,7 @@ function DocBlockCard({
     );
 }
 
-function ItemCard({ item }: { item: ProjectItem }) {
+function ItemCard({ item, onEdit }: { item: ProjectItem; onEdit: (item: ProjectItem) => void }) {
     return (
         <div className="bg-theme-card border border-neutral-200 rounded-3xl p-5 flex justify-between items-center hover:shadow-xl hover:border-neutral-300 transition-all group active:scale-[0.99] cursor-default">
             <div className="flex items-center gap-4">
@@ -3046,7 +3371,14 @@ function ItemCard({ item }: { item: ProjectItem }) {
                 </div>
                 <div>
                     <div className={`font-black tracking-tight ${item.status === 'done' ? 'line-through text-neutral-400' : 'text-neutral-900 dark:text-neutral-100 text-lg'}`}>
-                        {item.title}
+                        <button
+                            type="button"
+                            onClick={() => onEdit(item)}
+                            className="hover:underline hover:text-black dark:hover:text-white transition-colors text-left outline-none cursor-pointer focus:underline font-black"
+                            title={`ดู/แก้ไข ${item.title}`}
+                        >
+                            {item.title}
+                        </button>
                     </div>
                     <div className="flex items-center gap-3 mt-1">
                         {item.workstream && (
@@ -3074,12 +3406,16 @@ function ItemCard({ item }: { item: ProjectItem }) {
                     </span>
                     {item.start_date && (
                         <span className="text-[10px] font-bold text-neutral-400 mt-1.5 uppercase tracking-tighter">
-                            Starts {item.start_date}
+                             Starts {item.start_date}
                         </span>
                     )}
                 </div>
-                <button className="p-2 rounded-xl text-neutral-300 hover:text-black hover:bg-neutral-50 transition-all opacity-0 group-hover:opacity-100">
-                    <MoreVertical className="w-5 h-5" />
+                <button 
+                    onClick={() => onEdit(item)}
+                    className="p-2 rounded-xl text-neutral-400 hover:text-black hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all opacity-0 group-hover:opacity-100 outline-none"
+                    title="แก้ไข"
+                >
+                    <Edit2 className="w-4 h-4" />
                 </button>
             </div>
         </div>

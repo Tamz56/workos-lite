@@ -566,9 +566,13 @@ export default function ProjectsClient() {
                                     {filteredProjects.map(project => (
                                         <tr key={project.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-950/10 transition-colors group">
                                             <td className="p-4 max-w-[240px]">
-                                                <div className="font-bold text-neutral-900 dark:text-neutral-100 group-hover:text-black dark:group-hover:text-white transition-colors truncate">
+                                                <Link 
+                                                    href={`/projects/${project.slug}`} 
+                                                    className="font-bold text-neutral-900 dark:text-neutral-100 group-hover:text-black dark:group-hover:text-white hover:text-black dark:hover:text-white hover:underline cursor-pointer transition-colors truncate block"
+                                                    title={`เปิดหน้าโครงการ ${project.name}`}
+                                                >
                                                     {project.name}
-                                                </div>
+                                                </Link>
                                                 <div className="text-[10px] text-neutral-400 font-mono mt-0.5">{project.slug}</div>
                                             </td>
                                             <td className="p-4">
@@ -647,7 +651,7 @@ export default function ProjectsClient() {
                                             {project.category}
                                         </span>
                                         <Link href={`/projects/${project.slug}`} className="block">
-                                            <h2 className="font-black text-lg text-neutral-900 dark:text-neutral-100 group-hover:text-black dark:group-hover:text-white transition-colors leading-tight tracking-tight">
+                                            <h2 className="font-black text-lg text-neutral-900 dark:text-neutral-100 group-hover:text-black dark:group-hover:text-white hover:underline transition-colors leading-tight tracking-tight">
                                                 {project.name}
                                             </h2>
                                         </Link>
