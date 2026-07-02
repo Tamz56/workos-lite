@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { Project, ProjectItem, ProjectRegistryStatus, ProjectProgressStage, ProjectRegistryMetadata, Note, ProjectDocBlockType, ProjectDocumentationBlock, ProjectContentRoadmapStatus, ProjectContentType, ProjectContentLayer, ProjectContentRoadmapItem } from "@/lib/types";
 import { 
@@ -465,7 +465,9 @@ function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectCont
 export default function ProjectDetailClient() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const slug = params.slug as string;
+    const isArborContext = searchParams?.get("arborContext") === "1";
 
     const [project, setProject] = useState<Project | null>(null);
     const [metadata, setMetadata] = useState<Record<string, ProjectRegistryMetadata>>({});
@@ -514,6 +516,7 @@ export default function ProjectDetailClient() {
     const [formFiles, setFormFiles] = useState("");       
     const [formNextAction, setFormNextAction] = useState("");
     const [formStatus, setFormStatus] = useState("active");
+    const [formOrderIndex, setFormOrderIndex] = useState("");
 
     // Arbor Assistant Dialog state
     const [isArborModalOpen, setIsArborModalOpen] = useState(false);
@@ -612,14 +615,72 @@ export default function ProjectDetailClient() {
     }, [slug]);
 
     const loadDocBlocks = useCallback(() => {
-        const allBlocks = getStoredDocBlocks();
+        let allBlocks = getStoredDocBlocks();
+        let modified = false;
+
+        // 1. Rename block if found
+        allBlocks = allBlocks.map(b => {
+            if (
+                b.projectSlug === "green-fineness-content" &&
+                b.title === "Decision Log — Green Fineness Content Project Structure"
+            ) {
+                modified = true;
+                return {
+                    ...b,
+                    title: "Decision Log — Project Structure and Data Ownership",
+                    updatedAt: new Date().toISOString()
+                };
+            }
+            return b;
+        });
+
+        // 2. Set default orderIndex for existing Green Fineness Content docs
+        allBlocks = allBlocks.map(b => {
+            if (b.projectSlug === "green-fineness-content" && (b.orderIndex === undefined || b.orderIndex === null)) {
+                if (b.title.startsWith("System Structure — Green Fineness Content")) {
+                    modified = true;
+                    return { ...b, orderIndex: 10 };
+                }
+                if (b.title.startsWith("SOP — Green Fineness Content Production")) {
+                    modified = true;
+                    return { ...b, orderIndex: 20 };
+                }
+                if (b.title.startsWith("Process Note — Current Workflow")) {
+                    modified = true;
+                    return { ...b, orderIndex: 30 };
+                }
+                if (
+                    b.title === "Decision Log — Project Structure and Data Ownership" ||
+                    b.title === "Decision Log — Green Fineness Content Project Structure"
+                ) {
+                    modified = true;
+                    return { ...b, orderIndex: 40 };
+                }
+            }
+            return b;
+        });
+
+        if (modified) {
+            saveStoredDocBlocks(allBlocks);
+        }
+
         const projectBlocks = allBlocks.filter(b => b.projectSlug === slug);
-        // Sort by date descending, then by createdAt descending
+
+        // Sort by orderIndex ascending if present, fallback to date descending, then createdAt descending
         projectBlocks.sort((a, b) => {
+            const hasA = a.orderIndex !== undefined && a.orderIndex !== null;
+            const hasB = b.orderIndex !== undefined && b.orderIndex !== null;
+            if (hasA && hasB) {
+                return (a.orderIndex || 0) - (b.orderIndex || 0);
+            }
+            if (hasA) return -1;
+            if (hasB) return 1;
+
             const dateCompare = b.date.localeCompare(a.date);
             if (dateCompare !== 0) return dateCompare;
             return b.createdAt.localeCompare(a.createdAt);
         });
+
         setDocBlocks(projectBlocks);
     }, [slug]);
 
@@ -653,6 +714,7 @@ export default function ProjectDetailClient() {
         setFormFiles("");
         setFormNextAction("");
         setFormStatus("active");
+        setFormOrderIndex("");
         setIsDocModalOpen(true);
     };
 
@@ -675,6 +737,7 @@ export default function ProjectDetailClient() {
         setFormFiles(block.relatedFiles ? block.relatedFiles.join("\n") : "");
         setFormNextAction(block.nextAction || "");
         setFormStatus(block.status);
+        setFormOrderIndex(block.orderIndex !== undefined && block.orderIndex !== null ? block.orderIndex.toString() : "");
         setIsDocModalOpen(true);
     };
 
@@ -696,6 +759,8 @@ export default function ProjectDetailClient() {
 
         const allBlocks = getStoredDocBlocks();
         const now = new Date().toISOString();
+        const parsedOrderVal = formOrderIndex.trim() ? parseInt(formOrderIndex.trim(), 10) : undefined;
+        const orderIndex = (parsedOrderVal !== undefined && !isNaN(parsedOrderVal)) ? parsedOrderVal : undefined;
 
         if (activeDocBlock) {
             // Update
@@ -712,6 +777,7 @@ export default function ProjectDetailClient() {
                         relatedFiles,
                         nextAction: formNextAction.trim(),
                         status: formStatus,
+                        orderIndex,
                         updatedAt: now
                     };
                 }
@@ -734,6 +800,7 @@ export default function ProjectDetailClient() {
                 relatedFiles,
                 nextAction: formNextAction.trim(),
                 status: formStatus,
+                orderIndex,
                 createdAt: now,
                 updatedAt: now
             };
@@ -928,6 +995,111 @@ export default function ProjectDetailClient() {
         setShowArborPreview(false);
         setActiveDocBlock(null);
         loadDocBlocks();
+    };
+
+    const generateArborContextMarkdown = () => {
+        if (!project) return "";
+
+        const activeMeta = (metadata[slug] || {}) as any;
+        const cat = activeMeta.category || "N/A";
+        const detStatus = activeMeta.status || "N/A";
+        const prio = activeMeta.priority || "N/A";
+        const goal = activeMeta.currentGoal || "N/A";
+        const next = activeMeta.nextAction || "N/A";
+        const cadence = activeMeta.cadence || "N/A";
+        const risk = activeMeta.riskOrBlockedBy || "N/A";
+        const updated = activeMeta.lastUpdated || "N/A";
+
+        // Filter doc blocks
+        const systemStructureBlock = docBlocks.find(b => b.type === "structure");
+        const sopBlock = docBlocks.find(b => b.type === "sop");
+        const decisionBlock = docBlocks.find(b => b.type === "decision");
+
+        // Format system structure
+        let systemStructureStr = "N/A";
+        if (systemStructureBlock) {
+            systemStructureStr = `### ${systemStructureBlock.title}\n${systemStructureBlock.details}`;
+        }
+
+        // Format SOP / Workflow
+        let sopStr = "N/A";
+        if (sopBlock) {
+            sopStr = `### ${sopBlock.title}\n${sopBlock.details}`;
+        }
+
+        // Format active content roadmap
+        let roadmapStr = "N/A";
+        if (roadmapItems.length > 0) {
+            roadmapStr = roadmapItems.map(item => {
+                return `- **${item.episodeCode || "N/A"}**: ${item.title || "N/A"} | Type: ${item.contentType || "N/A"} | Layer: ${item.contentLayer || "N/A"} | Status: ${item.status || "N/A"}${item.targetPublishDate ? ` | Target: ${item.targetPublishDate}` : ""}`;
+            }).join("\n");
+        }
+
+        // Recent publish notes / QA / performance
+        const publishLogs = docBlocks.filter(b => b.type === "publish" || b.type === "qa_review");
+        let publishLogsStr = "N/A";
+        if (publishLogs.length > 0) {
+            publishLogsStr = publishLogs.map(b => `- **${b.title}** (${b.date}): ${b.summary}\n${b.details}`).join("\n\n");
+        }
+
+        // Open questions
+        const openQuestions = docBlocks.filter(b => b.type === "decision" && b.status?.toLowerCase().includes("open"));
+        let openQuestionsStr = "N/A";
+        if (openQuestions.length > 0) {
+            openQuestionsStr = openQuestions.map(b => `- **${b.title}**: ${b.summary}`).join("\n");
+        } else if (decisionBlock) {
+            openQuestionsStr = `### Decision Logs & Context\n**${decisionBlock.title}**\nSummary: ${decisionBlock.summary}\n\nDetails:\n${decisionBlock.details}`;
+        }
+
+        // Suggested next actions (registry next action + blocks nextAction + items)
+        const blockNextActions = docBlocks.map(b => b.nextAction ? `- [Block: ${b.title}] ${b.nextAction}` : "").filter(Boolean);
+        const itemNextActions = items.map(it => it.status !== "done" ? `- [Backlog Item] ${it.title} (${it.status})` : "").filter(Boolean);
+        let suggestedNextStr = `- [Registry Metadata] ${next}`;
+        if (blockNextActions.length > 0) {
+            suggestedNextStr += "\n" + blockNextActions.join("\n");
+        }
+        if (itemNextActions.length > 0) {
+            suggestedNextStr += "\n" + itemNextActions.join("\n");
+        }
+
+        return `# Project
+- Name: ${project.name}
+- Slug: ${slug}
+- Category: ${cat}
+- Description: ${(project as any).description || "N/A"}
+
+# Current Status
+- Detailed Status: ${detStatus}
+- Priority: ${prio}
+- Cadence: ${cadence}
+- Last Updated: ${updated}
+
+# Current Goal
+${goal}
+
+# Next Action
+${next}
+
+# Risks / Blockers
+${risk}
+
+# System Structure
+${systemStructureStr}
+
+# Current SOP / Workflow
+${sopStr}
+
+# Active Content Roadmap
+${roadmapStr}
+
+# Recent Publish / Performance Notes
+${publishLogsStr}
+
+# Open Questions
+${openQuestionsStr}
+
+# Suggested Next Actions
+${suggestedNextStr}`;
     };
 
     // Filter & Search computation
@@ -1468,6 +1640,32 @@ export default function ProjectDetailClient() {
                 <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                 <span className="text-xs font-black uppercase tracking-widest">Back to Project Registry</span>
             </div>
+
+            {isArborContext && (
+                <div className="mb-6 bg-purple-500/5 dark:bg-purple-950/10 border border-purple-500/20 rounded-2xl p-6 space-y-4 text-left">
+                    <div className="flex items-center justify-between border-b border-purple-500/10 dark:border-purple-500/20 pb-3">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-purple-600 animate-pulse" />
+                            <h2 className="text-sm font-black text-purple-950 dark:text-purple-300 uppercase tracking-widest">
+                                Arbor Project Context View
+                            </h2>
+                        </div>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(generateArborContextMarkdown());
+                                alert("คัดลอก Arbor Project Context สำเร็จแล้ว! (Copied Arbor Context to clipboard)");
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black transition-all active:scale-95 shadow-sm"
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                            Copy Arbor Context
+                        </button>
+                    </div>
+                    <div className="bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 max-h-96 overflow-y-auto font-mono text-[11px] leading-relaxed text-neutral-800 dark:text-neutral-300 whitespace-pre-wrap select-all">
+                        {generateArborContextMarkdown()}
+                    </div>
+                </div>
+            )}
 
             <PageHeader
                 title={project.name}
@@ -2328,7 +2526,7 @@ export default function ProjectDetailClient() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">วันที่บันทึก (Date)</label>
                             <input
@@ -2345,6 +2543,16 @@ export default function ProjectDetailClient() {
                                 value={formStatus}
                                 onChange={e => setFormStatus(e.target.value)}
                                 placeholder="เช่น active, completed, archive"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ลำดับการจัดเรียง (Order Index)</label>
+                            <input
+                                type="number"
+                                value={formOrderIndex}
+                                onChange={e => setFormOrderIndex(e.target.value)}
+                                placeholder="เช่น 10, 20, 30"
                                 className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-neutral-400"
                             />
                         </div>

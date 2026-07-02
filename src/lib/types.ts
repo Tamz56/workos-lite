@@ -219,6 +219,7 @@ export interface ProjectDocumentationBlock {
     generatedBy?: "arbor";
     reviewedByUser?: boolean;
     appliedAt?: string;
+    orderIndex?: number;
 }
 
 export type ProjectContentRoadmapStatus =

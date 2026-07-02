@@ -223,7 +223,9 @@ export default function WritingStudioTab({
         notes: "",
         isMistake: false,
         correctedAt: "",
-        correctionNote: ""
+        correctionNote: "",
+        isFallback: false,
+        fallbackWindow: ""
     });
 
     const createEmptyGA4Snapshot = (windowKey: string) => ({
@@ -239,7 +241,9 @@ export default function WritingStudioTab({
         sourceMedium: "",
         organicUsers: "",
         referralUsers: "",
-        notes: ""
+        notes: "",
+        isFallback: false,
+        fallbackWindow: ""
     });
 
     // 2. Feedback Snapshots
@@ -2738,7 +2742,7 @@ export default function WritingStudioTab({
 
                                     {(() => {
                                         const activeFb = fbActiveSnap === "12h" ? fbSnap12h : fbActiveSnap === "24h" ? fbSnap24h : fbActiveSnap === "7d" ? fbSnap7d : fbActiveSnap === "30d" ? fbSnap30d : fbSnap90d;
-                                        const activeFbSetter = fbActiveSnap === "12h" ? setFbSnap12h : fbActiveSnap === "24h" ? setFbSnap24h : fbActiveSnap === "7d" ? setFbSnap7d : fbActiveSnap === "30d" ? setFbSnap30d : setFbSnap90d;
+                                        const activeFbSetter: any = fbActiveSnap === "12h" ? setFbSnap12h : fbActiveSnap === "24h" ? setFbSnap24h : fbActiveSnap === "7d" ? setFbSnap7d : fbActiveSnap === "30d" ? setFbSnap30d : setFbSnap90d;
 
                                         return (
                                             <div className="space-y-4">
@@ -3068,7 +3072,7 @@ export default function WritingStudioTab({
 
                                     {(() => {
                                         const activeGa4 = ga4ActiveSnap === "12h" ? ga4Snap12h : ga4ActiveSnap === "24h" ? ga4Snap24h : ga4ActiveSnap === "7d" ? ga4Snap7d : ga4ActiveSnap === "30d" ? ga4Snap30d : ga4Snap90d;
-                                        const activeGa4Setter = ga4ActiveSnap === "12h" ? setGa4Snap12h : ga4ActiveSnap === "24h" ? setGa4Snap24h : ga4ActiveSnap === "7d" ? setGa4Snap7d : ga4ActiveSnap === "30d" ? setGa4Snap30d : setGa4Snap90d;
+                                        const activeGa4Setter: any = ga4ActiveSnap === "12h" ? setGa4Snap12h : ga4ActiveSnap === "24h" ? setGa4Snap24h : ga4ActiveSnap === "7d" ? setGa4Snap7d : ga4ActiveSnap === "30d" ? setGa4Snap30d : setGa4Snap90d;
 
                                         return (
                                             <div className="space-y-4">
