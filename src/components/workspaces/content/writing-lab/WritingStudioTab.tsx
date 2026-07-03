@@ -94,6 +94,24 @@ interface WritingStudioTabProps {
 }
 
 type SubTabKey = "narrative" | "knowledge" | "social" | "seo" | "work_checklist" | "utm" | "performance" | "review";
+type ArticleMode = "narrative" | "knowledge";
+type PackageTargetTab = "SEO & Website Fields" | "Social Drafts" | "UTM / Publish" | "Schema";
+
+interface PackageFieldPreview {
+    key: string;
+    label: string;
+    targetTab: PackageTargetTab;
+    value: string;
+    existingValue: string;
+    willOverwrite: boolean;
+}
+
+interface PackageExtractionPreview {
+    sourceMode: ArticleMode;
+    fields: PackageFieldPreview[];
+    cleanBody: string;
+    removedSectionsCount: number;
+}
 
 const WORK_CHECKLIST_GROUPS = [
     {
@@ -479,6 +497,8 @@ export default function WritingStudioTab({
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
     const [isPackageValid, setIsPackageValid] = useState(true);
+    const [packagePreview, setPackagePreview] = useState<PackageExtractionPreview | null>(null);
+    const [shouldCleanExtractedBody, setShouldCleanExtractedBody] = useState(true);
 
     // Sync state when activeProject changes
     useEffect(() => {
@@ -1213,6 +1233,282 @@ export default function WritingStudioTab({
         setTimeout(() => {
             textarea.setSelectionRange(start + replacement.length, start + replacement.length);
         }, 0);
+    };
+
+    const normalizeHeading = (value: string) => value
+        .toLowerCase()
+        .replace(/[`*_()[\]:]/g, "")
+        .replace(/\s*\/\s*/g, " / ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const parseMarkdownHeadingBlocks = (markdown: string) => {
+        const lines = markdown.split(/\r?\n/);
+        const blocks: { level: number; title: string; content: string; start: number; end: number }[] = [];
+        let current: { level: number; title: string; start: number; contentLines: string[] } | null = null;
+
+        for (let index = 0; index < lines.length; index += 1) {
+            const line = lines[index];
+            const match = line.match(/^(#{1,2})\s+(.+?)\s*$/);
+            if (match) {
+                if (current) {
+                    blocks.push({
+                        level: current.level,
+                        title: current.title,
+                        content: current.contentLines.join("\n").trim(),
+                        start: current.start,
+                        end: index - 1
+                    });
+                }
+                current = {
+                    level: match[1].length,
+                    title: match[2].trim(),
+                    start: index,
+                    contentLines: []
+                };
+            } else if (current) {
+                current.contentLines.push(line);
+            }
+        }
+
+        if (current) {
+            blocks.push({
+                level: current.level,
+                title: current.title,
+                content: current.contentLines.join("\n").trim(),
+                start: current.start,
+                end: lines.length - 1
+            });
+        }
+
+        return { lines, blocks };
+    };
+
+    const cleanExtractedPackageSections = (markdown: string) => {
+        const { lines, blocks } = parseMarkdownHeadingBlocks(markdown);
+        const packageSectionNames = new Set([
+            "seo & website fields",
+            "social drafts",
+            "utm / publish",
+            "schema / custom json-ld",
+            "schema notes"
+        ]);
+        const removeRanges = blocks
+            .filter(block => block.level === 1 && packageSectionNames.has(normalizeHeading(block.title)))
+            .map(block => {
+                const nextH1 = blocks.find(candidate => candidate.level === 1 && candidate.start > block.start);
+                return {
+                    start: block.start,
+                    end: nextH1 ? nextH1.start - 1 : lines.length - 1
+                };
+            });
+
+        if (removeRanges.length === 0) {
+            return { cleanBody: markdown, removedSectionsCount: 0 };
+        }
+
+        const cleanBody = lines
+            .filter((_, index) => !removeRanges.some(range => index >= range.start && index <= range.end))
+            .join("\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+
+        return { cleanBody, removedSectionsCount: removeRanges.length };
+    };
+
+    const buildPackageExtractionPreview = (sourceMode: ArticleMode): PackageExtractionPreview | null => {
+        const sourceText = sourceMode === "narrative" ? narrativeBody : knowledgeBody;
+        if (!sourceText.trim()) return null;
+
+        const { blocks } = parseMarkdownHeadingBlocks(sourceText);
+        const sectionMap = new Map<string, string>();
+        blocks.forEach(block => {
+            const key = normalizeHeading(block.title);
+            if (!sectionMap.has(key) && block.content.trim()) {
+                sectionMap.set(key, block.content.trim());
+            }
+        });
+
+        const getSection = (...names: string[]) => {
+            for (const name of names) {
+                const value = sectionMap.get(normalizeHeading(name));
+                if (value) return value;
+            }
+            return "";
+        };
+
+        const selectedTitle = sourceMode === "narrative" ? narrativeTitle : knowledgeTitle;
+        const selectedSlug = sourceMode === "narrative" ? narrativeSlug : knowledgeSlug;
+        const selectedHeroSubtitle = sourceMode === "narrative" ? narrativeHeroSubtitle : knowledgeHeroSubtitle;
+        const selectedShortSummary = sourceMode === "narrative" ? narrativeShortSummary : knowledgeShortSummary;
+        const selectedMetaTitle = sourceMode === "narrative" ? narrativeMetaTitle : knowledgeMetaTitle;
+        const selectedMetaDescription = sourceMode === "narrative" ? narrativeMetaDescription : knowledgeMetaDescription;
+        const selectedKeywords = sourceMode === "narrative" ? narrativeKeywords : knowledgeKeywords;
+        const selectedSchema = sourceMode === "narrative" ? narrativeSchemaJsonld : knowledgeSchemaJsonld;
+        const selectedStatus = sourceMode === "narrative" ? narrativeStatus : knowledgeStatus;
+        const extractedKeywords = [getSection("Primary Keyword"), getSection("Secondary Keywords")]
+            .filter(Boolean)
+            .join(", ");
+
+        const candidates: Array<Omit<PackageFieldPreview, "willOverwrite">> = [
+            { key: "articleTitle", label: "Title", targetTab: "SEO & Website Fields", value: getSection("Title"), existingValue: selectedTitle },
+            { key: "articleSlug", label: "Slug", targetTab: "SEO & Website Fields", value: getSection("Slug"), existingValue: selectedSlug },
+            { key: "heroSubtitle", label: "Hero Subtitle", targetTab: "SEO & Website Fields", value: getSection("Hero Subtitle"), existingValue: selectedHeroSubtitle },
+            { key: "shortSummary", label: "Short Summary / Excerpt", targetTab: "SEO & Website Fields", value: getSection("Short Summary / Excerpt", "Short Summary", "Excerpt"), existingValue: selectedShortSummary },
+            { key: "metaTitle", label: "Meta Title", targetTab: "SEO & Website Fields", value: getSection("Meta Title"), existingValue: selectedMetaTitle },
+            { key: "metaDescription", label: "Meta Description", targetTab: "SEO & Website Fields", value: getSection("Meta Description"), existingValue: selectedMetaDescription },
+            { key: "keywords", label: "Keywords", targetTab: "SEO & Website Fields", value: extractedKeywords, existingValue: selectedKeywords },
+            { key: "knowledgePrimaryKeyword", label: "Primary Keyword", targetTab: "SEO & Website Fields", value: getSection("Primary Keyword"), existingValue: sourceMode === "knowledge" ? knowledgePrimaryKeyword : "" },
+            { key: "knowledgeSecondaryKeywords", label: "Secondary Keywords", targetTab: "SEO & Website Fields", value: getSection("Secondary Keywords"), existingValue: sourceMode === "knowledge" ? knowledgeSecondaryKeywords : "" },
+            { key: "knowledgeCategory", label: "Category", targetTab: "SEO & Website Fields", value: getSection("Category"), existingValue: sourceMode === "knowledge" ? knowledgeCategory : "" },
+            { key: "contentLayer", label: "Content Layer", targetTab: "SEO & Website Fields", value: getSection("Content Layer"), existingValue: contentLayer },
+            { key: "contentFamily", label: "Series", targetTab: "SEO & Website Fields", value: getSection("Series"), existingValue: contentFamily },
+            { key: "episodeCode", label: "Episode", targetTab: "SEO & Website Fields", value: getSection("Episode"), existingValue: episodeCode },
+            { key: "journeyStage", label: "Journey Stage", targetTab: "SEO & Website Fields", value: getSection("Journey Stage"), existingValue: sourceMode === "narrative" ? narrativeJourneyStage : "" },
+            { key: "articleStatus", label: "Article Status", targetTab: "SEO & Website Fields", value: getSection("Article Status"), existingValue: selectedStatus },
+            { key: "facebookGroupPost", label: "Facebook Group Post", targetTab: "Social Drafts", value: getSection("Facebook Group Post"), existingValue: facebookGroupPost },
+            { key: "facebookPagePost", label: "Facebook Page Post", targetTab: "Social Drafts", value: getSection("Facebook Page Post"), existingValue: facebookPagePost },
+            { key: "personalPost", label: "Personal Post", targetTab: "Social Drafts", value: getSection("Personal Post"), existingValue: personalPost },
+            { key: "shortCaption", label: "Short Caption", targetTab: "Social Drafts", value: getSection("Short Caption"), existingValue: shortCaption },
+            { key: "hashtags", label: "Hashtags", targetTab: "Social Drafts", value: getSection("Hashtags"), existingValue: hashtags },
+            { key: "publishedUrl", label: "Published URL", targetTab: "UTM / Publish", value: getSection("Published URL"), existingValue: publishedUrl },
+            { key: "groupUtm", label: "UTM Group", targetTab: "UTM / Publish", value: getSection("UTM Group"), existingValue: groupUtm },
+            { key: "pageUtm", label: "UTM Page", targetTab: "UTM / Publish", value: getSection("UTM Page"), existingValue: pageUtm },
+            { key: "personalUtm", label: "UTM Personal", targetTab: "UTM / Publish", value: getSection("UTM Personal"), existingValue: personalUtm },
+            { key: "publishStatus", label: "Publish Status", targetTab: "UTM / Publish", value: getSection("Publish Status"), existingValue: publishStatus },
+            { key: "performanceSummary", label: "Publish Log Note", targetTab: "UTM / Publish", value: getSection("Publish Log Note"), existingValue: performanceSummary },
+            { key: "schemaJsonld", label: "Schema / Custom JSON-LD", targetTab: "Schema", value: getSection("Schema / Custom JSON-LD", "Schema Notes"), existingValue: selectedSchema }
+        ];
+
+        const fields = candidates
+            .filter(field => field.value.trim())
+            .filter(field => sourceMode === "knowledge" || !["knowledgePrimaryKeyword", "knowledgeSecondaryKeywords", "knowledgeCategory"].includes(field.key))
+            .filter(field => sourceMode === "narrative" || field.key !== "journeyStage")
+            .map(field => ({
+                ...field,
+                value: field.value.trim(),
+                willOverwrite: !!field.existingValue.trim() && field.existingValue.trim() !== field.value.trim()
+            }));
+
+        const { cleanBody, removedSectionsCount } = cleanExtractedPackageSections(sourceText);
+        return { sourceMode, fields, cleanBody, removedSectionsCount };
+    };
+
+    const handleExtractPackageFields = () => {
+        const sourceMode: ArticleMode = subTab === "narrative"
+            ? "narrative"
+            : subTab === "knowledge"
+                ? "knowledge"
+                : seoMode === "narrative"
+                    ? "narrative"
+                    : "knowledge";
+        const preview = buildPackageExtractionPreview(sourceMode);
+        if (!preview || preview.fields.length === 0) {
+            alert("ยังไม่พบ section ที่รองรับใน article package นี้");
+            return;
+        }
+        setPackagePreview(preview);
+        setShouldCleanExtractedBody(preview.removedSectionsCount > 0);
+    };
+
+    const applyPackageField = (field: PackageFieldPreview, sourceMode: ArticleMode) => {
+        const value = field.value;
+        switch (field.key) {
+            case "articleTitle":
+                sourceMode === "narrative" ? setNarrativeTitle(value) : setKnowledgeTitle(value);
+                break;
+            case "articleSlug":
+                sourceMode === "narrative" ? setNarrativeSlug(value) : setKnowledgeSlug(value);
+                break;
+            case "heroSubtitle":
+                sourceMode === "narrative" ? setNarrativeHeroSubtitle(value) : setKnowledgeHeroSubtitle(value);
+                break;
+            case "shortSummary":
+                sourceMode === "narrative" ? setNarrativeShortSummary(value) : setKnowledgeShortSummary(value);
+                break;
+            case "metaTitle":
+                sourceMode === "narrative" ? setNarrativeMetaTitle(value) : setKnowledgeMetaTitle(value);
+                break;
+            case "metaDescription":
+                sourceMode === "narrative" ? setNarrativeMetaDescription(value) : setKnowledgeMetaDescription(value);
+                break;
+            case "keywords":
+                sourceMode === "narrative" ? setNarrativeKeywords(value) : setKnowledgeKeywords(value);
+                break;
+            case "knowledgePrimaryKeyword":
+                setKnowledgePrimaryKeyword(value);
+                break;
+            case "knowledgeSecondaryKeywords":
+                setKnowledgeSecondaryKeywords(value);
+                break;
+            case "knowledgeCategory":
+                setKnowledgeCategory(value);
+                break;
+            case "contentLayer":
+                setContentLayer(value);
+                break;
+            case "contentFamily":
+                setContentFamily(value);
+                break;
+            case "episodeCode":
+                setEpisodeCode(value);
+                break;
+            case "journeyStage":
+                setNarrativeJourneyStage(value);
+                break;
+            case "articleStatus":
+                sourceMode === "narrative" ? setNarrativeStatus(value) : setKnowledgeStatus(value);
+                break;
+            case "facebookGroupPost":
+                setFacebookGroupPost(value);
+                break;
+            case "facebookPagePost":
+                setFacebookPagePost(value);
+                break;
+            case "personalPost":
+                setPersonalPost(value);
+                break;
+            case "shortCaption":
+                setShortCaption(value);
+                break;
+            case "hashtags":
+                setHashtags(value);
+                break;
+            case "publishedUrl":
+                setPublishedUrl(value);
+                break;
+            case "groupUtm":
+                setGroupUtm(value);
+                break;
+            case "pageUtm":
+                setPageUtm(value);
+                break;
+            case "personalUtm":
+                setPersonalUtm(value);
+                break;
+            case "publishStatus":
+                setPublishStatus(value);
+                break;
+            case "performanceSummary":
+                setPerformanceSummary(value);
+                break;
+            case "schemaJsonld":
+                sourceMode === "narrative" ? setNarrativeSchemaJsonld(value) : setKnowledgeSchemaJsonld(value);
+                break;
+        }
+    };
+
+    const handleApplyPackageFields = () => {
+        if (!packagePreview) return;
+        packagePreview.fields.forEach(field => applyPackageField(field, packagePreview.sourceMode));
+        if (shouldCleanExtractedBody) {
+            if (packagePreview.sourceMode === "narrative") {
+                setNarrativeBody(packagePreview.cleanBody);
+            } else {
+                setKnowledgeBody(packagePreview.cleanBody);
+            }
+        }
+        setPackagePreview(null);
     };
 
     // Deterministic Generator from Article Body
@@ -2239,15 +2535,26 @@ export default function WritingStudioTab({
                                             </button>
                                         </div>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleGenerateSEO}
-                                        disabled={!(narrativeBody || knowledgeBody)}
-                                        className="flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-theme-primary text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50 h-fit"
-                                    >
-                                        <Wand2 className="w-3.5 h-3.5 text-blue-500" />
-                                        Generate from Active Body
-                                    </button>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleExtractPackageFields}
+                                            disabled={!(narrativeBody || knowledgeBody)}
+                                            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50 h-fit border border-emerald-500/20"
+                                        >
+                                            <FileText className="w-3.5 h-3.5" />
+                                            Extract Package Fields
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleGenerateSEO}
+                                            disabled={!(narrativeBody || knowledgeBody)}
+                                            className="flex items-center gap-1.5 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-theme-primary text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50 h-fit"
+                                        >
+                                            <Wand2 className="w-3.5 h-3.5 text-blue-500" />
+                                            Generate from Active Body
+                                        </button>
+                                    </div>
                                 </div>
                                 {renderPasteGuidance("seo")}
 
@@ -3802,6 +4109,112 @@ export default function WritingStudioTab({
                             </div>
                         )}
 
+                    </div>
+                </div>
+            )}
+            {/* Modal for Package Field Extraction Preview */}
+            {packagePreview && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-theme-card border border-theme-border rounded-[32px] max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-theme-border/60 flex items-center justify-between gap-4">
+                            <div>
+                                <h3 className="text-base font-black text-theme-primary flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-emerald-600" />
+                                    <span>Extract Package Fields Preview</span>
+                                </h3>
+                                <p className="text-[10px] font-bold text-theme-muted mt-0.5">
+                                    ตรวจ fields ที่พบจาก {packagePreview.sourceMode === "knowledge" ? "Knowledge Article" : "Narrative Article"} ก่อนนำไปเติมใน tab ที่ถูกต้อง
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setPackagePreview(null)}
+                                className="w-8 h-8 rounded-full bg-theme-panel hover:bg-theme-hover flex items-center justify-center text-theme-secondary hover:text-theme-primary transition-all font-bold shrink-0"
+                            >
+                                x
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="bg-theme-panel/50 border border-theme-border rounded-2xl p-4">
+                                    <div className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Fields Detected</div>
+                                    <div className="text-2xl font-black text-theme-primary mt-1">{packagePreview.fields.length}</div>
+                                </div>
+                                <div className="bg-theme-panel/50 border border-theme-border rounded-2xl p-4">
+                                    <div className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Overwrites</div>
+                                    <div className="text-2xl font-black text-amber-600 mt-1">
+                                        {packagePreview.fields.filter(field => field.willOverwrite).length}
+                                    </div>
+                                </div>
+                                <div className="bg-theme-panel/50 border border-theme-border rounded-2xl p-4">
+                                    <div className="text-[9px] font-black uppercase tracking-widest text-theme-muted">Extracted Sections</div>
+                                    <div className="text-2xl font-black text-theme-primary mt-1">{packagePreview.removedSectionsCount}</div>
+                                </div>
+                            </div>
+
+                            <div className="border border-theme-border rounded-2xl overflow-hidden">
+                                <div className="grid grid-cols-12 gap-0 bg-theme-panel/60 border-b border-theme-border text-[9px] font-black uppercase tracking-widest text-theme-muted">
+                                    <div className="col-span-3 px-3 py-2">Field</div>
+                                    <div className="col-span-2 px-3 py-2">Target Tab</div>
+                                    <div className="col-span-5 px-3 py-2">Detected Value</div>
+                                    <div className="col-span-2 px-3 py-2">Existing</div>
+                                </div>
+                                <div className="divide-y divide-theme-border max-h-[360px] overflow-y-auto custom-scrollbar">
+                                    {packagePreview.fields.map((field) => (
+                                        <div key={`${field.key}-${field.targetTab}`} className="grid grid-cols-12 gap-0 text-xs">
+                                            <div className="col-span-3 px-3 py-3 font-black text-theme-primary">
+                                                {field.label}
+                                                {field.willOverwrite && (
+                                                    <div className="mt-1 text-[9px] text-amber-600 font-black uppercase">Will overwrite</div>
+                                                )}
+                                            </div>
+                                            <div className="col-span-2 px-3 py-3 text-theme-secondary font-bold">{field.targetTab}</div>
+                                            <div className="col-span-5 px-3 py-3 text-theme-primary whitespace-pre-wrap break-words max-h-24 overflow-hidden">
+                                                {field.value}
+                                            </div>
+                                            <div className="col-span-2 px-3 py-3 text-theme-muted whitespace-pre-wrap break-words max-h-24 overflow-hidden">
+                                                {field.existingValue || "Empty"}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <label className={`flex items-start gap-3 p-4 rounded-2xl border text-xs font-bold ${
+                                packagePreview.removedSectionsCount > 0
+                                    ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                    : "bg-theme-panel/40 border-theme-border text-theme-muted"
+                            }`}>
+                                <input
+                                    type="checkbox"
+                                    checked={shouldCleanExtractedBody}
+                                    disabled={packagePreview.removedSectionsCount === 0}
+                                    onChange={(e) => setShouldCleanExtractedBody(e.target.checked)}
+                                    className="mt-0.5 rounded border-theme-border text-emerald-600 focus:ring-emerald-500"
+                                />
+                                <span>
+                                    ลบ extracted sections ออกจาก article body หลัง apply
+                                    <span className="block text-[10px] font-medium mt-0.5 opacity-80">
+                                        จะเก็บเฉพาะเนื้อหา article body ให้สะอาด และย้าย fields ไปยัง tab ที่เหมาะสม
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div className="p-6 border-t border-theme-border/60 bg-theme-panel/40 flex flex-col sm:flex-row items-center justify-end gap-3">
+                            <button
+                                onClick={() => setPackagePreview(null)}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700/60 rounded-xl text-xs font-bold text-neutral-600 dark:text-theme-secondary hover:bg-neutral-50 dark:hover:bg-slate-700 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleApplyPackageFields}
+                                className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-md"
+                            >
+                                Apply Detected Fields
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
