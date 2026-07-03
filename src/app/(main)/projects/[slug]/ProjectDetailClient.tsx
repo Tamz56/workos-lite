@@ -1591,6 +1591,36 @@ ${suggestedNextStr}`;
         });
     };
 
+    const arborRoadmapPreviewSummary = useMemo(() => {
+        const statusCounts: Record<string, number> = {};
+        const priorityCounts: Record<string, number> = {};
+
+        arborRoadmapDrafts.forEach(item => {
+            statusCounts[item.status] = (statusCounts[item.status] || 0) + 1;
+            priorityCounts[item.priority] = (priorityCounts[item.priority] || 0) + 1;
+        });
+
+        const formatDistribution = (counts: Record<string, number>, labels?: Record<string, string>) => {
+            const entries = Object.entries(counts);
+            if (entries.length === 0) return "None";
+            return entries.map(([key, count]) => `${labels?.[key] || key}: ${count}`).join(" / ");
+        };
+
+        return {
+            totalRows: arborRoadmapDrafts.length,
+            missingEpisodeCode: arborRoadmapDrafts.filter(item => !item.episodeCode.trim()).length,
+            missingTitle: arborRoadmapDrafts.filter(item => !item.title.trim()).length,
+            missingParentEp: arborRoadmapDrafts.filter(item => !(item.relatedMainEpisode || "").trim()).length,
+            statusDistribution: formatDistribution(statusCounts, ROADMAP_STATUS_LABELS),
+            priorityDistribution: formatDistribution(priorityCounts, {
+                high: "High",
+                medium: "Medium",
+                low: "Low",
+                none: "None"
+            })
+        };
+    }, [arborRoadmapDrafts]);
+
     // Filter & Search Roadmap Items
     const filteredRoadmapItems = useMemo(() => {
         return roadmapItems.filter(item => {
@@ -1829,10 +1859,10 @@ ${suggestedNextStr}`;
             />
 
             {/* Main content grid */}
-            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8 pb-12">
+            <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
                 
                 {/* Main Deliverables & Milestones (Left side) */}
-                <div className="lg:col-span-8 space-y-10">
+                <div className="xl:col-span-9 space-y-10">
                     
                     {/* Project Items Form */}
                     <div className="bg-theme-panel p-4 rounded-3xl border border-neutral-200 shadow-sm focus-within:shadow-md transition-shadow">
@@ -2356,7 +2386,7 @@ ${suggestedNextStr}`;
                 </div>
 
                 {/* Project Registry Metadata side panel (Right side) */}
-                <div className="lg:col-span-4 space-y-6">
+                <div className="xl:col-span-3 space-y-6">
                     {activeMeta && (
                         <div className="bg-theme-card border border-neutral-200 rounded-[32px] p-6 shadow-sm space-y-6">
                             <div className="flex justify-between items-center pb-4 border-b border-neutral-200/50">
@@ -3194,6 +3224,7 @@ ${suggestedNextStr}`;
                 isOpen={isArborRoadmapOpen}
                 onClose={() => setIsArborRoadmapOpen(false)}
                 title="✨ Arbor Content Roadmap Assistant"
+                maxWidth={showArborRoadmapPreview ? "max-w-[min(1200px,95vw)]" : "max-w-2xl"}
             >
                 <div className="space-y-4 text-left max-h-[85vh] overflow-y-auto pr-1">
                     {!showArborRoadmapPreview ? (
@@ -3248,17 +3279,48 @@ ${suggestedNextStr}`;
                                 </p>
                             </div>
 
+                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
+                                <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+                                    <div className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Rows</div>
+                                    <div className="text-sm font-black text-neutral-900 dark:text-white">{arborRoadmapPreviewSummary.totalRows}</div>
+                                </div>
+                                <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+                                    <div className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Missing EP</div>
+                                    <div className="text-sm font-black text-neutral-900 dark:text-white">{arborRoadmapPreviewSummary.missingEpisodeCode}</div>
+                                </div>
+                                <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+                                    <div className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Missing Title</div>
+                                    <div className="text-sm font-black text-neutral-900 dark:text-white">{arborRoadmapPreviewSummary.missingTitle}</div>
+                                </div>
+                                <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+                                    <div className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Missing Parent</div>
+                                    <div className="text-sm font-black text-neutral-900 dark:text-white">{arborRoadmapPreviewSummary.missingParentEp}</div>
+                                </div>
+                                <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900 lg:col-span-1">
+                                    <div className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Status</div>
+                                    <div className="text-xs font-bold text-neutral-700 dark:text-neutral-300">{arborRoadmapPreviewSummary.statusDistribution}</div>
+                                </div>
+                                <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900 lg:col-span-1">
+                                    <div className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Priority</div>
+                                    <div className="text-xs font-bold text-neutral-700 dark:text-neutral-300">{arborRoadmapPreviewSummary.priorityDistribution}</div>
+                                </div>
+                            </div>
+
                             <div className="border border-neutral-200 rounded-2xl overflow-hidden dark:border-neutral-800">
-                                <div className="overflow-x-auto max-h-[350px]">
-                                    <table className="w-full text-left border-collapse text-[10px]">
-                                        <thead>
+                                <div className="overflow-auto max-h-[520px]">
+                                    <table className="min-w-[1680px] w-full text-left border-collapse text-[10px]">
+                                        <thead className="sticky top-0 z-10">
                                             <tr className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 text-neutral-400 font-bold uppercase tracking-wider">
-                                                <th className="px-3 py-2 min-w-[92px]">รหัส EP</th>
-                                                <th className="px-3 py-2 min-w-[280px]">หัวข้อ</th>
-                                                <th className="px-3 py-2">ประเภท</th>
-                                                <th className="px-3 py-2">ระดับชั้น</th>
-                                                <th className="px-3 py-2">สถานะ</th>
-                                                <th className="px-3 py-2">Parent EP</th>
+                                                <th className="px-3 py-2 min-w-[110px]">รหัส EP</th>
+                                                <th className="px-3 py-2 min-w-[360px]">หัวข้อ</th>
+                                                <th className="px-3 py-2 min-w-[160px]">ประเภท</th>
+                                                <th className="px-3 py-2 min-w-[160px]">ระดับชั้น</th>
+                                                <th className="px-3 py-2 min-w-[180px]">Theme</th>
+                                                <th className="px-3 py-2 min-w-[110px]">Priority</th>
+                                                <th className="px-3 py-2 min-w-[130px]">สถานะ</th>
+                                                <th className="px-3 py-2 min-w-[220px]">Channel</th>
+                                                <th className="px-3 py-2 min-w-[110px]">Parent EP</th>
+                                                <th className="px-3 py-2 min-w-[260px]">Next Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60 text-neutral-700 dark:text-neutral-300">
@@ -3269,7 +3331,7 @@ ${suggestedNextStr}`;
                                                             type="text"
                                                             value={draft.episodeCode}
                                                             onChange={e => handleUpdateDraftCell(idx, "episodeCode", e.target.value)}
-                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1.5 py-1 text-[10px] font-mono font-bold"
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px] font-mono font-bold"
                                                         />
                                                     </td>
                                                     <td className="px-2 py-1.5">
@@ -3277,14 +3339,14 @@ ${suggestedNextStr}`;
                                                             type="text"
                                                             value={draft.title}
                                                             onChange={e => handleUpdateDraftCell(idx, "title", e.target.value)}
-                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1.5 py-1 text-[10px]"
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         />
                                                     </td>
                                                     <td className="px-2 py-1.5">
                                                         <select
                                                             value={draft.contentType}
                                                             onChange={e => handleUpdateDraftCell(idx, "contentType", e.target.value)}
-                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1 py-1 text-[10px]"
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         >
                                                             {Object.entries(CONTENT_TYPE_LABELS).map(([k, label]) => (
                                                                 <option key={k} value={k}>{label}</option>
@@ -3295,7 +3357,7 @@ ${suggestedNextStr}`;
                                                         <select
                                                             value={draft.contentLayer}
                                                             onChange={e => handleUpdateDraftCell(idx, "contentLayer", e.target.value)}
-                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1 py-1 text-[10px]"
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         >
                                                             {Object.entries(CONTENT_LAYER_LABELS).map(([k, label]) => (
                                                                 <option key={k} value={k}>{label}</option>
@@ -3303,10 +3365,30 @@ ${suggestedNextStr}`;
                                                         </select>
                                                     </td>
                                                     <td className="px-2 py-1.5">
+                                                        <input
+                                                            type="text"
+                                                            value={draft.seriesOrTheme || ""}
+                                                            onChange={e => handleUpdateDraftCell(idx, "seriesOrTheme", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <select
+                                                            value={draft.priority}
+                                                            onChange={e => handleUpdateDraftCell(idx, "priority", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
+                                                        >
+                                                            <option value="high">High</option>
+                                                            <option value="medium">Medium</option>
+                                                            <option value="low">Low</option>
+                                                            <option value="none">None</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
                                                         <select
                                                             value={draft.status}
                                                             onChange={e => handleUpdateDraftCell(idx, "status", e.target.value)}
-                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1 py-1 text-[10px]"
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         >
                                                             {Object.entries(ROADMAP_STATUS_LABELS).map(([k, label]) => (
                                                                 <option key={k} value={k}>{label}</option>
@@ -3316,10 +3398,26 @@ ${suggestedNextStr}`;
                                                     <td className="px-2 py-1.5">
                                                         <input
                                                             type="text"
+                                                            value={draft.targetChannel || ""}
+                                                            onChange={e => handleUpdateDraftCell(idx, "targetChannel", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <input
+                                                            type="text"
                                                             value={draft.relatedMainEpisode || ""}
                                                             onChange={e => handleUpdateDraftCell(idx, "relatedMainEpisode", e.target.value)}
-                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-1.5 py-1 text-[10px] font-mono"
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px] font-mono"
                                                             placeholder="EP.10.3"
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <input
+                                                            type="text"
+                                                            value={draft.nextAction || ""}
+                                                            onChange={e => handleUpdateDraftCell(idx, "nextAction", e.target.value)}
+                                                            className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         />
                                                     </td>
                                                 </tr>
