@@ -4,7 +4,7 @@ import { z } from "zod";
 
 const UpdateProjectItemSchema = z.object({
     title: z.string().min(1).optional(),
-    status: z.enum(["inbox", "planned", "done"]).optional(),
+    status: z.enum(["inbox", "planned", "in_progress", "drafted", "ready_for_review", "done", "blocked", "archived"]).optional(),
     priority: z.number().int().nullable().optional(),
     schedule_bucket: z.enum(["morning", "afternoon", "evening", "none"]).nullable().optional(),
     start_date: z.string().nullable().optional(),

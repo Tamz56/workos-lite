@@ -669,7 +669,7 @@ export default function ProjectDetailClient() {
     const [isDelModalOpen, setIsDelModalOpen] = useState(false);
     const [activeDelItem, setActiveDelItem] = useState<ProjectItem | null>(null);
     const [delTitle, setDelTitle] = useState("");
-    const [delStatus, setDelStatus] = useState<"inbox" | "planned" | "done">("inbox");
+    const [delStatus, setDelStatus] = useState<"inbox" | "planned" | "in_progress" | "drafted" | "ready_for_review" | "done" | "blocked" | "archived">("inbox");
     const [delIsMilestone, setDelIsMilestone] = useState(false);
     const [delWorkstream, setDelWorkstream] = useState("");
     const [delScheduleBucket, setDelScheduleBucket] = useState<"morning" | "afternoon" | "evening" | "none">("none");
@@ -3542,7 +3542,12 @@ ${suggestedNextStr}
                                 >
                                     <option value="inbox">Inbox</option>
                                     <option value="planned">Planned</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="drafted">Drafted</option>
+                                    <option value="ready_for_review">Ready for Review</option>
                                     <option value="done">Completed</option>
+                                    <option value="blocked">Blocked</option>
+                                    <option value="archived">Archived</option>
                                 </select>
                             </div>
 

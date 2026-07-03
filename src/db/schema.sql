@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS project_items (
   id              TEXT PRIMARY KEY,
   project_id      TEXT NOT NULL,
   title           TEXT NOT NULL,
-  status          TEXT NOT NULL CHECK (status IN ('inbox', 'planned', 'done')),
+  status          TEXT NOT NULL CHECK (status IN ('inbox', 'planned', 'in_progress', 'drafted', 'ready_for_review', 'done', 'blocked', 'archived')),
   priority        INTEGER NULL,
   schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning', 'afternoon', 'evening', 'none') OR schedule_bucket IS NULL),
   start_date      TEXT NULL,

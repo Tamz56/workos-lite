@@ -313,6 +313,67 @@ function ensureMigrations() {
         END;
     `);
 
+    // BACKLOG-001: Expand project_items status options for content production workflow
+    const projectItemsTableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='project_items'").get() as { sql: string } | undefined;
+    const needsProjectItemsStatusMigration = projectItemsTableInfo && (
+        !projectItemsTableInfo.sql.includes("'in_progress'") ||
+        !projectItemsTableInfo.sql.includes("'drafted'") ||
+        !projectItemsTableInfo.sql.includes("'ready_for_review'")
+    );
+
+    if (needsProjectItemsStatusMigration) {
+        console.log("🛠 Migrating project_items table to expand status options (BACKLOG-001)...");
+        db.exec(`
+            -- Backup existing data
+            CREATE TABLE project_items_backup AS SELECT * FROM project_items;
+
+            -- Drop old table (and its trigger + indexes via CASCADE)
+            DROP TABLE project_items;
+
+            -- Recreate with expanded CHECK constraint
+            CREATE TABLE project_items (
+                id              TEXT PRIMARY KEY,
+                project_id      TEXT NOT NULL,
+                title           TEXT NOT NULL,
+                status          TEXT NOT NULL CHECK (status IN ('inbox', 'planned', 'in_progress', 'drafted', 'ready_for_review', 'done', 'blocked', 'archived')),
+                priority        INTEGER NULL,
+                schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning', 'afternoon', 'evening', 'none') OR schedule_bucket IS NULL),
+                start_date      TEXT NULL,
+                end_date        TEXT NULL,
+                is_milestone    INTEGER NOT NULL DEFAULT 0,
+                workstream      TEXT NULL,
+                dod_text        TEXT NULL,
+                notes           TEXT NULL,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
+            -- Restore data
+            INSERT INTO project_items (id, project_id, title, status, priority, schedule_bucket, start_date, end_date, is_milestone, workstream, dod_text, notes, created_at, updated_at)
+            SELECT id, project_id, title, status, priority, schedule_bucket, start_date, end_date, is_milestone, workstream, dod_text, notes, created_at, updated_at
+            FROM project_items_backup;
+
+            -- Cleanup backup
+            DROP TABLE project_items_backup;
+
+            -- Recreate indexes
+            CREATE INDEX IF NOT EXISTS idx_project_items_project_status ON project_items(project_id, status);
+            CREATE INDEX IF NOT EXISTS idx_project_items_project_start_date ON project_items(project_id, start_date);
+            CREATE INDEX IF NOT EXISTS idx_project_items_workstream ON project_items(project_id, workstream, start_date);
+
+            -- Recreate trigger
+            CREATE TRIGGER IF NOT EXISTS trg_project_items_updated_at
+            AFTER UPDATE ON project_items
+            FOR EACH ROW
+            WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+            BEGIN
+                UPDATE project_items SET updated_at = datetime('now') WHERE id = NEW.id;
+            END;
+        `);
+        console.log("✅ project_items table migrated successfully (BACKLOG-001).");
+    }
+
     migrated = true;
 }
 
@@ -474,7 +535,7 @@ function ensureProjectsAndSprints() {
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL,
           title TEXT NOT NULL,
-          status TEXT NOT NULL CHECK (status IN ('inbox', 'planned', 'done')),
+          status TEXT NOT NULL CHECK (status IN ('inbox', 'planned', 'in_progress', 'drafted', 'ready_for_review', 'done', 'blocked', 'archived')),
           priority INTEGER NULL,
           schedule_bucket TEXT NULL CHECK (schedule_bucket IN ('morning', 'afternoon', 'evening', 'none') OR schedule_bucket IS NULL),
           start_date TEXT NULL,

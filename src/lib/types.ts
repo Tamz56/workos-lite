@@ -134,7 +134,7 @@ export interface ProjectItem {
     id: string;
     project_id: string;
     title: string;
-    status: "inbox" | "planned" | "done";
+    status: "inbox" | "planned" | "in_progress" | "drafted" | "ready_for_review" | "done" | "blocked" | "archived";
     priority: number | null;
     schedule_bucket: ScheduleBucket | null;
     start_date: string | null;
