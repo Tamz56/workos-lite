@@ -553,8 +553,181 @@ checklist:
   };
 }
 
+const GF_VIDEO_STUDIO_TEMPLATE_KEY = "gf_video_studio_seed";
+
+const GF_VIDEO_STUDIO_DOCS = {
+  operatingCenter: {
+    ref: "gf_video_studio_operating_center",
+    title: "GF Video Studio — Operating Center",
+    content_md: `# GF Video Studio — Operating Center
+
+ศูนย์กลางการวางระบบผลิตวิดีโอความรู้ของ Green Fineness สำหรับแปลงบทความ ความรู้ภาคสนาม และเรื่องเล่าของพืชให้เป็นวิดีโอสั้นที่ชัดเจน ใช้งานจริง และไม่กล่าวอ้างเกินจริง
+
+## Purpose
+- วางมาตรฐานการผลิตวิดีโอความรู้แบบ Thai-first
+- เชื่อม Article Studio, Writing Desk Lite และ Publish Queue เข้ากับงานวิดีโอ
+- เก็บ decision, prompt, visual direction และ pilot log ไว้ในระบบเดียว
+
+## Operating Flow
+1. เลือกหัวข้อหรือบทความต้นทาง
+2. สกัด key message สำหรับคลิปสั้น
+3. เขียน script / voiceover / on-screen text
+4. เตรียม visual prompt และ reference
+5. ผลิต pilot clip
+6. Review ความถูกต้อง โทน และความเข้าใจง่าย
+7. ส่งต่อ publish queue`
+  },
+  board: {
+    ref: "gf_video_content_board",
+    title: "GF Video Studio — Video Content Board",
+    content_md: `# GF Video Studio — Video Content Board
+
+บอร์ดรวมรายการวิดีโอที่กำลังวางแผน ผลิต ทดลอง และเตรียมเผยแพร่
+
+| Code | Working Title | Source | Format | Status | Notes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| GFKVS-002 | เมล็ดเริ่มตื่น | Plant Journey / Article | Short Knowledge Video | Planned | Pilot clip |
+
+## Status Standard
+- Idea
+- Script
+- Visual Prompt
+- Production
+- Review
+- Ready to Publish
+- Published`
+  },
+  seriesLibrary: {
+    ref: "gf_video_series_library",
+    title: "GF Video Studio — Series Library",
+    content_md: `# GF Video Studio — Series Library
+
+คลังโครงสร้างซีรีส์วิดีโอความรู้ของ Green Fineness
+
+## Starter Series
+- Plant Journey Short Knowledge
+- Soil & Microbe Basics
+- Nutrient Learning Clips
+- Field Observation Notes
+
+## Series Template
+- Series promise
+- Target viewer
+- Episode length
+- Visual language
+- Claim guardrails
+- CTA pattern`
+  },
+  promptLibrary: {
+    ref: "gf_video_prompt_studio_library",
+    title: "GF Video Studio — Prompt Studio Library",
+    content_md: `# GF Video Studio — Prompt Studio Library
+
+คลัง prompt สำหรับแปลงบทความและความรู้ Green Fineness เป็น script, storyboard, visual prompt และ caption
+
+## Prompt Types
+- Article-to-video brief
+- Short script
+- Voiceover draft
+- On-screen text
+- Visual scene prompt
+- Thumbnail prompt
+- Caption and publish copy
+
+## Prompt Guardrails
+- ใช้ภาษาไทยที่ชัด อ่านง่าย และสุภาพ
+- หลีกเลี่ยงคำโฆษณาแรงหรือการรับประกันผลลัพธ์
+- แยก facts, observation และ creative framing ให้ชัดเจน`
+  },
+  visualBible: {
+    ref: "gf_video_visual_bible",
+    title: "GF Video Studio — Visual Bible",
+    content_md: `# GF Video Studio — Visual Bible
+
+มาตรฐานภาพสำหรับวิดีโอ Green Fineness Knowledge Video Studio
+
+## Visual Direction
+- ธรรมชาติ สะอาด อบอุ่น และน่าเชื่อถือ
+- เน้นพืช ดิน ราก น้ำ แสง และการสังเกตจริง
+- หลีกเลี่ยงภาพแฟนตาซี วิทยาศาสตร์เกินจริง หรือเคลมผลลัพธ์เกินขอบเขต
+
+## Core Scenes
+- เมล็ดและการงอก
+- รากและจุลินทรีย์ในดิน
+- ใบและการสังเคราะห์แสง
+- แปลงทดลองและมือคนทำงานจริง
+
+## Review Checklist
+- ภาพช่วยให้เข้าใจเนื้อหาหรือไม่
+- โทนยังเป็น Green Fineness หรือไม่
+- มีจุดที่อาจทำให้เข้าใจผิดทางวิทยาศาสตร์หรือไม่`
+  },
+  pilotLog: {
+    ref: "gf_video_pilot_episode_log",
+    title: "GF Video Studio — Pilot Episode Log",
+    content_md: `# GF Video Studio — Pilot Episode Log
+
+บันทึกการทดลองผลิต pilot episode ก่อนขยายเป็น workflow ประจำ
+
+| Date | Code | Episode | Source | Result | Next Action |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| TBD | GFKVS-002 | เมล็ดเริ่มตื่น | Plant Journey | Planned | Draft script and visual prompt |
+
+## Pilot Review Notes
+- Hook ชัดหรือไม่
+- ความยาวเหมาะกับ short video หรือไม่
+- ภาพและเสียงช่วยให้คนดูเข้าใจเร็วขึ้นหรือไม่
+- มี claim ที่ต้องลดความแรงหรือเพิ่มบริบทหรือไม่`
+  }
+};
+
+const GF_VIDEO_STUDIO_STARTER_TASKS = [
+  "GFKVS-001 — Create GF Short Knowledge Template v1",
+  "GFKVS-002 — Pilot Clip: เมล็ดเริ่มตื่น",
+  "GFKVS-003 — Build Visual Bible v1",
+  "GFKVS-004 — Prepare Article-to-Video Prompt v1"
+];
+
+function getGFVideoStudioTaskNotes() {
+  return `---
+template_key: ${GF_VIDEO_STUDIO_TEMPLATE_KEY}
+project_slug: green-fineness-content
+module: gf_video_studio
+---`;
+}
+
+function buildGFVideoStudioSeedTemplate(): AgentPayload {
+  const docs = Object.values(GF_VIDEO_STUDIO_DOCS).map((doc) => ({
+    type: "doc.create",
+    saveAs: doc.ref,
+    data: {
+      title: doc.title,
+      content_md: doc.content_md,
+      project_id: GF_OPERATING_CENTER_PROJECT_ID,
+      workspace: "content"
+    }
+  }));
+
+  const tasks = GF_VIDEO_STUDIO_STARTER_TASKS.map((title) => ({
+    type: "task.create",
+    data: {
+      title,
+      workspace: "content",
+      status: "planned" as const,
+      project_id: GF_OPERATING_CENTER_PROJECT_ID,
+      notes: getGFVideoStudioTaskNotes()
+    }
+  }));
+
+  return {
+    dry_run: true,
+    actions: [...docs, ...tasks]
+  };
+}
+
 export const AGENT_TEMPLATES: Record<string, (params: TemplateParams) => AgentPayload> = {
   "Green Fineness — Content Operating Center": () => buildGFContentOperatingCenterTemplate(),
+  "Green Fineness — Video Studio Seed": () => buildGFVideoStudioSeedTemplate(),
   "Blank": (params) => ({
     dry_run: true,
     actions: [
