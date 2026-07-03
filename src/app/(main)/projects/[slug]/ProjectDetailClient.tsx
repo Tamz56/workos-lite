@@ -1136,12 +1136,36 @@ export default function ProjectDetailClient() {
             sopStr = `### ${sopBlock.title}\n${sopBlock.details}`;
         }
 
-        // Format active content roadmap
+        // Format active content roadmap (structured items from localStorage)
         let roadmapStr = "N/A";
         if (roadmapItems.length > 0) {
             roadmapStr = roadmapItems.map(item => {
                 return `- **${item.episodeCode || "N/A"}**: ${item.title || "N/A"} | Type: ${item.contentType || "N/A"} | Layer: ${item.contentLayer || "N/A"} | Status: ${item.status || "N/A"}${item.targetPublishDate ? ` | Target: ${item.targetPublishDate}` : ""}`;
             }).join("\n");
+        }
+
+        // OPS-003D: Extract Content Roadmap doc and Publish Log doc from projectDocs
+        const roadmapDoc = projectDocs.find(d => d.title?.includes("Content Roadmap"));
+        const publishLogDoc = projectDocs.find(d => d.title?.includes("Publish Log"));
+
+        const extractDocExcerpt = (doc: any, maxLines: number = 30): string => {
+            if (!doc) return "N/A";
+            const md = (doc as any).content_md;
+            if (!md || typeof md !== "string") return `(Document exists: ${doc.title}, but content not loaded)`;
+            const lines = md.split("\n").filter((l: string) => l.trim().length > 0);
+            const excerpt = lines.slice(0, maxLines).join("\n");
+            const truncated = lines.length > maxLines ? `\n... (${lines.length - maxLines} more lines)` : "";
+            return excerpt + truncated;
+        };
+
+        let roadmapDocStr = "N/A";
+        if (roadmapDoc) {
+            roadmapDocStr = `- Document: **${roadmapDoc.title}**\n- Last Updated: ${new Date(roadmapDoc.updated_at).toLocaleDateString()}\n\n${extractDocExcerpt(roadmapDoc)}`;
+        }
+
+        let publishLogDocStr = "N/A";
+        if (publishLogDoc) {
+            publishLogDocStr = `- Document: **${publishLogDoc.title}**\n- Last Updated: ${new Date(publishLogDoc.updated_at).toLocaleDateString()}\n\n${extractDocExcerpt(publishLogDoc)}`;
         }
 
         // Recent publish notes / QA / performance
@@ -1198,10 +1222,19 @@ ${systemStructureStr}
 # Current SOP / Workflow
 ${sopStr}
 
-# Active Content Roadmap
+# Structured Roadmap Board
+Source: Roadmap UI Table / localStorage (${roadmapItems.length} items)
 ${roadmapStr}
 
-# Recent Publish / Performance Notes
+# Content Roadmap Document
+Source: Project Doc / SQLite
+${roadmapDocStr}
+
+# Publish Log Document
+Source: Project Doc / SQLite
+${publishLogDocStr}
+
+# Recent Publish / Performance Notes (Doc Blocks)
 ${publishLogsStr}
 
 # Open Questions
@@ -1211,7 +1244,14 @@ ${openQuestionsStr}
 ${projectDocs.length > 0 ? projectDocs.map(d => `- **${d.title}** (updated: ${new Date(d.updated_at).toLocaleDateString()})`).join("\n") : "N/A"}
 
 # Suggested Next Actions
-${suggestedNextStr}`;
+${suggestedNextStr}
+
+# Data Source Note
+- Structured Roadmap Board (above) reads from localStorage — used for table/operation tracking in the Roadmap UI.
+- Content Roadmap Document (above) reads from SQLite docs — used for editorial planning notes and long-form roadmap context.
+- These two sources are not automatically synced yet.
+- Use Arbor Roadmap Parser to import structured items into the Roadmap Board.
+- Use the Doc Editor to update the Content Roadmap Document.`;
     };
 
     // Filter & Search computation
