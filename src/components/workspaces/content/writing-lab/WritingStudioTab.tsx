@@ -93,7 +93,160 @@ interface WritingStudioTabProps {
     onRefresh: () => void;
 }
 
-type SubTabKey = "narrative" | "knowledge" | "social" | "seo" | "utm" | "performance" | "review";
+type SubTabKey = "narrative" | "knowledge" | "social" | "seo" | "work_checklist" | "utm" | "performance" | "review";
+
+const WORK_CHECKLIST_GROUPS = [
+    {
+        title: "Article Body",
+        items: [
+            "วางเนื้อหา Narrative Article หรือ Knowledge Article ให้ถูก tab",
+            "ตรวจ heading, markdown image positions, captions และ references",
+            "แยก SEO fields, schema, UTM และ social posts ออกจาก article body"
+        ]
+    },
+    {
+        title: "Website Fields",
+        items: [
+            "เติม Title, Slug, Hero Subtitle และ Short Summary",
+            "เติม Meta Title, Meta Description, Keywords และ Cover Image URL",
+            "ตรวจ Internal Links และสถานะบทความก่อนส่งขึ้นเว็บ"
+        ]
+    },
+    {
+        title: "Images",
+        items: [
+            "ใส่ตำแหน่งภาพใน markdown เช่น K01 / N01",
+            "เติม caption และ image URL ให้ตรงกับบทความ",
+            "ตรวจภาพว่าไม่สื่อสารเกินจริงหรือขัด Green Fineness tone"
+        ]
+    },
+    {
+        title: "Schema",
+        items: [
+            "เตรียม Schema / JSON-LD ใน Website Fields",
+            "ตรวจชนิดบทความและข้อมูล author/source ให้ครบ",
+            "หลีกเลี่ยง claim ที่แรงเกินหลักฐาน"
+        ]
+    },
+    {
+        title: "Social Drafts",
+        items: [
+            "เตรียม Facebook Group, Facebook Page และ Personal Post",
+            "เติม Short Caption, Reference Note และ Hashtags ถ้าจำเป็น",
+            "ปรับโทนให้เหมาะกับแต่ละช่องทาง"
+        ]
+    },
+    {
+        title: "UTM / Publish",
+        items: [
+            "เติม Published URL และ Campaign Name",
+            "Generate / ตรวจ UTM links",
+            "บันทึก publish status, publish log และ post URLs"
+        ]
+    },
+    {
+        title: "Performance / Feedback",
+        items: [
+            "เติม Facebook Snapshot และ GA4 note",
+            "บันทึก reach, engagement, comments และ shares",
+            "สรุป interpretation และ next decision"
+        ]
+    }
+];
+
+const PASTE_GUIDANCE: Record<SubTabKey, { title: string; body: string; items: string[] }> = {
+    narrative: {
+        title: "What to paste here",
+        body: "วางเฉพาะเนื้อหา narrative/story article body markdown ที่นี่ และเก็บ website fields, schema, UTM, social posts ไว้ใน tab แยก",
+        items: [
+            "Narrative article body",
+            "Markdown image positions",
+            "Captions",
+            "Story references / source notes"
+        ]
+    },
+    knowledge: {
+        title: "What to paste here",
+        body: "วางเฉพาะ article body markdown ที่นี่ ห้ามปะปน SEO fields, schema, UTM หรือ social posts",
+        items: [
+            "Article body",
+            "Markdown image positions",
+            "Captions",
+            "References"
+        ]
+    },
+    social: {
+        title: "What to paste here",
+        body: "วาง draft สำหรับ social distribution แยกตามช่องทาง เพื่อให้ copy/publish ต่อได้ง่าย",
+        items: [
+            "Facebook Group Post",
+            "Facebook Page Post",
+            "Personal Post",
+            "Short Caption",
+            "Reference Note",
+            "Hashtags if needed"
+        ]
+    },
+    seo: {
+        title: "What to paste here",
+        body: "วางข้อมูลหน้าเว็บและ SEO metadata เท่านั้น ไม่ต้องใส่ body article หรือ social posts",
+        items: [
+            "Title",
+            "Slug",
+            "Hero Subtitle",
+            "Short Summary",
+            "Meta Title",
+            "Meta Description",
+            "Keywords",
+            "Cover Image URL",
+            "Internal Links"
+        ]
+    },
+    work_checklist: {
+        title: "How to use this checklist",
+        body: "ใช้ tab นี้เป็นจุดตรวจงานของ article package ปัจจุบัน ก่อนส่งต่อ review หรือ publish",
+        items: [
+            "เช็กว่าแต่ละส่วนถูกวางใน tab ที่ถูกต้อง",
+            "ไล่ทำจาก Article Body ไปจนถึง Performance / Feedback",
+            "กลับไปเติม tab ที่ยังขาดก่อนกด Save หรือ Review"
+        ]
+    },
+    utm: {
+        title: "What to paste here",
+        body: "วางข้อมูลการเผยแพร่จริงและลิงก์ติดตามผล หลังบทความหรือโพสต์พร้อม publish",
+        items: [
+            "Published URL",
+            "UTM links",
+            "Publish status",
+            "Publish log",
+            "Post URLs",
+            "Initial performance note"
+        ]
+    },
+    performance: {
+        title: "What to paste here",
+        body: "วางข้อมูลผลลัพธ์หลังเผยแพร่ เพื่อให้ตัดสินใจต่อยอดคอนเทนต์ได้แม่นขึ้น",
+        items: [
+            "Facebook Snapshot",
+            "GA4 note",
+            "reach / engagement / comments / shares",
+            "interpretation",
+            "next decision"
+        ]
+    },
+    review: {
+        title: "What to check here",
+        body: "ใช้ส่วนนี้ตรวจความพร้อมและความเสี่ยงก่อนเผยแพร่หรือก่อนส่งงานต่อ",
+        items: [
+            "claim risk",
+            "tone",
+            "image placement",
+            "SEO completeness",
+            "schema readiness",
+            "social readiness"
+        ]
+    }
+};
 
 export default function WritingStudioTab({ 
     projectId, 
@@ -1538,6 +1691,31 @@ export default function WritingStudioTab({
         }))
     );
 
+    const renderPasteGuidance = (key: SubTabKey) => {
+        const guidance = PASTE_GUIDANCE[key];
+
+        return (
+            <div className="bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/50 dark:border-amber-900/30 rounded-2xl p-4 space-y-2">
+                <div>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-300">
+                        {guidance.title}
+                    </h4>
+                    <p className="text-[11px] font-bold leading-relaxed text-amber-900/80 dark:text-amber-200/80 mt-1">
+                        {guidance.body}
+                    </p>
+                </div>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {guidance.items.map((item) => (
+                        <li key={item} className="flex items-start gap-2 text-[10px] font-bold text-amber-900/80 dark:text-amber-100/80">
+                            <CheckCircle className="w-3 h-3 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span>{item}</span>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6">
             {/* Header: Episode selector & metadata */}
@@ -1720,6 +1898,18 @@ export default function WritingStudioTab({
                                 <span>SEO & Website Fields</span>
                                 <Globe className="w-3.5 h-3.5" />
                             </button>
+
+                            <button
+                                onClick={() => setSubTab("work_checklist")}
+                                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                    subTab === "work_checklist" 
+                                        ? "bg-black text-white dark:bg-slate-800 dark:text-theme-primary font-black" 
+                                        : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                                }`}
+                            >
+                                <span>Work Checklist</span>
+                                <CheckCircle className="w-3.5 h-3.5" />
+                            </button>
                             
                             <button
                                 onClick={() => setSubTab("utm")}
@@ -1847,6 +2037,7 @@ export default function WritingStudioTab({
                                         </button>
                                     </div>
                                 </div>
+                                {renderPasteGuidance("narrative")}
                                 <textarea
                                     id="narrative-body-textarea"
                                     value={narrativeBody}
@@ -1887,6 +2078,7 @@ export default function WritingStudioTab({
                                         </button>
                                     </div>
                                 </div>
+                                {renderPasteGuidance("knowledge")}
                                 <textarea
                                     id="knowledge-body-textarea"
                                     value={knowledgeBody}
@@ -1906,6 +2098,7 @@ export default function WritingStudioTab({
                                         <span className="text-[10px] font-bold text-green-600 animate-pulse">{copyStatus}!</span>
                                     )}
                                 </div>
+                                {renderPasteGuidance("social")}
 
                                 <div className="space-y-4">
                                     <div>
@@ -2056,6 +2249,7 @@ export default function WritingStudioTab({
                                         Generate from Active Body
                                     </button>
                                 </div>
+                                {renderPasteGuidance("seo")}
 
                                 <div className="space-y-4">
                                     {seoMode === "narrative" ? (
@@ -2509,6 +2703,41 @@ export default function WritingStudioTab({
                             </div>
                         )}
 
+                        {/* Work Checklist Panel */}
+                        {subTab === "work_checklist" && (
+                            <div className="space-y-6">
+                                <div className="space-y-2 border-b border-theme-border/40 pb-4">
+                                    <h3 className="text-sm font-black text-theme-primary uppercase tracking-widest flex items-center gap-2">
+                                        <CheckCircle className="text-emerald-600 w-4 h-4" />
+                                        Work Checklist
+                                    </h3>
+                                    <p className="text-[10px] font-bold text-theme-muted leading-relaxed">
+                                        เช็กงานของ article package ปัจจุบันแบบเรียบง่าย ก่อนส่งต่อ Website, Publish หรือ Arbor Review
+                                    </p>
+                                </div>
+
+                                {renderPasteGuidance("work_checklist")}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {WORK_CHECKLIST_GROUPS.map((group) => (
+                                        <div key={group.title} className="bg-theme-panel/30 border border-theme-border/60 rounded-2xl p-4 space-y-3">
+                                            <h4 className="text-[11px] font-black uppercase tracking-wider text-theme-primary">
+                                                {group.title}
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {group.items.map((item) => (
+                                                    <li key={item} className="flex items-start gap-2 text-xs font-bold leading-relaxed text-theme-secondary">
+                                                        <span className="mt-0.5 w-3.5 h-3.5 rounded border border-theme-border bg-theme-card shrink-0" />
+                                                        <span>{item}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* 4. UTM / Publish Panel */}
                         {subTab === "utm" && (
                             <div className="space-y-6">
@@ -2523,6 +2752,7 @@ export default function WritingStudioTab({
                                         Generate UTM
                                     </button>
                                 </div>
+                                {renderPasteGuidance("utm")}
 
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
@@ -2613,6 +2843,7 @@ export default function WritingStudioTab({
                                         )}
                                     </div>
                                 </div>
+                                {renderPasteGuidance("performance")}
 
                                 {/* Publishing Record */}
                                 <div className="bg-theme-panel/30 border border-theme-border/60 p-5 rounded-2xl space-y-4">
@@ -3479,6 +3710,7 @@ export default function WritingStudioTab({
                                         {isReviewing ? 'Analyzing...' : 'Run Arbor Review'}
                                     </button>
                                 </div>
+                                {renderPasteGuidance("review")}
 
                                 {!reviewResult ? (
                                     <div className="py-16 text-center text-theme-muted font-bold italic space-y-2">

@@ -117,6 +117,17 @@ export default function ArticleCommandPanel({
     if (!checks.utmCampaign) missingFields.push("UTM Campaign");
 
     const isAllReady = missingFields.length === 0;
+    const nextActionLabel = !checks.bodyContent
+        ? "Paste Knowledge Article Body"
+        : !(checks.metaTitle && checks.metaDescription && checks.slug && checks.heroSubtitle && checks.shortSummary)
+            ? "Add SEO & Website Fields"
+            : !checks.socialDrafts
+                ? "Prepare Social Drafts"
+                : !checks.utmCampaign
+                    ? "Add UTM links"
+                    : isAllReady
+                        ? "Ready for Arbor Review"
+                        : "Complete the current section or open Work Checklist.";
 
     const checklistLabels = [
         { key: "title", label: "Title Exists" },
@@ -168,9 +179,9 @@ export default function ArticleCommandPanel({
                     </span>
                 </div>
                 <div className="flex items-center justify-between text-[10px]">
-                    <span className="font-bold text-theme-muted uppercase">Next Decision:</span>
-                    <span className="font-black text-indigo-600 truncate max-w-[130px]" title={decision}>
-                        {decision || "None"}
+                    <span className="font-bold text-theme-muted uppercase">Next Action:</span>
+                    <span className="font-black text-indigo-600 truncate max-w-[130px]" title={decision || nextActionLabel}>
+                        {decision && decision !== "No action" ? decision : nextActionLabel}
                     </span>
                 </div>
             </div>
