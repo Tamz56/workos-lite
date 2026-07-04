@@ -1242,6 +1242,26 @@ export default function WritingStudioTab({
         .replace(/\s+/g, " ")
         .trim();
 
+    const normalizeKeywordField = (value: string) => {
+        const withKeywordSeparators = value
+            .replace(/\r\n/g, "\n")
+            .replace(/(^|\n)\s*[-*•]\s+/g, "$1, ")
+            .replace(/([^\s])\s*[-*•]\s+/g, "$1, ");
+
+        const seen = new Set<string>();
+        return withKeywordSeparators
+            .split(/[,\n]+/)
+            .map(item => item.trim())
+            .filter(Boolean)
+            .filter(item => {
+                const key = item.toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .join(", ");
+    };
+
     const parseMarkdownHeadingBlocks = (markdown: string) => {
         const lines = markdown.split(/\r?\n/);
         const blocks: { level: number; title: string; content: string; start: number; end: number }[] = [];
@@ -1380,15 +1400,21 @@ export default function WritingStudioTab({
             { key: "schemaJsonld", label: "Schema / Custom JSON-LD", targetTab: "Schema", value: getSection("Schema / Custom JSON-LD", "Schema Notes"), existingValue: selectedSchema }
         ];
 
+        const keywordFieldKeys = new Set(["keywords", "knowledgePrimaryKeyword", "knowledgeSecondaryKeywords", "hashtags"]);
         const fields = candidates
             .filter(field => field.value.trim())
             .filter(field => sourceMode === "knowledge" || !["knowledgePrimaryKeyword", "knowledgeSecondaryKeywords", "knowledgeCategory"].includes(field.key))
             .filter(field => sourceMode === "narrative" || field.key !== "journeyStage")
-            .map(field => ({
-                ...field,
-                value: field.value.trim(),
-                willOverwrite: !!field.existingValue.trim() && field.existingValue.trim() !== field.value.trim()
-            }));
+            .map(field => {
+                const value = keywordFieldKeys.has(field.key)
+                    ? normalizeKeywordField(field.value)
+                    : field.value.trim();
+                return {
+                    ...field,
+                    value,
+                    willOverwrite: !!field.existingValue.trim() && field.existingValue.trim() !== value
+                };
+            });
 
         const { cleanBody, removedSectionsCount } = cleanExtractedPackageSections(sourceText);
         return { sourceMode, fields, cleanBody, removedSectionsCount };
