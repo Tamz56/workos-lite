@@ -1422,6 +1422,56 @@ export default function WritingStudioTab({
         return { cleanBody, removedSectionsCount: removeRanges.length };
     };
 
+    const cleanGeneratedSeoMetadataSection = (markdown: string) => {
+        const { lines, blocks } = parseMarkdownHeadingBlocks(markdown);
+        const metadataSectionNames = new Set([
+            "seo & website fields",
+            "clean field values — manual fill",
+            "clean field values - manual fill"
+        ]);
+        const finalPackNames = new Set([
+            "final article pack v1"
+        ]);
+        const articleBodyMarkers = new Set([
+            "knowledge article body",
+            "narrative article body",
+            "article body"
+        ]);
+
+        const removeRanges = blocks
+            .filter(block => {
+                const normalizedTitle = normalizeHeading(block.title);
+                if (block.level === 1 && metadataSectionNames.has(normalizedTitle)) return true;
+                if (block.level !== 1 || !finalPackNames.has(normalizedTitle)) return false;
+
+                const contentLabels = parsePackageFieldValues(block.content);
+                if (contentLabels.size === 0) return false;
+
+                return !block.content
+                    .split(/\r?\n/)
+                    .some(line => articleBodyMarkers.has(normalizeHeading(line.replace(/^#{1,6}\s+/, ""))));
+            })
+            .map(block => {
+                const nextH1 = blocks.find(candidate => candidate.level === 1 && candidate.start > block.start);
+                return {
+                    start: block.start,
+                    end: nextH1 ? nextH1.start - 1 : lines.length - 1
+                };
+            });
+
+        if (removeRanges.length === 0) {
+            return { cleanBody: markdown, removedSectionsCount: 0 };
+        }
+
+        const cleanBody = lines
+            .filter((_, index) => !removeRanges.some(range => index >= range.start && index <= range.end))
+            .join("\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+
+        return { cleanBody, removedSectionsCount: removeRanges.length };
+    };
+
     const buildPackageExtractionPreview = (sourceMode: ArticleMode): PackageExtractionPreview | null => {
         const sourceText = sourceMode === "narrative" ? narrativeBody : knowledgeBody;
         if (!sourceText.trim()) return null;
@@ -1704,6 +1754,18 @@ export default function WritingStudioTab({
                 const parsedCategory = getParsedSeoField("Category");
                 if (parsedCategory) setKnowledgeCategory(parsedCategory);
                 if (parsedStatus) setKnowledgeStatus(parsedStatus);
+            }
+
+            const { cleanBody, removedSectionsCount } = cleanGeneratedSeoMetadataSection(sourceText);
+            if (removedSectionsCount > 0 && cleanBody !== sourceText) {
+                const shouldRemoveSeoBlock = window.confirm("SEO fields were generated. Remove the extracted SEO block from the article body?");
+                if (shouldRemoveSeoBlock) {
+                    if (isNarrative) {
+                        setNarrativeBody(cleanBody);
+                    } else {
+                        setKnowledgeBody(cleanBody);
+                    }
+                }
             }
             return;
         }
