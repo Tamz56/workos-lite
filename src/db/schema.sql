@@ -370,6 +370,7 @@ END;
 -- Arbor Writing Lab Entities
 CREATE TABLE IF NOT EXISTS gf_story_sets (
   id           TEXT PRIMARY KEY,
+  slug         TEXT NULL,
   title        TEXT NOT NULL,
   description  TEXT NULL,
   status       TEXT NOT NULL DEFAULT 'active',

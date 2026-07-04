@@ -946,6 +946,7 @@ function ensureArborWritingLab() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS gf_story_sets (
           id           TEXT PRIMARY KEY,
+          slug         TEXT NULL,
           title        TEXT NOT NULL,
           description  TEXT NULL,
           status       TEXT NOT NULL DEFAULT 'active',
@@ -1053,6 +1054,20 @@ function ensureArborWritingLab() {
     `);
 
     // Idempotent column additions for existing tables
+    const storySetCols = db.prepare("PRAGMA table_info(gf_story_sets)").all() as any[];
+    const storySetColNames = storySetCols.map(c => c.name);
+
+    if (!storySetColNames.includes('slug')) {
+        try {
+            db.exec("ALTER TABLE gf_story_sets ADD COLUMN slug TEXT");
+        } catch (e: any) {
+            if (!e.message?.includes("duplicate column name")) {
+                console.error("Migration error on story set slug:", e);
+                throw e;
+            }
+        }
+    }
+
     const episodeCols = db.prepare("PRAGMA table_info(gf_episodes)").all() as any[];
     const episodeColNames = episodeCols.map(c => c.name);
 
@@ -1181,6 +1196,74 @@ function ensureArborWritingLab() {
     }
 }
 
+type ArborStorySetSeed = {
+    id: string;
+    slug?: string;
+    title: string;
+    description: string;
+};
+
+function normalizeStorySetName(name: string) {
+    return name
+        .normalize("NFKC")
+        .replace(/\s+/g, "")
+        .trim()
+        .toLocaleLowerCase("th-TH");
+}
+
+function seedStorySetsWithoutDuplicates(storySets: ArborStorySetSeed[]) {
+    const existingRows = db.prepare("SELECT id, slug, title FROM gf_story_sets").all() as {
+        id: string;
+        slug: string | null;
+        title: string;
+    }[];
+
+    const bySlug = new Map<string, string>();
+    const byNormalizedTitle = new Map<string, string>();
+
+    for (const row of existingRows) {
+        if (row.slug) bySlug.set(row.slug, row.id);
+        byNormalizedTitle.set(normalizeStorySetName(row.title), row.id);
+    }
+
+    const insertStmt = db.prepare(`
+        INSERT INTO gf_story_sets (id, slug, title, description, status, created_at, updated_at)
+        VALUES (@id, @slug, @title, @description, 'active', datetime('now'), datetime('now'))
+    `);
+
+    const updateStmt = db.prepare(`
+        UPDATE gf_story_sets
+        SET
+            slug = COALESCE(NULLIF(slug, ''), @slug),
+            description = CASE
+                WHEN description IS NULL OR TRIM(description) = '' THEN @description
+                ELSE description
+            END,
+            status = 'active',
+            updated_at = datetime('now')
+        WHERE id = @id
+    `);
+
+    const tx = db.transaction(() => {
+        for (const storySet of storySets) {
+            const slug = storySet.slug ?? null;
+            const matchId = (slug ? bySlug.get(slug) : undefined)
+                ?? byNormalizedTitle.get(normalizeStorySetName(storySet.title));
+
+            if (matchId) {
+                updateStmt.run({ ...storySet, id: matchId, slug });
+                continue;
+            }
+
+            insertStmt.run({ ...storySet, slug });
+            if (slug) bySlug.set(slug, storySet.id);
+            byNormalizedTitle.set(normalizeStorySetName(storySet.title), storySet.id);
+        }
+    });
+
+    tx();
+}
+
 export function seedArborWritingLab() {
     const storySets = [
         { id: "STORY-SET-01", title: "ชีวิตของพืชหนึ่งต้น", description: "The core journey of a single plant from seed to seed." },
@@ -1190,21 +1273,52 @@ export function seedArborWritingLab() {
         { id: "STORY-SET-05", title: "การดูแลพืชอย่างเข้าใจ", description: "Practical guide to plant care based on scientific understanding." }
     ];
 
-    const stmt = db.prepare(`
-        INSERT INTO gf_story_sets (id, title, description, status)
-        VALUES (?, ?, ?, 'active')
-        ON CONFLICT(id) DO UPDATE SET
-            title = excluded.title,
-            description = excluded.description,
-            updated_at = datetime('now')
-    `);
-
-    const tx = db.transaction(() => {
-        for (const ss of storySets) {
-            stmt.run(ss.id, ss.title, ss.description);
+    const greenFinenessTopicStorySets = [
+        {
+            id: "plant-observation",
+            slug: "plant-observation",
+            title: "การสังเกตอาการพืช",
+            description: "ชุดบทความสำหรับอ่านใบ ลำต้น ราก และสภาพแวดล้อมแบบ System-Level Observation โดยไม่รีบสรุปจากอาการเดียว"
+        },
+        {
+            id: "soil-organic-matter",
+            slug: "soil-organic-matter",
+            title: "ดินและอินทรียวัตถุ",
+            description: "ชุดบทความเกี่ยวกับโครงสร้างดิน อินทรียวัตถุ น้ำ อากาศ ราก และชีวิตในดิน ซึ่งเป็นฐานของระบบปลูก"
+        },
+        {
+            id: "water-environment",
+            slug: "water-environment",
+            title: "น้ำและสภาพแวดล้อม",
+            description: "ชุดบทความเกี่ยวกับน้ำ แสง อุณหภูมิ อากาศ ความชื้น ปากใบ และสภาพแวดล้อมที่กำหนดจังหวะการทำงานของพืช"
+        },
+        {
+            id: "root-growth",
+            slug: "root-growth",
+            title: "รากและการเจริญเติบโต",
+            description: "ชุดบทความเกี่ยวกับระบบราก การตั้งตัวของพืช ลำต้น ใบ ฮอร์โมน ระบบลำเลียง และการเจริญเติบโตทั้งต้น"
+        },
+        {
+            id: "plant-nutrition",
+            slug: "plant-nutrition",
+            title: "ธาตุอาหารพืช",
+            description: "ชุดบทความเกี่ยวกับบทบาทของธาตุอาหารต่อการสร้างเนื้อเยื่อ การเติบโต การลำเลียง และการจัดการให้พืชใช้ได้จริง"
+        },
+        {
+            id: "growing-system",
+            slug: "growing-system",
+            title: "ระบบการปลูก",
+            description: "ชุดบทความที่เชื่อมความรู้เรื่องดิน น้ำ แสง ราก พืช และการดูแล ให้กลายเป็นการจัดการระบบปลูกอย่างเป็นเหตุเป็นผล"
+        },
+        {
+            id: "ecology-relationships",
+            slug: "ecology-relationships",
+            title: "นิเวศวิทยาและความสัมพันธ์",
+            description: "ชุดบทความที่มองความสัมพันธ์ระหว่างดิน พืช น้ำ อากาศ จุลินทรีย์ อินทรียวัตถุ และสิ่งมีชีวิตรอบข้างในระบบธรรมชาติ"
         }
-    });
-    tx();
+    ];
+
+    seedStorySetsWithoutDuplicates([...storySets, ...greenFinenessTopicStorySets]);
 
     // Seed/update EP.7 in gf_episodes
     db.prepare(`
@@ -1796,5 +1910,4 @@ ensurePromptWorkflows();
 if (!shouldSkipSeed) {
     ensureSeedProjects();
 }
-
 
