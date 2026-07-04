@@ -1262,6 +1262,92 @@ export default function WritingStudioTab({
             .join(", ");
     };
 
+    const cleanPackageFieldValue = (value: string) => {
+        const trimmed = value.trim();
+        return /^\[(blank|empty|none|n\/a)\]$/i.test(trimmed) ? "" : trimmed;
+    };
+
+    const parsePackageFieldValues = (markdown: string) => {
+        const supportedLabels = [
+            "Article Title",
+            "Title",
+            "Slug",
+            "Hero Subtitle",
+            "Featured Image URL",
+            "Primary Keyword",
+            "Secondary Keywords",
+            "Category",
+            "Short Summary",
+            "Short Summary / Excerpt",
+            "Excerpt",
+            "Meta Title",
+            "SEO Meta Title",
+            "Meta Description",
+            "SEO Meta Description",
+            "Keywords",
+            "Internal Links",
+            "Status",
+            "Content Layer",
+            "Series",
+            "Episode",
+            "Journey Stage",
+            "Article Status",
+            "Facebook Group Post",
+            "Facebook Page Post",
+            "Personal Post",
+            "Short Caption",
+            "Hashtags",
+            "Published URL",
+            "UTM Group",
+            "UTM Page",
+            "UTM Personal",
+            "Publish Status",
+            "Publish Log Note",
+            "Schema / Custom JSON-LD",
+            "Schema Notes"
+        ];
+        const labelKeys = new Map(supportedLabels.map(label => [normalizeHeading(label), label]));
+        const lines = markdown.split(/\r?\n/);
+        const sectionMap = new Map<string, string>();
+        let currentLabel: string | null = null;
+        let currentLines: string[] = [];
+
+        const commitCurrent = () => {
+            if (!currentLabel) return;
+            const key = normalizeHeading(currentLabel);
+            if (!sectionMap.has(key)) {
+                sectionMap.set(key, cleanPackageFieldValue(currentLines.join("\n")));
+            }
+        };
+
+        lines.forEach(line => {
+            const headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*$/);
+            const candidateText = headingMatch ? headingMatch[2].trim() : line.trim();
+            const matchedLabel = labelKeys.get(normalizeHeading(candidateText));
+
+            if (matchedLabel) {
+                commitCurrent();
+                currentLabel = matchedLabel;
+                currentLines = [];
+                return;
+            }
+
+            if (headingMatch) {
+                commitCurrent();
+                currentLabel = null;
+                currentLines = [];
+                return;
+            }
+
+            if (currentLabel) {
+                currentLines.push(line);
+            }
+        });
+
+        commitCurrent();
+        return sectionMap;
+    };
+
     const parseMarkdownHeadingBlocks = (markdown: string) => {
         const lines = markdown.split(/\r?\n/);
         const blocks: { level: number; title: string; content: string; start: number; end: number }[] = [];
@@ -1340,19 +1426,12 @@ export default function WritingStudioTab({
         const sourceText = sourceMode === "narrative" ? narrativeBody : knowledgeBody;
         if (!sourceText.trim()) return null;
 
-        const { blocks } = parseMarkdownHeadingBlocks(sourceText);
-        const sectionMap = new Map<string, string>();
-        blocks.forEach(block => {
-            const key = normalizeHeading(block.title);
-            if (!sectionMap.has(key) && block.content.trim()) {
-                sectionMap.set(key, block.content.trim());
-            }
-        });
+        const sectionMap = parsePackageFieldValues(sourceText);
 
         const getSection = (...names: string[]) => {
             for (const name of names) {
                 const value = sectionMap.get(normalizeHeading(name));
-                if (value) return value;
+                if (typeof value === "string") return value;
             }
             return "";
         };
@@ -1360,23 +1439,25 @@ export default function WritingStudioTab({
         const selectedTitle = sourceMode === "narrative" ? narrativeTitle : knowledgeTitle;
         const selectedSlug = sourceMode === "narrative" ? narrativeSlug : knowledgeSlug;
         const selectedHeroSubtitle = sourceMode === "narrative" ? narrativeHeroSubtitle : knowledgeHeroSubtitle;
+        const selectedFeaturedImageUrl = sourceMode === "narrative" ? narrativeFeaturedImageUrl : knowledgeFeaturedImageUrl;
         const selectedShortSummary = sourceMode === "narrative" ? narrativeShortSummary : knowledgeShortSummary;
         const selectedMetaTitle = sourceMode === "narrative" ? narrativeMetaTitle : knowledgeMetaTitle;
         const selectedMetaDescription = sourceMode === "narrative" ? narrativeMetaDescription : knowledgeMetaDescription;
         const selectedKeywords = sourceMode === "narrative" ? narrativeKeywords : knowledgeKeywords;
         const selectedSchema = sourceMode === "narrative" ? narrativeSchemaJsonld : knowledgeSchemaJsonld;
         const selectedStatus = sourceMode === "narrative" ? narrativeStatus : knowledgeStatus;
-        const extractedKeywords = [getSection("Primary Keyword"), getSection("Secondary Keywords")]
+        const extractedKeywords = getSection("Keywords") || [getSection("Primary Keyword"), getSection("Secondary Keywords")]
             .filter(Boolean)
             .join(", ");
 
         const candidates: Array<Omit<PackageFieldPreview, "willOverwrite">> = [
-            { key: "articleTitle", label: "Title", targetTab: "SEO & Website Fields", value: getSection("Title"), existingValue: selectedTitle },
+            { key: "articleTitle", label: "Title", targetTab: "SEO & Website Fields", value: getSection("Article Title", "Title"), existingValue: selectedTitle },
             { key: "articleSlug", label: "Slug", targetTab: "SEO & Website Fields", value: getSection("Slug"), existingValue: selectedSlug },
             { key: "heroSubtitle", label: "Hero Subtitle", targetTab: "SEO & Website Fields", value: getSection("Hero Subtitle"), existingValue: selectedHeroSubtitle },
+            { key: "featuredImageUrl", label: "Featured Image URL", targetTab: "SEO & Website Fields", value: getSection("Featured Image URL"), existingValue: selectedFeaturedImageUrl },
             { key: "shortSummary", label: "Short Summary / Excerpt", targetTab: "SEO & Website Fields", value: getSection("Short Summary / Excerpt", "Short Summary", "Excerpt"), existingValue: selectedShortSummary },
-            { key: "metaTitle", label: "Meta Title", targetTab: "SEO & Website Fields", value: getSection("Meta Title"), existingValue: selectedMetaTitle },
-            { key: "metaDescription", label: "Meta Description", targetTab: "SEO & Website Fields", value: getSection("Meta Description"), existingValue: selectedMetaDescription },
+            { key: "metaTitle", label: "Meta Title", targetTab: "SEO & Website Fields", value: getSection("SEO Meta Title", "Meta Title"), existingValue: selectedMetaTitle },
+            { key: "metaDescription", label: "Meta Description", targetTab: "SEO & Website Fields", value: getSection("SEO Meta Description", "Meta Description"), existingValue: selectedMetaDescription },
             { key: "keywords", label: "Keywords", targetTab: "SEO & Website Fields", value: extractedKeywords, existingValue: selectedKeywords },
             { key: "knowledgePrimaryKeyword", label: "Primary Keyword", targetTab: "SEO & Website Fields", value: getSection("Primary Keyword"), existingValue: sourceMode === "knowledge" ? knowledgePrimaryKeyword : "" },
             { key: "knowledgeSecondaryKeywords", label: "Secondary Keywords", targetTab: "SEO & Website Fields", value: getSection("Secondary Keywords"), existingValue: sourceMode === "knowledge" ? knowledgeSecondaryKeywords : "" },
@@ -1385,7 +1466,7 @@ export default function WritingStudioTab({
             { key: "contentFamily", label: "Series", targetTab: "SEO & Website Fields", value: getSection("Series"), existingValue: contentFamily },
             { key: "episodeCode", label: "Episode", targetTab: "SEO & Website Fields", value: getSection("Episode"), existingValue: episodeCode },
             { key: "journeyStage", label: "Journey Stage", targetTab: "SEO & Website Fields", value: getSection("Journey Stage"), existingValue: sourceMode === "narrative" ? narrativeJourneyStage : "" },
-            { key: "articleStatus", label: "Article Status", targetTab: "SEO & Website Fields", value: getSection("Article Status"), existingValue: selectedStatus },
+            { key: "articleStatus", label: "Article Status", targetTab: "SEO & Website Fields", value: getSection("Article Status", "Status"), existingValue: selectedStatus },
             { key: "facebookGroupPost", label: "Facebook Group Post", targetTab: "Social Drafts", value: getSection("Facebook Group Post"), existingValue: facebookGroupPost },
             { key: "facebookPagePost", label: "Facebook Page Post", targetTab: "Social Drafts", value: getSection("Facebook Page Post"), existingValue: facebookPagePost },
             { key: "personalPost", label: "Personal Post", targetTab: "Social Drafts", value: getSection("Personal Post"), existingValue: personalPost },
@@ -1448,6 +1529,13 @@ export default function WritingStudioTab({
                 break;
             case "heroSubtitle":
                 sourceMode === "narrative" ? setNarrativeHeroSubtitle(value) : setKnowledgeHeroSubtitle(value);
+                break;
+            case "featuredImageUrl":
+                if (sourceMode === "narrative") {
+                    setNarrativeFeaturedImageUrl(value);
+                } else {
+                    setKnowledgeFeaturedImageUrl(value);
+                }
                 break;
             case "shortSummary":
                 sourceMode === "narrative" ? setNarrativeShortSummary(value) : setKnowledgeShortSummary(value);
@@ -1547,6 +1635,76 @@ export default function WritingStudioTab({
                 ? "เนื้อหา Narrative Article ยังว่างอยู่ ไม่สามารถใช้คำนวณฟิลด์อัตโนมัติได้" 
                 : "เนื้อหา Knowledge Article ยังว่างอยู่ ไม่สามารถใช้คำนวณฟิลด์อัตโนมัติได้"
             );
+            return;
+        }
+
+        const parsedSeoFields = parsePackageFieldValues(sourceText);
+        const getParsedSeoField = (...names: string[]) => {
+            for (const name of names) {
+                const value = parsedSeoFields.get(normalizeHeading(name));
+                if (typeof value === "string") return value;
+            }
+            return "";
+        };
+        const hasParsedSeoFields = [
+            "Article Title",
+            "Title",
+            "Slug",
+            "Hero Subtitle",
+            "Featured Image URL",
+            "Primary Keyword",
+            "Secondary Keywords",
+            "Category",
+            "Short Summary",
+            "Short Summary / Excerpt",
+            "Excerpt",
+            "Meta Title",
+            "SEO Meta Title",
+            "Meta Description",
+            "SEO Meta Description",
+            "Keywords",
+            "Status"
+        ].some(label => parsedSeoFields.has(normalizeHeading(label)));
+
+        if (hasParsedSeoFields) {
+            const parsedTitle = getParsedSeoField("Article Title", "Title");
+            const parsedSlug = getParsedSeoField("Slug");
+            const parsedHeroSubtitle = getParsedSeoField("Hero Subtitle");
+            const parsedFeaturedImageUrl = getParsedSeoField("Featured Image URL");
+            const parsedShortSummary = getParsedSeoField("Short Summary / Excerpt", "Short Summary", "Excerpt");
+            const parsedMetaTitle = getParsedSeoField("SEO Meta Title", "Meta Title");
+            const parsedMetaDescription = getParsedSeoField("SEO Meta Description", "Meta Description");
+            const parsedPrimaryKeyword = getParsedSeoField("Primary Keyword");
+            const parsedSecondaryKeywords = getParsedSeoField("Secondary Keywords");
+            const parsedKeywords = getParsedSeoField("Keywords") || [parsedPrimaryKeyword, parsedSecondaryKeywords].filter(Boolean).join(", ");
+            const parsedStatus = getParsedSeoField("Status", "Article Status");
+            const normalizedKeywords = normalizeKeywordField(parsedKeywords);
+
+            if (isNarrative) {
+                if (parsedTitle) setNarrativeTitle(parsedTitle);
+                if (parsedSlug) setNarrativeSlug(parsedSlug);
+                if (parsedHeroSubtitle) setNarrativeHeroSubtitle(parsedHeroSubtitle);
+                if (parsedFeaturedImageUrl) setNarrativeFeaturedImageUrl(parsedFeaturedImageUrl);
+                if (parsedShortSummary) setNarrativeShortSummary(parsedShortSummary);
+                if (parsedMetaTitle) setNarrativeMetaTitle(parsedMetaTitle);
+                if (parsedMetaDescription) setNarrativeMetaDescription(parsedMetaDescription);
+                if (normalizedKeywords) setNarrativeKeywords(normalizedKeywords);
+                if (parsedStatus) setNarrativeStatus(parsedStatus);
+            } else {
+                if (parsedTitle) setKnowledgeTitle(parsedTitle);
+                if (parsedSlug) setKnowledgeSlug(parsedSlug);
+                if (parsedHeroSubtitle) setKnowledgeHeroSubtitle(parsedHeroSubtitle);
+                if (parsedFeaturedImageUrl) setKnowledgeFeaturedImageUrl(parsedFeaturedImageUrl);
+                if (parsedShortSummary) setKnowledgeShortSummary(parsedShortSummary);
+                if (parsedMetaTitle) setKnowledgeMetaTitle(parsedMetaTitle);
+                if (parsedMetaDescription) setKnowledgeMetaDescription(parsedMetaDescription);
+                if (normalizedKeywords) setKnowledgeKeywords(normalizedKeywords);
+                if (parsedPrimaryKeyword) setKnowledgePrimaryKeyword(normalizeKeywordField(parsedPrimaryKeyword));
+                if (parsedSecondaryKeywords) setKnowledgeSecondaryKeywords(normalizeKeywordField(parsedSecondaryKeywords));
+                const parsedCategory = getParsedSeoField("Category");
+                if (parsedCategory) setKnowledgeCategory(parsedCategory);
+                if (parsedStatus) setKnowledgeStatus(parsedStatus);
+            }
             return;
         }
 
