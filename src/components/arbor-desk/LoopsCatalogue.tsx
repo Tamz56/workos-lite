@@ -75,10 +75,26 @@ const CURATED_LOOPS = [
     role: "Social content pre-publish review loop",
     status: "Saved / Ready for Review",
     description: "ขั้นตอนการตรวจสอบชุดโพสต์สื่อสังคมออนไลน์แยกตามประเภทช่องทางปลายทาง"
+  },
+  {
+    id: "1e0f45b2-c888-414a-bb9f-106f38f2d42b",
+    title: "WorkOS Daily Attention Loop v1 — Daily Focus and Decision System for WorkOS-Lite",
+    category: "Attention System",
+    role: "Daily Focus and Decision System",
+    status: "Saved / Ready for Review",
+    description: "ระบบช่วยเลือกว่าวันนี้ควรใช้ attention กับอะไร 1–3 เรื่อง อะไรให้ AI เตรียมได้ อะไรต้องตัดสินใจเอง และอะไรควรพักไว้ก่อน"
+  },
+  {
+    id: "76f2d26e-d54e-40d5-9fd2-2ae2132150d2",
+    title: "Daily Attention Brief Template v1 — 5-Minute Daily Focus Template",
+    category: "Attention System",
+    role: "Daily Use Template",
+    status: "Saved / Ready to Use",
+    description: "แม่แบบสั้นสำหรับใช้ตอนเช้าและปิดงานตอนเย็น เพื่อเลือก focus item รายวันโดยไม่สร้าง to-do list ยาวเกินจำเป็น"
   }
 ];
 
-const CATEGORIES = ["All", "Foundation", "Source Index", "Green Fineness Loops"];
+const CATEGORIES = ["All", "Foundation", "Source Index", "Green Fineness Loops", "Attention System"];
 
 type LoadedDoc = {
   id: string;
