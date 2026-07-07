@@ -25,6 +25,8 @@ interface ArticleCommandPanelProps {
     generatedPackageText: string;
     onSendToInbox: () => void;
     onCopyInsightPrompt: () => void;
+    onCopyGFAdminFields: () => void;
+    copyGFAdminSuccess: boolean;
     
     // Live states for checklist computation
     workingTitle: string;
@@ -62,6 +64,8 @@ export default function ArticleCommandPanel({
     generatedPackageText,
     onSendToInbox,
     onCopyInsightPrompt,
+    onCopyGFAdminFields,
+    copyGFAdminSuccess,
     
     workingTitle,
     slug,
@@ -270,6 +274,15 @@ export default function ArticleCommandPanel({
                     >
                         <Copy size={12} className="text-purple-500" />
                         Copy Insight Prompt
+                    </button>
+
+                    <button
+                        onClick={onCopyGFAdminFields}
+                        className="p-2 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 dark:border-emerald-500/10 rounded-xl font-bold text-center flex items-center justify-center gap-1 transition-all col-span-2"
+                        title="คัดลอกข้อมูลบทความสำหรับนำไปลงหน้า Admin Library Article"
+                    >
+                        <Copy size={12} className="text-emerald-500" />
+                        {copyGFAdminSuccess ? "คัดลอก GF Fields สำเร็จ!" : "Copy GF Admin Fields"}
                     </button>
                 </div>
             </div>

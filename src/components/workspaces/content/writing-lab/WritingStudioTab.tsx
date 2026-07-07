@@ -489,6 +489,7 @@ export default function WritingStudioTab({
 
     // Handoff states
     const [copyPromptSuccess, setCopyPromptSuccess] = useState(false);
+    const [copyGFAdminSuccess, setCopyGFAdminSuccess] = useState(false);
 
     // WorkOS Handoff Package states
     const [isWorkOSModalOpen, setIsWorkOSModalOpen] = useState(false);
@@ -2128,6 +2129,84 @@ export default function WritingStudioTab({
         setTimeout(() => setCopyPackageSuccess(false), 2000);
     };
 
+    const handleCopyGFAdminFields = () => {
+        if (!activeProject) return;
+
+        const hasKnowledgeData = !!(knowledgeTitle || knowledgeBody || activeProject.knowledge_title || activeProject.knowledge_body);
+        const hasNarrativeData = !!(narrativeTitle || narrativeBody || activeProject.narrative_title || activeProject.narrative_body);
+        const isKnowledgeOnly = hasKnowledgeData && !hasNarrativeData;
+
+        // Map content type category
+        let gfCategory = "บทความ";
+        const mode = activeProject.writing_mode;
+        const isKnowledgeCompanionOrOnly = (mode === "knowledge_article" || mode === "knowledge_journey_article") || hasKnowledgeData;
+        
+        if (isKnowledgeCompanionOrOnly) {
+            gfCategory = "บทความ";
+        } else if (mode === "journey_chapter") {
+            gfCategory = "บันทึกต้นไม้";
+        } else if (mode === "documentary_chapter") {
+            gfCategory = "บันทึกภาคสนาม";
+        } else if (mode === "writers_journal") {
+            gfCategory = "ข้อคิดและการพินิจ";
+        } else {
+            gfCategory = "บทความ";
+        }
+
+        // topic เดิมที่ WorkOS ใช้ใน CATEGORY ให้ย้ายไปเป็น primary_topic
+        const primary_topic = knowledgeCategory || activeProject.knowledge_category || "";
+
+        // Map status (default = Draft)
+        const rawStatus = knowledgeStatus || narrativeStatus || activeProject.knowledge_status || activeProject.narrative_status || activeProject.status || "draft";
+        const status = rawStatus.toLowerCase() === "published" ? "Published" : "Draft";
+
+        // Prioritize body selection
+        const isPrioritizeKnowledge = (mode === "knowledge_article" || mode === "knowledge_journey_article") || isKnowledgeOnly || hasKnowledgeData;
+        const body_content = isPrioritizeKnowledge
+            ? (knowledgeBody || narrativeBody || activeProject.knowledge_body || activeProject.narrative_body || "")
+            : (narrativeBody || knowledgeBody || activeProject.narrative_body || activeProject.knowledge_body || "");
+
+        // Resolve slug (must be English URL-safe, not Thai title)
+        const isRealSlug = (s: any): boolean => {
+            if (!s || typeof s !== "string") return false;
+            if (/[\u0e00-\u0e7f]/.test(s)) return false;
+            return /^[a-zA-Z0-9-_]+$/.test(s.trim());
+        };
+
+        const resolvedSlug = [
+            knowledgeSlug,
+            narrativeSlug,
+            activeProject.knowledge_slug,
+            activeProject.narrative_slug,
+            activeProject.slug,
+            slug
+        ].map(s => s || "").find(isRealSlug) || "";
+
+        const adminFields = {
+            article_title: knowledgeTitle || narrativeTitle || workingTitle || activeProject.knowledge_title || activeProject.narrative_title || activeProject.title || "",
+            slug: resolvedSlug,
+            category: gfCategory,
+            primary_topic: primary_topic,
+            status: status,
+            hero_subtitle: knowledgeHeroSubtitle || narrativeHeroSubtitle || heroSubtitle || activeProject.knowledge_hero_subtitle || activeProject.narrative_hero_subtitle || "",
+            featured_image_url: knowledgeFeaturedImageUrl || narrativeFeaturedImageUrl || activeProject.knowledge_featured_image_url || activeProject.narrative_featured_image_url || "",
+            short_summary: knowledgeShortSummary || narrativeShortSummary || shortSummary || activeProject.knowledge_short_summary || activeProject.narrative_short_summary || activeProject.summary || "",
+            body_content: body_content,
+            meta_title: knowledgeMetaTitle || narrativeMetaTitle || metaTitle || activeProject.knowledge_meta_title || activeProject.narrative_meta_title || activeProject.meta_title || "",
+            meta_description: knowledgeMetaDescription || narrativeMetaDescription || metaDescription || activeProject.knowledge_meta_description || activeProject.narrative_meta_description || activeProject.meta_description || "",
+            primary_keyword: knowledgePrimaryKeyword || activeProject.knowledge_primary_keyword || "",
+            secondary_keywords: knowledgeSecondaryKeywords || activeProject.knowledge_secondary_keywords || "",
+            seo_keywords: knowledgeKeywords || narrativeKeywords || keywords || activeProject.knowledge_keywords || activeProject.narrative_keywords || activeProject.keywords || "",
+            custom_json_ld: knowledgeSchemaJsonld || narrativeSchemaJsonld || activeProject.knowledge_schema_jsonld || activeProject.narrative_schema_jsonld || ""
+        };
+
+        const jsonString = JSON.stringify(adminFields, null, 2);
+        navigator.clipboard.writeText(jsonString);
+
+        setCopyGFAdminSuccess(true);
+        setTimeout(() => setCopyGFAdminSuccess(false), 2000);
+    };
+
     const handleSendToInbox = () => {
         try {
             sessionStorage.setItem("workos.arborInbox.pendingPayload", generatedPackageText);
@@ -2540,6 +2619,8 @@ export default function WritingStudioTab({
                                     campaignName={campaignName}
                                     publishStatus={publishStatus}
                                     decision={decision}
+                                    onCopyGFAdminFields={handleCopyGFAdminFields}
+                                    copyGFAdminSuccess={copyGFAdminSuccess}
                                 />
                             </div>
                         )}
@@ -4539,6 +4620,13 @@ export default function WritingStudioTab({
 
                         {/* Modal Footer */}
                         <div className="p-6 border-t border-theme-border/60 bg-theme-panel/40 flex flex-col sm:flex-row items-center justify-end gap-3">
+                            <button
+                                onClick={handleCopyGFAdminFields}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <Copy className="w-3.5 h-3.5" />
+                                {copyGFAdminSuccess ? "คัดลอก GF Fields สำเร็จ!" : "Copy GF Admin Fields"}
+                            </button>
                             <button
                                 onClick={handleCopyPackage}
                                 className="w-full sm:w-auto px-5 py-2.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700/60 rounded-xl text-xs font-bold text-neutral-600 dark:text-theme-secondary hover:bg-neutral-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
