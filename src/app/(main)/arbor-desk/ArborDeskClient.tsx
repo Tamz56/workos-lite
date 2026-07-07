@@ -415,7 +415,7 @@ export default function ArborDeskClient() {
                                 <section className="bg-theme-card border border-theme-border rounded-[32px] p-6 shadow-sm space-y-4">
                                     <div className="flex items-center justify-between">
                                         <h2 className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Recent Documents</h2>
-                                        <Link href="/notes" className="text-[10px] font-black text-blue-600 hover:underline">
+                                        <Link href="/docs" className="text-[10px] font-black text-blue-600 hover:underline">
                                             All Docs
                                         </Link>
                                     </div>

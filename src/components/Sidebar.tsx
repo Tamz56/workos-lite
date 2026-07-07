@@ -124,10 +124,10 @@ export function Sidebar() {
                         isCollapsed={isCollapsed}
                     />
                     <NavItem
-                        href="/notes"
-                        label="Notes"
+                        href="/docs"
+                        label="Docs"
                         icon={<FolderIcon className="w-5 h-5" />}
-                        active={pathname.startsWith("/notes")}
+                        active={pathname.startsWith("/docs")}
                         isCollapsed={isCollapsed}
                     />
                     <NavItem

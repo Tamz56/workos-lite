@@ -12,7 +12,7 @@ export default function Topbar() {
         if (pathname === "/today") return "Today";
         if (pathname === "/done") return "Done";
         if (pathname === "/planner") return "Today";
-        if (pathname.startsWith("/docs")) return "Notes";
+        if (pathname.startsWith("/docs")) return "Docs";
         if (pathname.startsWith("/projects")) return "Projects";
         if (pathname.startsWith("/timeline")) return "Timeline";
         if (pathname.startsWith("/sprints")) return "Sprints";
