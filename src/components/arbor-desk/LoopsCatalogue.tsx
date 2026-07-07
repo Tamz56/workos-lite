@@ -91,10 +91,18 @@ const CURATED_LOOPS = [
     role: "Daily Use Template",
     status: "Saved / Ready to Use",
     description: "แม่แบบสั้นสำหรับใช้ตอนเช้าและปิดงานตอนเย็น เพื่อเลือก focus item รายวันโดยไม่สร้าง to-do list ยาวเกินจำเป็น"
+  },
+  {
+    id: "4f36399f-c902-4075-adda-6bfa5f6a1de6",
+    title: "GF Video Studio — Storyboard Production Table Template v1",
+    category: "Video Studio",
+    role: "Storyboard Production Template",
+    status: "Saved / Ready to Use",
+    description: "แม่แบบตาราง storyboard สำหรับผลิตคลิปความรู้สั้นของ Green Fineness โดยคุมเวลา ภาพ เสียง VO ข้อความบนจอ และ camera / motion notes ในตารางเดียว"
   }
 ];
 
-const CATEGORIES = ["All", "Foundation", "Source Index", "Green Fineness Loops", "Attention System"];
+const CATEGORIES = ["All", "Foundation", "Source Index", "Green Fineness Loops", "Attention System", "Video Studio"];
 
 type LoadedDoc = {
   id: string;
