@@ -266,3 +266,8 @@ Do not add speculative features, unused endpoints, unused environment variables,
 Keep the diff small and focused.
 If the task appears to require a broad refactor, stop and propose phases first.
 
+---
+
+## Green Fineness Knowledge Articles Standard
+
+Green Fineness Knowledge Articles must be research-backed, deep but readable, and system-based. Do not produce articles as general knowledge summaries or personal opinion. Each Knowledge Article should start from Research Questions and a NotebookLM Research Prompt before drafting. Use reliable sources such as textbooks, peer-reviewed papers, review articles, university extension sources, or NotebookLM summaries from source documents. Explain difficult mechanisms in accessible language, connect plant, soil, water, roots, nutrients, microbes, and environment as a system, and translate knowledge into practical observation without giving rigid formulas or overclaiming. For market-sensitive topics such as humic substances, seaweed extract, microbes, mycorrhizae, plant defense compounds, biostimulants, or biological inputs, use careful claim language and avoid guaranteed claims unless strongly supported by evidence.
