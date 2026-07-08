@@ -16,6 +16,7 @@ import { Modal } from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import ProjectLoopsTab from "@/components/projects/ProjectLoopsTab";
 
 const STATUS_LABELS: Record<ProjectRegistryStatus, string> = {
     idea: "Idea",
@@ -680,7 +681,7 @@ export default function ProjectDetailClient() {
     const [delToDelete, setDelToDelete] = useState<string | null>(null);
 
     // --- Project Context and Decisions State (ARBOR-AGENT-001) ---
-    const [activeTab, setActiveTab] = useState<"deliverables" | "context">("deliverables");
+    const [activeTab, setActiveTab] = useState<"deliverables" | "context" | "loops">("deliverables");
     const [contextOverview, setContextOverview] = useState("");
     const [contextPurpose, setContextPurpose] = useState("");
     const [contextStandingInstructions, setContextStandingInstructions] = useState("");
@@ -699,6 +700,27 @@ export default function ProjectDetailClient() {
 
     const [savingContext, setSavingContext] = useState(false);
     const [savingDecision, setSavingDecision] = useState(false);
+
+    // --- Project Loops Tab State (ARBOR-AGENT-003) ---
+    const [loops, setLoops] = useState<any[]>([]);
+    const [loopTemplates, setLoopTemplates] = useState<any[]>([]);
+    const [loadingLoops, setLoadingLoops] = useState(false);
+
+    const refreshLoops = useCallback(async (includeArchived = false) => {
+        setLoadingLoops(true);
+        try {
+            const res = await fetch(`/api/projects/${slug}/loops?include_archived=${includeArchived ? "1" : "0"}`);
+            if (res.ok) {
+                const data = await res.json();
+                setLoops(data.loops || []);
+                setLoopTemplates(data.templates || []);
+            }
+        } catch (err) {
+            console.error("Failed to load loops:", err);
+        } finally {
+            setLoadingLoops(false);
+        }
+    }, [slug]);
 
     // Default metadata helper
     const defaultMetadataForProject = useCallback((proj: Project): ProjectRegistryMetadata => {
@@ -762,10 +784,12 @@ export default function ProjectDetailClient() {
             if (decisionsRes.ok) {
                 setDecisions(await decisionsRes.json());
             }
+
+            await refreshLoops(false);
         } finally {
             setLoading(false);
         }
-    }, [slug]);
+    }, [slug, refreshLoops]);
 
     const loadDocBlocks = useCallback(() => {
         let allBlocks = getStoredDocBlocks();
@@ -2065,6 +2089,17 @@ ${suggestedNextStr}
                     <BookOpen className="w-3.5 h-3.5" />
                     Context & Decisions
                 </button>
+                <button 
+                    onClick={() => setActiveTab("loops")}
+                    className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all ${
+                        activeTab === "loops" 
+                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm" 
+                            : "text-neutral-400 hover:text-neutral-600 dark:hover:text-slate-200"
+                    }`}
+                >
+                    <Layers className="w-3.5 h-3.5" />
+                    Workflows & Loops
+                </button>
             </div>
 
             {/* Main content grid */}
@@ -2883,6 +2918,18 @@ ${suggestedNextStr}
                             )}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {activeTab === "loops" && (
+                <div className="w-full max-w-[1600px] mx-auto mt-8 pb-12">
+                    <ProjectLoopsTab
+                        slug={slug}
+                        loops={loops}
+                        templates={loopTemplates}
+                        loading={loadingLoops}
+                        onRefresh={refreshLoops}
+                    />
                 </div>
             )}
 
