@@ -70,4 +70,46 @@ if (tableInfo.sql.includes("'planned','done'")) {
         console.log("Tasks table rebuilt successfully.");
     }
 }
+
+// Migration: Add project_contexts and project_decisions tables
+console.log("Adding project_contexts and project_decisions tables if needed...");
+db.exec(`
+    CREATE TABLE IF NOT EXISTS project_contexts (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL UNIQUE,
+      overview TEXT,
+      purpose TEXT,
+      standing_instructions TEXT,
+      tone_voice TEXT,
+      guardrails TEXT,
+      output_standards TEXT,
+      decision_rules TEXT,
+      source_of_truth TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE TRIGGER IF NOT EXISTS trg_project_contexts_updated_at
+    AFTER UPDATE ON project_contexts
+    FOR EACH ROW
+    WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+    BEGIN
+      UPDATE project_contexts SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
+
+    CREATE TABLE IF NOT EXISTS project_decisions (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      decision TEXT NOT NULL,
+      reason TEXT,
+      impact TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_project_decisions_project_id ON project_decisions(project_id);
+`);
+console.log("Context and Decisions tables created/verified.");
+
 console.log("Migration complete.");

@@ -430,9 +430,9 @@ function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectCont
         let priority: "high" | "medium" | "low" | "none" = "medium";
         let relatedMainEpisode = "";
         const notes = "";
-        let seriesOrTheme = "";
-        let targetChannel = "Facebook / Website";
-        let nextAction = "เตรียมยกร่างเนื้อหาตอน";
+        const seriesOrTheme = "";
+        const targetChannel = "Facebook / Website";
+        const nextAction = "เตรียมยกร่างเนื้อหาตอน";
 
         // Heuristic detection based on columns
         if (cols.length >= 2) {
@@ -678,6 +678,28 @@ export default function ProjectDetailClient() {
     const [delNotes, setDelNotes] = useState("");
     const [isDeleteDelOpen, setIsDeleteDelOpen] = useState(false);
     const [delToDelete, setDelToDelete] = useState<string | null>(null);
+
+    // --- Project Context and Decisions State (ARBOR-AGENT-001) ---
+    const [activeTab, setActiveTab] = useState<"deliverables" | "context">("deliverables");
+    const [contextOverview, setContextOverview] = useState("");
+    const [contextPurpose, setContextPurpose] = useState("");
+    const [contextStandingInstructions, setContextStandingInstructions] = useState("");
+    const [contextToneVoice, setContextToneVoice] = useState("");
+    const [contextGuardrails, setContextGuardrails] = useState("");
+    const [contextOutputStandards, setContextOutputStandards] = useState("");
+    const [contextDecisionRules, setContextDecisionRules] = useState("");
+    const [contextSourceOfTruth, setContextSourceOfTruth] = useState("");
+    
+    const [decisions, setDecisions] = useState<any[]>([]);
+    const [isAddingDecision, setIsAddingDecision] = useState(false);
+    const [newDecisionTitle, setNewDecisionTitle] = useState("");
+    const [newDecisionText, setNewDecisionText] = useState("");
+    const [newDecisionReason, setNewDecisionReason] = useState("");
+    const [newDecisionImpact, setNewDecisionImpact] = useState("");
+
+    const [savingContext, setSavingContext] = useState(false);
+    const [savingDecision, setSavingDecision] = useState(false);
+
     // Default metadata helper
     const defaultMetadataForProject = useCallback((proj: Project): ProjectRegistryMetadata => {
         return {
@@ -696,10 +718,13 @@ export default function ProjectDetailClient() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [projRes, itemsRes] = await Promise.all([
+            const [projRes, itemsRes, contextRes, decisionsRes] = await Promise.all([
                 fetch(`/api/projects/${slug}`),
-                fetch(`/api/projects/${slug}/items`)
+                fetch(`/api/projects/${slug}/items`),
+                fetch(`/api/projects/${slug}/context`),
+                fetch(`/api/projects/${slug}/decisions`)
             ]);
+
             if (projRes.ok) {
                 const projData: Project = await projRes.json();
                 setProject(projData);
@@ -717,7 +742,26 @@ export default function ProjectDetailClient() {
                     }
                 } catch { /* ignore docs fetch failure */ }
             }
-            if (itemsRes.ok) setItems(await itemsRes.json());
+
+            if (itemsRes.ok) {
+                setItems(await itemsRes.json());
+            }
+
+            if (contextRes.ok) {
+                const ctxData = await contextRes.json();
+                setContextOverview(ctxData.overview || "");
+                setContextPurpose(ctxData.purpose || "");
+                setContextStandingInstructions(ctxData.standing_instructions || "");
+                setContextToneVoice(ctxData.tone_voice || "");
+                setContextGuardrails(ctxData.guardrails || "");
+                setContextOutputStandards(ctxData.output_standards || "");
+                setContextDecisionRules(ctxData.decision_rules || "");
+                setContextSourceOfTruth(ctxData.source_of_truth || "");
+            }
+
+            if (decisionsRes.ok) {
+                setDecisions(await decisionsRes.json());
+            }
         } finally {
             setLoading(false);
         }
@@ -938,6 +982,105 @@ export default function ProjectDetailClient() {
         setIsDeleteDocOpen(false);
         setDocToDelete(null);
         loadDocBlocks();
+    };
+
+    // --- Project Context and Decisions Actions (ARBOR-AGENT-001) ---
+    const handleSaveContext = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSavingContext(true);
+        try {
+            const res = await fetch(`/api/projects/${slug}/context`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    overview: contextOverview,
+                    purpose: contextPurpose,
+                    standing_instructions: contextStandingInstructions,
+                    tone_voice: contextToneVoice,
+                    guardrails: contextGuardrails,
+                    output_standards: contextOutputStandards,
+                    decision_rules: contextDecisionRules,
+                    source_of_truth: contextSourceOfTruth
+                })
+            });
+            if (res.ok) {
+                setToastMessage("บันทึก Project Context สำเร็จ");
+                setShowToast(true);
+            } else {
+                const data = await res.json();
+                alert(`ล้มเหลว: ${data.error}`);
+            }
+        } catch (err: any) {
+            alert(`เกิดข้อผิดพลาด: ${err.message}`);
+        } finally {
+            setSavingContext(false);
+        }
+    };
+
+    const handleAddDecision = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newDecisionTitle.trim() || !newDecisionText.trim()) {
+            alert("กรุณาระบุหัวข้อและรายละเอียดการตัดสินใจ");
+            return;
+        }
+
+        setSavingDecision(true);
+        try {
+            const res = await fetch(`/api/projects/${slug}/decisions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: newDecisionTitle.trim(),
+                    decision: newDecisionText.trim(),
+                    reason: newDecisionReason.trim(),
+                    impact: newDecisionImpact.trim()
+                })
+            });
+            if (res.ok) {
+                setToastMessage("เพิ่มบันทึกการตัดสินใจเรียบร้อยแล้ว");
+                setShowToast(true);
+                setIsAddingDecision(false);
+                setNewDecisionTitle("");
+                setNewDecisionText("");
+                setNewDecisionReason("");
+                setNewDecisionImpact("");
+                // Reload decisions list
+                const decRes = await fetch(`/api/projects/${slug}/decisions`);
+                if (decRes.ok) setDecisions(await decRes.json());
+            } else {
+                const data = await res.json();
+                alert(`ล้มเหลว: ${data.error}`);
+            }
+        } catch (err: any) {
+            alert(`เกิดข้อผิดพลาด: ${err.message}`);
+        } finally {
+            setSavingDecision(false);
+        }
+    };
+
+    const handleDeleteDecision = async (id: string) => {
+        // Explicit delete confirmation
+        if (!window.confirm("คุณต้องการลบบันทึกการตัดสินใจนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้ (Are you sure you want to delete this decision log? This action cannot be undone.)")) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/projects/${slug}/decisions?id=${id}`, {
+                method: "DELETE"
+            });
+            if (res.ok) {
+                setToastMessage("ลบบันทึกการตัดสินใจเรียบร้อยแล้ว");
+                setShowToast(true);
+                // Reload decisions list
+                const decRes = await fetch(`/api/projects/${slug}/decisions`);
+                if (decRes.ok) setDecisions(await decRes.json());
+            } else {
+                const data = await res.json();
+                alert(`ล้มเหลว: ${data.error}`);
+            }
+        } catch (err: any) {
+            alert(`เกิดข้อผิดพลาด: ${err.message}`);
+        }
     };
 
     // --- Arbor Assistant Parser Engine & Methods ---
@@ -1898,8 +2041,35 @@ ${suggestedNextStr}
                 }
             />
 
+            {/* Tabs selector */}
+            <div className="w-full max-w-[1600px] mx-auto flex items-center gap-1 bg-neutral-100 dark:bg-neutral-900/60 p-1 rounded-2xl w-fit mt-6 border border-neutral-200 dark:border-neutral-800">
+                <button 
+                    onClick={() => setActiveTab("deliverables")}
+                    className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all ${
+                        activeTab === "deliverables" 
+                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm" 
+                            : "text-neutral-400 hover:text-neutral-600 dark:hover:text-slate-200"
+                    }`}
+                >
+                    <Layout className="w-3.5 h-3.5" />
+                    Deliverables & Docs
+                </button>
+                <button 
+                    onClick={() => setActiveTab("context")}
+                    className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all ${
+                        activeTab === "context" 
+                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm" 
+                            : "text-neutral-400 hover:text-neutral-600 dark:hover:text-slate-200"
+                    }`}
+                >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    Context & Decisions
+                </button>
+            </div>
+
             {/* Main content grid */}
-            <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
+            {activeTab === "deliverables" && (
+                <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
                 
                 {/* Main Deliverables & Milestones (Left side) */}
                 <div className="xl:col-span-9 space-y-10">
@@ -2502,6 +2672,291 @@ ${suggestedNextStr}
                     )}
                 </div>
             </div>
+            )}
+
+            {activeTab === "context" && (
+                <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
+                    {/* Left Column: Context Form */}
+                    <div className="xl:col-span-8 space-y-6">
+                        <div className="bg-theme-card border border-neutral-200 dark:border-neutral-800 rounded-[32px] p-6 shadow-sm">
+                            <div className="flex justify-between items-center pb-4 border-b border-neutral-200/60 dark:border-neutral-800/60 mb-6">
+                                <div>
+                                    <h3 className="font-black text-lg text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                                        <BookOpen className="w-5 h-5 text-neutral-400" />
+                                        Project Context Configuration
+                                    </h3>
+                                    <p className="text-xs text-neutral-400 mt-1 font-medium">โครงร่างกฎเกณฑ์ คำสั่งประจำ และข้อมูลตั้งต้นสำหรับตัวช่วยเอเจนต์ (Agent / LLM Instructions)</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleSaveContext} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Project Overview */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-neutral-500 tracking-wider">Project Overview / ภาพรวมโครงการ</label>
+                                        <textarea
+                                            value={contextOverview}
+                                            onChange={e => setContextOverview(e.target.value)}
+                                            rows={4}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-950/20 border border-neutral-200 dark:border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed outline-none focus:border-neutral-400"
+                                            placeholder="สรุปภาพรวมและวัตถุประสงค์โดยย่อ..."
+                                        />
+                                    </div>
+
+                                    {/* Project Purpose */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-neutral-500 tracking-wider">Project Purpose / เป้าหมายระยะยาว</label>
+                                        <textarea
+                                            value={contextPurpose}
+                                            onChange={e => setContextPurpose(e.target.value)}
+                                            rows={4}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-950/20 border border-neutral-200 dark:border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed outline-none focus:border-neutral-400"
+                                            placeholder="เป้าหมายสูงสุด และเกณฑ์ชี้วัดความสำเร็จ..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-neutral-100 dark:border-neutral-800/40 pt-6">
+                                    {/* Standing Instructions */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-neutral-500 tracking-wider">Standing Instructions / คำสั่งประจำ</label>
+                                        <textarea
+                                            value={contextStandingInstructions}
+                                            onChange={e => setContextStandingInstructions(e.target.value)}
+                                            rows={5}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-950/20 border border-neutral-200 dark:border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed outline-none focus:border-neutral-400"
+                                            placeholder="ขั้นตอนทำงานมาตรฐานที่ต้องทำซ้ำๆ ทุกครั้ง..."
+                                        />
+                                    </div>
+
+                                    {/* Tone & Voice */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-neutral-500 tracking-wider">Tone / Voice / น้ำเสียงและสไตล์ภาษา</label>
+                                        <textarea
+                                            value={contextToneVoice}
+                                            onChange={e => setContextToneVoice(e.target.value)}
+                                            rows={5}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-950/20 border border-neutral-200 dark:border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed outline-none focus:border-neutral-400"
+                                            placeholder="รูปแบบการเรียบเรียง น้ำเสียง ระดับความเป็นทางการ ตัวอย่างสำนวนภาษา..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-neutral-100 dark:border-neutral-800/40 pt-6">
+                                    {/* Guardrails */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-neutral-500 tracking-wider">Guardrails / ข้อพึงระวังและข้อห้าม</label>
+                                        <textarea
+                                            value={contextGuardrails}
+                                            onChange={e => setContextGuardrails(e.target.value)}
+                                            rows={5}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-950/20 border border-neutral-200 dark:border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed outline-none focus:border-neutral-400"
+                                            placeholder="สิ่งต้องห้าม คำที่ห้ามใช้ หรือจุดเสี่ยงที่ต้องระวังความปลอดภัยทางกฎหมาย..."
+                                        />
+                                    </div>
+
+                                    {/* Output Standards */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-neutral-500 tracking-wider">Output Standards / เกณฑ์มาตรฐานงาน</label>
+                                        <textarea
+                                            value={contextOutputStandards}
+                                            onChange={e => setContextOutputStandards(e.target.value)}
+                                            rows={5}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-950/20 border border-neutral-200 dark:border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed outline-none focus:border-neutral-400"
+                                            placeholder="มาตรฐานขั้นต่ำ เช่น ความยาว รูปแบบฟอนต์ การจัดโครงสร้างหัวข้อ..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-neutral-100 dark:border-neutral-800/40 pt-6">
+                                    {/* Decision Rules */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-neutral-500 tracking-wider">Decision Rules / กฎและกรอบการตัดสินใจ</label>
+                                        <textarea
+                                            value={contextDecisionRules}
+                                            onChange={e => setContextDecisionRules(e.target.value)}
+                                            rows={5}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-950/20 border border-neutral-200 dark:border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed outline-none focus:border-neutral-400"
+                                            placeholder="เงื่อนไขการตัดสินใจ หรือเกณฑ์ประเมินที่ชัดเจน..."
+                                        />
+                                    </div>
+
+                                    {/* Source of Truth */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-neutral-500 tracking-wider">Source of Truth / แหล่งอ้างอิงข้อมูลจริง</label>
+                                        <textarea
+                                            value={contextSourceOfTruth}
+                                            onChange={e => setContextSourceOfTruth(e.target.value)}
+                                            rows={5}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-950/20 border border-neutral-200 dark:border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed outline-none focus:border-neutral-400"
+                                            placeholder="ลิงก์เอกสารอ้างอิง, คู่มือมาตรฐาน, ฐานข้อมูลวิจัย..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-6 border-t border-neutral-100 dark:border-neutral-800/60">
+                                    <button
+                                        type="submit"
+                                        disabled={savingContext}
+                                        className="bg-black text-white dark:bg-white dark:text-black px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-wider disabled:opacity-50 transition-all hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-md active:scale-95 flex items-center gap-2"
+                                    >
+                                        {savingContext ? "กำลังบันทึก..." : "Save Project Context"}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Decision Log */}
+                    <div className="xl:col-span-4 space-y-6">
+                        <div className="bg-theme-card border border-neutral-200 dark:border-neutral-800 rounded-[32px] p-6 shadow-sm space-y-6">
+                            <div className="flex justify-between items-center pb-4 border-b border-neutral-200/50">
+                                <div>
+                                    <h3 className="font-black text-base text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-neutral-400" />
+                                        Decision Log
+                                    </h3>
+                                    <p className="text-[10px] text-neutral-400 font-medium">บันทึกการตัดสินใจและข้อตกลงสำคัญภายในโครงการ</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsAddingDecision(true)}
+                                    className="p-1.5 rounded-lg bg-neutral-50 dark:bg-neutral-950 text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-all border border-neutral-200 dark:border-neutral-800"
+                                    title="Add Decision Entry"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Decisions entries list */}
+                            {decisions.length === 0 ? (
+                                <div className="text-center py-10 bg-neutral-50/50 dark:bg-neutral-900/10 rounded-2xl border border-dashed border-neutral-200/80">
+                                    <p className="text-neutral-400 font-medium italic text-xs leading-relaxed">
+                                        ยังไม่มีบันทึกการตัดสินใจใดๆ<br/>กดปุ่ม (+) เพื่อเริ่มบันทึกการตัดสินใจแรก
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                                    {decisions.map((dec) => (
+                                        <div 
+                                            key={dec.id} 
+                                            className="p-4 bg-neutral-50 dark:bg-neutral-950/20 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 space-y-3 relative group"
+                                        >
+                                            <div className="flex justify-between items-start gap-4">
+                                                <h4 className="text-xs font-black text-neutral-900 dark:text-neutral-100 leading-tight">
+                                                    {dec.title}
+                                                </h4>
+                                                <button
+                                                    onClick={() => handleDeleteDecision(dec.id)}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/25 rounded transition-all"
+                                                    title="Delete Decision"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+
+                                            <div className="space-y-2 text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-400">
+                                                <div className="space-y-0.5">
+                                                    <span className="text-[9px] font-black uppercase text-neutral-400 block tracking-wider">การตัดสินใจ / Decision</span>
+                                                    <p className="font-semibold text-neutral-800 dark:text-neutral-200">{dec.decision}</p>
+                                                </div>
+                                                {dec.reason && (
+                                                    <div className="space-y-0.5 pt-1 border-t border-neutral-100 dark:border-neutral-900/40">
+                                                        <span className="text-[9px] font-black uppercase text-neutral-400 block tracking-wider">เหตุผล / Reason</span>
+                                                        <p>{dec.reason}</p>
+                                                    </div>
+                                                )}
+                                                {dec.impact && (
+                                                    <div className="space-y-0.5 pt-1 border-t border-neutral-100 dark:border-neutral-900/40">
+                                                        <span className="text-[9px] font-black uppercase text-neutral-400 block tracking-wider">ผลกระทบ / Impact</span>
+                                                        <p className="text-blue-600 dark:text-blue-400 font-medium">{dec.impact}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="text-[9px] text-neutral-400 flex justify-between items-center pt-2 border-t border-neutral-100 dark:border-neutral-900/40">
+                                                <span>{dec.id}</span>
+                                                <span>{new Date(dec.created_at).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Decision Entry Modal */}
+            <Modal isOpen={isAddingDecision} onClose={() => setIsAddingDecision(false)} title="เพิ่มบันทึกการตัดสินใจ (Add Decision Entry)">
+                <form onSubmit={handleAddDecision} className="p-3 space-y-5">
+                    {/* Title */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest block">หัวข้อการตัดสินใจ (Decision Title) *</label>
+                        <input
+                            type="text"
+                            required
+                            value={newDecisionTitle}
+                            onChange={(e) => setNewDecisionTitle(e.target.value)}
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-neutral-400"
+                            placeholder="เช่น โครงสร้างตารางเนื้อหา, การเปลี่ยนชื่อระบบ..."
+                        />
+                    </div>
+
+                    {/* Decision Text */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest block">รายละเอียดข้อตกลง / การตัดสินใจ (Decision) *</label>
+                        <textarea
+                            required
+                            value={newDecisionText}
+                            onChange={(e) => setNewDecisionText(e.target.value)}
+                            rows={3}
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-neutral-400"
+                            placeholder="รายละเอียดการตัดสินใจ..."
+                        />
+                    </div>
+
+                    {/* Reason */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest block">เหตุผลประกอบ (Reason / Rationale)</label>
+                        <textarea
+                            value={newDecisionReason}
+                            onChange={(e) => setNewDecisionReason(e.target.value)}
+                            rows={2}
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-neutral-400"
+                            placeholder="ทำไมถึงเลือกแนวทางนี้..."
+                        />
+                    </div>
+
+                    {/* Impact */}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest block">ผลกระทบต่อระบบ / การทำงาน (Impact)</label>
+                        <input
+                            type="text"
+                            value={newDecisionImpact}
+                            onChange={(e) => setNewDecisionImpact(e.target.value)}
+                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-neutral-400"
+                            placeholder="เช่น มีผลกระทบต่อ API โครงสร้างฐานข้อมูล..."
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-neutral-250/20">
+                        <button
+                            type="button"
+                            onClick={() => setIsAddingDecision(false)}
+                            className="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 rounded-xl text-xs font-black text-neutral-600 dark:text-neutral-300 transition-all"
+                        >
+                            ยกเลิก (Cancel)
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={savingDecision}
+                            className="px-5 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-black hover:opacity-90 transition-all shadow-md"
+                        >
+                            {savingDecision ? "กำลังบันทึก..." : "บันทึกข้อมูล (Save)"}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* Registry Edit Panel Modal */}
             <Modal isOpen={isRegistryEditOpen} onClose={() => setIsRegistryEditOpen(false)} title="แก้ไขข้อมูลโครงการ (Project Registry)">
