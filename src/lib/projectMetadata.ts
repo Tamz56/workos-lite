@@ -51,8 +51,8 @@ export function getEpisodeCode(project: any): string | undefined {
 
     const epId = project.episode_id || project.id;
     if (epId) {
-        // Match short digits at the end (1 or 2 digits)
-        const match = epId.match(/E0?(\d{1,2})$/i);
+        // Match short digits at the end (1 or 2 digits) anchored to the start
+        const match = epId.match(/^EP-E?0?(\d{1,2})$/i) || epId.match(/^E?0?(\d{1,2})$/i);
         if (match) {
             return `EP.${match[1]}`;
         }

@@ -38,8 +38,8 @@ function WritingLabContent() {
     const [storySets, setStorySets] = useState<any[]>([]);
     const [projects, setProjects] = useState<any[]>([]);
 
-    const fetchData = async () => {
-        setLoading(true);
+    const fetchData = async (background = false) => {
+        if (!background) setLoading(true);
         try {
             const [ssRes, pRes] = await Promise.all([
                 fetch("/api/content/writing-lab/story-sets", { cache: 'no-store' }),
@@ -57,7 +57,7 @@ function WritingLabContent() {
         } catch (error) {
             console.error("Failed to fetch Lab data", error);
         } finally {
-            setLoading(false);
+            if (!background) setLoading(false);
         }
     };
 
@@ -200,15 +200,18 @@ function WritingLabContent() {
                 {activeTab === "story-map" && (
                     <StoryMapTab 
                         storySets={storySets} 
+                        projects={projects}
                         loading={loading} 
-                        onRefresh={fetchData} 
+                        onRefresh={() => fetchData(true)} 
                         onSelectEpisode={handleSelectEpisode}
                     />
                 )}
                 {activeTab === "episode-backlog" && (
                     <EpisodeBacklogTab 
                         storySets={storySets} 
+                        projects={projects}
                         loading={loading} 
+                        onRefresh={() => fetchData(true)}
                         onSelectEpisode={handleSelectEpisode}
                     />
                 )}
@@ -217,7 +220,7 @@ function WritingLabContent() {
                         projects={projects} 
                         loading={loading} 
                         onSelectProject={handleSelectProject} 
-                        onRefresh={fetchData} 
+                        onRefresh={() => fetchData(true)} 
                     />
                 )}
                 {activeTab === "writing-studio" && (
@@ -229,7 +232,7 @@ function WritingLabContent() {
                         onCreateProject={() => handleOpenCreateProject()}
                         onSelectProject={handleSelectProject}
                         onSelectEpisode={handleSelectEpisode}
-                        onRefresh={fetchData}
+                        onRefresh={() => fetchData(true)}
                     />
                 )}
             </div>

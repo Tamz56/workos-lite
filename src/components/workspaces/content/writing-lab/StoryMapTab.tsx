@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronRight, Layers, FileText, Share2, Plus, MoreVertical, Archive, Trash2, Eye, EyeOff } from "lucide-react";
+import { ChevronRight, Layers, FileText, Share2, Plus, MoreVertical, Archive, Trash2, Eye, EyeOff, Edit3 } from "lucide-react";
 import CreateEpisodeModal from "./CreateEpisodeModal";
+import RenameEpisodeModal from "./RenameEpisodeModal";
+import ArchiveConfirmationModal from "./ArchiveConfirmationModal";
 import { getCleanDisplayTitle, getLegacyId } from "@/lib/projectMetadata";
 
 interface StoryMapTabProps {
     storySets: any[];
+    projects: any[];
     loading: boolean;
     onRefresh: () => void;
     onSelectEpisode: (id: string) => void;
@@ -17,25 +20,36 @@ const formatEpisodeTitle = (id: string, title: string) => {
     return getCleanDisplayTitle({ id, title });
 };
 
-export default function StoryMapTab({ storySets, loading, onRefresh, onSelectEpisode }: StoryMapTabProps) {
+export default function StoryMapTab({ storySets, projects, loading, onRefresh, onSelectEpisode }: StoryMapTabProps) {
     const [selectedStorySet, setSelectedStorySet] = useState<{ id: string; title: string; episodes: any[] } | null>(null);
     const [showArchived, setShowArchived] = useState(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
-    const handleArchiveEpisode = async (e: React.MouseEvent, id: string, currentStatus: string) => {
+    // Modals state
+    const [renameEpisode, setRenameEpisode] = useState<{ id: string; title: string; hasLinkedProject: boolean } | null>(null);
+    const [archiveState, setArchiveState] = useState<{ id: string; title: string; hasLinkedProject: boolean; linkedProjectTitle?: string; actionType: "archive" | "restore" } | null>(null);
+
+    const handleArchiveTrigger = (e: React.MouseEvent, ep: any) => {
         e.stopPropagation();
-        if (!window.confirm(`Are you sure you want to ${currentStatus === 'archived' ? 'restore' : 'archive'} this episode?`)) return;
-        
-        try {
-            const res = await fetch(`/api/content/writing-lab/episodes/${id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: currentStatus === 'archived' ? 'idea' : 'archived' })
-            });
-            if (res.ok) onRefresh();
-        } catch (error) {
-            console.error("Archive failed", error);
-        }
+        const linkedProj = projects.find(p => p.episode_id === ep.id);
+        setArchiveState({
+            id: ep.id,
+            title: ep.title,
+            hasLinkedProject: !!linkedProj,
+            linkedProjectTitle: linkedProj?.title,
+            actionType: ep.status === "archived" ? "restore" : "archive"
+        });
+        setActiveMenu(null);
+    };
+
+    const handleRenameTrigger = (e: React.MouseEvent, ep: any) => {
+        e.stopPropagation();
+        const linkedProj = projects.find(p => p.episode_id === ep.id);
+        setRenameEpisode({
+            id: ep.id,
+            title: ep.title,
+            hasLinkedProject: !!linkedProj
+        });
         setActiveMenu(null);
     };
 
@@ -151,7 +165,14 @@ export default function StoryMapTab({ storySets, loading, onRefresh, onSelectEpi
                                                       {activeMenu === ep.id && (
                                                           <div className="absolute right-0 top-8 z-20 bg-theme-card border border-theme-border rounded-xl shadow-xl p-1.5 min-w-[120px] animate-in fade-in zoom-in-95 duration-200">
                                                               <button 
-                                                                  onClick={(e) => handleArchiveEpisode(e, ep.id, ep.status)}
+                                                                  onClick={(e) => handleRenameTrigger(e, ep)}
+                                                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover hover:text-theme-primary rounded-lg transition-all"
+                                                              >
+                                                                 <Edit3 className="w-3 h-3" />
+                                                                 Rename
+                                                              </button>
+                                                              <button 
+                                                                  onClick={(e) => handleArchiveTrigger(e, ep)}
                                                                   className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover hover:text-theme-primary rounded-lg transition-all"
                                                               >
                                                                  <Archive className="w-3 h-3" />
@@ -203,6 +224,31 @@ export default function StoryMapTab({ storySets, loading, onRefresh, onSelectEpi
                     storySetId={selectedStorySet.id}
                     storySetTitle={selectedStorySet.title}
                     coreEpisodes={selectedStorySet.episodes.filter(ep => ep.role === "core_episode")}
+                    onSuccess={onRefresh}
+                />
+            )}
+
+            {renameEpisode && (
+                <RenameEpisodeModal
+                    isOpen={!!renameEpisode}
+                    onClose={() => setRenameEpisode(null)}
+                    episodeId={renameEpisode.id}
+                    currentTitle={renameEpisode.title}
+                    hasLinkedProject={renameEpisode.hasLinkedProject}
+                    onSuccess={onRefresh}
+                />
+            )}
+
+            {archiveState && (
+                <ArchiveConfirmationModal
+                    isOpen={!!archiveState}
+                    onClose={() => setArchiveState(null)}
+                    type="episode"
+                    itemId={archiveState.id}
+                    itemTitle={archiveState.title}
+                    hasLinkedItem={archiveState.hasLinkedProject}
+                    linkedItemTitle={archiveState.linkedProjectTitle}
+                    actionType={archiveState.actionType}
                     onSuccess={onRefresh}
                 />
             )}

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { parseProjectMetadata, ASSET_TYPE_LABELS, ASSET_TYPE_COLORS } from "@/lib/projectMetadata";
+import ArchiveConfirmationModal from "./ArchiveConfirmationModal";
 
 const ROLE_COLORS: Record<string, string> = {
     core_episode: "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
@@ -35,20 +36,18 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
     const [showArchived, setShowArchived] = React.useState(false);
     const [activeMenu, setActiveMenu] = React.useState<string | null>(null);
 
-    const handleArchive = async (e: React.MouseEvent, id: string, currentStatus: string) => {
+    // Modal state
+    const [archiveState, setArchiveState] = React.useState<{ id: string; title: string; hasLinkedEpisode: boolean; linkedEpisodeTitle?: string; actionType: "archive" | "restore" } | null>(null);
+
+    const handleArchiveTrigger = (e: React.MouseEvent, project: any) => {
         e.stopPropagation();
-        if (!window.confirm(`Are you sure you want to ${currentStatus === 'archived' ? 'restore' : 'archive'} this project?`)) return;
-        
-        try {
-            const res = await fetch(`/api/content/writing-lab/projects/${id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: currentStatus === 'archived' ? 'draft' : 'archived' })
-            });
-            if (res.ok) onRefresh();
-        } catch (error) {
-            console.error("Archive failed", error);
-        }
+        setArchiveState({
+            id: project.id,
+            title: project.title,
+            hasLinkedEpisode: !!project.episode_id,
+            linkedEpisodeTitle: project.episode_title,
+            actionType: project.status === "archived" ? "restore" : "archive"
+        });
         setActiveMenu(null);
     };
 
@@ -168,8 +167,8 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
                                     {activeMenu === project.id && (
                                         <div className="absolute right-14 top-4 z-20 bg-theme-card border border-theme-border rounded-xl shadow-xl p-1.5 min-w-[140px] animate-in fade-in zoom-in-95 duration-200">
                                             <button 
-                                                onClick={(e) => handleArchive(e, project.id, project.status)}
-                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover hover:text-theme-primary rounded-lg transition-all"
+                                                onClick={(e) => handleArchiveTrigger(e, project)}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-theme-secondary hover:bg-theme-hover hover:text-theme-primary rounded-lg transition-all cursor-pointer"
                                             >
                                                 <Archive className="w-3.5 h-3.5" />
                                                 {project.status === 'archived' ? 'Restore' : 'Archive'}
@@ -200,6 +199,20 @@ export default function ContentLibraryTab({ projects, loading, onSelectProject, 
                     </div>
                 )}
             </div>
+
+            {archiveState && (
+                <ArchiveConfirmationModal
+                    isOpen={!!archiveState}
+                    onClose={() => setArchiveState(null)}
+                    type="project"
+                    itemId={archiveState.id}
+                    itemTitle={archiveState.title}
+                    hasLinkedItem={archiveState.hasLinkedEpisode}
+                    linkedItemTitle={archiveState.linkedEpisodeTitle}
+                    actionType={archiveState.actionType}
+                    onSuccess={onRefresh}
+                />
+            )}
         </div>
     );
 }

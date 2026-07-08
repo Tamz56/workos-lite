@@ -20,15 +20,33 @@ export async function PATCH(
       }
     }
 
-    if (updates.length === 0) {
+    if (updates.length === 0 && !body.sync_project_title && body.archive_project === undefined && body.restore_project === undefined) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    updates.push("updated_at = datetime('now')");
-    values.push(id);
+    const tx = db.transaction(() => {
+      if (updates.length > 0) {
+        const sql = `UPDATE gf_episodes SET ${updates.join(", ")}, updated_at = datetime('now') WHERE id = ?`;
+        db.prepare(sql).run(...values, id);
+      }
 
-    const sql = `UPDATE gf_episodes SET ${updates.join(", ")} WHERE id = ?`;
-    db.prepare(sql).run(...values);
+      // Sync project title if requested and title is provided
+      if (body.title !== undefined && body.sync_project_title) {
+        db.prepare("UPDATE gf_writing_projects SET title = ?, updated_at = datetime('now') WHERE episode_id = ?").run(body.title, id);
+      }
+
+      // Archive project if requested
+      if (body.status === "archived" && body.archive_project) {
+        db.prepare("UPDATE gf_writing_projects SET status = 'archived', updated_at = datetime('now') WHERE episode_id = ?").run(id);
+      }
+
+      // Restore project to 'draft' if requested
+      if (body.status !== "archived" && body.status !== undefined && body.restore_project) {
+        db.prepare("UPDATE gf_writing_projects SET status = 'draft', updated_at = datetime('now') WHERE episode_id = ? AND status = 'archived'").run(id);
+      }
+    });
+
+    tx();
 
     const updatedEpisode = db.prepare("SELECT * FROM gf_episodes WHERE id = ?").get(id);
     return NextResponse.json(updatedEpisode);

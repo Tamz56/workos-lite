@@ -37,16 +37,37 @@ export async function PATCH(
       }
     }
 
-    if (updates.length === 0) {
+    if (updates.length === 0 && body.archive_episode === undefined && body.restore_episode === undefined) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    updates.push("updated_at = datetime('now')");
-    values.push(id);
+    const tx = db.transaction(() => {
+      if (updates.length > 0) {
+        const localUpdates = [...updates, "updated_at = datetime('now')"];
+        const localValues = [...values, id];
+        const sql = `UPDATE gf_writing_projects SET ${localUpdates.join(", ")} WHERE id = ?`;
+        console.log(`Updating project ${id} with SQL: ${sql}`, localValues);
+        db.prepare(sql).run(...localValues);
+      }
 
-    const sql = `UPDATE gf_writing_projects SET ${updates.join(", ")} WHERE id = ?`;
-    console.log(`Updating project ${id} with SQL: ${sql}`, values);
-    db.prepare(sql).run(...values);
+      // Archive episode if requested
+      if (body.status === "archived" && body.archive_episode) {
+        const project = db.prepare("SELECT episode_id FROM gf_writing_projects WHERE id = ?").get(id) as { episode_id: string | null } | undefined;
+        if (project?.episode_id) {
+          db.prepare("UPDATE gf_episodes SET status = 'archived', updated_at = datetime('now') WHERE id = ?").run(project.episode_id);
+        }
+      }
+
+      // Restore episode if requested (to 'idea' status)
+      if (body.status !== "archived" && body.status !== undefined && body.restore_episode) {
+        const project = db.prepare("SELECT episode_id FROM gf_writing_projects WHERE id = ?").get(id) as { episode_id: string | null } | undefined;
+        if (project?.episode_id) {
+          db.prepare("UPDATE gf_episodes SET status = 'idea', updated_at = datetime('now') WHERE id = ? AND status = 'archived'").run(project.episode_id);
+        }
+      }
+    });
+
+    tx();
 
     const updatedProject = db.prepare(`
       SELECT p.*,

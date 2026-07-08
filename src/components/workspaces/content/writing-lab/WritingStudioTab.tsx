@@ -21,11 +21,13 @@ import {
     Search,
     ChevronDown,
     Wand2,
-    BarChart2
+    BarChart2,
+    Edit3
 } from "lucide-react";
 import { validatePayload } from "@/lib/arborInboxSchema";
 import ArticleCommandPanel from "@/components/workspaces/content/writing-lab/ArticleCommandPanel";
 import { parseProjectMetadata, ASSET_TYPE_LABELS, ASSET_TYPE_COLORS, getCleanDisplayTitle } from "@/lib/projectMetadata";
+import RenameEpisodeModal from "./RenameEpisodeModal";
 
 interface WritingProject {
     id: string;
@@ -285,6 +287,8 @@ export default function WritingStudioTab({
         .find(ep => ep.id === resolvedEpisodeId);
 
         // States
+    const [showArchivedEpisodes, setShowArchivedEpisodes] = useState(false);
+    const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [subTab, setSubTab] = useState<SubTabKey>("narrative");
     const [isExpanded, setIsExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -2305,11 +2309,13 @@ export default function WritingStudioTab({
 
     // Flatten all episodes for selection drop down
     const allEpisodes = storySets.flatMap(set => 
-        (set.episodes || []).map((ep: any) => ({
-            id: ep.id,
-            title: ep.title,
-            story_set_title: set.title
-        }))
+        (set.episodes || [])
+            .filter((ep: any) => showArchivedEpisodes ? true : (ep.status !== 'archived' || ep.id === resolvedEpisodeId))
+            .map((ep: any) => ({
+                id: ep.id,
+                title: ep.title,
+                story_set_title: set.title
+            }))
     );
 
     const renderPasteGuidance = (key: SubTabKey) => {
@@ -2360,15 +2366,66 @@ export default function WritingStudioTab({
                         )}
                         
                         {activeProject ? (
-                            <input 
-                                type="text"
-                                value={workingTitle}
-                                onChange={(e) => setWorkingTitle(e.target.value)}
-                                className="text-xl font-black text-theme-primary bg-transparent border-b border-transparent hover:border-theme-border/50 focus:border-theme-primary focus:outline-none py-0.5 outline-none w-full max-w-lg transition-all"
-                                placeholder="Edit working title..."
-                            />
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-0">
+                                <input 
+                                    type="text"
+                                    value={workingTitle}
+                                    onChange={(e) => setWorkingTitle(e.target.value)}
+                                    className="text-xl font-black text-theme-primary bg-transparent border-b border-transparent hover:border-theme-border/50 focus:border-theme-primary focus:outline-none py-0.5 outline-none w-full max-w-md transition-all truncate"
+                                    placeholder="Edit working title..."
+                                />
+                                {activeEpisode && activeEpisode.title !== workingTitle && (
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                if (window.confirm(`Update Project Title to match Episode title ("${activeEpisode.title}")?\n\nThis will change the writing project title from "${workingTitle}" to "${activeEpisode.title}".`)) {
+                                                    setWorkingTitle(activeEpisode.title);
+                                                }
+                                            }}
+                                            className="px-2.5 py-1 text-[9px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 rounded-lg transition-all cursor-pointer"
+                                            title="Update Project Title from Episode"
+                                        >
+                                            Update Project Title from Episode
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                if (window.confirm(`Update Episode Title to match Project title ("${workingTitle}")?\n\nThis will change the canonical episode title from "${activeEpisode.title}" to "${workingTitle}".`)) {
+                                                    try {
+                                                        const res = await fetch(`/api/content/writing-lab/episodes/${activeEpisode.id}`, {
+                                                            method: "PATCH",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ title: workingTitle })
+                                                        });
+                                                        if (res.ok) {
+                                                            onRefresh();
+                                                        }
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                    }
+                                                }
+                                            }}
+                                            className="px-2.5 py-1 text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 rounded-lg transition-all cursor-pointer"
+                                            title="Update Episode Title from Project"
+                                        >
+                                            Update Episode Title from Project
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         ) : activeEpisode ? (
-                            <h2 className="text-xl font-black text-theme-primary">{getCleanDisplayTitle(activeEpisode)}</h2>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-black text-theme-primary">{getCleanDisplayTitle(activeEpisode)}</h2>
+                                <button 
+                                    type="button"
+                                    onClick={() => setIsRenameModalOpen(true)}
+                                    className="p-1 hover:bg-theme-hover rounded text-theme-muted hover:text-theme-primary transition-all cursor-pointer"
+                                    title="Rename Episode"
+                                >
+                                    <Edit3 className="w-4 h-4" />
+                                </button>
+                            </div>
                         ) : (
                             <h2 className="text-xl font-black text-theme-primary italic">Select an episode to edit</h2>
                         )}
@@ -2380,24 +2437,59 @@ export default function WritingStudioTab({
                         )}
                     </div>
                     {activeProject && (
-                        <p className="text-[10px] text-theme-muted font-mono font-bold mt-1">
-                            Project ID: {activeProject.id} {legacyId && `· Legacy ID: ${legacyId}`} {sourceLocation && `· Source: ${sourceLocation}`}
+                        <p className="text-[10px] text-theme-muted font-mono font-bold mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span>Project ID: {activeProject.id}</span>
+                            {legacyId && <span>· Legacy ID: {legacyId}</span>}
+                            {sourceLocation && <span>· Source: {sourceLocation}</span>}
+                            {activeEpisode && (
+                                <>
+                                    <span>·</span>
+                                    <span className="text-theme-secondary font-bold">
+                                        Episode Title: <span className="underline">{activeEpisode.title}</span>
+                                    </span>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setIsRenameModalOpen(true)}
+                                        className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-bold cursor-pointer text-[10px]"
+                                    >
+                                        [Rename Episode]
+                                    </button>
+                                </>
+                            )}
                         </p>
                     )}
                     {activeEpisode && !activeProject && (
-                        <p className="text-xs text-theme-muted font-bold mt-1">
-                            Original: {getCleanDisplayTitle(activeEpisode)} · Story Set: {activeEpisode.story_set_title}
+                        <p className="text-xs text-theme-muted font-bold mt-1 flex items-center gap-2">
+                            <span>Original: {getCleanDisplayTitle(activeEpisode)} · Story Set: {activeEpisode.story_set_title}</span>
+                            <button 
+                                type="button"
+                                onClick={() => setIsRenameModalOpen(true)}
+                                className="text-blue-500 hover:text-blue-600 underline font-bold cursor-pointer text-xs"
+                            >
+                                [Rename Episode]
+                            </button>
                         </p>
                     )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
+                    {/* Show Archived toggle for episodes select */}
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-theme-secondary cursor-pointer select-none">
+                        <input 
+                            type="checkbox"
+                            checked={showArchivedEpisodes}
+                            onChange={(e) => setShowArchivedEpisodes(e.target.checked)}
+                            className="rounded text-theme-accent focus:ring-theme-accent/10 bg-theme-input border-theme-border cursor-pointer w-3.5 h-3.5"
+                        />
+                        <span>Show Archived Episodes</span>
+                    </label>
+
                     {/* Select episode dropdown */}
                     <div className="relative">
                         <select 
                             value={resolvedEpisodeId || ""}
                             onChange={(e) => onSelectEpisode(e.target.value)}
-                            className="bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-xs font-bold text-theme-primary appearance-none pr-8 outline-none focus:ring-2 focus:ring-theme-accent/10"
+                            className="bg-theme-input border border-theme-border rounded-xl px-4 py-2.5 text-xs font-bold text-theme-primary appearance-none pr-8 outline-none focus:ring-2 focus:ring-theme-accent/10 cursor-pointer"
                         >
                             <option value="">Select Episode...</option>
                             {allEpisodes.map(ep => (
@@ -4644,6 +4736,17 @@ export default function WritingStudioTab({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {isRenameModalOpen && activeEpisode && (
+                <RenameEpisodeModal
+                    isOpen={isRenameModalOpen}
+                    onClose={() => setIsRenameModalOpen(false)}
+                    episodeId={activeEpisode.id}
+                    currentTitle={activeEpisode.title}
+                    hasLinkedProject={!!activeProject}
+                    onSuccess={onRefresh}
+                />
             )}
         </div>
     );
