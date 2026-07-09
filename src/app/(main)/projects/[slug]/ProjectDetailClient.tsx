@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { Project, ProjectItem, ProjectRegistryStatus, ProjectProgressStage, ProjectRegistryMetadata, Note, ProjectDocBlockType, ProjectDocumentationBlock, ProjectContentRoadmapStatus, ProjectContentType, ProjectContentLayer, ProjectContentRoadmapItem } from "@/lib/types";
 import { 
-    MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, 
+    MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, ChevronDown, ChevronRight,
     Plus, CheckCircle2, Layout, Calendar, FileText, Info,
     BookOpen, Sparkles, Search, LayoutGrid, Table, FileCode, Check, ExternalLink, RefreshCw,
     Copy, Layers, Tv, Tag, PlusCircle, ArrowUp, ArrowDown
@@ -4443,10 +4443,88 @@ function ItemCard({ item, onEdit }: { item: ProjectItem; onEdit: (item: ProjectI
     );
 }
 
+interface GroupConfig {
+    id: string;
+    name: string;
+    keywords: string[];
+}
+
+const GROUPS_CONFIG: GroupConfig[] = [
+    {
+        id: "featured",
+        name: "Featured Documents",
+        keywords: ["Index", "Overview", "Summary", "Operating Model", "Main Plan", "Current Status"]
+    },
+    {
+        id: "plans",
+        name: "Plans & Specs",
+        keywords: ["Spec", "Specification", "Plan", "Scope", "Requirement", "Requirements", "Architecture", "Protocol", "Template", "Setup", "Matrix"]
+    },
+    {
+        id: "logs",
+        name: "Work Logs & Observations",
+        keywords: ["Log", "Observation", "Observations", "Daily", "Day 0", "Day 1", "Day 3", "Day 7", "Day 14", "Day 21", "Day 28", "Check-in", "Checkin", "Progress"]
+    },
+    {
+        id: "research",
+        name: "Research & References",
+        keywords: ["Research", "Intake", "Source", "Sources", "Reference", "References", "NotebookLM", "Literature", "Study Notes", "Notes"]
+    },
+    {
+        id: "outputs",
+        name: "Outputs & Drafts",
+        keywords: ["Draft", "Final", "Article", "Social", "Social Pack", "Publish", "Publish Pack", "UTM", "Export", "Content Pack", "Copy"]
+    },
+    {
+        id: "decisions",
+        name: "Decisions & Reviews",
+        keywords: ["Decision", "Decisions", "Review", "QA", "Approval", "Gate", "Retrospective", "Audit", "Validation"]
+    }
+];
+
+const GROUP_ORDER = ["featured", "plans", "logs", "research", "outputs", "decisions", "other"];
+
+const GROUP_NAMES: Record<string, string> = {
+    featured: "Featured Documents",
+    plans: "Plans & Specs",
+    logs: "Work Logs & Observations",
+    research: "Research & References",
+    outputs: "Outputs & Drafts",
+    decisions: "Decisions & Reviews",
+    other: "Other Documents"
+};
+
+function getGroupForNote(title: string): string {
+    const lowerTitle = title.toLowerCase();
+    for (const group of GROUPS_CONFIG) {
+        for (const kw of group.keywords) {
+            if (lowerTitle.includes(kw.toLowerCase())) {
+                return group.id;
+            }
+        }
+    }
+    return "other";
+}
+
+function getDayNumber(title: string): number | null {
+    const match = title.match(/Day\s*(\d+)/i);
+    return match ? parseInt(match[1], 10) : null;
+}
+
 function RelatedNotesSection({ projectId }: { projectId: string }) {
     const router = useRouter();
     const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+        featured: false,
+        plans: false,
+        logs: true,
+        research: true,
+        outputs: true,
+        decisions: true,
+        other: true
+    });
 
     const loadNotes = useCallback(async () => {
         try {
@@ -4480,6 +4558,29 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
         }
     }
 
+    const toggleGroup = (groupId: string) => {
+        setCollapsedGroups(prev => ({
+            ...prev,
+            [groupId]: !prev[groupId]
+        }));
+    };
+
+    // Construct groups maps
+    const groups: Record<string, Note[]> = {
+        featured: [],
+        plans: [],
+        logs: [],
+        research: [],
+        outputs: [],
+        decisions: [],
+        other: []
+    };
+
+    notes.forEach(note => {
+        const groupId = getGroupForNote(note.title || "");
+        groups[groupId].push(note);
+    });
+
     return (
         <section>
             <div className="flex items-center justify-between mb-4 px-2">
@@ -4503,19 +4604,78 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
                     <p className="text-neutral-400 font-medium italic text-xs">No linked notes. Document your process.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {notes.map(note => (
-                        <div 
-                            key={note.id} 
-                            onClick={() => router.push(`/docs/${note.id}`)}
-                            className="bg-theme-card border border-neutral-200 rounded-2xl p-4 hover:border-neutral-900 transition-all group cursor-pointer shadow-sm hover:shadow-md active:scale-[0.98] dark:border-neutral-800 dark:hover:border-neutral-700"
-                        >
-                            <div className="font-bold text-neutral-900 dark:text-neutral-100 line-clamp-1 group-hover:text-black dark:group-hover:text-white">{note.title || "Untitled"}</div>
-                            <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest mt-1">
-                                Modified {new Date(note.updated_at).toLocaleDateString()}
+                <div className="space-y-4">
+                    {GROUP_ORDER.map(groupId => {
+                        const groupNotes = groups[groupId];
+                        if (groupNotes.length === 0) return null;
+                        const isCollapsed = collapsedGroups[groupId];
+                        const groupName = GROUP_NAMES[groupId];
+
+                        // Sort inside group:
+                        // 1. If title contains a Day number, sort by numeric day ascending: Day 0, Day 1, Day 3, Day 7, Day 14, Day 21, Day 28
+                        // 2. Otherwise, if updated_at is missing, preserve current order.
+                        // 3. Otherwise, sort by modified date descending (updated_at)
+                        const sortedNotes = [...groupNotes].sort((a, b) => {
+                            const dayA = getDayNumber(a.title || "");
+                            const dayB = getDayNumber(b.title || "");
+
+                            if (dayA !== null && dayB !== null) {
+                                return dayA - dayB;
+                            }
+                            if (dayA !== null) return -1;
+                            if (dayB !== null) return 1;
+
+                            if (!a.updated_at || !b.updated_at) {
+                                return 0; // Preserve current/original order
+                            }
+
+                            const timeA = new Date(a.updated_at).getTime();
+                            const timeB = new Date(b.updated_at).getTime();
+                            return timeB - timeA;
+                        });
+
+                        return (
+                            <div key={groupId} className="border border-neutral-200/50 dark:border-neutral-800/50 rounded-3xl overflow-hidden bg-neutral-50/10 dark:bg-slate-900/5 p-1">
+                                <button
+                                    onClick={() => toggleGroup(groupId)}
+                                    className="w-full flex items-center justify-between p-3 text-left hover:bg-neutral-100/40 dark:hover:bg-slate-800/10 rounded-2xl transition-all"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {isCollapsed ? (
+                                            <ChevronRight className="w-4 h-4 text-neutral-450" />
+                                        ) : (
+                                            <ChevronDown className="w-4 h-4 text-neutral-450" />
+                                        )}
+                                        <span className="text-xs font-black uppercase tracking-widest text-neutral-700 dark:text-neutral-300 font-bold">
+                                            {groupName}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-neutral-450 bg-neutral-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-black">
+                                            {groupNotes.length}
+                                        </span>
+                                    </div>
+                                </button>
+                                
+                                {!isCollapsed && (
+                                    <div className="p-3 pt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-3 transition-all">
+                                        {sortedNotes.map(note => (
+                                            <div 
+                                                key={note.id} 
+                                                onClick={() => router.push(`/docs/${note.id}`)}
+                                                className="bg-theme-card border border-neutral-200 rounded-2xl p-4 hover:border-neutral-900 transition-all group cursor-pointer shadow-sm hover:shadow-md active:scale-[0.98] dark:border-neutral-800 dark:hover:border-neutral-700"
+                                            >
+                                                <div className="font-bold text-neutral-900 dark:text-neutral-100 line-clamp-1 group-hover:text-black dark:group-hover:text-white">
+                                                    {note.title || "Untitled"}
+                                                </div>
+                                                <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-widest mt-1">
+                                                    Modified {new Date(note.updated_at).toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </section>
