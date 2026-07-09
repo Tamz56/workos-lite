@@ -226,4 +226,34 @@ db.prepare(`
 `).run();
 console.log("Loops templates seeded/verified.");
 
+// Migration: Add Decision Gate columns to project_loops and create project_loop_gate_events
+console.log("Adding Decision Gate columns/tables if needed...");
+try {
+    db.exec("ALTER TABLE project_loops ADD COLUMN gate_status TEXT DEFAULT 'not_required'");
+} catch (e) { /* ignore */ }
+try {
+    db.exec("ALTER TABLE project_loops ADD COLUMN last_gate_action TEXT");
+} catch (e) { /* ignore */ }
+try {
+    db.exec("ALTER TABLE project_loops ADD COLUMN last_gate_at TEXT");
+} catch (e) { /* ignore */ }
+
+db.exec(`
+    CREATE TABLE IF NOT EXISTS project_loop_gate_events (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      loop_id TEXT NOT NULL,
+      gate_level INTEGER NOT NULL,
+      gate_action TEXT NOT NULL,
+      gate_status TEXT NOT NULL,
+      summary TEXT,
+      reason TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY(loop_id) REFERENCES project_loops(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_project_loop_gate_events_loop_id ON project_loop_gate_events(loop_id);
+`);
+console.log("Decision Gate tables/columns verified.");
+
 console.log("Migration complete.");

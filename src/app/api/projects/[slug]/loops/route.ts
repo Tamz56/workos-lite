@@ -32,8 +32,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
         const loops = db.prepare(loopsQuery).all(project.id);
         const templates = db.prepare("SELECT * FROM project_loop_templates WHERE is_active = 1").all();
+        const gateEvents = db.prepare("SELECT * FROM project_loop_gate_events WHERE project_id = ? ORDER BY created_at DESC").all(project.id);
 
-        return NextResponse.json({ loops, templates });
+        return NextResponse.json({ loops, templates, gateEvents });
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 500 });
     }

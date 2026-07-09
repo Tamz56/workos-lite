@@ -704,6 +704,7 @@ export default function ProjectDetailClient() {
     // --- Project Loops Tab State (ARBOR-AGENT-003) ---
     const [loops, setLoops] = useState<any[]>([]);
     const [loopTemplates, setLoopTemplates] = useState<any[]>([]);
+    const [gateEvents, setGateEvents] = useState<any[]>([]);
     const [loadingLoops, setLoadingLoops] = useState(false);
 
     const refreshLoops = useCallback(async (includeArchived = false) => {
@@ -714,6 +715,7 @@ export default function ProjectDetailClient() {
                 const data = await res.json();
                 setLoops(data.loops || []);
                 setLoopTemplates(data.templates || []);
+                setGateEvents(data.gateEvents || []);
             }
         } catch (err) {
             console.error("Failed to load loops:", err);
@@ -2927,6 +2929,7 @@ ${suggestedNextStr}
                         slug={slug}
                         loops={loops}
                         templates={loopTemplates}
+                        gateEvents={gateEvents}
                         loading={loadingLoops}
                         onRefresh={refreshLoops}
                     />
