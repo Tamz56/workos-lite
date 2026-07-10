@@ -43,6 +43,7 @@ import {
   saveRoseTrialState,
   clearRoseTrialState,
 } from "./storage";
+import { generateRoseTrialMarkdown } from "./exportMarkdown";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -201,6 +202,9 @@ export default function RoseTrialLabClient() {
   // Dialog/Modal states
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [day0DialogOpen, setDay0DialogOpen] = useState(false);
+  const [exportMarkdownOpen, setExportMarkdownOpen] = useState(false);
+  const [exportedAt, setExportedAt] = useState<string | null>(null);
+  const [exportedMarkdown, setExportedMarkdown] = useState("");
   const [checklistFilter, setChecklistFilter] = useState<"all" | "pending" | "ready">("all");
 
   // Checklist modals
@@ -421,9 +425,30 @@ export default function RoseTrialLabClient() {
     setToastVisible(true);
   };
 
-  const handleExportMarkdownDisabled = () => {
-    setToastType("info");
-    setToastMessage("ระบบส่งออก Markdown จะเปิดใช้ใน Stage 2C");
+  const handleExportMarkdown = () => {
+    const snapshotAt = new Date().toISOString();
+    const currentReadiness = calculateReadiness(state);
+    setExportedAt(snapshotAt);
+    setExportedMarkdown(generateRoseTrialMarkdown(state, currentReadiness, snapshotAt, { isDirty }));
+    setExportMarkdownOpen(true);
+  };
+
+  const handleCopyMarkdown = async () => {
+    if (!navigator.clipboard?.writeText) {
+      setToastType("error");
+      setToastMessage("ไม่สามารถคัดลอก Markdown ได้ กรุณาเลือกและคัดลอกจากช่องข้อความ");
+      setToastVisible(true);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(exportedMarkdown);
+      setToastType("success");
+      setToastMessage("คัดลอก Markdown แล้ว");
+    } catch {
+      setToastType("error");
+      setToastMessage("ไม่สามารถคัดลอก Markdown ได้ กรุณาเลือกและคัดลอกจากช่องข้อความ");
+    }
     setToastVisible(true);
   };
 
@@ -1208,10 +1233,10 @@ export default function RoseTrialLabClient() {
               บันทึกการเตรียม
             </button>
 
-            {/* Export Button (Disabled in Stage 2B) */}
+            {/* Export Button */}
             <button
-              onClick={handleExportMarkdownDisabled}
-              className="flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-4 py-3 text-sm font-semibold text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+              onClick={handleExportMarkdown}
+              className="flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-4 py-3 text-sm font-semibold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
             >
               <FileText className="h-4 w-4" />
               ส่งออก Markdown
@@ -1568,6 +1593,54 @@ export default function RoseTrialLabClient() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ─── Export Markdown Preview Modal ─────────────────────────────────────── */}
+      <Modal
+        isOpen={exportMarkdownOpen}
+        title="ตัวอย่าง Markdown"
+        onClose={() => setExportMarkdownOpen(false)}
+        maxWidth="max-w-4xl"
+      >
+        <div className="space-y-4 pt-2">
+          <div className="flex flex-col gap-1 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-neutral-400">
+              Snapshot
+            </p>
+            <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">
+              สร้างเมื่อ: {formatThaiDate(exportedAt)}
+            </p>
+            {isDirty && (
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                เอกสารนี้สร้างจากข้อมูลปัจจุบันบนหน้าจอ ซึ่งอาจยังไม่ได้บันทึกลงในเครื่อง
+              </p>
+            )}
+          </div>
+
+          <textarea
+            readOnly
+            value={exportedMarkdown}
+            className="min-h-[52vh] w-full resize-y rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-950 px-4 py-3 font-mono text-xs leading-relaxed text-neutral-100 outline-none focus:ring-2 focus:ring-rose-500"
+            aria-label="ตัวอย่าง Markdown"
+          />
+
+          <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 dark:border-neutral-900 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setExportMarkdownOpen(false)}
+              className="rounded-xl px-5 py-2.5 text-xs font-bold text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-200"
+            >
+              ปิด
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyMarkdown}
+              className="rounded-xl bg-black px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+            >
+              คัดลอก Markdown
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* ─── Reset Dialog Confirmation ────────────────────────────────────────── */}
