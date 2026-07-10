@@ -34,7 +34,7 @@ import type {
   ReadinessResult,
 } from "./types";
 import {
-  DEFAULT_ROSE_TRIAL_STATE,
+  createDefaultRoseTrialState,
   CHECKLIST_STATUS_LABELS,
   CHECKLIST_CATEGORY_LABELS,
 } from "./defaults";
@@ -48,6 +48,23 @@ import { Modal } from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 // ─── Readiness Calculation Helper ─────────────────────────────────────────────
+
+export function parseIntegerInput(value: string, minValue: number): number | null {
+  if (value === "") {
+    return 0;
+  }
+
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < minValue) {
+    return null;
+  }
+
+  return parsed;
+}
 
 export function calculateReadiness(state: RoseTrialState): ReadinessResult {
   const { pilot, batch, checklistItems, treatments } = state;
@@ -68,8 +85,17 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
   );
 
   // Cuttings validation
-  const totalCuttings = batch.totalCuttings || 0;
-  const assignedCuttings = treatments.reduce((sum, t) => sum + (t.cuttingCount || 0), 0);
+  const hasValidTotalCuttings =
+    Number.isFinite(batch.totalCuttings) &&
+    Number.isInteger(batch.totalCuttings) &&
+    batch.totalCuttings > 0;
+  const totalCuttings = hasValidTotalCuttings ? batch.totalCuttings : 0;
+  const assignedCuttings = treatments.reduce((sum, t) => {
+    if (!Number.isFinite(t.cuttingCount) || !Number.isInteger(t.cuttingCount)) {
+      return sum;
+    }
+    return sum + t.cuttingCount;
+  }, 0);
   const cuttingDifference = totalCuttings - assignedCuttings;
 
   const reasons: string[] = [];
@@ -84,7 +110,7 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
   if (!batch.batchName.trim()) {
     reasons.push("ชื่อ Batch ต้องไม่ว่าง");
   }
-  if (totalCuttings <= 0) {
+  if (!hasValidTotalCuttings) {
     reasons.push("จำนวนกิ่งปักชำทั้งหมดต้องมากกว่า 0");
   }
   if (criticalMissingItems.length > 0) {
@@ -96,7 +122,7 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
   let hasDuplicateCode = false;
   let hasEmptyCode = false;
   let hasEmptyName = false;
-  let hasNegativeCutting = false;
+  let hasInvalidCutting = false;
 
   for (const t of treatments) {
     const code = t.code.trim();
@@ -111,8 +137,12 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
     if (!t.name.trim()) {
       hasEmptyName = true;
     }
-    if (t.cuttingCount < 0) {
-      hasNegativeCutting = true;
+    if (
+      !Number.isFinite(t.cuttingCount) ||
+      !Number.isInteger(t.cuttingCount) ||
+      t.cuttingCount < 0
+    ) {
+      hasInvalidCutting = true;
     }
   }
 
@@ -125,8 +155,8 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
   if (hasEmptyName) {
     reasons.push("มีชื่อ Treatment ว่างอยู่");
   }
-  if (hasNegativeCutting) {
-    reasons.push("จำนวนกิ่งใน Treatment ต้องไม่ติดลบ");
+  if (hasInvalidCutting) {
+    reasons.push("จำนวนกิ่งใน Treatment ต้องเป็นจำนวนเต็มไม่ติดลบ");
   }
   if (cuttingDifference !== 0) {
     reasons.push(
@@ -160,7 +190,7 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
 
 export default function RoseTrialLabClient() {
   const [mounted, setMounted] = useState(false);
-  const [state, setState] = useState<RoseTrialState>(DEFAULT_ROSE_TRIAL_STATE);
+  const [state, setState] = useState<RoseTrialState>(() => createDefaultRoseTrialState());
   const [isDirty, setIsDirty] = useState(false);
 
   // Toast notifications
@@ -367,8 +397,16 @@ export default function RoseTrialLabClient() {
   };
 
   const handleReset = () => {
-    clearRoseTrialState();
-    setState(DEFAULT_ROSE_TRIAL_STATE);
+    const success = clearRoseTrialState();
+    if (!success) {
+      setResetDialogOpen(false);
+      setToastType("error");
+      setToastMessage("ไม่สามารถล้างข้อมูลในเครื่องได้ ข้อมูลเดิมยังคงอยู่");
+      setToastVisible(true);
+      return;
+    }
+
+    setState(createDefaultRoseTrialState());
     setIsDirty(false);
     setResetDialogOpen(false);
     setToastType("success");
@@ -623,7 +661,8 @@ export default function RoseTrialLabClient() {
                 step="1"
                 value={state.batch.totalCuttings || ""}
                 onChange={(e) => {
-                  const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                  const val = parseIntegerInput(e.target.value, 0);
+                  if (val === null) return;
                   updateBatch({ totalCuttings: val });
                 }}
                 className={`w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border ${
@@ -964,7 +1003,8 @@ export default function RoseTrialLabClient() {
                       step="1"
                       value={t.cuttingCount || ""}
                       onChange={(e) => {
-                        const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                        const val = parseIntegerInput(e.target.value, 0);
+                        if (val === null) return;
                         updateTreatment(t.id, { cuttingCount: val });
                       }}
                       className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-rose-500 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2"
@@ -1068,7 +1108,7 @@ export default function RoseTrialLabClient() {
                   พร้อมบางส่วน (Partially Ready)
                 </p>
                 <p className="mt-1 text-xs text-amber-600 dark:text-amber-400/80 leading-relaxed font-semibold">
-                  รายการอุปกรณ์จำเป็นครบถ้วน แต่ยังมีวัสดุไม่เร่งด่วนบางรายการที่กำลังเตรียม คุณสามารถเริ่มต้น Day 0 ได้
+                  รายการจำเป็นพร้อมแล้ว แต่ยังมีรายการทางเลือกที่ยังไม่พร้อม ระบบยังไม่เปิดให้เริ่ม Day 0 จนกว่ารายการเตรียมทั้งหมดจะครบตามเงื่อนไข
                 </p>
               </div>
             </div>

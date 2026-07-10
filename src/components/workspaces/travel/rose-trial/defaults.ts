@@ -262,3 +262,13 @@ export const CHECKLIST_CATEGORY_LABELS: Record<ChecklistCategory, string> = {
   label_and_record: "ป้ายและการบันทึก",
   trial_area: "พื้นที่ทดลอง",
 };
+
+export function createDefaultRoseTrialState(): RoseTrialState {
+  return {
+    ...DEFAULT_ROSE_TRIAL_STATE,
+    pilot: { ...DEFAULT_ROSE_TRIAL_STATE.pilot },
+    batch: { ...DEFAULT_ROSE_TRIAL_STATE.batch },
+    checklistItems: DEFAULT_ROSE_TRIAL_STATE.checklistItems.map((item) => ({ ...item })),
+    treatments: DEFAULT_ROSE_TRIAL_STATE.treatments.map((treatment) => ({ ...treatment })),
+  };
+}
