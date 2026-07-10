@@ -560,6 +560,103 @@ function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectCont
     return items;
 }
 
+interface ParsedBacklogItem {
+    title: string;
+    status: string;
+    workstream: string;
+    notes: string;
+}
+
+function normalizeStatus(val: string): string {
+    const clean = val.toLowerCase().trim();
+    if (clean.includes("done") || clean.includes("closed") || clean.includes("complete") || clean.includes("completed")) {
+        return "done";
+    }
+    if (clean.includes("next") || clean.includes("planned") || clean.includes("plan")) {
+        return "planned";
+    }
+    if (clean.includes("inbox") || clean.includes("todo") || clean.includes("to do")) {
+        return "inbox";
+    }
+    return "inbox";
+}
+
+function parseBacklogItemsFromText(input: string): ParsedBacklogItem[] {
+    const lines = input.split(/\r?\n/);
+    const items: ParsedBacklogItem[] = [];
+    let currentItem: ParsedBacklogItem | null = null;
+    let currentField: "none" | "notes" | "workstream" | "status" = "none";
+
+    const titleRegex = /^\s*([A-Z0-9]+(?:–|-|—)[A-Z0-9]+(?:–|-|—)[A-Z0-9]+(?:–|-|—)\d{2,4}|[A-Z0-9]+(?:-[A-Z0-9]+)*-\d{2,4})\b/i;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Check if this line is a new item title (starts with task ID e.g. ASTRO-NUM-003 or DEV-120 or GF-APP-054)
+        if (titleRegex.test(trimmed)) {
+            if (currentItem) {
+                items.push(currentItem);
+            }
+            currentItem = {
+                title: trimmed,
+                status: "inbox",
+                workstream: "",
+                notes: ""
+            };
+            currentField = "none";
+            continue;
+        }
+
+        // If no current item, skip metadata lines
+        if (!currentItem) continue;
+
+        // Check field matches
+        if (trimmed.startsWith("Workstream:")) {
+            currentField = "workstream";
+            const val = trimmed.substring("Workstream:".length).trim();
+            if (val) currentItem.workstream = val;
+            continue;
+        }
+        if (trimmed.startsWith("Status:")) {
+            currentField = "status";
+            const val = trimmed.substring("Status:".length).trim();
+            if (val) currentItem.status = normalizeStatus(val);
+            continue;
+        }
+        if (
+            trimmed.startsWith("Notes สั้น ๆ:") ||
+            trimmed.startsWith("Notes:") ||
+            trimmed.startsWith("รายละเอียด:") ||
+            trimmed.startsWith("คำอธิบาย:")
+        ) {
+            currentField = "notes";
+            const prefix = trimmed.startsWith("Notes สั้น ๆ:") ? "Notes สั้น ๆ:" :
+                           trimmed.startsWith("Notes:") ? "Notes:" :
+                           trimmed.startsWith("รายละเอียด:") ? "รายละเอียด:" : "คำอธิบาย:";
+            const val = trimmed.substring(prefix.length).trim();
+            if (val) currentItem.notes = val;
+            continue;
+        }
+
+        // Append to active field if multiline
+        if (currentField === "notes") {
+            currentItem.notes = currentItem.notes ? `${currentItem.notes}\n${trimmed}` : trimmed;
+        } else if (currentField === "workstream") {
+            currentItem.workstream = currentItem.workstream ? `${currentItem.workstream} ${trimmed}` : trimmed;
+        } else if (currentField === "status") {
+            currentItem.status = normalizeStatus(trimmed);
+        }
+    }
+
+    if (currentItem) {
+        items.push(currentItem);
+    }
+
+    return items;
+}
+
 export default function ProjectDetailClient() {
     const params = useParams();
     const router = useRouter();
@@ -572,6 +669,10 @@ export default function ProjectDetailClient() {
     const [items, setItems] = useState<ProjectItem[]>([]);
     const [newItemTitle, setNewItemTitle] = useState("");
     const [addingItem, setAddingItem] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importText, setImportText] = useState("");
+    const [parsedItems, setParsedItems] = useState<ParsedBacklogItem[]>([]);
+    const [importing, setImporting] = useState(false);
     const [loading, setLoading] = useState(true);
 
     // Actions state
@@ -1996,6 +2097,93 @@ ${suggestedNextStr}
         }
     };
 
+    const handlePreviewImport = () => {
+        const parsed = parseBacklogItemsFromText(importText);
+        setParsedItems(parsed);
+        if (parsed.length === 0) {
+            setToastMessage("ไม่พบข้อมูลรายการงานในข้อความที่ระบุ (กรุณาใช้รหัสงาน e.g. ASTRO-NUM-003)");
+            setShowToast(true);
+        }
+    };
+
+    const handleUpdatePreviewItem = (index: number, field: keyof ParsedBacklogItem, value: string) => {
+        setParsedItems(prev => {
+            const next = [...prev];
+            next[index] = {
+                ...next[index],
+                [field]: value
+            };
+            return next;
+        });
+    };
+
+    const handleRemovePreviewItem = (index: number) => {
+        setParsedItems(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleImportBacklogItems = async () => {
+        if (parsedItems.length === 0 || importing) return;
+
+        // Check if any parsed item has an empty title after trimming
+        const hasEmptyTitle = parsedItems.some(item => !item.title.trim());
+        if (hasEmptyTitle) {
+            setToastMessage("มีบางรายการไม่มีชื่อ (Title ห้ามเป็นค่าว่าง)");
+            setShowToast(true);
+            return;
+        }
+
+        setImporting(true);
+        try {
+            let successCount = 0;
+            const failedItems: string[] = [];
+
+            for (const item of parsedItems) {
+                try {
+                    const res = await fetch(`/api/projects/${slug}/items`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            title: item.title.trim(),
+                            status: item.status,
+                            workstream: item.workstream.trim() || null,
+                            notes: item.notes.trim() || null
+                        })
+                    });
+
+                    if (res.ok) {
+                        successCount++;
+                    } else {
+                        let errText = res.statusText;
+                        try {
+                            const data = await res.json();
+                            errText = data.error || errText;
+                        } catch {}
+                        failedItems.push(`"${item.title}" (${errText})`);
+                    }
+                } catch (err: any) {
+                    failedItems.push(`"${item.title}" (${err.message || "Network Error"})`);
+                }
+            }
+
+            if (failedItems.length > 0) {
+                setToastMessage(`นำเข้าสำเร็จ ${successCount} รายการ, ล้มเหลว ${failedItems.length} รายการ:\n${failedItems.join("\n")}`);
+                setShowToast(true);
+                if (successCount > 0) {
+                    await loadData(true);
+                }
+            } else {
+                setToastMessage(`นำเข้าข้อมูล Backlog สำเร็จทั้งหมด ${successCount} รายการ`);
+                setShowToast(true);
+                setImportText("");
+                setParsedItems([]);
+                setIsImportModalOpen(false);
+                await loadData(true);
+            }
+        } finally {
+            setImporting(false);
+        }
+    };
+
     if (loading) return <PageShell><div className="p-20 text-center text-neutral-400 italic font-medium">Loading project details...</div></PageShell>;
     if (!project) return <PageShell><div className="p-20 text-center text-red-500 font-bold">Project &quot;{slug}&quot; not found.</div></PageShell>;
 
@@ -2149,6 +2337,14 @@ ${suggestedNextStr}
                                 className="bg-black text-white dark:bg-white dark:text-black px-6 py-3 rounded-2xl text-sm font-black disabled:opacity-50 transition-all hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-lg active:scale-95"
                             >
                                 {addingItem ? "Adding..." : "Add Item"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsImportModalOpen(true)}
+                                className="flex items-center gap-1.5 px-6 py-3 rounded-2xl bg-white border border-neutral-200 text-sm font-black uppercase tracking-widest hover:border-neutral-900 transition-all shadow-sm active:scale-95 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:border-neutral-700"
+                            >
+                                <PlusCircle className="w-4 h-4 text-purple-500" />
+                                Import
                             </button>
                         </form>
                     </div>
@@ -4035,6 +4231,138 @@ ${suggestedNextStr}
                     setRoadmapToDelete(null);
                 }}
             />
+
+            {/* Import Backlog Items Modal */}
+            <Modal
+                isOpen={isImportModalOpen}
+                onClose={() => {
+                    setIsImportModalOpen(false);
+                    setImportText("");
+                    setParsedItems([]);
+                }}
+                title="Import Backlog / Deliverables from Arbor Summary"
+            >
+                <div className="p-6 space-y-6 max-w-3xl">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block text-left">วางข้อความสรุปของ Arbor / ChatGPT (Arbor Text Summary)</label>
+                        <textarea
+                            value={importText}
+                            onChange={(e) => setImportText(e.target.value)}
+                            placeholder="วางข้อความที่นี่..."
+                            className="w-full h-40 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 transition-all font-mono"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={handlePreviewImport}
+                            className="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                            Preview Items
+                        </button>
+                    </div>
+
+                    {parsedItems.length > 0 && (
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-neutral-500 text-left">Preview Parsed Items ({parsedItems.length})</h3>
+                            <div className="space-y-3 max-h-80 overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 bg-neutral-50/50">
+                                {parsedItems.map((item, idx) => {
+                                    const isDuplicate = items.some(existing => existing.title.toLowerCase().trim() === item.title.toLowerCase().trim());
+
+                                    return (
+                                        <div key={idx} className="border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 bg-theme-card space-y-3 text-left relative group/item">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemovePreviewItem(idx)}
+                                                className="absolute top-3 right-3 text-neutral-400 hover:text-red-500 text-xs font-bold transition-colors"
+                                            >
+                                                Remove
+                                            </button>
+
+                                            {isDuplicate && (
+                                                <div className="inline-flex items-center gap-1 text-[10px] font-black text-amber-600 bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                                    ⚠️ Possible duplicate
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">หัวข้อภารกิจ (Title) *</label>
+                                                <input
+                                                    type="text"
+                                                    value={item.title}
+                                                    onChange={(e) => handleUpdatePreviewItem(idx, "title", e.target.value)}
+                                                    className="w-full px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/30 text-xs font-semibold outline-none focus:border-neutral-400 transition-all"
+                                                    placeholder="Title"
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">สถานะ (Status)</label>
+                                                    <select
+                                                        value={item.status}
+                                                        onChange={(e) => handleUpdatePreviewItem(idx, "status", e.target.value)}
+                                                        className="w-full px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/30 text-xs font-semibold outline-none focus:border-neutral-400 transition-all"
+                                                    >
+                                                        <option value="inbox">Inbox</option>
+                                                        <option value="planned">Planned</option>
+                                                        <option value="done">Completed</option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">หมวดงาน (Workstream)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={item.workstream}
+                                                        onChange={(e) => handleUpdatePreviewItem(idx, "workstream", e.target.value)}
+                                                        className="w-full px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/30 text-xs font-semibold outline-none focus:border-neutral-400 transition-all"
+                                                        placeholder="e.g. UI/UX, Dev"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">บันทึกรายละเอียด (Notes)</label>
+                                                <textarea
+                                                    value={item.notes}
+                                                    onChange={(e) => handleUpdatePreviewItem(idx, "notes", e.target.value)}
+                                                    className="w-full h-16 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/30 text-xs font-semibold outline-none focus:border-neutral-400 transition-all"
+                                                    placeholder="Notes details..."
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 pt-4">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsImportModalOpen(false);
+                                setImportText("");
+                                setParsedItems([]);
+                            }}
+                            className="px-4 py-2 rounded-xl border border-neutral-200 text-xs font-black uppercase tracking-wider hover:border-neutral-900 transition-all active:scale-95"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={parsedItems.length === 0 || parsedItems.some(i => !i.title.trim()) || importing}
+                            onClick={handleImportBacklogItems}
+                            className="px-5 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                        >
+                            {importing ? "Importing..." : "Add to Backlog"}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Deliverable / Backlog Edit Modal */}
             <Modal 
