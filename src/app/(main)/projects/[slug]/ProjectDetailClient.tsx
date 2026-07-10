@@ -657,6 +657,58 @@ function parseBacklogItemsFromText(input: string): ParsedBacklogItem[] {
     return items;
 }
 
+interface ParsedProjectLog {
+    title: string;
+    details: string;
+}
+
+function isBacklogText(input: string): boolean {
+    const lower = input.toLowerCase();
+    const hasTitleField = lower.includes("title:");
+    const hasWorkstreamField = lower.includes("workstream:");
+    const hasNotesField = lower.includes("notes:") || lower.includes("notes สั้น ๆ:");
+
+    const hasBacklogFields = hasTitleField && hasWorkstreamField && hasNotesField;
+
+    const hasLogIndicators = (
+        lower.includes("project log") ||
+        lower.includes("commit hash") ||
+        lower.includes("commit message") ||
+        lower.includes("files committed") ||
+        lower.includes("commit result") ||
+        lower.includes("final verdict") ||
+        lower.includes("qa evidence") ||
+        lower.includes("scope confirmation") ||
+        lower.includes("passed / committed / closed")
+    );
+    return hasBacklogFields && !hasLogIndicators;
+}
+
+function parseProjectLogFromText(input: string): ParsedProjectLog {
+    const lines = input.split(/\r?\n/);
+    let title = "";
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith("# ")) {
+            title = line.substring(2).trim();
+            break;
+        } else if (line.startsWith("#")) {
+            title = line.substring(1).trim();
+            break;
+        }
+    }
+    
+    if (!title) {
+        title = "Project Log — Imported Arbor Summary";
+    }
+
+    return {
+        title,
+        details: input.trim()
+    };
+}
+
 export default function ProjectDetailClient() {
     const params = useParams();
     const router = useRouter();
@@ -673,6 +725,9 @@ export default function ProjectDetailClient() {
     const [importText, setImportText] = useState("");
     const [parsedItems, setParsedItems] = useState<ParsedBacklogItem[]>([]);
     const [importing, setImporting] = useState(false);
+    const [isLogImportOpen, setIsLogImportOpen] = useState(false);
+    const [logImportText, setLogImportText] = useState("");
+    const [parsedLog, setParsedLog] = useState<ParsedProjectLog | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Actions state
@@ -2184,6 +2239,60 @@ ${suggestedNextStr}
         }
     };
 
+    const handlePreviewLogImport = () => {
+        const text = logImportText.trim();
+        if (!text) {
+            setToastMessage("กรุณากรอกข้อความเพื่อนำเข้า");
+            setShowToast(true);
+            return;
+        }
+
+        // Backlog-shaped rejection check
+        if (isBacklogText(text)) {
+            setToastMessage("ข้อความนี้ดูเหมือนรายการ Backlog กรุณาใช้ Backlog Import");
+            setShowToast(true);
+            return;
+        }
+
+        const parsed = parseProjectLogFromText(text);
+        setParsedLog(parsed);
+    };
+
+    const handleSaveLogImport = () => {
+        if (!parsedLog || !parsedLog.title.trim()) return;
+
+        const allBlocks = getStoredDocBlocks();
+        const now = new Date().toISOString();
+        const newId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        
+        const newBlock: ProjectDocumentationBlock = {
+            id: newId,
+            projectSlug: slug,
+            type: "process_note",
+            title: parsedLog.title.trim(),
+            date: new Date().toISOString().split("T")[0],
+            summary: "นำเข้าจาก Arbor Project Log",
+            details: parsedLog.details.trim(),
+            evidenceLinks: [],
+            relatedFiles: [],
+            status: "active",
+            createdAt: now,
+            updatedAt: now
+        };
+        
+        allBlocks.push(newBlock);
+        saveStoredDocBlocks(allBlocks);
+        
+        loadDocBlocks();
+        
+        setToastMessage("นำเข้าบล็อกประวัติ (Project Log) เรียบร้อยแล้ว");
+        setShowToast(true);
+        
+        setIsLogImportOpen(false);
+        setLogImportText("");
+        setParsedLog(null);
+    };
+
     if (loading) return <PageShell><div className="p-20 text-center text-neutral-400 italic font-medium">Loading project details...</div></PageShell>;
     if (!project) return <PageShell><div className="p-20 text-center text-red-500 font-bold">Project &quot;{slug}&quot; not found.</div></PageShell>;
 
@@ -2404,6 +2513,13 @@ ${suggestedNextStr}
                                 >
                                     <Plus className="w-3.5 h-3.5" />
                                     Add Block
+                                </button>
+                                <button
+                                    onClick={() => setIsLogImportOpen(true)}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-neutral-200 text-xs font-black uppercase tracking-wider hover:border-neutral-900 hover:text-black dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white dark:hover:border-neutral-700 shadow-sm active:scale-95 transition-all"
+                                >
+                                    <FileText className="w-3.5 h-3.5 text-blue-500" />
+                                    Import Log
                                 </button>
                                 <button
                                     onClick={handleOpenArbor}
@@ -4231,6 +4347,105 @@ ${suggestedNextStr}
                     setRoadmapToDelete(null);
                 }}
             />
+
+            {/* Import Project Log Modal */}
+            <Modal
+                isOpen={isLogImportOpen}
+                onClose={() => {
+                    setIsLogImportOpen(false);
+                    setLogImportText("");
+                    setParsedLog(null);
+                }}
+                title="Import Project Log from Arbor Summary"
+            >
+                <div className="p-6 space-y-6 max-w-3xl">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block text-left">วางข้อความสรุปประวัติงาน / Commit / QA (Arbor Project Log Text)</label>
+                        <textarea
+                            value={logImportText}
+                            onChange={(e) => setLogImportText(e.target.value)}
+                            placeholder="วางข้อความสรุปประวัติที่นี่..."
+                            className="w-full h-40 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 transition-all font-mono"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={handlePreviewLogImport}
+                            className="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                            Preview Log
+                        </button>
+                    </div>
+
+                    {parsedLog && (
+                        <div className="space-y-4 text-left">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-neutral-500">Preview Parsed Project Log</h3>
+                            
+                            <div className="border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 bg-theme-card space-y-4">
+                                {docBlocks.some(existing => existing.title.toLowerCase().trim() === parsedLog.title.toLowerCase().trim()) && (
+                                    <div className="inline-flex items-center gap-1 text-[10px] font-black text-amber-600 bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                        ⚠️ Possible duplicate
+                                    </div>
+                                )}
+
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">หัวข้อเอกสาร (Log Title) *</label>
+                                    <input
+                                        type="text"
+                                        value={parsedLog.title}
+                                        onChange={(e) => setParsedLog({ ...parsedLog, title: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/30 text-xs font-semibold outline-none focus:border-neutral-400 transition-all"
+                                        placeholder="Log Title"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">เป้าหมายบันทึก (Target Section)</label>
+                                    <div className="text-xs font-bold text-neutral-500 bg-neutral-100 dark:bg-neutral-850 px-3 py-1.5 rounded-xl inline-block">
+                                        Project Documentation & Logs
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-neutral-400 uppercase tracking-widest block">รายละเอียด (Log Content) *</label>
+                                    <textarea
+                                        value={parsedLog.details}
+                                        onChange={(e) => setParsedLog({ ...parsedLog, details: e.target.value })}
+                                        className="w-full h-40 px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/30 text-xs font-semibold outline-none focus:border-neutral-400 transition-all font-mono"
+                                        placeholder="Log details..."
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 pt-4">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsLogImportOpen(false);
+                                setLogImportText("");
+                                setParsedLog(null);
+                            }}
+                            className="px-4 py-2 rounded-xl border border-neutral-200 text-xs font-black uppercase tracking-wider hover:border-neutral-900 transition-all active:scale-95"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!parsedLog || !parsedLog.title.trim() || !parsedLog.details.trim()}
+                            onClick={handleSaveLogImport}
+                            className="px-5 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                        >
+                            ADD TO PROJECT LOG
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Import Backlog Items Modal */}
             <Modal
