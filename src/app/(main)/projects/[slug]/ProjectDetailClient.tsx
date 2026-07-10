@@ -571,6 +571,7 @@ export default function ProjectDetailClient() {
     const [metadata, setMetadata] = useState<Record<string, ProjectRegistryMetadata>>({});
     const [items, setItems] = useState<ProjectItem[]>([]);
     const [newItemTitle, setNewItemTitle] = useState("");
+    const [addingItem, setAddingItem] = useState(false);
     const [loading, setLoading] = useState(true);
 
     // Actions state
@@ -739,14 +740,14 @@ export default function ProjectDetailClient() {
         };
     }, []);
 
-    const loadData = useCallback(async () => {
-        setLoading(true);
+    const loadData = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const [projRes, itemsRes, contextRes, decisionsRes] = await Promise.all([
-                fetch(`/api/projects/${slug}`),
-                fetch(`/api/projects/${slug}/items`),
-                fetch(`/api/projects/${slug}/context`),
-                fetch(`/api/projects/${slug}/decisions`)
+                fetch(`/api/projects/${slug}`, { cache: "no-store" }),
+                fetch(`/api/projects/${slug}/items`, { cache: "no-store" }),
+                fetch(`/api/projects/${slug}/context`, { cache: "no-store" }),
+                fetch(`/api/projects/${slug}/decisions`, { cache: "no-store" })
             ]);
 
             if (projRes.ok) {
@@ -759,7 +760,7 @@ export default function ProjectDetailClient() {
 
                 // OPS-002D: Load project-linked docs for context summary
                 try {
-                    const docsRes = await fetch(`/api/docs?project_id=${projData.id}`);
+                    const docsRes = await fetch(`/api/docs?project_id=${projData.id}`, { cache: "no-store" });
                     if (docsRes.ok) {
                         const docsData = await docsRes.json();
                         setProjectDocs(docsData.docs || []);
@@ -1709,7 +1710,7 @@ ${suggestedNextStr}
                 setToastMessage("บันทึกการแก้ไข Deliverable เรียบร้อยแล้ว");
                 setShowToast(true);
                 setIsDelModalOpen(false);
-                loadData();
+                loadData(true);
             } else {
                 setToastMessage("ไม่สามารถบันทึกข้อมูลได้");
                 setShowToast(true);
@@ -1741,7 +1742,7 @@ ${suggestedNextStr}
                 setIsDeleteDelOpen(false);
                 setDelToDelete(null);
                 setIsDelModalOpen(false); // Close edit modal too just in case
-                loadData();
+                loadData(true);
             } else {
                 setToastMessage("ไม่สามารถลบข้อมูลได้");
                 setShowToast(true);
@@ -1963,17 +1964,35 @@ ${suggestedNextStr}
 
     const handleAddItem = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newItemTitle.trim()) return;
+        const trimmedTitle = newItemTitle.trim();
+        if (!trimmedTitle || addingItem) return;
 
-        const res = await fetch(`/api/projects/${slug}/items`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: newItemTitle, status: "inbox" })
-        });
+        setAddingItem(true);
+        try {
+            const res = await fetch(`/api/projects/${slug}/items`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title: trimmedTitle, status: "inbox" })
+            });
 
-        if (res.ok) {
-            setNewItemTitle("");
-            loadData();
+            if (res.ok) {
+                setNewItemTitle("");
+                await loadData(true);
+            } else {
+                let errorMsg = "เกิดข้อผิดพลาดในการประมวลผล";
+                try {
+                    const data = await res.json();
+                    errorMsg = data.error || errorMsg;
+                } catch { /* ignore parse error */ }
+                setToastMessage(`ล้มเหลวในการสร้างรายการ: ${errorMsg}`);
+                setShowToast(true);
+            }
+        } catch (err: any) {
+            console.error("Error creating backlog item:", err);
+            setToastMessage(`เกิดข้อผิดพลาดในการเชื่อมต่อ: ${err.message || "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้"}`);
+            setShowToast(true);
+        } finally {
+            setAddingItem(false);
         }
     };
 
@@ -2126,10 +2145,10 @@ ${suggestedNextStr}
                             </div>
                             <button 
                                 type="submit" 
-                                disabled={!newItemTitle.trim()}
+                                disabled={!newItemTitle.trim() || addingItem}
                                 className="bg-black text-white dark:bg-white dark:text-black px-6 py-3 rounded-2xl text-sm font-black disabled:opacity-50 transition-all hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-lg active:scale-95"
                             >
-                                Add Item
+                                {addingItem ? "Adding..." : "Add Item"}
                             </button>
                         </form>
                     </div>
@@ -4382,8 +4401,21 @@ function DocBlockCard({
 }
 
 function ItemCard({ item, onEdit }: { item: ProjectItem; onEdit: (item: ProjectItem) => void }) {
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onEdit(item);
+        }
+    };
+
     return (
-        <div className="bg-theme-card border border-neutral-200 rounded-3xl p-5 flex justify-between items-center hover:shadow-xl hover:border-neutral-300 transition-all group active:scale-[0.99] cursor-default">
+        <div 
+            role="button"
+            tabIndex={0}
+            onClick={() => onEdit(item)}
+            onKeyDown={handleKeyDown}
+            className="bg-theme-card border border-neutral-200 rounded-3xl p-5 flex justify-between items-center hover:shadow-xl hover:border-neutral-300 transition-all group active:scale-[0.99] cursor-pointer focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white"
+        >
             <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${
                     item.status === 'done' ? 'bg-green-100 text-green-600' : 'bg-neutral-50 text-neutral-400 group-hover:bg-neutral-900 group-hover:text-white dark:bg-neutral-800 dark:text-neutral-500'
@@ -4391,15 +4423,8 @@ function ItemCard({ item, onEdit }: { item: ProjectItem; onEdit: (item: ProjectI
                     {item.status === 'done' ? <CheckCircle2 className="w-6 h-6" /> : <Layout className="w-5 h-5" />}
                 </div>
                 <div>
-                    <div className={`font-black tracking-tight ${item.status === 'done' ? 'line-through text-neutral-400' : 'text-neutral-900 dark:text-neutral-100 text-lg'}`}>
-                        <button
-                            type="button"
-                            onClick={() => onEdit(item)}
-                            className="hover:underline hover:text-black dark:hover:text-white transition-colors text-left outline-none cursor-pointer focus:underline font-black"
-                            title={`ดู/แก้ไข ${item.title}`}
-                        >
-                            {item.title}
-                        </button>
+                    <div className={`font-black tracking-tight ${item.status === 'done' ? 'line-through text-neutral-400' : 'text-neutral-900 dark:text-neutral-100 text-lg'} group-hover:underline`}>
+                        {item.title}
                     </div>
                     <div className="flex items-center gap-3 mt-1">
                         {item.workstream && (
@@ -4431,13 +4456,12 @@ function ItemCard({ item, onEdit }: { item: ProjectItem; onEdit: (item: ProjectI
                         </span>
                     )}
                 </div>
-                <button 
-                    onClick={() => onEdit(item)}
-                    className="p-2 rounded-xl text-neutral-400 hover:text-black hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all opacity-0 group-hover:opacity-100 outline-none"
+                <div 
+                    className="p-2 rounded-xl text-neutral-400 group-hover:text-black group-hover:bg-neutral-100 dark:group-hover:text-neutral-300 dark:group-hover:bg-neutral-800 transition-all opacity-0 group-hover:opacity-100"
                     title="แก้ไข"
                 >
                     <Edit2 className="w-4 h-4" />
-                </button>
+                </div>
             </div>
         </div>
     );

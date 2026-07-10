@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const UpdateProjectSchema = z.object({
     name: z.string().min(1).optional(),
     status: z.enum(["inbox", "planned", "done"]).optional(),

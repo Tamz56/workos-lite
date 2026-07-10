@@ -3,6 +3,8 @@ import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const CreateProjectItemSchema = z.object({
     title: z.string().min(1),
     status: z.enum(["inbox", "planned", "done"]).default("planned"),
