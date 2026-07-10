@@ -175,7 +175,7 @@ export function Sidebar() {
                         isCollapsed={isCollapsed}
                     />
                     <NavItem
-                        href="/workspaces/travel"
+                        href="/workspaces/travel/rose-trial"
                         label="Nutrient Planner App"
                         icon={<TableCellsIcon className="w-5 h-5" />}
                         active={pathname.startsWith("/workspaces/travel")}
