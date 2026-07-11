@@ -4,6 +4,7 @@
 // Stage 2B: Form State + localStorage persistence
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Flower2,
   Layers,
@@ -190,6 +191,7 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function RoseTrialLabClient() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<RoseTrialState>(() => createDefaultRoseTrialState());
   const [isDirty, setIsDirty] = useState(false);
@@ -420,9 +422,9 @@ export default function RoseTrialLabClient() {
 
   const handleDay0Confirm = () => {
     setDay0DialogOpen(false);
-    setToastType("success");
-    setToastMessage("ข้อมูลพร้อมสำหรับเริ่ม Day 0 แล้ว");
-    setToastVisible(true);
+    saveRoseTrialState(state);
+    setIsDirty(false);
+    router.push("/workspaces/travel/rose-trial/day-0");
   };
 
   const handleExportMarkdown = () => {
