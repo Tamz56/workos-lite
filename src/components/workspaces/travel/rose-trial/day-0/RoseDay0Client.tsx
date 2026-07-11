@@ -41,8 +41,14 @@ import type {
 } from "./types";
 import { createDefaultRoseDay0State, HUMIDITY_SYSTEM_LABELS } from "./defaults";
 import { loadRoseDay0State, saveRoseDay0State, clearRoseDay0State } from "./storage";
-import { generateTrialUnits } from "./generateTrialUnits";
-import { exportRoseDay0ToMarkdown } from "./exportMarkdown";
+import {
+  copyRoseDay0Markdown,
+  createRoseDay0MarkdownPreview,
+  formatRoseDay0SavedTimestamp,
+  getPreparationSnapshotChangeReasons,
+  regenerateRoseDay0TrialUnits,
+  type Day0MarkdownPreview,
+} from "./logic";
 import { loadRoseTrialState } from "../storage";
 import { calculateReadiness as calculatePrepReadiness } from "../RoseTrialLabClient";
 import { Toast } from "@/components/ui/Toast";
@@ -121,6 +127,8 @@ export default function RoseDay0Client() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
+  const [exportPreview, setExportPreview] = useState<Day0MarkdownPreview | null>(null);
+  const [snapshotChangeReasons, setSnapshotChangeReasons] = useState<string[]>([]);
 
   // Custom Deviation Modal State
   const [addDeviationOpen, setAddDeviationOpen] = useState(false);
@@ -156,6 +164,7 @@ export default function RoseDay0Client() {
     }
 
     if (result.state) {
+      setSnapshotChangeReasons(getPreparationSnapshotChangeReasons(result.state.trialSnapshot, prep));
       setState(result.state);
     } else {
       // Create initial snapshot from Prep
@@ -194,6 +203,7 @@ export default function RoseDay0Client() {
       }));
 
       saveRoseDay0State(freshState);
+      setSnapshotChangeReasons(getPreparationSnapshotChangeReasons(freshState.trialSnapshot, prep));
       setState(freshState);
     }
   }, []);
@@ -523,58 +533,48 @@ export default function RoseDay0Client() {
 
   const handleExportMarkdown = () => {
     if (!state) return;
-    const markdown = exportRoseDay0ToMarkdown(state);
-    navigator.clipboard.writeText(markdown)
-      .then(() => {
-        setToastType("success");
-        setToastMessage("คัดลอก Day 0 Markdown ลงคลิปบอร์ดแล้ว");
-        setToastVisible(true);
-      })
-      .catch(() => {
-        setToastType("error");
-        setToastMessage("ไม่สามารถคัดลอกเอกสารลงคลิปบอร์ดได้");
-        setToastVisible(true);
-      });
+    setExportPreview(createRoseDay0MarkdownPreview(state));
+  };
+
+  const handleCopyMarkdownPreview = async () => {
+    if (!exportPreview) return;
+    const result = await copyRoseDay0Markdown(exportPreview.markdown);
+    if (result.ok) {
+      setToastType("success");
+      setToastMessage("คัดลอก Day 0 Markdown ลงคลิปบอร์ดแล้ว");
+    } else {
+      setToastType("error");
+      setToastMessage(result.errorMessage || "ไม่สามารถคัดลอกเอกสารลงคลิปบอร์ดได้");
+    }
+    setToastVisible(true);
   };
 
   // Re-generate Trial Units handler
-  const handleRegenerateTrialUnits = () => {
+  const executeRegenerateTrialUnits = () => {
     if (!state) return;
 
-    const executeGeneration = () => {
-      const result = generateTrialUnits(
-        state.batch.batchName || state.trialSnapshot.batchName,
-        state.treatments,
-        state.trialUnits
-      );
+    const result = regenerateRoseDay0TrialUnits(state);
+    setState(result.state);
+    setIsDirty(true);
+    setGenerateConfirmOpen(false);
 
-      setState((prev) => {
-        if (!prev) return null;
-        const updated = {
-          ...prev,
-          trialUnits: result.units,
-        };
-        setIsDirty(true);
-        return markAsDraft(updated);
-      });
+    if (result.warnings.length > 0) {
+      setToastType("info");
+      setToastMessage(`จัดเรียงข้อมูลรหัสกิ่งใหม่แล้ว: ${result.warnings.join(", ")}`);
+    } else {
+      setToastType("success");
+      setToastMessage(`สร้างรหัสกิ่งปักชำรายตัวจำนวน ${result.state.trialUnits.length} กิ่งเสร็จสมบูรณ์`);
+    }
+    setToastVisible(true);
+  };
 
-      setGenerateConfirmOpen(false);
-
-      if (result.warnings.length > 0) {
-        setToastType("info");
-        setToastMessage(`จัดเรียงข้อมูลรหัสกิ่งใหม่แล้ว: ${result.warnings.join(", ")}`);
-      } else {
-        setToastType("success");
-        setToastMessage(`สร้างรหัสกิ่งปักชำรายตัวจำนวน ${result.units.length} กิ่งเสร็จสมบูรณ์`);
-      }
-      setToastVisible(true);
-    };
-
+  const handleRegenerateTrialUnits = () => {
+    if (!state) return;
     if (state.trialUnits.length > 0) {
       // มีกิ่งเดิมอยู่แล้ว ขอความเห็นชอบก่อนทับ
       setGenerateConfirmOpen(true);
     } else {
-      executeGeneration();
+      executeRegenerateTrialUnits();
     }
   };
 
@@ -657,11 +657,12 @@ export default function RoseDay0Client() {
   if (!state) return null;
 
   const validation = validateCompletion(state);
+  const savedTimestampLabel = formatRoseDay0SavedTimestamp(state.updatedAt);
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 py-6 md:px-6 md:py-8 space-y-6 pb-24">
+    <div className="w-full max-w-3xl mx-auto overflow-x-hidden px-4 py-6 md:px-6 md:py-8 space-y-6 pb-24">
       {/* Back button and page status */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
           onClick={() => router.push("/workspaces/travel")}
           className="flex items-center gap-1 text-sm font-semibold text-neutral-500 hover:text-neutral-700 transition-colors"
@@ -699,12 +700,28 @@ export default function RoseDay0Client() {
 
       {/* ─── Section 1: Preparation Snapshot ─────────────────────────────────── */}
       <section className="space-y-3" aria-labelledby="snapshot-heading">
-        <div className="flex items-center justify-between">
-          <h2 id="snapshot-heading" className="text-sm font-bold text-neutral-500 uppercase tracking-widest">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <h2 id="snapshot-heading" className="min-w-0 text-sm font-bold text-neutral-500 uppercase tracking-widest">
             1. ข้อมูลแผนการทดลองต้นแบบ (Preparation Snapshot)
           </h2>
           <span className="text-xs text-neutral-400">Locked Snapshot</span>
         </div>
+
+        {snapshotChangeReasons.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <div className="min-w-0 space-y-1">
+                <p className="font-bold">
+                  ข้อมูล Preparation ปัจจุบันมีการเปลี่ยนแปลงหลังจากสร้าง Day 0
+                </p>
+                <p>
+                  Day 0 ยังคงใช้ snapshot เดิมเพื่อรักษาประวัติการเริ่มทดลอง
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/50 p-4 space-y-3.5 text-xs text-neutral-600 dark:text-neutral-400">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -729,6 +746,9 @@ export default function RoseDay0Client() {
             <p className="flex items-center gap-1 text-[10px] text-neutral-400">
               <Info className="h-3.5 w-3.5" />
               ข้อมูล Snapshot นี้ถูกบันทึกเมื่อกดปุ่มเริ่มและจะไม่เปลี่ยนตาม Preparation เดิม เพื่อประวัติวิจัยที่ถาวร
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-neutral-400">
+              {savedTimestampLabel}
             </p>
           </div>
         </div>
@@ -1610,14 +1630,14 @@ export default function RoseDay0Client() {
           </div>
 
           {/* Trial Unit generator trigger button */}
-          <div className="pt-2 border-t border-neutral-100 dark:border-neutral-900 flex justify-between items-center flex-wrap gap-3">
-            <div className="text-xs text-neutral-400 flex items-center gap-1">
+          <div className="pt-2 border-t border-neutral-100 dark:border-neutral-900 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 text-xs text-neutral-400 flex items-center gap-1">
               <Info className="h-4 w-4" />
               สร้างรหัสรายกิ่งตามจำนวนปักชำจริงในกลุ่ม
             </div>
             <button
               onClick={handleRegenerateTrialUnits}
-              className="flex items-center gap-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95"
+              className="flex w-full items-center justify-center gap-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 sm:w-auto"
             >
               <Layers className="h-3.5 w-3.5" />
               สร้าง/อัปเดต รหัสกิ่งปักชำรายกิ่ง
@@ -1628,10 +1648,10 @@ export default function RoseDay0Client() {
 
       {/* ─── Section 8: Trial Units ──────────────────────────────────────────── */}
       <section className="space-y-3" aria-labelledby="trial-units-heading">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
             <Tag className="h-5 w-5 text-neutral-500" />
-            <h2 id="trial-units-heading" className="text-base font-bold text-neutral-900 dark:text-white">
+            <h2 id="trial-units-heading" className="min-w-0 text-base font-bold text-neutral-900 dark:text-white">
               8. บัญชีรหัสกิ่งปักชำรายตัว (Trial Units)
             </h2>
           </div>
@@ -1649,18 +1669,18 @@ export default function RoseDay0Client() {
               return (
                 <div
                   key={unit.id}
-                  className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-3.5 space-y-2.5 shadow-sm"
+                  className="min-w-0 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-3.5 space-y-2.5 shadow-sm"
                 >
-                  <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-900 pb-1.5">
-                    <span className="font-mono text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                  <div className="flex min-w-0 flex-col gap-1 border-b border-neutral-100 dark:border-neutral-900 pb-1.5 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="min-w-0 break-all font-mono text-xs font-bold text-neutral-800 dark:text-neutral-200">
                       {unit.id}
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-900 text-[10px] text-neutral-400 font-bold">
+                    <span className="w-fit px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-900 text-[10px] text-neutral-400 font-bold">
                       {unit.treatmentCode}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {/* Container Code */}
                     <div className="space-y-0.5">
                       <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest block">
@@ -2099,44 +2119,58 @@ export default function RoseDay0Client() {
       <ConfirmDialog
         isOpen={generateConfirmOpen}
         title="มีรหัสกิ่งปักชำรายตัวเดิมอยู่แล้ว ยืนยันการจัดเรียงใหม่?"
-        message="ระบบตรวจพบรายการกิ่งปักชำเดิม หากต้องการจัดเรียงรหัสใหม่ ระบบจะรักษาข้อมูลเดิม ( containerCode, notes) เฉพาะรหัสกิ่งปักชำที่ยังสอดคล้องกับกลุ่ม Treatment เดิมเท่านั้น รายการรหัสส่วนที่หายไปหรือเกินจำนวนจะถูกลบออกถาวร"
+        message={`ระบบจะจัดสร้างรายการกิ่งใหม่ตามจำนวนกิ่งจริงในแต่ละ Treatment
+ข้อมูลของรหัสกิ่งที่ยังตรงกันจะถูกเก็บไว้
+รายการที่เกินจากจำนวนใหม่อาจถูกนำออก`}
         confirmText="ยืนยันจัดเรียงใหม่"
         cancelText="ยกเลิก"
-        onConfirm={handleResetConfirm} // In this context, call generate function
+        onConfirm={executeRegenerateTrialUnits}
         onCancel={() => setGenerateConfirmOpen(false)}
       >
         <div className="pt-2 text-xs text-rose-500 font-semibold">
           * ข้อแนะนำ: ตรวจสอบจำนวนกิ่งรวมจริงในแต่ละ Treatment ให้ถูกต้องก่อนกดยืนยัน
         </div>
-        <div className="flex justify-end gap-3.5 pt-4">
-          <button
-            onClick={() => {
-              // Execute generation directly inside
-              const result = generateTrialUnits(
-                state.batch.batchName || state.trialSnapshot.batchName,
-                state.treatments,
-                state.trialUnits
-              );
-              setState((prev) => {
-                if (!prev) return null;
-                const updated = {
-                  ...prev,
-                  trialUnits: result.units,
-                };
-                setIsDirty(true);
-                return markAsDraft(updated);
-              });
-              setGenerateConfirmOpen(false);
-              setToastType("success");
-              setToastMessage(`อัปเดตบัญชีรหัสกิ่งจำนวน ${result.units.length} กิ่งเรียบร้อย`);
-              setToastVisible(true);
-            }}
-            className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-bold hover:bg-rose-700 text-xs shadow-md transition-all active:scale-95 cursor-pointer"
-          >
-            ยืนยันอัปเดตและจัดกลุ่ม
-          </button>
-        </div>
       </ConfirmDialog>
+
+      <Modal
+        isOpen={exportPreview !== null}
+        title="ตัวอย่าง Markdown — Day 0"
+        onClose={() => setExportPreview(null)}
+        maxWidth="max-w-3xl"
+      >
+        {exportPreview && (
+          <div className="space-y-4 pt-3">
+            <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+              สร้างเมื่อ:{" "}
+              {new Date(exportPreview.generatedAt).toLocaleString("th-TH", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </p>
+            <textarea
+              readOnly
+              value={exportPreview.markdown}
+              className="h-[55vh] w-full resize-y rounded-xl border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-relaxed text-neutral-700 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300"
+            />
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setExportPreview(null)}
+                className="rounded-xl border border-neutral-200 px-5 py-2.5 text-xs font-bold text-neutral-500 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-900"
+              >
+                ปิด
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyMarkdownPreview}
+                className="rounded-xl bg-rose-600 px-5 py-2.5 text-xs font-bold text-white shadow-md transition-colors hover:bg-rose-700"
+              >
+                คัดลอก Markdown
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Toast Feedback */}
       <Toast

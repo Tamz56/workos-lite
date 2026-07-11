@@ -31,18 +31,18 @@ export default function Topbar() {
     };
 
     return (
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-theme-topbar backdrop-blur-md px-4 md:px-6 shadow-[0_1px_0_0_rgba(0,0,0,0.03)] transition-theme">
-            <h1 className="text-lg font-bold text-white">{getTitle()}</h1>
-            <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex h-16 min-w-0 items-center justify-between border-b border-white/10 bg-theme-topbar backdrop-blur-md px-4 md:px-6 shadow-[0_1px_0_0_rgba(0,0,0,0.03)] transition-theme">
+            <h1 className="min-w-0 truncate text-lg font-bold text-white">{getTitle()}</h1>
+            <div className="flex min-w-0 shrink-0 items-center gap-3">
                 <button 
                     onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-white/60 hover:text-white group"
+                    className="flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-white/60 transition-all hover:bg-white/10 hover:text-white group sm:px-3"
                 >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
                         <Search className="w-4 h-4 text-white/60 group-hover:text-white" />
-                        <span className="text-sm font-medium">Search...</span>
+                        <span className="hidden text-sm font-medium sm:inline">Search...</span>
                     </div>
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] font-bold text-white/60">
+                    <div className="hidden items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] font-bold text-white/60 sm:flex">
                         <Command className="w-2.5 h-2.5" />
                         <span>K</span>
                     </div>
