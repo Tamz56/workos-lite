@@ -629,3 +629,59 @@ WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
 BEGIN
   UPDATE prompt_workflow_steps SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
+
+-- Arbor Daily Planner (ARBOR-PLANNER-001B)
+CREATE TABLE IF NOT EXISTS planner_days (
+  id                      TEXT PRIMARY KEY,
+  plan_date               TEXT NOT NULL UNIQUE,
+  main_outcome            TEXT NULL,
+  daily_capacity_minutes  INTEGER NULL,
+  energy_level            TEXT NULL CHECK (energy_level IS NULL OR energy_level IN ('low','medium','high','recovery')),
+  status                  TEXT NOT NULL DEFAULT 'planning' CHECK (status IN ('planning','active','completed')),
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_days_plan_date ON planner_days(plan_date);
+CREATE INDEX IF NOT EXISTS idx_planner_days_status ON planner_days(status);
+
+CREATE TRIGGER IF NOT EXISTS trg_planner_days_updated_at
+AFTER UPDATE ON planner_days
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE planner_days SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TABLE IF NOT EXISTS planner_items (
+  id                TEXT PRIMARY KEY,
+  planner_day_id    TEXT NOT NULL,
+  source_type       TEXT NOT NULL CHECK (source_type IN ('task','project_item')),
+  source_id         TEXT NOT NULL,
+  work_mode         TEXT NOT NULL CHECK (work_mode IN ('focus','production','ai_preparation','ai_execution','review','maintenance')),
+  priority          TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('critical','high','normal','low')),
+  estimated_minutes INTEGER NULL,
+  energy_level      TEXT NULL CHECK (energy_level IS NULL OR energy_level IN ('high','medium','low')),
+  scheduled_block   TEXT NULL CHECK (scheduled_block IS NULL OR scheduled_block IN ('morning_focus','afternoon_production','pre_ai_preparation','evening_ai','flexible')),
+  planned_order     INTEGER NOT NULL DEFAULT 0,
+  planner_status    TEXT NOT NULL DEFAULT 'planned' CHECK (planner_status IN ('planned','ready','doing','waiting','review','completed','carried_forward','blocked')),
+  is_main_task      INTEGER NOT NULL DEFAULT 0,
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(planner_day_id) REFERENCES planner_days(id) ON DELETE CASCADE
+);
+
+-- Prevent same source being added twice to the same planner day
+CREATE UNIQUE INDEX IF NOT EXISTS idx_planner_items_no_dup
+  ON planner_items(planner_day_id, source_type, source_id);
+
+CREATE INDEX IF NOT EXISTS idx_planner_items_day_order ON planner_items(planner_day_id, planned_order);
+CREATE INDEX IF NOT EXISTS idx_planner_items_source ON planner_items(source_type, source_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_planner_items_updated_at
+AFTER UPDATE ON planner_items
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE planner_items SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
