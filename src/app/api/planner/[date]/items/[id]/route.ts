@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { z } from "zod";
 import type { PlannerDay } from "@/lib/planner/types";
+import { calculateTimeRangeMinutes, getTimeRangeError } from "@/lib/planner/time";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,14 @@ function isValidDateString(s: string): boolean {
 }
 
 // Patch schema: does NOT allow changing source_type or source_id
+const OptionalTimeField = z.preprocess(value => value === "" ? null : value, z.string().nullable().optional());
+
 const PatchPlannerItemSchema = z.object({
     work_mode: z.enum(["focus", "production", "ai_preparation", "ai_execution", "review", "maintenance"]).optional(),
     priority: z.enum(["critical", "high", "normal", "low"]).optional(),
     estimated_minutes: z.number().int().min(0).nullable().optional(),
+    start_time: OptionalTimeField,
+    end_time: OptionalTimeField,
     energy_level: z.enum(["high", "medium", "low"]).nullable().optional(),
     scheduled_block: z.enum(["morning_focus", "afternoon_production", "pre_ai_preparation", "evening_ai", "flexible"]).nullable().optional(),
     planned_order: z.number().int().min(0).optional(),
@@ -31,7 +36,12 @@ const PatchPlannerItemSchema = z.object({
     is_main_task: z.union([z.boolean(), z.literal(0), z.literal(1)])
         .transform(v => (v ? 1 : 0))
         .optional(),
-}).strict();
+}).strict().superRefine((data, ctx) => {
+    const changesTime = data.start_time !== undefined || data.end_time !== undefined;
+    if (!changesTime) return;
+    const error = getTimeRangeError(data.start_time, data.end_time);
+    if (error) ctx.addIssue({ code: "custom", message: error, path: ["start_time"] });
+});
 
 // --- Helper: validate date + day + item ---
 
@@ -76,12 +86,15 @@ export async function PATCH(
         const parsed = PatchPlannerItemSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json(
-                { error: "Validation failed", details: parsed.error.flatten() },
+                { error: parsed.error.issues[0]?.message ?? "Validation failed", details: parsed.error.flatten() },
                 { status: 400 }
             );
         }
 
         const data = parsed.data;
+        const calculatedMinutes = data.start_time && data.end_time
+            ? calculateTimeRangeMinutes(data.start_time, data.end_time)
+            : data.estimated_minutes;
 
         // Enforce one main task per day
         if (data.is_main_task === 1 && item.is_main_task !== 1) {
@@ -101,7 +114,9 @@ export async function PATCH(
 
         if (data.work_mode !== undefined) { updates.push("work_mode = ?"); values.push(data.work_mode); }
         if (data.priority !== undefined) { updates.push("priority = ?"); values.push(data.priority); }
-        if (data.estimated_minutes !== undefined) { updates.push("estimated_minutes = ?"); values.push(data.estimated_minutes); }
+        if (calculatedMinutes !== undefined) { updates.push("estimated_minutes = ?"); values.push(calculatedMinutes); }
+        if (data.start_time !== undefined) { updates.push("start_time = ?"); values.push(data.start_time); }
+        if (data.end_time !== undefined) { updates.push("end_time = ?"); values.push(data.end_time); }
         if (data.energy_level !== undefined) { updates.push("energy_level = ?"); values.push(data.energy_level); }
         if (data.scheduled_block !== undefined) { updates.push("scheduled_block = ?"); values.push(data.scheduled_block); }
         if (data.planned_order !== undefined) { updates.push("planned_order = ?"); values.push(data.planned_order); }

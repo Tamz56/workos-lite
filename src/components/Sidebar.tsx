@@ -138,6 +138,13 @@ export function Sidebar() {
                         isCollapsed={isCollapsed}
                     />
                     <NavItem
+                        href="/arbor-planner"
+                        label="Planner"
+                        icon={<CalendarIcon className="w-5 h-5" />}
+                        active={pathname === "/arbor-planner"}
+                        isCollapsed={isCollapsed}
+                    />
+                    <NavItem
                         href="/projects"
                         label="Projects"
                         icon={<BriefcaseIcon className="w-5 h-5" />}

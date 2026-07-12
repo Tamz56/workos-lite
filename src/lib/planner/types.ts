@@ -73,6 +73,8 @@ export interface PlannerItem {
     work_mode: PlannerWorkMode;
     priority: PlannerPriority;
     estimated_minutes: number | null;
+    start_time: string | null;
+    end_time: string | null;
     energy_level: PlannerEnergyLevel | null;
     scheduled_block: PlannerScheduledBlock | null;
     planned_order: number;

@@ -8,6 +8,7 @@ import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { PlannerDay, EnrichedPlannerItem } from "@/lib/planner/types";
+import { calculateTimeRangeMinutes, getTimeRangeError } from "@/lib/planner/time";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +23,16 @@ function isValidDateString(s: string): boolean {
 
 // --- Zod Schema ---
 
+const OptionalTimeField = z.preprocess(value => value === "" ? null : value, z.string().nullable().optional());
+
 const CreatePlannerItemSchema = z.object({
     source_type: z.enum(["task", "project_item"]),
     source_id: z.string().min(1),
     work_mode: z.enum(["focus", "production", "ai_preparation", "ai_execution", "review", "maintenance"]),
     priority: z.enum(["critical", "high", "normal", "low"]).default("normal"),
     estimated_minutes: z.number().int().min(0).nullable().optional(),
+    start_time: OptionalTimeField,
+    end_time: OptionalTimeField,
     energy_level: z.enum(["high", "medium", "low"]).nullable().optional(),
     scheduled_block: z.enum(["morning_focus", "afternoon_production", "pre_ai_preparation", "evening_ai", "flexible"]).nullable().optional(),
     planned_order: z.number().int().min(0).default(0),
@@ -35,6 +40,9 @@ const CreatePlannerItemSchema = z.object({
     is_main_task: z.union([z.boolean(), z.literal(0), z.literal(1)])
         .transform(v => (v ? 1 : 0))
         .default(0),
+}).superRefine((data, ctx) => {
+    const error = getTimeRangeError(data.start_time, data.end_time);
+    if (error) ctx.addIssue({ code: "custom", message: error, path: ["start_time"] });
 });
 
 // --- Source enrichment ---
@@ -150,12 +158,15 @@ export async function POST(
         const parsed = CreatePlannerItemSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json(
-                { error: "Validation failed", details: parsed.error.flatten() },
+                { error: parsed.error.issues[0]?.message ?? "Validation failed", details: parsed.error.flatten() },
                 { status: 400 }
             );
         }
 
         const data = parsed.data;
+        const calculatedMinutes = data.start_time && data.end_time
+            ? calculateTimeRangeMinutes(data.start_time, data.end_time)
+            : data.estimated_minutes ?? null;
 
         // Verify source exists
         if (data.source_type === "task") {
@@ -208,9 +219,9 @@ export async function POST(
         db.prepare(`
             INSERT INTO planner_items (
                 id, planner_day_id, source_type, source_id, work_mode, priority,
-                estimated_minutes, energy_level, scheduled_block, planned_order,
+                estimated_minutes, start_time, end_time, energy_level, scheduled_block, planned_order,
                 planner_status, is_main_task, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
         `).run(
             id,
             plannerDay.id,
@@ -218,7 +229,9 @@ export async function POST(
             data.source_id,
             data.work_mode,
             data.priority,
-            data.estimated_minutes ?? null,
+            calculatedMinutes,
+            data.start_time ?? null,
+            data.end_time ?? null,
             data.energy_level ?? null,
             data.scheduled_block ?? null,
             data.planned_order,

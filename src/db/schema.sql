@@ -661,6 +661,8 @@ CREATE TABLE IF NOT EXISTS planner_items (
   work_mode         TEXT NOT NULL CHECK (work_mode IN ('focus','production','ai_preparation','ai_execution','review','maintenance')),
   priority          TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('critical','high','normal','low')),
   estimated_minutes INTEGER NULL,
+  start_time        TEXT NULL,
+  end_time          TEXT NULL,
   energy_level      TEXT NULL CHECK (energy_level IS NULL OR energy_level IN ('high','medium','low')),
   scheduled_block   TEXT NULL CHECK (scheduled_block IS NULL OR scheduled_block IN ('morning_focus','afternoon_production','pre_ai_preparation','evening_ai','flexible')),
   planned_order     INTEGER NOT NULL DEFAULT 0,
