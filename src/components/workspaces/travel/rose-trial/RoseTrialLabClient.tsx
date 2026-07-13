@@ -49,6 +49,11 @@ import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { loadRoseDay0State } from "./day-0/storage";
+import type { RoseDay0State } from "./day-0/types";
+import { buildTrialModeSummariesSafely } from "../../../../lib/rose-trial-domain/summaries";
+import { TrialModeSummary } from "./TrialModeSummary";
+
 // ─── Readiness Calculation Helper ─────────────────────────────────────────────
 
 export function parseIntegerInput(value: string, minValue: number): number | null {
@@ -195,6 +200,8 @@ export default function RoseTrialLabClient() {
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<RoseTrialState>(() => createDefaultRoseTrialState());
   const [isDirty, setIsDirty] = useState(false);
+  const [day0State, setDay0State] = useState<RoseDay0State | null>(null);
+  const [day0Corrupt, setDay0Corrupt] = useState(false);
 
   // Toast notifications
   const [toastMessage, setToastMessage] = useState("");
@@ -238,6 +245,19 @@ export default function RoseTrialLabClient() {
     setMounted(true);
     const loaded = loadRoseTrialState();
     setState(loaded);
+
+    // Load Day 0 state read-only safely
+    try {
+      const day0Result = loadRoseDay0State();
+      if (day0Result.isCorrupt) {
+        setDay0Corrupt(true);
+      } else {
+        setDay0State(day0Result.state);
+      }
+    } catch (err) {
+      console.error("Failed to load Day 0 state read-only:", err);
+      setDay0Corrupt(true);
+    }
   }, []);
 
   // Format date helper for Thai localization
@@ -475,6 +495,9 @@ export default function RoseTrialLabClient() {
     return true;
   });
 
+  // Map read-only summaries behind a failure boundary; storage is never mutated here.
+  const trialSummaries = buildTrialModeSummariesSafely(state, day0State, day0Corrupt);
+
   return (
     <div className="w-full max-w-3xl mx-auto px-4 py-6 md:px-6 md:py-8 space-y-6 pb-24">
       {/* Header Banner */}
@@ -515,6 +538,9 @@ export default function RoseTrialLabClient() {
           </p>
         )}
       </div>
+
+      {/* Trial Mode Summary Cards */}
+      <TrialModeSummary summaries={trialSummaries} />
 
       {/* ─── Section A: Pilot Overview ───────────────────────────────────────── */}
       <section className="space-y-3" aria-labelledby="pilot-overview-heading">
