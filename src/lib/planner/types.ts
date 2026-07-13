@@ -75,6 +75,7 @@ export interface PlannerItem {
     estimated_minutes: number | null;
     start_time: string | null;
     end_time: string | null;
+    ai_provider_key: string | null;
     energy_level: PlannerEnergyLevel | null;
     scheduled_block: PlannerScheduledBlock | null;
     planned_order: number;

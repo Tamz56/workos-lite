@@ -8,6 +8,7 @@ import { getDb } from "@/db/db";
 import { z } from "zod";
 import type { PlannerDay } from "@/lib/planner/types";
 import { calculateTimeRangeMinutes, getTimeRangeError } from "@/lib/planner/time";
+import { aiProviderExists } from "@/lib/planner/provider";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ function isValidDateString(s: string): boolean {
 
 // Patch schema: does NOT allow changing source_type or source_id
 const OptionalTimeField = z.preprocess(value => value === "" ? null : value, z.string().nullable().optional());
+const OptionalProviderKey = z.preprocess(value => value === "" ? null : value, z.string().trim().min(1).nullable().optional());
 
 const PatchPlannerItemSchema = z.object({
     work_mode: z.enum(["focus", "production", "ai_preparation", "ai_execution", "review", "maintenance"]).optional(),
@@ -29,6 +31,7 @@ const PatchPlannerItemSchema = z.object({
     estimated_minutes: z.number().int().min(0).nullable().optional(),
     start_time: OptionalTimeField,
     end_time: OptionalTimeField,
+    ai_provider_key: OptionalProviderKey,
     energy_level: z.enum(["high", "medium", "low"]).nullable().optional(),
     scheduled_block: z.enum(["morning_focus", "afternoon_production", "pre_ai_preparation", "evening_ai", "flexible"]).nullable().optional(),
     planned_order: z.number().int().min(0).optional(),
@@ -96,6 +99,10 @@ export async function PATCH(
             ? calculateTimeRangeMinutes(data.start_time, data.end_time)
             : data.estimated_minutes;
 
+        if (!aiProviderExists(db, data.ai_provider_key)) {
+            return NextResponse.json({ error: `AI provider '${data.ai_provider_key}' not found.` }, { status: 400 });
+        }
+
         // Enforce one main task per day
         if (data.is_main_task === 1 && item.is_main_task !== 1) {
             const existingMain = db.prepare(
@@ -117,6 +124,7 @@ export async function PATCH(
         if (calculatedMinutes !== undefined) { updates.push("estimated_minutes = ?"); values.push(calculatedMinutes); }
         if (data.start_time !== undefined) { updates.push("start_time = ?"); values.push(data.start_time); }
         if (data.end_time !== undefined) { updates.push("end_time = ?"); values.push(data.end_time); }
+        if (data.ai_provider_key !== undefined) { updates.push("ai_provider_key = ?"); values.push(data.ai_provider_key); }
         if (data.energy_level !== undefined) { updates.push("energy_level = ?"); values.push(data.energy_level); }
         if (data.scheduled_block !== undefined) { updates.push("scheduled_block = ?"); values.push(data.scheduled_block); }
         if (data.planned_order !== undefined) { updates.push("planned_order = ?"); values.push(data.planned_order); }

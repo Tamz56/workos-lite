@@ -5,6 +5,8 @@ import { Modal } from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/layout/PageShell";
 import { PlannerItemCard } from "@/components/arbor-planner/PlannerItemCard";
+import { AIResourceStatusPanel } from "@/components/arbor-planner/AIResourceStatusPanel";
+import { AssignmentRecommendationPanel } from "@/components/arbor-planner/AssignmentRecommendationPanel";
 import {
     DELETE_CONFIRMATION, WORK_BLOCKS, calculateCapacity, getBangkokDate, groupPlannerItems, shiftPlannerDate,
 } from "@/components/arbor-planner/plannerUi";
@@ -13,6 +15,8 @@ import type {
     PlannerEnergyLevel, PlannerItemStatus, PlannerPriority, PlannerScheduledBlock, PlannerSourceType, PlannerWorkMode,
 } from "@/lib/planner/types";
 import { calculateTimeRangeMinutes } from "@/lib/planner/time";
+import type { AIResourceProfile } from "@/lib/assignment/types";
+import { getAIProviderOptions } from "@/components/arbor-planner/assignmentUi";
 
 type DayData = PlannerDay | PlannerDayTemplate;
 type Source = { id: string; title: string; status: string; type: PlannerSourceType; context: string; projectSlug?: string };
@@ -20,12 +24,12 @@ type SourceTask = { id: string; title: string; status: string; workspace: string
 type SourceProject = { id: string; slug: string; name: string; status: string };
 type SourceProjectItem = { id: string; title: string; status: string };
 type ItemForm = {
-    work_mode: PlannerWorkMode; priority: PlannerPriority; estimated_minutes: string; start_time: string; end_time: string; energy_level: PlannerEnergyLevel | "";
+    work_mode: PlannerWorkMode; priority: PlannerPriority; estimated_minutes: string; start_time: string; end_time: string; ai_provider_key: string; energy_level: PlannerEnergyLevel | "";
     scheduled_block: PlannerScheduledBlock; planned_order: string; planner_status: PlannerItemStatus; is_main_task: boolean;
 };
 
 const initialItemForm: ItemForm = {
-    work_mode: "focus", priority: "normal", estimated_minutes: "", start_time: "", end_time: "", energy_level: "", scheduled_block: "morning_focus",
+    work_mode: "focus", priority: "normal", estimated_minutes: "", start_time: "", end_time: "", ai_provider_key: "", energy_level: "", scheduled_block: "morning_focus",
     planned_order: "0", planner_status: "planned", is_main_task: false,
 };
 const fieldClass = "w-full rounded-lg border border-theme-input-border bg-theme-input-bg px-3 py-2 text-sm text-theme-primary outline-none focus:border-blue-500";
@@ -120,6 +124,20 @@ export default function ArborPlannerClient() {
 
             {error && <div role="alert" className="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-500">{error}</div>}
 
+            <div className="mb-5 grid gap-4 xl:grid-cols-2">
+                <AIResourceStatusPanel />
+                <AssignmentRecommendationPanel
+                    key={date}
+                    date={date}
+                    hasDay={persisted}
+                    itemCount={items.length}
+                    onViewItem={id => {
+                        const item = items.find(candidate => candidate.id === id);
+                        if (item) setEditing(item);
+                    }}
+                />
+            </div>
+
             {!persisted ? (
                 <section className="rounded-2xl border border-dashed border-theme-border bg-theme-card-bg p-6 sm:p-8">
                     <h2 className="text-xl font-bold text-theme-primary">ยังไม่มีแผนสำหรับวันนี้</h2>
@@ -184,6 +202,7 @@ function PlannerItemModal({ date, open, item, onClose, onSaved }: { date: string
     const [form, setForm] = useState<ItemForm>(initialItemForm);
     const [sources, setSources] = useState<Source[]>([]);
     const [selected, setSelected] = useState<Source | null>(null);
+    const [aiProfiles, setAIProfiles] = useState<AIResourceProfile[]>([]);
     const [filters, setFilters] = useState({ type: "all", status: "all", context: "all", search: "" });
     const [loadingSources, setLoadingSources] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -192,9 +211,15 @@ function PlannerItemModal({ date, open, item, onClose, onSaved }: { date: string
     useEffect(() => {
         if (!open) return;
         setError(null);
-        if (item) setForm({ work_mode: item.work_mode, priority: item.priority, estimated_minutes: item.estimated_minutes?.toString() ?? "", start_time: item.start_time ?? "", end_time: item.end_time ?? "", energy_level: item.energy_level ?? "", scheduled_block: item.scheduled_block ?? "flexible", planned_order: item.planned_order.toString(), planner_status: item.planner_status, is_main_task: item.is_main_task === 1 });
+        void loadAIProfiles();
+        if (item) setForm({ work_mode: item.work_mode, priority: item.priority, estimated_minutes: item.estimated_minutes?.toString() ?? "", start_time: item.start_time ?? "", end_time: item.end_time ?? "", ai_provider_key: item.ai_provider_key ?? "", energy_level: item.energy_level ?? "", scheduled_block: item.scheduled_block ?? "flexible", planned_order: item.planned_order.toString(), planner_status: item.planner_status, is_main_task: item.is_main_task === 1 });
         else { setForm(initialItemForm); setSelected(null); void loadSources(); }
     }, [open, item]);
+
+    async function loadAIProfiles() {
+        try { setAIProfiles((await requestJson<{ profiles: AIResourceProfile[] }>("/api/ai-resources")).profiles); }
+        catch (reason) { setError(reason instanceof Error ? reason.message : "โหลดรายชื่อผู้ให้บริการ AI ไม่สำเร็จ"); }
+    }
 
     async function loadSources() {
         setLoadingSources(true);
@@ -217,7 +242,7 @@ function PlannerItemModal({ date, open, item, onClose, onSaved }: { date: string
         setSaving(true); setError(null);
         try {
             const exactMinutes = form.start_time && form.end_time ? calculateTimeRangeMinutes(form.start_time, form.end_time) : null;
-            const payload = { ...form, start_time: form.start_time || null, end_time: form.end_time || null, estimated_minutes: exactMinutes ?? (form.estimated_minutes === "" ? null : Number(form.estimated_minutes)), energy_level: form.energy_level || null, planned_order: Number(form.planned_order) };
+            const payload = { ...form, start_time: form.start_time || null, end_time: form.end_time || null, ai_provider_key: form.ai_provider_key || null, estimated_minutes: exactMinutes ?? (form.estimated_minutes === "" ? null : Number(form.estimated_minutes)), energy_level: form.energy_level || null, planned_order: Number(form.planned_order) };
             await requestJson(item ? `/api/planner/${date}/items/${item.id}` : `/api/planner/${date}/items`, { method: item ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item ? payload : { ...payload, source_type: selected!.type, source_id: selected!.id }) });
             await onSaved();
         } catch (reason) { setError(reason instanceof Error ? reason.message : "บันทึกรายการไม่สำเร็จ"); }
@@ -228,16 +253,17 @@ function PlannerItemModal({ date, open, item, onClose, onSaved }: { date: string
         {error && <div role="alert" className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">{error}</div>}
         {!item && <div className="space-y-3"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><select className={fieldClass} value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })}><option value="all">ทุก Source Type</option><option value="task">Task</option><option value="project_item">Project Item</option></select><select className={fieldClass} value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}><option value="all">ทุกสถานะ</option>{Array.from(new Set(sources.map(s => s.status))).map(status => <option key={status}>{status}</option>)}</select><select className={fieldClass} value={filters.context} onChange={e => setFilters({ ...filters, context: e.target.value })}><option value="all">ทุก Workspace / Project</option>{contexts.map(context => <option key={context}>{context}</option>)}</select><input className={fieldClass} value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} placeholder="ค้นหาชื่องาน" /></div><div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-theme-border p-2">{loadingSources ? <div className="p-5 text-center text-sm text-theme-muted">กำลังโหลดงานต้นทาง...</div> : shown.length === 0 ? <div className="p-5 text-center text-sm text-theme-muted">ไม่พบงานที่ตรงกับตัวกรอง</div> : shown.map(source => <button key={`${source.type}-${source.id}`} onClick={() => setSelected(source)} className={`w-full rounded-lg border p-3 text-left ${selected?.id === source.id && selected.type === source.type ? "border-blue-500 bg-blue-500/10" : "border-theme-border hover:bg-theme-hover"}`}><div className="text-sm font-semibold text-theme-primary">{source.title}</div><div className="mt-1 text-xs text-theme-muted">{source.type} · {source.status} · {source.context}</div></button>)}</div></div>}
         {item && <div className="mb-4 rounded-lg bg-theme-hover p-3 text-sm text-theme-secondary">งานต้นทาง: <strong>{item.source_missing ? "ไม่พบงานต้นทาง" : item.source_title}</strong><br /><span className="text-xs">Source type และ Source ID ไม่สามารถเปลี่ยนได้</span></div>}
-        <ItemFields form={form} onChange={setForm} />
+        <ItemFields form={form} aiProfiles={aiProfiles} onChange={setForm} />
         <div className="mt-6 flex justify-end gap-2 border-t border-theme-border pt-4"><button disabled={saving} onClick={onClose} className="rounded-lg border border-theme-border px-4 py-2 text-sm text-theme-secondary">ยกเลิก</button><button disabled={saving || (!item && !selected)} onClick={() => void save()} className={primaryButton}>{saving ? (item ? "กำลังอัปเดต..." : "กำลังเพิ่ม...") : (item ? "บันทึกการแก้ไข" : "เพิ่มในแผน")}</button></div>
     </Modal>;
 }
 
-function ItemFields({ form, onChange }: { form: ItemForm; onChange: (form: ItemForm) => void }) {
+function ItemFields({ form, aiProfiles, onChange }: { form: ItemForm; aiProfiles: AIResourceProfile[]; onChange: (form: ItemForm) => void }) {
     const exactMinutes = form.start_time && form.end_time ? calculateTimeRangeMinutes(form.start_time, form.end_time) : null;
     const hasAnyExactTime = Boolean(form.start_time || form.end_time);
     return <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SelectField label="Work Mode" value={form.work_mode} values={["focus", "production", "ai_preparation", "ai_execution", "review", "maintenance"]} onChange={value => onChange({ ...form, work_mode: value as PlannerWorkMode })} />
+        {(form.work_mode === "ai_execution" || form.work_mode === "ai_preparation") && <label className="text-sm font-medium text-theme-secondary">AI Provider<select value={form.ai_provider_key} onChange={event => onChange({ ...form, ai_provider_key: event.target.value })} className={fieldClass + " mt-1"}><option value="">ไม่ระบุผู้ให้บริการ</option>{getAIProviderOptions(aiProfiles).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
         <SelectField label="Priority" value={form.priority} values={["critical", "high", "normal", "low"]} onChange={value => onChange({ ...form, priority: value as PlannerPriority })} />
         <label className="text-sm font-medium text-theme-secondary">Start Time<input type="time" value={form.start_time} onChange={e => onChange({ ...form, start_time: e.target.value })} className={fieldClass + " mt-1"} /></label>
         <label className="text-sm font-medium text-theme-secondary">End Time<input type="time" value={form.end_time} onChange={e => onChange({ ...form, end_time: e.target.value })} className={fieldClass + " mt-1"} /></label>

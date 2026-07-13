@@ -8,7 +8,7 @@ function item(overrides: Partial<EnrichedPlannerItem> = {}): EnrichedPlannerItem
     return {
         id: "PITM-1", planner_day_id: "PDAY-1", source_type: "task", source_id: "TASK-1",
         work_mode: "focus", priority: "normal", estimated_minutes: 60, energy_level: "high",
-        start_time: null, end_time: null,
+        start_time: null, end_time: null, ai_provider_key: null,
         scheduled_block: "morning_focus", planned_order: 0, planner_status: "planned", is_main_task: 0,
         created_at: "", updated_at: "", source_title: "ทดสอบงานภาษาไทย", source_status: "planned",
         source_workspace: "content", source_project_id: null, source_project_name: null, source_missing: false,

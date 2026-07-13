@@ -2113,6 +2113,7 @@ function ensurePlannerTables() {
           estimated_minutes INTEGER NULL,
           start_time        TEXT NULL,
           end_time          TEXT NULL,
+          ai_provider_key   TEXT NULL,
           energy_level      TEXT NULL CHECK (energy_level IS NULL OR energy_level IN ('high','medium','low')),
           scheduled_block   TEXT NULL CHECK (scheduled_block IS NULL OR scheduled_block IN ('morning_focus','afternoon_production','pre_ai_preparation','evening_ai','flexible')),
           planned_order     INTEGER NOT NULL DEFAULT 0,
@@ -2147,6 +2148,34 @@ function ensurePlannerTables() {
     if (!plannerItemColumnNames.includes("end_time")) {
         db.exec("ALTER TABLE planner_items ADD COLUMN end_time TEXT NULL");
     }
+    if (!plannerItemColumnNames.includes("ai_provider_key")) {
+        db.exec("ALTER TABLE planner_items ADD COLUMN ai_provider_key TEXT NULL");
+    }
+}
+
+function ensureAIResourceProfiles() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS ai_resource_profiles (
+          id                TEXT PRIMARY KEY,
+          provider_key      TEXT NOT NULL UNIQUE,
+          display_name      TEXT NOT NULL,
+          availability      TEXT NOT NULL DEFAULT 'unknown' CHECK (availability IN ('unavailable','low','medium','high','unknown')),
+          remaining_percent INTEGER NULL CHECK (remaining_percent IS NULL OR (remaining_percent >= 0 AND remaining_percent <= 100)),
+          reset_at          TEXT NULL,
+          cost_tier         TEXT NULL CHECK (cost_tier IS NULL OR cost_tier IN ('low','medium','high')),
+          notes             TEXT NULL,
+          created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TRIGGER IF NOT EXISTS trg_ai_resource_profiles_updated_at
+        AFTER UPDATE ON ai_resource_profiles
+        FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+        BEGIN
+          UPDATE ai_resource_profiles SET updated_at = datetime('now') WHERE id = NEW.id;
+        END;
+    `);
 }
 
 ensureNotes();
@@ -2161,6 +2190,7 @@ ensurePromptRunLogs();
 ensurePromptVersions();
 ensurePromptWorkflows();
 ensurePlannerTables();
+ensureAIResourceProfiles();
 
 if (!shouldSkipSeed) {
     ensureSeedProjects();

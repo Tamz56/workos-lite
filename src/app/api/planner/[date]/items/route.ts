@@ -9,6 +9,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { PlannerDay, EnrichedPlannerItem } from "@/lib/planner/types";
 import { calculateTimeRangeMinutes, getTimeRangeError } from "@/lib/planner/time";
+import { aiProviderExists } from "@/lib/planner/provider";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ function isValidDateString(s: string): boolean {
 // --- Zod Schema ---
 
 const OptionalTimeField = z.preprocess(value => value === "" ? null : value, z.string().nullable().optional());
+const OptionalProviderKey = z.preprocess(value => value === "" ? null : value, z.string().trim().min(1).nullable().optional());
 
 const CreatePlannerItemSchema = z.object({
     source_type: z.enum(["task", "project_item"]),
@@ -33,6 +35,7 @@ const CreatePlannerItemSchema = z.object({
     estimated_minutes: z.number().int().min(0).nullable().optional(),
     start_time: OptionalTimeField,
     end_time: OptionalTimeField,
+    ai_provider_key: OptionalProviderKey,
     energy_level: z.enum(["high", "medium", "low"]).nullable().optional(),
     scheduled_block: z.enum(["morning_focus", "afternoon_production", "pre_ai_preparation", "evening_ai", "flexible"]).nullable().optional(),
     planned_order: z.number().int().min(0).default(0),
@@ -168,6 +171,10 @@ export async function POST(
             ? calculateTimeRangeMinutes(data.start_time, data.end_time)
             : data.estimated_minutes ?? null;
 
+        if (!aiProviderExists(db, data.ai_provider_key)) {
+            return NextResponse.json({ error: `AI provider '${data.ai_provider_key}' not found.` }, { status: 400 });
+        }
+
         // Verify source exists
         if (data.source_type === "task") {
             const task = db.prepare("SELECT id FROM tasks WHERE id = ?").get(data.source_id);
@@ -219,9 +226,9 @@ export async function POST(
         db.prepare(`
             INSERT INTO planner_items (
                 id, planner_day_id, source_type, source_id, work_mode, priority,
-                estimated_minutes, start_time, end_time, energy_level, scheduled_block, planned_order,
+                estimated_minutes, start_time, end_time, ai_provider_key, energy_level, scheduled_block, planned_order,
                 planner_status, is_main_task, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
         `).run(
             id,
             plannerDay.id,
@@ -232,6 +239,7 @@ export async function POST(
             calculatedMinutes,
             data.start_time ?? null,
             data.end_time ?? null,
+            data.ai_provider_key ?? null,
             data.energy_level ?? null,
             data.scheduled_block ?? null,
             data.planned_order,
