@@ -499,19 +499,19 @@ export default function RoseTrialLabClient() {
   const trialSummaries = buildTrialModeSummariesSafely(state, day0State, day0Corrupt);
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 py-6 md:px-6 md:py-8 space-y-6 pb-24">
+    <div className="w-full max-w-[1280px] mx-auto px-4 py-6 md:px-6 md:py-8 xl:px-8 space-y-6 pb-24">
       {/* Header Banner */}
       <div className="rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/10 border border-rose-100 dark:border-rose-900/40 p-5 md:p-6 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40">
               <Flower2 className="h-5 w-5 text-rose-600 dark:text-rose-400" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-rose-500 dark:text-rose-400 uppercase tracking-wider">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-rose-500 dark:text-rose-400 uppercase tracking-wider truncate">
                 GF-APP-075 — Nutrient Planner App
               </p>
-              <h1 className="mt-0.5 text-xl font-bold text-neutral-900 dark:text-white leading-snug">
+              <h1 className="mt-0.5 text-xl font-bold text-neutral-900 dark:text-white leading-snug break-words">
                 {state.pilot.trialName || "ไม่ได้ระบุชื่อการทดลอง"}
               </h1>
             </div>
@@ -554,9 +554,9 @@ export default function RoseTrialLabClient() {
           <span className="text-xs text-neutral-400">Section A</span>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-4 md:p-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-4 md:p-5">
           {/* Trial Name */}
-          <div className="space-y-1">
+          <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
               ชื่อการทดลอง <span className="text-rose-500">*</span>
             </label>
@@ -576,63 +576,61 @@ export default function RoseTrialLabClient() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* Crop Name */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                พืชที่ทดลอง
-              </label>
-              <input
-                type="text"
-                disabled
-                value="กุหลาบ (Rose)"
-                className="w-full px-3.5 py-2.5 bg-neutral-100 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-              />
-            </div>
+          {/* Crop Name */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+              พืชที่ทดลอง
+            </label>
+            <input
+              type="text"
+              disabled
+              value="กุหลาบ (Rose)"
+              className="w-full px-3.5 py-2.5 bg-neutral-100 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+            />
+          </div>
 
-            {/* Expected Start Date */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                วันที่คาดว่าจะเริ่ม
-              </label>
-              <input
-                type="date"
-                value={state.pilot.expectedStartDate}
-                onChange={(e) => updatePilot({ expectedStartDate: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-rose-500 rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2"
-              />
-            </div>
+          {/* Expected Start Date */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+              วันที่คาดว่าจะเริ่ม
+            </label>
+            <input
+              type="date"
+              value={state.pilot.expectedStartDate}
+              onChange={(e) => updatePilot({ expectedStartDate: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-rose-500 rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2"
+            />
+          </div>
 
-            {/* Location */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                สถานที่ทดลอง
-              </label>
-              <input
-                type="text"
-                value={state.pilot.location}
-                onChange={(e) => updatePilot({ location: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-rose-500 rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2"
-                placeholder="เช่น โรงเรือนพัชรา หรือห้องแล็บ 2"
-              />
-            </div>
+          {/* Location */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+              สถานที่ทดลอง
+            </label>
+            <input
+              type="text"
+              value={state.pilot.location}
+              onChange={(e) => updatePilot({ location: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-rose-500 rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2"
+              placeholder="เช่น โรงเรือนพัชรา หรือห้องแล็บ 2"
+            />
+          </div>
 
-            {/* Project Code */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                รหัสโปรเจกต์
-              </label>
-              <input
-                type="text"
-                disabled
-                value="GF-APP-075"
-                className="w-full px-3.5 py-2.5 bg-neutral-100 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-              />
-            </div>
+          {/* Project Code */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+              รหัสโปรเจกต์
+            </label>
+            <input
+              type="text"
+              disabled
+              value="GF-APP-075"
+              className="w-full px-3.5 py-2.5 bg-neutral-100 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+            />
           </div>
 
           {/* Goal */}
-          <div className="space-y-1">
+          <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
               เป้าหมายการทดลอง <span className="text-rose-500">*</span>
             </label>
@@ -653,7 +651,7 @@ export default function RoseTrialLabClient() {
           </div>
 
           {/* Notes */}
-          <div className="space-y-1">
+          <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
               หมายเหตุภาพรวม
             </label>
@@ -680,85 +678,83 @@ export default function RoseTrialLabClient() {
           <span className="text-xs text-neutral-400">Section B</span>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-4 md:p-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* Batch Name */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                ชื่อ Batch <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={state.batch.batchName}
-                onChange={(e) => updateBatch({ batchName: e.target.value })}
-                className={`w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border ${
-                  !state.batch.batchName.trim()
-                    ? "border-rose-300 dark:border-rose-900/60 focus:ring-rose-500"
-                    : "border-neutral-200 dark:border-neutral-800 focus:ring-rose-500"
-                } rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2`}
-                placeholder="เช่น Batch-Rose-A"
-              />
-              {!state.batch.batchName.trim() && (
-                <p className="text-xs text-rose-500">กรุณาระบุชื่อ Batch</p>
-              )}
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-4 md:p-5">
+          {/* Batch Name */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+              ชื่อ Batch <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={state.batch.batchName}
+              onChange={(e) => updateBatch({ batchName: e.target.value })}
+              className={`w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border ${
+                !state.batch.batchName.trim()
+                  ? "border-rose-300 dark:border-rose-900/60 focus:ring-rose-500"
+                  : "border-neutral-200 dark:border-neutral-800 focus:ring-rose-500"
+              } rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2`}
+              placeholder="เช่น Batch-Rose-A"
+            />
+            {!state.batch.batchName.trim() && (
+              <p className="text-xs text-rose-500">กรุณาระบุชื่อ Batch</p>
+            )}
+          </div>
 
-            {/* Total Cuttings */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                จำนวนกิ่งปักชำทั้งหมด <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={state.batch.totalCuttings || ""}
-                onChange={(e) => {
-                  const val = parseIntegerInput(e.target.value, 0);
-                  if (val === null) return;
-                  updateBatch({ totalCuttings: val });
-                }}
-                className={`w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border ${
-                  (state.batch.totalCuttings || 0) <= 0
-                    ? "border-rose-300 dark:border-rose-900/60 focus:ring-rose-500"
-                    : "border-neutral-200 dark:border-neutral-800 focus:ring-rose-500"
-                } rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2`}
-                placeholder="จำนวนกิ่งปักชำทั้งหมด"
-              />
-              {(state.batch.totalCuttings || 0) <= 0 && (
-                <p className="text-xs text-rose-500">จำนวนกิ่งปักชำต้องมากกว่า 0</p>
-              )}
-            </div>
+          {/* Total Cuttings */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+              จำนวนกิ่งปักชำทั้งหมด <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={state.batch.totalCuttings || ""}
+              onChange={(e) => {
+                const val = parseIntegerInput(e.target.value, 0);
+                if (val === null) return;
+                updateBatch({ totalCuttings: val });
+              }}
+              className={`w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border ${
+                (state.batch.totalCuttings || 0) <= 0
+                  ? "border-rose-300 dark:border-rose-900/60 focus:ring-rose-500"
+                  : "border-neutral-200 dark:border-neutral-800 focus:ring-rose-500"
+              } rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2`}
+              placeholder="จำนวนกิ่งปักชำทั้งหมด"
+            />
+            {(state.batch.totalCuttings || 0) <= 0 && (
+              <p className="text-xs text-rose-500">จำนวนกิ่งปักชำต้องมากกว่า 0</p>
+            )}
+          </div>
 
-            {/* Planned Start Date */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                วันที่เริ่มวางแผน
-              </label>
-              <input
-                type="date"
-                value={state.batch.plannedStartDate}
-                onChange={(e) => updateBatch({ plannedStartDate: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-rose-500 rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2"
-              />
-            </div>
+          {/* Planned Start Date */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+              วันที่เริ่มวางแผน
+            </label>
+            <input
+              type="date"
+              value={state.batch.plannedStartDate}
+              onChange={(e) => updateBatch({ plannedStartDate: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 focus:ring-rose-500 rounded-xl text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2"
+            />
+          </div>
 
-            {/* Display computed Treatment Count */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                จำนวนกลุ่มทดลอง (คำนวณ)
-              </label>
-              <input
-                type="text"
-                disabled
-                value={`${state.treatments.length} กลุ่ม`}
-                className="w-full px-3.5 py-2.5 bg-neutral-100 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-              />
-            </div>
+          {/* Display computed Treatment Count */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+              จำนวนกลุ่มทดลอง (คำนวณ)
+            </label>
+            <input
+              type="text"
+              disabled
+              value={`${state.treatments.length} กลุ่ม`}
+              className="w-full px-3.5 py-2.5 bg-neutral-100 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+            />
           </div>
 
           {/* Notes */}
-          <div className="space-y-1">
+          <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
               หมายเหตุ Batch
             </label>
@@ -844,26 +840,26 @@ export default function RoseTrialLabClient() {
                 className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 overflow-hidden shadow-sm"
               >
                 {/* Category Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
-                  <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-neutral-400" />
-                    <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 w-full min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Tag className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+                    <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 break-words">
                       {catLabel}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-neutral-400">
+                  <span className="text-xs font-semibold text-neutral-400 flex-shrink-0">
                     พร้อม: {categoryTotalReady} / {catItems.length}
                   </span>
                 </div>
 
                 {/* Category Items */}
-                <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                <ul className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-neutral-200 dark:bg-neutral-800 divide-y-0 divide-x-0">
                   {catItems.map((item) => {
                     const isItemReady = item.status === "ready" || item.status === "not_needed";
                     return (
                       <li
                         key={item.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 hover:bg-neutral-50/50 dark:hover:bg-neutral-900/30 transition-colors"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 bg-white dark:bg-neutral-950 hover:bg-neutral-50/50 dark:hover:bg-neutral-900/30 transition-colors odd:last:lg:col-span-2"
                       >
                         {/* Name & Critical */}
                         <div className="flex-1 min-w-0">
@@ -882,7 +878,7 @@ export default function RoseTrialLabClient() {
                             >
                               {item.isCritical ? "จำเป็น" : "เลือกได้"}
                             </button>
-                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 leading-snug">
+                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 leading-snug break-words">
                               {item.name}
                             </span>
                           </div>
@@ -892,7 +888,7 @@ export default function RoseTrialLabClient() {
                                 จำนวน: {item.requiredQuantity} {item.unit}
                               </span>
                             )}
-                            {item.notes && <span className="truncate max-w-xs">| {item.notes}</span>}
+                            {item.notes && <span className="break-words max-w-full">| {item.notes}</span>}
                           </div>
                         </div>
 
@@ -998,7 +994,7 @@ export default function RoseTrialLabClient() {
         )}
 
         {/* Treatment Cards list */}
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           {state.treatments.map((t) => {
             return (
               <div
@@ -1180,7 +1176,7 @@ export default function RoseTrialLabClient() {
           )}
 
           {/* Stats grid */}
-          <div className="grid grid-cols-2 divide-y divide-neutral-100 dark:divide-neutral-800 sm:grid-cols-4 sm:divide-y-0 sm:divide-x border-b border-neutral-100 dark:border-neutral-900">
+          <div className="grid grid-cols-2 divide-y divide-neutral-100 dark:divide-neutral-800 sm:grid-cols-2 md:grid-cols-4 sm:divide-y-0 md:divide-x border-b border-neutral-100 dark:border-neutral-900">
             <div className="flex flex-col items-center px-4 py-4 text-center">
               <span className="text-2xl font-bold text-neutral-900 dark:text-white">
                 {readiness.totalItems > 0
@@ -1238,11 +1234,11 @@ export default function RoseTrialLabClient() {
       {/* ─── Actions Buttons Toolbar ─────────────────────────────────────────── */}
       <section className="space-y-4" aria-label="การดำเนินการหลัก">
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-4 md:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center w-full">
             {/* Reset Button */}
             <button
               onClick={() => setResetDialogOpen(true)}
-              className="flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 px-4 py-3 text-sm font-semibold text-neutral-600 dark:text-neutral-300 transition-colors"
+              className="w-full sm:w-auto flex-shrink-0 flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 px-4 py-3 text-sm font-semibold text-neutral-600 dark:text-neutral-300 transition-colors"
             >
               <RotateCcw className="h-4 w-4" />
               รีเซ็ตข้อมูล
@@ -1251,7 +1247,7 @@ export default function RoseTrialLabClient() {
             {/* Save Button */}
             <button
               onClick={handleSave}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold border transition-colors ${
+              className={`w-full sm:w-auto flex-shrink-0 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold border transition-colors ${
                 isDirty
                   ? "bg-rose-50 border-rose-200 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/40 dark:hover:bg-rose-900/30 dark:text-rose-400"
                   : "bg-neutral-50 border-neutral-200 text-neutral-400 dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-500"
@@ -1264,7 +1260,7 @@ export default function RoseTrialLabClient() {
             {/* Export Button */}
             <button
               onClick={handleExportMarkdown}
-              className="flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-4 py-3 text-sm font-semibold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              className="w-full sm:w-auto flex-shrink-0 flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-4 py-3 text-sm font-semibold text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
             >
               <FileText className="h-4 w-4" />
               ส่งออก Markdown
@@ -1274,7 +1270,7 @@ export default function RoseTrialLabClient() {
             <button
               onClick={() => setDay0DialogOpen(true)}
               disabled={readiness.status !== "ready_for_day0"}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all ${
+              className={`w-full sm:w-auto sm:ml-auto flex-shrink-0 flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all ${
                 readiness.status === "ready_for_day0"
                   ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md active:scale-95 cursor-pointer"
                   : "bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 border border-neutral-200/50 dark:border-neutral-800/80 cursor-not-allowed"
