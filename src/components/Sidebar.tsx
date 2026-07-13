@@ -19,7 +19,8 @@ import {
     SparklesIcon,
     ChevronDownIcon,
     ChevronUpIcon,
-    TableCellsIcon
+    TableCellsIcon,
+    XMarkIcon
 } from "@heroicons/react/24/outline";
 
 const STORAGE_KEY = "workos.sidebar.collapsed";
@@ -54,6 +55,12 @@ export function Sidebar() {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     const [isHydrated, setIsHydrated] = useState(false);
+    const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+    const setMobileOpenState = (open: boolean) => {
+        setIsMobileOpen(open);
+        window.dispatchEvent(new CustomEvent("mobile-sidebar-state", { detail: open }));
+    };
 
     useEffect(() => {
         const savedCollapsed = localStorage.getItem(STORAGE_KEY);
@@ -65,7 +72,32 @@ export function Sidebar() {
             setIsAdvancedOpen(savedAdvanced === "true");
         }
         setIsHydrated(true);
+        window.dispatchEvent(new CustomEvent("mobile-sidebar-state", { detail: false }));
     }, []);
+
+    useEffect(() => {
+        const handleToggle = () => {
+            setMobileOpenState(!isMobileOpen);
+        };
+        window.addEventListener("toggle-mobile-sidebar", handleToggle);
+        return () => {
+            window.removeEventListener("toggle-mobile-sidebar", handleToggle);
+        };
+    }, [isMobileOpen]);
+
+    useEffect(() => {
+        setMobileOpenState(false);
+    }, [pathname]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && isMobileOpen) {
+                setMobileOpenState(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isMobileOpen]);
 
     const toggleCollapse = () => {
         const newState = !isCollapsed;
@@ -81,22 +113,44 @@ export function Sidebar() {
 
     // Avoid flash of expanded sidebar during hydration
     if (!isHydrated) {
-        return <aside className="w-56 bg-theme-sidebar border-r border-white/10 h-screen sticky top-0 z-40" />;
+        return <aside className="w-56 md:w-56 bg-theme-sidebar border-r border-white/10 h-screen fixed inset-y-0 left-0 z-50 transform -translate-x-full md:relative md:translate-x-0" />;
     }
 
+    const sidebarWidthClass = isCollapsed ? "md:w-18" : "md:w-56";
+
     return (
-        <aside className={`${isCollapsed ? "w-18" : "w-56"} bg-theme-sidebar border-r border-white/10 shadow-[1px_0_0_rgba(0,0,0,0.03)] flex flex-col h-screen sticky top-0 z-40 transition-all duration-300 transition-theme overflow-hidden`}>
-            {/* Logo */}
-            <div className={`h-16 flex items-center ${isCollapsed ? "justify-center px-0" : "px-6"} border-b border-white/10 mb-4 transition-all duration-300`}>
-                {isCollapsed ? (
-                    <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center font-bold text-white text-xs">AD</div>
-                ) : (
-                    <div className="flex flex-col leading-none">
-                        <span className="text-lg font-bold text-white">ArborDesk</span>
-                        <span className="text-[10px] text-white/50 font-medium tracking-wide">WorkOS-Lite</span>
-                    </div>
-                )}
-            </div>
+        <>
+            {/* Mobile Backdrop */}
+            {isMobileOpen && (
+                <div
+                    className="fixed inset-0 bg-black/60 z-40 md:hidden animate-fadeIn"
+                    onClick={() => setMobileOpenState(false)}
+                />
+            )}
+
+            <aside
+                id="mobile-sidebar"
+                className={`fixed inset-y-0 left-0 z-50 w-56 ${sidebarWidthClass} bg-theme-sidebar border-r border-white/10 shadow-[1px_0_0_rgba(0,0,0,0.03)] flex flex-col h-screen transform transition-transform md:transition-all duration-300 ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:relative md:flex overflow-hidden`}
+            >
+                {/* Logo */}
+                <div className={`h-16 flex items-center justify-between ${isCollapsed ? "justify-center px-0" : "px-6"} border-b border-white/10 mb-4 transition-all duration-300`}>
+                    {isCollapsed ? (
+                        <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center font-bold text-white text-xs">AD</div>
+                    ) : (
+                        <div className="flex flex-col leading-none">
+                            <span className="text-lg font-bold text-white">ArborDesk</span>
+                            <span className="text-[10px] text-white/50 font-medium tracking-wide">WorkOS-Lite</span>
+                        </div>
+                    )}
+                    {/* Mobile Close Button */}
+                    <button
+                        onClick={() => setMobileOpenState(false)}
+                        className="md:hidden p-1 rounded-md text-white/50 hover:text-white hover:bg-white/10 focus:outline-none"
+                        aria-label="Close menu"
+                    >
+                        <XMarkIcon className="w-6 h-6" />
+                    </button>
+                </div>
 
             {/* Navigation */}
             <nav className={`flex-1 ${isCollapsed ? "px-2" : "px-4"} space-y-1 transition-all duration-300 overflow-y-auto custom-scrollbar`}>
@@ -308,6 +362,7 @@ export function Sidebar() {
                 </button>
             </div>
         </aside>
+    </>
     );
 }
 

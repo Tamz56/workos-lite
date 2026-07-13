@@ -51,8 +51,18 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 
 import { loadRoseDay0State } from "./day-0/storage";
 import type { RoseDay0State } from "./day-0/types";
-import { buildTrialModeSummariesSafely } from "../../../../lib/rose-trial-domain/summaries";
+import {
+  buildTrialModeSummariesSafely,
+  buildRoseTrialComparisonReport,
+} from "../../../../lib/rose-trial-domain/summaries";
+import {
+  mapRoseDay0SnapshotToSnapshotRecord,
+  mapRoseDay0ToActualRecord,
+  mapRosePreparationToPlannedRecord,
+} from "../../../../lib/rose-trial-domain/adapters";
+import type { ActualLoadState } from "../../../../lib/rose-trial-domain/types";
 import { TrialModeSummary } from "./TrialModeSummary";
+import { TrialComparisonPanel } from "./TrialComparisonPanel";
 
 // ─── Readiness Calculation Helper ─────────────────────────────────────────────
 
@@ -498,6 +508,36 @@ export default function RoseTrialLabClient() {
   // Map read-only summaries behind a failure boundary; storage is never mutated here.
   const trialSummaries = buildTrialModeSummariesSafely(state, day0State, day0Corrupt);
 
+  // Compute three-way comparison report safely at runtime
+  let comparisonReport;
+  try {
+    const currentPlan = mapRosePreparationToPlannedRecord(state);
+    const snapshotPlan = day0State ? mapRoseDay0SnapshotToSnapshotRecord(day0State.trialSnapshot) : null;
+    const actual = day0State ? mapRoseDay0ToActualRecord(day0State) : null;
+    const actualLoadState: ActualLoadState = day0Corrupt
+      ? "corrupt"
+      : day0State
+        ? "valid"
+        : "not_found";
+
+    comparisonReport = buildRoseTrialComparisonReport({
+      currentPlan,
+      snapshotPlan,
+      actual,
+      actualLoadState,
+    });
+  } catch (err) {
+    console.error("Failed to build comparison report:", err);
+    comparisonReport = {
+      overallStatus: "corrupt" as const,
+      summaryText: "ข้อมูล Day 0 บางส่วนไม่สามารถอ่านได้",
+      items: [],
+      planChangeCount: 0,
+      actualDeviationCount: 0,
+      dataIssueCount: 0,
+    };
+  }
+
   return (
     <div className="w-full max-w-[1280px] mx-auto px-4 py-6 md:px-6 md:py-8 xl:px-8 space-y-6 pb-24">
       {/* Header Banner */}
@@ -541,6 +581,9 @@ export default function RoseTrialLabClient() {
 
       {/* Trial Mode Summary Cards */}
       <TrialModeSummary summaries={trialSummaries} />
+
+      {/* Three-Way Comparison Panel */}
+      <TrialComparisonPanel report={comparisonReport} />
 
       {/* ─── Section A: Pilot Overview ───────────────────────────────────────── */}
       <section className="space-y-3" aria-labelledby="pilot-overview-heading">

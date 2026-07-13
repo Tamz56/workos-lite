@@ -126,3 +126,85 @@ export interface TrialModeSummary {
   warnings: string[];
   href: string | null;
 }
+
+// ─── Three-Way Comparison Domain Models ───────────────────────────────────────
+
+export interface SnapshotTreatment {
+  code: string;
+  name: string;
+  description: string;
+  plannedUnitCount: number;
+  plannedInputName: string;
+  notes: string;
+}
+
+export interface SnapshotTrialRecord {
+  metadata: {
+    trialId: string;
+    snapshotCreatedAt: string | null;
+  };
+  identity: TrialIdentity;
+  plannedStartDate: string | null;
+  plannedBatch: {
+    batchName: string;
+    plannedUnitCount: number;
+  };
+  plannedTreatments: SnapshotTreatment[];
+  objectives: string[];
+  notes: string;
+  dataIssues: string[];
+}
+
+export type ActualLoadState = "not_found" | "valid" | "corrupt";
+
+export type TrialComparisonStatus =
+  | "match"
+  | "plan_changed"
+  | "actual_deviation"
+  | "incomplete";
+
+export type TrialComparisonChangeType =
+  | "added"
+  | "removed"
+  | "value_changed"
+  | "incomplete"
+  | "none";
+
+export type TrialComparisonCategory =
+  | "trial_identity"
+  | "batch"
+  | "schedule"
+  | "unit_count"
+  | "treatment"
+  | "data_quality";
+
+export type TrialComparisonSeverity = "info" | "warning" | "error";
+
+export interface TrialComparisonItem {
+  id: string;
+  category: TrialComparisonCategory;
+  severity: TrialComparisonSeverity;
+  status: TrialComparisonStatus;
+  changeType: TrialComparisonChangeType;
+  label: string;
+  currentPlanValue: string | number | null;
+  snapshotValue: string | number | null;
+  actualValue: string | number | null;
+  explanation: string;
+}
+
+export interface RoseTrialComparisonReport {
+  overallStatus: "no_actual" | "match" | "differs" | "incomplete" | "corrupt";
+  summaryText: string;
+  items: TrialComparisonItem[];
+  planChangeCount: number;
+  actualDeviationCount: number;
+  dataIssueCount: number;
+}
+
+export interface RoseTrialComparisonInput {
+  currentPlan: PlannedTrialRecord | null;
+  snapshotPlan: SnapshotTrialRecord | null;
+  actual: ActualTrialRecord | null;
+  actualLoadState: ActualLoadState;
+}

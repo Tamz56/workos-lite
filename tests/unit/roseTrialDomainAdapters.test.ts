@@ -5,9 +5,13 @@ import {
   createRoseTrialRecordId,
   mapRosePreparationToPlannedRecord,
   mapRoseDay0ToActualRecord,
+  mapRoseDay0SnapshotToSnapshotRecord,
 } from "../../src/lib/rose-trial-domain/adapters";
 import type { RoseTrialState } from "../../src/components/workspaces/travel/rose-trial/types";
-import type { RoseDay0State } from "../../src/components/workspaces/travel/rose-trial/day-0/types";
+import type {
+  Day0TrialSnapshot,
+  RoseDay0State,
+} from "../../src/components/workspaces/travel/rose-trial/day-0/types";
 import { createDefaultRoseTrialState } from "../../src/components/workspaces/travel/rose-trial/defaults";
 
 describe("Rose Trial Domain Adapters (GF-APP-077B)", () => {
@@ -572,6 +576,206 @@ describe("Rose Trial Domain Adapters (GF-APP-077B)", () => {
       const clone = structuredClone(validDay0State);
       mapRoseDay0ToActualRecord(validDay0State);
       expect(validDay0State).toEqual(clone);
+    });
+  });
+
+  describe("Day 0 Snapshot to Snapshot Record Adapter", () => {
+    it("should return null for null/undefined snapshot", () => {
+      expect(mapRoseDay0SnapshotToSnapshotRecord(null)).toBeNull();
+    });
+
+    it("should return null if trialName is missing", () => {
+      expect(
+        mapRoseDay0SnapshotToSnapshotRecord({ trialName: "" } as unknown as Day0TrialSnapshot)
+      ).toBeNull();
+    });
+
+    it("should map valid snapshot record correctly", () => {
+      const snap = validDay0State.trialSnapshot;
+      const record = mapRoseDay0SnapshotToSnapshotRecord(snap);
+      expect(record).not.toBeNull();
+      expect(record!.identity.title).toBe(snap.trialName);
+      expect(record!.plannedBatch.batchName).toBe(snap.batchName);
+      expect(record!.plannedBatch.plannedUnitCount).toBe(snap.totalCuttings);
+      expect(record!.plannedTreatments.length).toBe(2);
+      expect(record!.plannedTreatments[0].code).toBe("T1");
+      expect(record!.plannedTreatments[0].plannedUnitCount).toBe(15);
+      expect(record!.plannedTreatments[0].plannedInputName).toBe("IBA 1000 ppm");
+    });
+
+    it("should handle malformed snapshot treatment safely", () => {
+      const snap = {
+        ...validDay0State.trialSnapshot,
+        treatments: [null, { code: "T1", cuttingCount: "invalid" }] as unknown as Day0TrialSnapshot["treatments"],
+      };
+      const record = mapRoseDay0SnapshotToSnapshotRecord(snap);
+      expect(record).not.toBeNull();
+      expect(record!.plannedTreatments[0].code).toBe("T1");
+      expect(record!.plannedTreatments[0].plannedUnitCount).toBe(0); // normalized
+      expect(record!.dataIssues).toContain("snapshot_treatment_malformed");
+      expect(record!.dataIssues).toContain("snapshot_treatment_count_invalid");
+    });
+
+    it("should mark duplicate treatment codes in snapshot", () => {
+      const snap = {
+        ...validDay0State.trialSnapshot,
+        treatments: [
+          { code: "T1", name: "T1", description: "", cuttingCount: 10, inputName: "", notes: "" },
+          { code: "t1", name: "T1", description: "", cuttingCount: 10, inputName: "", notes: "" },
+        ],
+      };
+      const record = mapRoseDay0SnapshotToSnapshotRecord(snap);
+      expect(record!.dataIssues).toContain("snapshot_treatment_code_duplicate");
+    });
+
+    it("should fallback plannedStartDate to null when date is malformed", () => {
+      const snap = {
+        ...validDay0State.trialSnapshot,
+        plannedStartDate: "invalid-date",
+      };
+      const record = mapRoseDay0SnapshotToSnapshotRecord(snap);
+      expect(record!.plannedStartDate).toBeNull();
+    });
+
+    it("should not mutate the input snapshot object", () => {
+      const snap = structuredClone(validDay0State.trialSnapshot);
+      mapRoseDay0SnapshotToSnapshotRecord(validDay0State.trialSnapshot);
+      expect(validDay0State.trialSnapshot).toEqual(snap);
+    });
+
+    it("should mark a non-array snapshot treatment source", () => {
+      const snapshot = {
+        ...validDay0State.trialSnapshot,
+        treatments: { broken: true },
+      } as unknown as Day0TrialSnapshot;
+      const record = mapRoseDay0SnapshotToSnapshotRecord(snapshot);
+      expect(record!.plannedTreatments).toEqual([]);
+      expect(record!.dataIssues).toContain("snapshot_treatments_not_array");
+    });
+
+    it("should mark an invalid snapshot date", () => {
+      const record = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        plannedStartDate: "2026-02-30",
+      });
+      expect(record!.plannedStartDate).toBeNull();
+      expect(record!.dataIssues).toContain("snapshot_start_date_invalid");
+    });
+
+    it("should mark an invalid snapshot total count without throwing", () => {
+      const record = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        totalCuttings: -1,
+      });
+      expect(record!.plannedBatch.plannedUnitCount).toBe(0);
+      expect(record!.dataIssues).toContain("snapshot_total_count_invalid");
+    });
+
+    it("should preserve missing-code identities when malformed treatments are reordered", () => {
+      const first = { code: "", name: "กลุ่ม ก", description: "สูตร ก", cuttingCount: 5, inputName: "A", notes: "" };
+      const second = { code: "", name: "กลุ่ม ข", description: "สูตร ข", cuttingCount: 7, inputName: "B", notes: "" };
+      const before = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        treatments: [first, second],
+      });
+      const after = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        treatments: [second, first],
+      });
+      const codesByName = (record: NonNullable<typeof before>) =>
+        Object.fromEntries(record.plannedTreatments.map((treatment) => [treatment.name, treatment.code]));
+      expect(codesByName(before!)).toEqual(codesByName(after!));
+      expect(before!.dataIssues).toContain("snapshot_treatment_code_missing");
+    });
+
+    it("should mark missing batch and invalid treatment count", () => {
+      const record = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        batchName: "",
+        treatments: [{
+          ...validDay0State.trialSnapshot.treatments[0],
+          cuttingCount: 1.5,
+        }],
+      });
+      expect(record!.plannedBatch.batchName).toBe("");
+      expect(record!.plannedTreatments[0].plannedUnitCount).toBe(0);
+      expect(record!.dataIssues).toEqual(expect.arrayContaining([
+        "snapshot_batch_missing",
+        "snapshot_treatment_count_invalid",
+      ]));
+    });
+
+    it("should keep one representative for indistinguishable missing-code treatments", () => {
+      const treatment = {
+        code: "",
+        name: "กลุ่มไม่มีรหัส",
+        description: "สูตรเดียวกัน",
+        cuttingCount: 5,
+        inputName: "A",
+        notes: "",
+      };
+      const snapshot = {
+        ...validDay0State.trialSnapshot,
+        treatments: [treatment, { ...treatment }],
+      };
+      const original = structuredClone(snapshot);
+
+      expect(() => mapRoseDay0SnapshotToSnapshotRecord(snapshot)).not.toThrow();
+      const record = mapRoseDay0SnapshotToSnapshotRecord(snapshot)!;
+      const codes = record.plannedTreatments.map((item) => item.code);
+
+      expect(record.plannedTreatments).toHaveLength(1);
+      expect(record.dataIssues).toEqual(expect.arrayContaining([
+        "snapshot_treatment_code_missing",
+        "snapshot_treatment_identity_ambiguous",
+      ]));
+      expect(new Set(codes).size).toBe(codes.length);
+      expect(codes[0]).toMatch(/^missing-[0-9a-f]{8}$/);
+      expect(codes[0]).not.toMatch(/missing-\d{1,2}$/);
+      expect(snapshot).toEqual(original);
+    });
+
+    it("should resolve an ambiguous missing-code collision deterministically after reorder", () => {
+      const treatment = {
+        code: "",
+        name: "กลุ่มไม่มีรหัส",
+        description: "สูตรเดียวกัน",
+        cuttingCount: 5,
+        inputName: "A",
+        notes: "",
+      };
+      const first = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        treatments: [treatment, { ...treatment }],
+      });
+      const reordered = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        treatments: [{ ...treatment }, treatment],
+      });
+      const repeated = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        treatments: [treatment, { ...treatment }],
+      });
+
+      expect(reordered).toEqual(first);
+      expect(repeated).toEqual(first);
+    });
+
+    it("should preserve valid codes and separate distinct missing-code content", () => {
+      const record = mapRoseDay0SnapshotToSnapshotRecord({
+        ...validDay0State.trialSnapshot,
+        treatments: [
+          validDay0State.trialSnapshot.treatments[0],
+          { code: "", name: "กลุ่ม ก", description: "สูตร ก", cuttingCount: 5, inputName: "A", notes: "" },
+          { code: "", name: "กลุ่ม ข", description: "สูตร ข", cuttingCount: 5, inputName: "B", notes: "" },
+        ],
+      })!;
+      const codes = record.plannedTreatments.map((item) => item.code);
+
+      expect(codes[0]).toBe("T1");
+      expect(codes.slice(1)).toHaveLength(2);
+      expect(new Set(codes).size).toBe(3);
+      expect(record.dataIssues).not.toContain("snapshot_treatment_identity_ambiguous");
     });
   });
 });

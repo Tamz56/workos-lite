@@ -1,7 +1,7 @@
 // GF-APP-077B — Rose Trial Domain Adapters
 
 import type { RoseTrialState } from "../../components/workspaces/travel/rose-trial/types";
-import type { RoseDay0State } from "../../components/workspaces/travel/rose-trial/day-0/types";
+import type { RoseDay0State, Day0TrialSnapshot } from "../../components/workspaces/travel/rose-trial/day-0/types";
 import type {
   PlannedTrialRecord,
   PlannedTreatment,
@@ -10,6 +10,8 @@ import type {
   ActualTrialUnit,
   TrialIdentity,
   DomainRecordMetadata,
+  SnapshotTrialRecord,
+  SnapshotTreatment,
 } from "./types";
 
 const DEFAULT_TRIAL_NAME = "Rose Rooting Trial #1 — ทดลองปักชำกุหลาบ";
@@ -25,6 +27,15 @@ function safeString(value: unknown): string {
 
 function normalizeIdentityPart(value: string): string {
   return value.normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function fnv1a32(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
 }
 
 function normalizeCode(value: unknown, fallback: string): string {
@@ -86,15 +97,7 @@ export function createRoseTrialRecordId(
   const cleanBatch = normalizeIdentityPart(batchName);
   const content = `${cleanTitle}|${cleanBatch}`;
 
-  // FNV-1a 32-bit stable hash implementation
-  let hash = 2166136261;
-  for (let i = 0; i < content.length; i++) {
-    hash ^= content.charCodeAt(i);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-
-  const hexHash = hash.toString(16).padStart(8, "0");
-  return `rose-cutting:${mode}:${hexHash}`;
+  return `rose-cutting:${mode}:${fnv1a32(content)}`;
 }
 
 // ─── Date Validation Helper ──────────────────────────────────────────────────
@@ -382,6 +385,133 @@ export function mapRoseDay0ToActualRecord(
     deviationCount: Array.isArray(day0State.deviations)
       ? day0State.deviations.filter(isRecord).length
       : 0,
+    dataIssues,
+  };
+}
+
+// ─── Day 0 Snapshot to Snapshot Record Adapter ────────────────────────────────
+
+export function mapRoseDay0SnapshotToSnapshotRecord(
+  snapshot: Day0TrialSnapshot | null | undefined
+): SnapshotTrialRecord | null {
+  if (!snapshot || !isRecord(snapshot)) {
+    return null;
+  }
+
+  const title = safeString(snapshot.trialName).trim();
+  if (!title) return null;
+  const batchName = safeString(snapshot.batchName).trim();
+
+  // Create stable ID using the same naming scheme
+  const recordId = createRoseTrialRecordId(title, batchName, "planned");
+
+  const rawStartDate = safeString(snapshot.plannedStartDate);
+  const plannedStartDate = getValidDateOrNull(rawStartDate);
+  const dataIssues: string[] = [];
+  const plannedTreatments: SnapshotTreatment[] = [];
+
+  if (!batchName) dataIssues.push("snapshot_batch_missing");
+  if (rawStartDate.trim() && plannedStartDate === null) {
+    dataIssues.push("snapshot_start_date_invalid");
+  }
+  if (
+    typeof snapshot.totalCuttings !== "number" ||
+    !Number.isFinite(snapshot.totalCuttings) ||
+    !Number.isInteger(snapshot.totalCuttings) ||
+    snapshot.totalCuttings < 0
+  ) {
+    dataIssues.push("snapshot_total_count_invalid");
+  }
+
+  const rawTreatments = Array.isArray(snapshot.treatments) ? snapshot.treatments : [];
+  if (!Array.isArray(snapshot.treatments)) {
+    dataIssues.push("snapshot_treatments_not_array");
+  }
+  const validSourceCodes = new Set(
+    rawTreatments
+      .filter(isRecord)
+      .map((value) => normalizeIdentityPart(safeString(value.code)))
+      .filter(Boolean)
+  );
+  const usedMissingFallbackCodes = new Set<string>();
+  rawTreatments.forEach((value) => {
+    if (!isRecord(value)) {
+      dataIssues.push("snapshot_treatment_malformed");
+      return;
+    }
+    const rawCode = safeString(value.code).trim();
+    let code = normalizeCode(rawCode, "");
+    if (!rawCode) {
+      dataIssues.push("snapshot_treatment_code_missing");
+      const stableContent = [
+        safeString(value.name),
+        safeString(value.description),
+        safeString(value.inputName),
+        safeString(value.notes),
+        typeof value.cuttingCount === "number" && Number.isFinite(value.cuttingCount)
+          ? String(value.cuttingCount)
+          : "",
+      ].map(normalizeIdentityPart).join("|");
+      if (!stableContent.replace(/\|/g, "")) {
+        return;
+      }
+      code = `missing-${fnv1a32(stableContent)}`;
+      const normalizedFallback = normalizeIdentityPart(code);
+      if (
+        validSourceCodes.has(normalizedFallback) ||
+        usedMissingFallbackCodes.has(normalizedFallback)
+      ) {
+        if (!dataIssues.includes("snapshot_treatment_identity_ambiguous")) {
+          dataIssues.push("snapshot_treatment_identity_ambiguous");
+        }
+        return;
+      }
+      usedMissingFallbackCodes.add(normalizedFallback);
+    }
+    if (
+      typeof value.cuttingCount !== "number" ||
+      !Number.isFinite(value.cuttingCount) ||
+      !Number.isInteger(value.cuttingCount) ||
+      value.cuttingCount < 0
+    ) {
+      dataIssues.push("snapshot_treatment_count_invalid");
+    }
+    plannedTreatments.push({
+      code,
+      name: safeString(value.name).trim() || "กลุ่มทดลองนิรนาม",
+      description: safeString(value.description),
+      plannedUnitCount: normalizeNonNegativeInteger(value.cuttingCount),
+      plannedInputName: safeString(value.inputName).trim() || "ไม่ได้ระบุ",
+      notes: safeString(value.notes),
+    });
+  });
+
+  if (hasDuplicateCodes(plannedTreatments.map((t) => t.code))) {
+    dataIssues.push("snapshot_treatment_code_duplicate");
+  }
+
+  const identity: TrialIdentity = {
+    trialId: recordId,
+    plantId: null,
+    cropId: "rose",
+    trialType: "cutting",
+    title,
+  };
+
+  return {
+    metadata: {
+      trialId: recordId,
+      snapshotCreatedAt: getValidTimestampOrNull(snapshot.sourceUpdatedAt),
+    },
+    identity,
+    plannedStartDate,
+    plannedBatch: {
+      batchName,
+      plannedUnitCount: normalizeNonNegativeInteger(snapshot.totalCuttings),
+    },
+    plannedTreatments,
+    objectives: safeString(snapshot.goal).trim() ? [safeString(snapshot.goal)] : [],
+    notes: "",
     dataIssues,
   };
 }

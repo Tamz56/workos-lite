@@ -1,10 +1,23 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Command, Search } from "lucide-react";
+import { Command, Search, Menu } from "lucide-react";
 
 export default function Topbar() {
     const pathname = usePathname();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    useEffect(() => {
+        const handleState = (e: Event) => {
+            const customEvent = e as CustomEvent<boolean>;
+            setSidebarOpen(customEvent.detail);
+        };
+        window.addEventListener("mobile-sidebar-state", handleState);
+        return () => {
+            window.removeEventListener("mobile-sidebar-state", handleState);
+        };
+    }, []);
 
     const getTitle = () => {
         if (pathname === "/dashboard") return "Dashboard";
@@ -32,7 +45,20 @@ export default function Topbar() {
 
     return (
         <header className="sticky top-0 z-30 flex h-16 min-w-0 items-center justify-between border-b border-white/10 bg-theme-topbar backdrop-blur-md px-4 md:px-6 shadow-[0_1px_0_0_rgba(0,0,0,0.03)] transition-theme">
-            <h1 className="min-w-0 truncate text-lg font-bold text-white">{getTitle()}</h1>
+            <div className="flex items-center gap-3 min-w-0">
+                {/* Hamburger menu button for mobile */}
+                <button
+                    onClick={() => window.dispatchEvent(new CustomEvent("toggle-mobile-sidebar"))}
+                    aria-expanded={sidebarOpen}
+                    aria-controls="mobile-sidebar"
+                    className="md:hidden p-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/10 focus:outline-none flex items-center justify-center flex-shrink-0"
+                    aria-label="Open menu"
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
+                <h1 className="min-w-0 truncate text-lg font-bold text-white leading-none mt-0.5">{getTitle()}</h1>
+            </div>
+
             <div className="flex min-w-0 shrink-0 items-center gap-3">
                 <button 
                     onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
