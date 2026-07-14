@@ -25,14 +25,13 @@ import {
 } from "lucide-react";
 
 import type {
-  RoseTrialState,
+  RoseTrialStateV2,
   PilotOverview,
   BatchSetup,
   PreparationChecklistItem,
   Treatment,
   ChecklistStatus,
   ChecklistCategory,
-  ReadinessResult,
 } from "./types";
 import {
   createDefaultRoseTrialState,
@@ -44,6 +43,7 @@ import {
   saveRoseTrialState,
   clearRoseTrialState,
 } from "./storage";
+import { calculateReadiness, parseIntegerInput } from "./readiness";
 import { generateRoseTrialMarkdown } from "./exportMarkdown";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
@@ -64,151 +64,12 @@ import type { ActualLoadState } from "../../../../lib/rose-trial-domain/types";
 import { TrialModeSummary } from "./TrialModeSummary";
 import { TrialComparisonPanel } from "./TrialComparisonPanel";
 
-// ─── Readiness Calculation Helper ─────────────────────────────────────────────
-
-export function parseIntegerInput(value: string, minValue: number): number | null {
-  if (value === "") {
-    return 0;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    return null;
-  }
-
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < minValue) {
-    return null;
-  }
-
-  return parsed;
-}
-
-export function calculateReadiness(state: RoseTrialState): ReadinessResult {
-  const { pilot, batch, checklistItems, treatments } = state;
-  const totalItems = checklistItems.length;
-
-  // Ready = status is "ready" or "not_needed"
-  const readyItemsList = checklistItems.filter(
-    (i) => i.status === "ready" || i.status === "not_needed"
-  );
-  const readyItems = readyItemsList.length;
-
-  const criticalMissingItems = checklistItems.filter(
-    (i) => i.isCritical && i.status !== "ready" && i.status !== "not_needed"
-  );
-
-  const optionalPendingItems = checklistItems.filter(
-    (i) => !i.isCritical && i.status !== "ready" && i.status !== "not_needed"
-  );
-
-  // Cuttings validation
-  const hasValidTotalCuttings =
-    Number.isFinite(batch.totalCuttings) &&
-    Number.isInteger(batch.totalCuttings) &&
-    batch.totalCuttings > 0;
-  const totalCuttings = hasValidTotalCuttings ? batch.totalCuttings : 0;
-  const assignedCuttings = treatments.reduce((sum, t) => {
-    if (!Number.isFinite(t.cuttingCount) || !Number.isInteger(t.cuttingCount)) {
-      return sum;
-    }
-    return sum + t.cuttingCount;
-  }, 0);
-  const cuttingDifference = totalCuttings - assignedCuttings;
-
-  const reasons: string[] = [];
-
-  // Validation checks
-  if (!pilot.trialName.trim()) {
-    reasons.push("ชื่อการทดลองต้องไม่ว่าง");
-  }
-  if (!pilot.goal.trim()) {
-    reasons.push("เป้าหมายการทดลองต้องไม่ว่าง");
-  }
-  if (!batch.batchName.trim()) {
-    reasons.push("ชื่อ Batch ต้องไม่ว่าง");
-  }
-  if (!hasValidTotalCuttings) {
-    reasons.push("จำนวนกิ่งปักชำทั้งหมดต้องมากกว่า 0");
-  }
-  if (criticalMissingItems.length > 0) {
-    reasons.push(`ยังมีอุปกรณ์/วัสดุจำเป็น ${criticalMissingItems.length} รายการที่ยังไม่พร้อมใช้`);
-  }
-
-  // Treatment validation
-  const codes = new Set<string>();
-  let hasDuplicateCode = false;
-  let hasEmptyCode = false;
-  let hasEmptyName = false;
-  let hasInvalidCutting = false;
-
-  for (const t of treatments) {
-    const code = t.code.trim();
-    if (!code) {
-      hasEmptyCode = true;
-    } else if (codes.has(code)) {
-      hasDuplicateCode = true;
-    } else {
-      codes.add(code);
-    }
-
-    if (!t.name.trim()) {
-      hasEmptyName = true;
-    }
-    if (
-      !Number.isFinite(t.cuttingCount) ||
-      !Number.isInteger(t.cuttingCount) ||
-      t.cuttingCount < 0
-    ) {
-      hasInvalidCutting = true;
-    }
-  }
-
-  if (hasEmptyCode) {
-    reasons.push("มี Treatment Code ว่างอยู่");
-  }
-  if (hasDuplicateCode) {
-    reasons.push("มี Treatment Code ซ้ำกัน");
-  }
-  if (hasEmptyName) {
-    reasons.push("มีชื่อ Treatment ว่างอยู่");
-  }
-  if (hasInvalidCutting) {
-    reasons.push("จำนวนกิ่งใน Treatment ต้องเป็นจำนวนเต็มไม่ติดลบ");
-  }
-  if (cuttingDifference !== 0) {
-    reasons.push(
-      cuttingDifference > 0
-        ? `จำนวนกิ่งใน Treatment ขาดอีก ${cuttingDifference} กิ่ง`
-        : `จำนวนกิ่งใน Treatment เกินไป ${Math.abs(cuttingDifference)} กิ่ง`
-    );
-  }
-
-  let status: "not_ready" | "partially_ready" | "ready_for_day0" = "ready_for_day0";
-  if (reasons.length > 0) {
-    status = "not_ready";
-  } else if (optionalPendingItems.length > 0) {
-    status = "partially_ready";
-  }
-
-  return {
-    status,
-    totalItems,
-    readyItems,
-    criticalMissingItems,
-    optionalPendingItems,
-    totalCuttings,
-    assignedCuttings,
-    cuttingDifference,
-    reasons,
-  };
-}
-
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function RoseTrialLabClient() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [state, setState] = useState<RoseTrialState>(() => createDefaultRoseTrialState());
+  const [state, setState] = useState<RoseTrialStateV2>(() => createDefaultRoseTrialState());
   const [isDirty, setIsDirty] = useState(false);
   const [day0State, setDay0State] = useState<RoseDay0State | null>(null);
   const [day0Corrupt, setDay0Corrupt] = useState(false);
@@ -254,7 +115,7 @@ export default function RoseTrialLabClient() {
   useEffect(() => {
     setMounted(true);
     const loaded = loadRoseTrialState();
-    setState(loaded);
+    setState(loaded.state);
 
     // Load Day 0 state read-only safely
     try {
@@ -422,7 +283,7 @@ export default function RoseTrialLabClient() {
       setIsDirty(false);
       // Reload from storage to get updated timestamp
       const loaded = loadRoseTrialState();
-      setState(loaded);
+      setState(loaded.state);
       setToastType("success");
       setToastMessage("บันทึกข้อมูลการเตรียมแล้ว");
     } else {

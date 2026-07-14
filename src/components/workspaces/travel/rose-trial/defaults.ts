@@ -2,13 +2,113 @@
 // Stage 2B: ข้อมูลเริ่มต้นสำหรับ Rose Trial Lab
 
 import type {
-  RoseTrialState,
+  RoseTrialStateV2,
   ChecklistStatus,
   ChecklistCategory,
+  PilotGroupConfig,
+  InventoryItem,
+  TreatmentProductRecord,
+  Day0WorkflowState,
+  Day0WorkflowStepId,
+  PilotStartRecord,
 } from "./types";
+import { generateTrialSamples } from "./sampleGeneration";
 
-export const DEFAULT_ROSE_TRIAL_STATE: RoseTrialState = {
-  version: 1,
+const DEFAULT_GROUP_CONFIG: readonly PilotGroupConfig[] = [
+  { id: "W-T0", medium: "water", treatmentRole: "control", treatmentCode: "T0", replicateCount: 2, locked: true },
+  { id: "W-T1", medium: "water", treatmentRole: "treatment", treatmentCode: "T1", replicateCount: 2, locked: true },
+  { id: "P-T0", medium: "peat_moss", treatmentRole: "control", treatmentCode: "T0", replicateCount: 2, locked: true },
+  { id: "P-T1", medium: "peat_moss", treatmentRole: "treatment", treatmentCode: "T1", replicateCount: 2, locked: true },
+];
+
+export function createDefaultPilotGroupConfig(): PilotGroupConfig[] {
+  return DEFAULT_GROUP_CONFIG.map((group) => ({ ...group }));
+}
+
+const DEFAULT_INVENTORY_DEFINITIONS: ReadonlyArray<
+  Pick<InventoryItem, "id" | "category" | "name" | "requiredQuantity" | "unit" | "priority">
+> = [
+  { id: "inventory-trial-cuttings", category: "plant_material", name: "กิ่งพันธุ์สำหรับการทดลอง", requiredQuantity: 8, unit: "กิ่ง", priority: "A" },
+  { id: "inventory-water-containers", category: "container", name: "ภาชนะสำหรับกลุ่ม Water", requiredQuantity: 4, unit: "ใบ", priority: "A" },
+  { id: "inventory-peat-containers", category: "container", name: "ภาชนะสำหรับกลุ่ม Peat Moss", requiredQuantity: 4, unit: "ใบ", priority: "A" },
+  { id: "inventory-peat-moss", category: "growing_medium", name: "พีทมอส", requiredQuantity: 1, unit: "ชุด", priority: "A" },
+  { id: "inventory-clonex", category: "treatment_product", name: "Clonex Rooting Gel", requiredQuantity: 1, unit: "ชุด", priority: "A" },
+  { id: "inventory-scissors", category: "equipment", name: "กรรไกรตัดกิ่ง", requiredQuantity: 1, unit: "อัน", priority: "A" },
+  { id: "inventory-labels", category: "labeling", name: "ป้ายระบุ Sample", requiredQuantity: 8, unit: "ชิ้น", priority: "A" },
+  { id: "inventory-cleaning-materials", category: "sanitation", name: "วัสดุทำความสะอาดอุปกรณ์", requiredQuantity: 1, unit: "ชุด", priority: "A" },
+  { id: "inventory-trial-location", category: "trial_area", name: "พื้นที่วางการทดลอง", requiredQuantity: 1, unit: "พื้นที่", priority: "A" },
+];
+
+export function createDefaultInventory(): InventoryItem[] {
+  return DEFAULT_INVENTORY_DEFINITIONS.map((item) => ({
+    ...item,
+    availableQuantity: 0,
+    usableQuantity: 0,
+    status: "procure",
+    note: "",
+    lastCheckedAt: null,
+  }));
+}
+
+export function createDefaultTreatmentProduct(): TreatmentProductRecord {
+  return {
+    productName: "Clonex Rooting Gel",
+    brand: "Clonex",
+    productType: "Commercial Rooting Treatment",
+    form: "Gel",
+    activeIngredient: "IBA",
+    seller: "",
+    productUrl: "",
+    packagingType: "repacked_unknown",
+    status: "selected",
+    purchasedSize: "",
+    purchasePrice: null,
+    purchaseDate: "",
+    receivedDate: "",
+    openedDate: "",
+    expiryNote: "",
+    storageNote: "",
+    appearanceNote: "",
+    applicationMethod: "",
+    limitationNote: "",
+  };
+}
+
+const WORKFLOW_STEP_IDS: readonly Day0WorkflowStepId[] = [
+  "workspace_preparation",
+  "container_labeling",
+  "water_preparation",
+  "peat_preparation",
+  "tool_cleaning",
+  "sample_recording",
+  "allocation_confirmation",
+  "control_preparation",
+  "clonex_preparation",
+  "clonex_application",
+  "sample_placement",
+  "day0_evidence",
+  "trial_placement",
+  "final_confirmation",
+];
+
+export function createDefaultDay0Workflow(): Day0WorkflowState {
+  return {
+    steps: WORKFLOW_STEP_IDS.map((id) => ({ id, completed: false, completedAt: null })),
+  };
+}
+
+export function createDefaultPilotStartRecord(): PilotStartRecord {
+  return {
+    started: false,
+    startedAt: null,
+    startConfirmation: false,
+    lockedGroupSnapshot: [],
+    lockedSampleIds: [],
+  };
+}
+
+export const DEFAULT_ROSE_TRIAL_STATE: RoseTrialStateV2 = {
+  version: 2,
   pilot: {
     trialName: "Rose Rooting Trial #1 — ทดลองปักชำกุหลาบ",
     cropName: "กุหลาบ",
@@ -238,6 +338,12 @@ export const DEFAULT_ROSE_TRIAL_STATE: RoseTrialState = {
       source: "default",
     },
   ],
+  groupConfig: createDefaultPilotGroupConfig(),
+  inventory: createDefaultInventory(),
+  treatmentProduct: createDefaultTreatmentProduct(),
+  samples: generateTrialSamples(createDefaultPilotGroupConfig()),
+  day0Workflow: createDefaultDay0Workflow(),
+  pilotStart: createDefaultPilotStartRecord(),
   updatedAt: null,
 };
 
@@ -263,12 +369,20 @@ export const CHECKLIST_CATEGORY_LABELS: Record<ChecklistCategory, string> = {
   trial_area: "พื้นที่ทดลอง",
 };
 
-export function createDefaultRoseTrialState(): RoseTrialState {
+export function createDefaultRoseTrialState(): RoseTrialStateV2 {
+  const groupConfig = createDefaultPilotGroupConfig();
   return {
     ...DEFAULT_ROSE_TRIAL_STATE,
+    version: 2,
     pilot: { ...DEFAULT_ROSE_TRIAL_STATE.pilot },
     batch: { ...DEFAULT_ROSE_TRIAL_STATE.batch },
     checklistItems: DEFAULT_ROSE_TRIAL_STATE.checklistItems.map((item) => ({ ...item })),
     treatments: DEFAULT_ROSE_TRIAL_STATE.treatments.map((treatment) => ({ ...treatment })),
+    groupConfig,
+    inventory: createDefaultInventory(),
+    treatmentProduct: createDefaultTreatmentProduct(),
+    samples: generateTrialSamples(groupConfig),
+    day0Workflow: createDefaultDay0Workflow(),
+    pilotStart: createDefaultPilotStartRecord(),
   };
 }

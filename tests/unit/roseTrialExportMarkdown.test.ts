@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultRoseTrialState } from "@/components/workspaces/travel/rose-trial/defaults";
 import { generateRoseTrialMarkdown } from "@/components/workspaces/travel/rose-trial/exportMarkdown";
-import { calculateReadiness } from "@/components/workspaces/travel/rose-trial/RoseTrialLabClient";
+import { calculateReadiness } from "@/components/workspaces/travel/rose-trial/readiness";
 import type { PreparationChecklistItem, RoseTrialState, Treatment } from "@/components/workspaces/travel/rose-trial/types";
 
 const EXPORTED_AT = "2026-07-11T00:00:00.000Z";

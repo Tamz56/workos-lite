@@ -9,8 +9,8 @@ import { createDefaultRoseTrialState } from "@/components/workspaces/travel/rose
 import {
   calculateReadiness,
   parseIntegerInput,
-} from "@/components/workspaces/travel/rose-trial/RoseTrialLabClient";
-import type { RoseTrialState } from "@/components/workspaces/travel/rose-trial/types";
+} from "@/components/workspaces/travel/rose-trial/readiness";
+import type { RoseTrialStateV2 } from "@/components/workspaces/travel/rose-trial/types";
 
 const STORAGE_KEY = "gf:rose-trial:v1";
 
@@ -36,7 +36,7 @@ function installLocalStorageMock(initialValue: string | null = null, removeThrow
   });
 }
 
-function createReadyState(): RoseTrialState {
+function createReadyState(): RoseTrialStateV2 {
   const state = createDefaultRoseTrialState();
   return {
     ...state,
@@ -90,21 +90,22 @@ describe("Rose Trial Stage 2B.1 storage safety", () => {
     ["empty batch object", JSON.stringify({ ...createDefaultRoseTrialState(), batch: {} })],
     ["checklist item missing field", JSON.stringify({ ...createDefaultRoseTrialState(), checklistItems: [{ id: "x" }] })],
     ["treatment missing field", JSON.stringify({ ...createDefaultRoseTrialState(), treatments: [{ id: "x" }] })],
-    ["wrong version", JSON.stringify({ ...createDefaultRoseTrialState(), version: 2 })],
+    ["unsupported version", JSON.stringify({ ...createDefaultRoseTrialState(), version: 99 })],
   ])("falls back to defaults for %s", (_label, raw) => {
     installLocalStorageMock(raw);
 
     const loaded = loadRoseTrialState();
 
-    expect(loaded).toEqual(createDefaultRoseTrialState());
-    expect(loaded).not.toBe(createDefaultRoseTrialState());
+    expect(loaded.state).toEqual(createDefaultRoseTrialState());
+    expect(loaded.state).not.toBe(createDefaultRoseTrialState());
+    expect(["corrupt", "unsupported"]).toContain(loaded.status);
   });
 
   it("loads valid saved state", () => {
     const saved = createReadyState();
     installLocalStorageMock(JSON.stringify(saved));
 
-    expect(loadRoseTrialState()).toEqual(saved);
+    expect(loadRoseTrialState()).toEqual({ state: saved, status: "valid" });
   });
 
   it("returns false when clear fails", () => {

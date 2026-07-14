@@ -50,7 +50,7 @@ import {
   type Day0MarkdownPreview,
 } from "./logic";
 import { loadRoseTrialState } from "../storage";
-import { calculateReadiness as calculatePrepReadiness } from "../RoseTrialLabClient";
+import { calculateReadiness as calculatePrepReadiness } from "../readiness";
 import { Toast } from "@/components/ui/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
@@ -146,7 +146,7 @@ export default function RoseDay0Client() {
     setMounted(true);
 
     // 1. Load Preparation state to check readiness gate
-    const prep = loadRoseTrialState();
+    const prep = loadRoseTrialState().state;
     const readiness = calculatePrepReadiness(prep);
 
     if (readiness.status !== "ready_for_day0") {
