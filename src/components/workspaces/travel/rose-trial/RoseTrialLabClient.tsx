@@ -32,6 +32,8 @@ import type {
   Treatment,
   ChecklistStatus,
   ChecklistCategory,
+  InventoryItem,
+  TreatmentProductRecord,
 } from "./types";
 import {
   createDefaultRoseTrialState,
@@ -44,6 +46,9 @@ import {
   clearRoseTrialState,
 } from "./storage";
 import { calculateReadiness, parseIntegerInput } from "./readiness";
+import { mergeInventoryWithDefaults, updateInventoryItems } from "./inventory";
+import { InventorySection } from "./InventorySection";
+import { TreatmentProductSection } from "./TreatmentProductSection";
 import { generateRoseTrialMarkdown } from "./exportMarkdown";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
@@ -115,7 +120,10 @@ export default function RoseTrialLabClient() {
   useEffect(() => {
     setMounted(true);
     const loaded = loadRoseTrialState();
-    setState(loaded.state);
+    setState({
+      ...loaded.state,
+      inventory: mergeInventoryWithDefaults(loaded.state.inventory),
+    });
 
     // Load Day 0 state read-only safely
     try {
@@ -171,6 +179,22 @@ export default function RoseTrialLabClient() {
       checklistItems: prev.checklistItems.map((item) =>
         item.id === itemId ? { ...item, ...fields } : item
       ),
+    }));
+    setIsDirty(true);
+  };
+
+  const updateInventoryItem = (itemId: string, fields: Partial<InventoryItem>) => {
+    setState((prev) => ({
+      ...prev,
+      inventory: updateInventoryItems(prev.inventory, itemId, fields),
+    }));
+    setIsDirty(true);
+  };
+
+  const updateTreatmentProduct = (fields: Partial<TreatmentProductRecord>) => {
+    setState((prev) => ({
+      ...prev,
+      treatmentProduct: { ...prev.treatmentProduct, ...fields },
     }));
     setIsDirty(true);
   };
@@ -673,6 +697,18 @@ export default function RoseTrialLabClient() {
         </div>
       </section>
 
+      <InventorySection
+        items={state.inventory}
+        sectionStatus={readiness.sections.inventory}
+        onUpdateItem={updateInventoryItem}
+      />
+
+      <TreatmentProductSection
+        product={state.treatmentProduct}
+        sectionStatus={readiness.sections.treatmentProduct}
+        onUpdate={updateTreatmentProduct}
+      />
+
       {/* ─── Section C: Preparation Checklist ─────────────────────────────────── */}
       <section className="space-y-3" aria-labelledby="checklist-heading">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1061,7 +1097,7 @@ export default function RoseTrialLabClient() {
                   พร้อมบางส่วน (Partially Ready)
                 </p>
                 <p className="mt-1 text-xs text-amber-600 dark:text-amber-400/80 leading-relaxed font-semibold">
-                  รายการจำเป็นพร้อมแล้ว แต่ยังมีรายการทางเลือกที่ยังไม่พร้อม ระบบยังไม่เปิดให้เริ่ม Day 0 จนกว่ารายการเตรียมทั้งหมดจะครบตามเงื่อนไข
+                  ไม่มี blocker ที่ขัดขวางการเริ่ม Day 0 แต่ยังมีรายการที่ควรตรวจทบทวนก่อนดำเนินการ
                 </p>
               </div>
             </div>
@@ -1173,9 +1209,9 @@ export default function RoseTrialLabClient() {
             {/* Ready Day 0 Button */}
             <button
               onClick={() => setDay0DialogOpen(true)}
-              disabled={readiness.status !== "ready_for_day0"}
+              disabled={!readiness.canStart}
               className={`w-full sm:w-auto sm:ml-auto flex-shrink-0 flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all ${
-                readiness.status === "ready_for_day0"
+                readiness.canStart
                   ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md active:scale-95 cursor-pointer"
                   : "bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 border border-neutral-200/50 dark:border-neutral-800/80 cursor-not-allowed"
               }`}

@@ -28,15 +28,28 @@ export function createDefaultPilotGroupConfig(): PilotGroupConfig[] {
 const DEFAULT_INVENTORY_DEFINITIONS: ReadonlyArray<
   Pick<InventoryItem, "id" | "category" | "name" | "requiredQuantity" | "unit" | "priority">
 > = [
-  { id: "inventory-trial-cuttings", category: "plant_material", name: "กิ่งพันธุ์สำหรับการทดลอง", requiredQuantity: 8, unit: "กิ่ง", priority: "A" },
-  { id: "inventory-water-containers", category: "container", name: "ภาชนะสำหรับกลุ่ม Water", requiredQuantity: 4, unit: "ใบ", priority: "A" },
-  { id: "inventory-peat-containers", category: "container", name: "ภาชนะสำหรับกลุ่ม Peat Moss", requiredQuantity: 4, unit: "ใบ", priority: "A" },
+  { id: "inventory-trial-cuttings", category: "plant_material", name: "กิ่งกุหลาบทดลอง", requiredQuantity: 8, unit: "กิ่ง", priority: "A" },
+  { id: "inventory-spare-cuttings", category: "plant_material", name: "กิ่งสำรอง", requiredQuantity: 2, unit: "กิ่ง", priority: "B" },
+  { id: "inventory-water-containers", category: "container", name: "ภาชนะชำน้ำ", requiredQuantity: 4, unit: "ใบ", priority: "A" },
+  { id: "inventory-peat-containers", category: "container", name: "กระถางหรือถ้วยพีทมอส", requiredQuantity: 4, unit: "ใบ", priority: "A" },
+  { id: "inventory-clonex-portion-container", category: "container", name: "ภาชนะย่อยสำหรับแบ่ง Clonex", requiredQuantity: 1, unit: "ใบ", priority: "B" },
+  { id: "inventory-tray", category: "container", name: "ถาดรอง", requiredQuantity: 1, unit: "ใบ", priority: "B" },
+  { id: "inventory-water-source", category: "growing_medium", name: "น้ำจากแหล่งเดียวกัน", requiredQuantity: 1, unit: "ชุด", priority: "A" },
   { id: "inventory-peat-moss", category: "growing_medium", name: "พีทมอส", requiredQuantity: 1, unit: "ชุด", priority: "A" },
   { id: "inventory-clonex", category: "treatment_product", name: "Clonex Rooting Gel", requiredQuantity: 1, unit: "ชุด", priority: "A" },
+  { id: "inventory-gel-tool", category: "treatment_product", name: "อุปกรณ์แบ่งเจล", requiredQuantity: 1, unit: "ชิ้น", priority: "B" },
   { id: "inventory-scissors", category: "equipment", name: "กรรไกรตัดกิ่ง", requiredQuantity: 1, unit: "อัน", priority: "A" },
-  { id: "inventory-labels", category: "labeling", name: "ป้ายระบุ Sample", requiredQuantity: 8, unit: "ชิ้น", priority: "A" },
-  { id: "inventory-cleaning-materials", category: "sanitation", name: "วัสดุทำความสะอาดอุปกรณ์", requiredQuantity: 1, unit: "ชุด", priority: "A" },
+  { id: "inventory-cleaning-materials", category: "sanitation", name: "อุปกรณ์ทำความสะอาด", requiredQuantity: 1, unit: "ชุด", priority: "A" },
+  { id: "inventory-gloves", category: "equipment", name: "ถุงมือ", requiredQuantity: 1, unit: "คู่", priority: "B" },
+  { id: "inventory-ruler", category: "equipment", name: "ไม้บรรทัด", requiredQuantity: 1, unit: "อัน", priority: "B" },
+  { id: "inventory-labels", category: "labeling", name: "ป้าย Sample ID", requiredQuantity: 8, unit: "ชิ้น", priority: "A" },
+  { id: "inventory-waterproof-marker", category: "labeling", name: "ปากกากันน้ำ", requiredQuantity: 1, unit: "ด้าม", priority: "A" },
+  { id: "inventory-timer", category: "equipment", name: "Timer", requiredQuantity: 1, unit: "เครื่อง", priority: "B" },
+  { id: "inventory-camera", category: "equipment", name: "กล้องหรือโทรศัพท์", requiredQuantity: 1, unit: "เครื่อง", priority: "B" },
   { id: "inventory-trial-location", category: "trial_area", name: "พื้นที่วางการทดลอง", requiredQuantity: 1, unit: "พื้นที่", priority: "A" },
+  { id: "inventory-rain-protection", category: "trial_area", name: "การป้องกันฝน", requiredQuantity: 1, unit: "ชุด", priority: "A" },
+  { id: "inventory-direct-sun-reduction", category: "trial_area", name: "การลดแดดตรง", requiredQuantity: 1, unit: "ชุด", priority: "A" },
+  { id: "inventory-photo-area", category: "trial_area", name: "พื้นที่ถ่ายภาพ", requiredQuantity: 1, unit: "พื้นที่", priority: "B" },
 ];
 
 export function createDefaultInventory(): InventoryItem[] {

@@ -144,14 +144,14 @@ describe("Rose Trial Stage 2B.1 numeric validation", () => {
   });
 });
 
-describe("Rose Trial Stage 2B.1 copy guard", () => {
-  it("does not tell partially ready users that Day 0 can start", () => {
+describe("Rose Trial Stage 2B.1 warning gate copy", () => {
+  it("uses canStart and explains that warnings do not block Day 0", () => {
     const source = fs.readFileSync(
       path.join(process.cwd(), "src/components/workspaces/travel/rose-trial/RoseTrialLabClient.tsx"),
       "utf8"
     );
 
-    expect(source).not.toContain("คุณสามารถเริ่มต้น Day 0 ได้");
-    expect(source).toContain("ระบบยังไม่เปิดให้เริ่ม Day 0");
+    expect(source).toContain("disabled={!readiness.canStart}");
+    expect(source).toContain("ไม่มี blocker ที่ขัดขวางการเริ่ม Day 0");
   });
 });

@@ -11,6 +11,21 @@ function createLegacyReadyState(): RoseTrialStateV2 {
     batch: { ...state.batch, batchName: "Batch A", totalCuttings: 8 },
     checklistItems: state.checklistItems.map((item) => ({ ...item, status: "ready" })),
     treatments: state.treatments.map((treatment) => ({ ...treatment, cuttingCount: 4 })),
+    inventory: state.inventory.map((item) => ({
+      ...item,
+      availableQuantity: item.requiredQuantity,
+      usableQuantity: item.requiredQuantity,
+      status: "ready",
+    })),
+    treatmentProduct: {
+      ...state.treatmentProduct,
+      status: "ready_to_use",
+      packagingType: "original",
+      seller: "ผู้ขายที่ตรวจสอบแล้ว",
+      expiryNote: "ตรวจแล้ว",
+      applicationMethod: "ใช้ตามข้อมูลผู้ขาย",
+      storageNote: "เก็บตามข้อมูลผู้ขาย",
+    },
   };
 }
 
@@ -39,14 +54,14 @@ describe("Rose Trial preparation readiness", () => {
     expect(result.warnings).toEqual(["ยังมีอุปกรณ์/วัสดุทางเลือก 1 รายการที่ยังไม่พร้อมใช้"]);
   });
 
-  it("returns ready when legacy requirements pass and ignores UI-dependent pending sections", () => {
+  it("returns ready when Inventory and Product gates pass while later sections stay pending", () => {
     const result = calculateReadiness(createLegacyReadyState());
 
     expect(result.status).toBe("ready_for_day0");
     expect(result.canStart).toBe(true);
     expect(result.sections).toMatchObject({
-      inventory: "pending",
-      treatmentProduct: "pending",
+      inventory: "ready",
+      treatmentProduct: "ready",
       samples: "pending",
       day0Workflow: "pending",
     });

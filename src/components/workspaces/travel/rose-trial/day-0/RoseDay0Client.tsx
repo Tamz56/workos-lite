@@ -149,7 +149,7 @@ export default function RoseDay0Client() {
     const prep = loadRoseTrialState().state;
     const readiness = calculatePrepReadiness(prep);
 
-    if (readiness.status !== "ready_for_day0") {
+    if (!readiness.canStart) {
       setPrepReady(false);
       return;
     }

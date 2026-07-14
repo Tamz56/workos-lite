@@ -31,6 +31,21 @@ function createReadyState(): RoseTrialState {
       ...treatment,
       cuttingCount: 1,
     })),
+    inventory: state.inventory.map((item) => ({
+      ...item,
+      availableQuantity: item.requiredQuantity,
+      usableQuantity: item.requiredQuantity,
+      status: "ready",
+    })),
+    treatmentProduct: {
+      ...state.treatmentProduct,
+      status: "ready_to_use",
+      packagingType: "original",
+      seller: "ผู้ขายที่ตรวจสอบแล้ว",
+      expiryNote: "ตรวจแล้ว",
+      applicationMethod: "ใช้ตามข้อมูลผู้ขาย",
+      storageNote: "เก็บตามข้อมูลผู้ขาย",
+    },
   };
 }
 
