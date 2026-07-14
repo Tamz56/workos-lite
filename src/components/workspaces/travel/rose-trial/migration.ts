@@ -164,6 +164,7 @@ function isValidBaseline(value: unknown): boolean {
     "basalCutAppearance", "existingDamage", "note",
   ];
   return stringFields.every((field) => isString(value[field])) &&
+    (value.sampleLabel === undefined || isString(value.sampleLabel)) &&
     typeof value.photoChecklist.wholeCutting === "boolean" &&
     typeof value.photoChecklist.basalCut === "boolean" &&
     typeof value.photoChecklist.sampleLabel === "boolean";

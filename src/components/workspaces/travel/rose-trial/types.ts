@@ -137,6 +137,7 @@ export interface SamplePhotoChecklist {
 }
 
 export interface SampleBaseline {
+  sampleLabel?: string;
   source: string;
   motherPlantId: string;
   cuttingPosition: string;
@@ -154,6 +155,8 @@ export interface SampleBaseline {
   note: string;
   photoChecklist: SamplePhotoChecklist;
 }
+
+export type SampleInitialCondition = "normal" | "observe" | "unsuitable";
 
 export type TrialSampleStatus = "pending" | "ready" | "excluded" | "replaced";
 

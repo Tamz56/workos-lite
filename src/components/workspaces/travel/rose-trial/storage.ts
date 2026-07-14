@@ -1,5 +1,6 @@
 import type { RoseTrialLoadResult, RoseTrialStateV2 } from "./types";
 import { createDefaultRoseTrialState } from "./defaults";
+import { normalizeSamplePreparationFields } from "./samplePreparation";
 import {
   isRoseTrialStateV1,
   isRoseTrialStateV2,
@@ -46,7 +47,13 @@ export function loadRoseTrialState(): RoseTrialLoadResult {
   }
 
   if (isRoseTrialStateV2(parsed)) {
-    return { state: parsed, status: "valid" };
+    return {
+      state: {
+        ...parsed,
+        samples: normalizeSamplePreparationFields(parsed.samples),
+      },
+      status: "valid",
+    };
   }
 
   if (isRoseTrialStateV1(parsed)) {

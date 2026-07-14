@@ -26,6 +26,19 @@ function createLegacyReadyState(): RoseTrialStateV2 {
       applicationMethod: "ใช้ตามข้อมูลผู้ขาย",
       storageNote: "เก็บตามข้อมูลผู้ขาย",
     },
+    samples: state.samples.map((sample) => ({
+      ...sample,
+      status: "ready",
+      baseline: {
+        ...sample.baseline,
+        sampleLabel: sample.id,
+        length: "12",
+        nodeCount: "3",
+        initialCondition: "normal",
+        note: "ตรวจแล้ว",
+        photoChecklist: { ...sample.baseline.photoChecklist },
+      },
+    })),
   };
 }
 
@@ -54,7 +67,7 @@ describe("Rose Trial preparation readiness", () => {
     expect(result.warnings).toEqual(["ยังมีอุปกรณ์/วัสดุทางเลือก 1 รายการที่ยังไม่พร้อมใช้"]);
   });
 
-  it("returns ready when Inventory and Product gates pass while later sections stay pending", () => {
+  it("returns ready when Inventory, Product, and Sample gates pass while workflow stays pending", () => {
     const result = calculateReadiness(createLegacyReadyState());
 
     expect(result.status).toBe("ready_for_day0");
@@ -62,7 +75,7 @@ describe("Rose Trial preparation readiness", () => {
     expect(result.sections).toMatchObject({
       inventory: "ready",
       treatmentProduct: "ready",
-      samples: "pending",
+      samples: "ready",
       day0Workflow: "pending",
     });
   });

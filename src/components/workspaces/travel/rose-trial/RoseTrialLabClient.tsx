@@ -49,6 +49,11 @@ import { calculateReadiness, parseIntegerInput } from "./readiness";
 import { mergeInventoryWithDefaults, updateInventoryItems } from "./inventory";
 import { InventorySection } from "./InventorySection";
 import { TreatmentProductSection } from "./TreatmentProductSection";
+import { SamplePreparationSection } from "./SamplePreparationSection";
+import {
+  updateTrialSamples,
+  type SamplePreparationPatch,
+} from "./samplePreparation";
 import { generateRoseTrialMarkdown } from "./exportMarkdown";
 import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
@@ -195,6 +200,14 @@ export default function RoseTrialLabClient() {
     setState((prev) => ({
       ...prev,
       treatmentProduct: { ...prev.treatmentProduct, ...fields },
+    }));
+    setIsDirty(true);
+  };
+
+  const updateSample = (sampleId: string, patch: SamplePreparationPatch) => {
+    setState((prev) => ({
+      ...prev,
+      samples: updateTrialSamples(prev.samples, sampleId, patch),
     }));
     setIsDirty(true);
   };
@@ -707,6 +720,13 @@ export default function RoseTrialLabClient() {
         product={state.treatmentProduct}
         sectionStatus={readiness.sections.treatmentProduct}
         onUpdate={updateTreatmentProduct}
+      />
+
+      <SamplePreparationSection
+        groupConfig={state.groupConfig}
+        samples={state.samples}
+        sectionStatus={readiness.sections.samples}
+        onUpdateSample={updateSample}
       />
 
       {/* ─── Section C: Preparation Checklist ─────────────────────────────────── */}

@@ -46,6 +46,19 @@ function createReadyState(): RoseTrialState {
       applicationMethod: "ใช้ตามข้อมูลผู้ขาย",
       storageNote: "เก็บตามข้อมูลผู้ขาย",
     },
+    samples: state.samples.map((sample) => ({
+      ...sample,
+      status: "ready",
+      baseline: {
+        ...sample.baseline,
+        sampleLabel: sample.id,
+        length: "12",
+        nodeCount: "3",
+        initialCondition: "normal",
+        note: "ตรวจแล้ว",
+        photoChecklist: { ...sample.baseline.photoChecklist },
+      },
+    })),
   };
 }
 

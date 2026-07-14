@@ -1,4 +1,5 @@
 import { summarizeInventoryReadiness } from "./inventory";
+import { summarizeSamplePreparation } from "./samplePreparation";
 import type {
   ReadinessResult,
   ReadinessSectionStatus,
@@ -136,6 +137,7 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
 
   let inventoryStatus: ReadinessSectionStatus = "pending";
   let treatmentProductStatus: ReadinessSectionStatus = "pending";
+  let samplesStatus: ReadinessSectionStatus = "pending";
   if (state.version === 2) {
     const inventoryReadiness = summarizeInventoryReadiness(state.inventory);
     blockers.push(...inventoryReadiness.blockers);
@@ -154,6 +156,11 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
     blockers.push(...productReadiness.blockers);
     warnings.push(...productReadiness.warnings);
     treatmentProductStatus = productReadiness.status;
+
+    const sampleReadiness = summarizeSamplePreparation(state.samples, state.groupConfig);
+    blockers.push(...sampleReadiness.blockers);
+    warnings.push(...sampleReadiness.warnings);
+    samplesStatus = sampleReadiness.status;
   }
 
   const status = blockers.length > 0
@@ -175,7 +182,7 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
         ? "blocked" : optionalPendingItems.length > 0 ? "warning" : "ready",
       inventory: inventoryStatus,
       treatmentProduct: treatmentProductStatus,
-      samples: "pending",
+      samples: samplesStatus,
       day0Workflow: "pending",
     },
     totalItems,

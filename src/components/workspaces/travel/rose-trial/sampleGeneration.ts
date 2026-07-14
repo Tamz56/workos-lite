@@ -6,6 +6,7 @@ import type {
 
 export function createDefaultSampleBaseline(): SampleBaseline {
   return {
+    sampleLabel: "",
     source: "",
     motherPlantId: "",
     cuttingPosition: "",
@@ -16,7 +17,7 @@ export function createDefaultSampleBaseline(): SampleBaseline {
     nodeCount: "",
     leafCount: "",
     stemMaturity: "",
-    initialCondition: "",
+    initialCondition: "normal",
     stemColor: "",
     basalCutAppearance: "",
     existingDamage: "",
@@ -83,6 +84,10 @@ export function generateTrialSamples(
           ? {
               ...defaultBaseline,
               ...existing.baseline,
+              sampleLabel: existing.baseline.sampleLabel ?? "",
+              initialCondition: ["normal", "observe", "unsuitable"].includes(existing.baseline.initialCondition)
+                ? existing.baseline.initialCondition
+                : "normal",
               photoChecklist: {
                 ...defaultBaseline.photoChecklist,
                 ...existing.baseline.photoChecklist,
