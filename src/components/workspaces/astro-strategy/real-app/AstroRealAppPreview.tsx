@@ -4,6 +4,7 @@ import * as React from "react";
 import { Star } from "lucide-react";
 
 import { AstroTodayPanel } from "./components/AstroTodayPanel";
+import { AstroStrategicTimingPanel } from "./components/AstroStrategicTimingPanel";
 import { AstroReflectionPanel } from "./components/AstroReflectionPanel";
 import { AstroReflectionHistoryPanel } from "./components/AstroReflectionHistoryPanel";
 import { AstroStrategyPlanningPanel } from "./components/AstroStrategyPlanningPanel";
@@ -45,10 +46,11 @@ import {
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type PreviewTab = "today" | "weekly" | "monthly" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools";
+type PreviewTab = "today" | "timing" | "weekly" | "monthly" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools";
 
 const TAB_ITEMS: { id: PreviewTab; label: string; description: string }[] = [
   { id: "today", label: "📊 สรุปวันนี้", description: "Daily Timing Brief" },
+  { id: "timing", label: "🕰 ฤกษ์และจังหวะเวลา", description: "Strategic Timing" },
   { id: "weekly", label: "📅 สรุปสัปดาห์", description: "Weekly Timing View" },
   { id: "monthly", label: "📅 สรุปรอบเดือน", description: "Monthly Strategy" },
   { id: "reflection", label: "✍️ สะท้อนคิด", description: "Reflection Log" },
@@ -893,6 +895,12 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
               thaiTransitFallbackNote={isHydrated ? thaiTransitFallbackNote : null}
               composerStrategyContext={isHydrated ? composerStrategyContext : null}
               showComposerStrategySummary={true}
+              onNavigateToTab={(tabId) => setActiveTab(tabId)}
+            />
+          )}
+          {activeTab === "timing" && (
+            <AstroStrategicTimingPanel
+              onNavigateToTab={(tabId) => setActiveTab(tabId)}
             />
           )}
           {activeTab === "weekly" && (

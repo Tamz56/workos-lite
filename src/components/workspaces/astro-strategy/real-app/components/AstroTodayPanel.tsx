@@ -40,6 +40,9 @@ export type AstroTodayPanelProps = {
   showComposerStrategySummary?: boolean;
   defaultComposerSummaryCollapsed?: boolean;
   composerSummaryVariant?: "compact" | "expanded";
+
+  // Navigation shell callback
+  onNavigateToTab?: (tabId: "today" | "timing" | "weekly" | "monthly" | "reflection" | "history" | "planning" | "profile" | "guide" | "tools" | "timing") => void;
 };
 
 const DEFAULT_WORK_RECOMMENDATION_MAP: Record<string, string> = {
@@ -76,7 +79,7 @@ export function AstroTodayPanel({
   workRecommendations = ["structure before expansion", "one checkpoint at a time"],
   riskPreventions = ["looping thoughts", "too much project switching"],
   recoveryAnchors = ["3-minute eye rest", "5-minute breathing pause"],
-  reflectionPrompt = "วันนี้มีงานหรือโปรเจกต์ใดที่ควรปิดเป็น checkpoint เล็ก ๆ ก่อนเปิดเรื่องใหม่?",
+  reflectionPrompt = "วันนี้มีงานหรือโปรเจกต์ใดที่ควรปิดเป็น checkpoint เล็ก ๆ ก่อนเรื่องใหม่?",
   workRecommendationThaiMap = DEFAULT_WORK_RECOMMENDATION_MAP,
   riskPreventionThaiMap = DEFAULT_RISK_PREVENTION_MAP,
   recoveryAnchorThaiMap = DEFAULT_RECOVERY_ANCHOR_MAP,
@@ -93,6 +96,7 @@ export function AstroTodayPanel({
   composerStrategyContext = null,
   showComposerStrategySummary = true,
   defaultComposerSummaryCollapsed = true,
+  onNavigateToTab,
 }: AstroTodayPanelProps) {
   const [chineseAstroExpanded, setChineseAstroExpanded] = React.useState(false);
   const [thaiTransitExpanded, setThaiTransitExpanded] = React.useState(!defaultThaiTransitCollapsed);
@@ -227,6 +231,46 @@ export function AstroTodayPanel({
             )}
           </div>
         )}
+
+        {/* Daily Timing Summary Card - Access Point to Strategic Timing Full View */}
+        <div className="bg-gradient-to-r from-violet-950/30 via-slate-900/50 to-indigo-950/30 border border-violet-500/20 rounded-xl p-5 space-y-4 hover:border-violet-500/40 transition-all sm:col-span-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-violet-500/10 pb-3">
+            <div className="flex items-center gap-2 text-violet-300">
+              <Compass className="w-5 h-5 text-violet-400" />
+              <span className="font-bold text-xs sm:text-sm tracking-wide text-slate-100">
+                🕰 สรุปจังหวะและฤกษ์วันนี้ — Strategic Timing Summary
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigateToTab?.("timing")}
+              className="px-3 py-1 rounded bg-violet-950/80 text-violet-200 border border-violet-500/25 text-xs hover:bg-violet-900 transition-all font-medium flex items-center gap-1 shadow-sm"
+            >
+              วิเคราะห์จังหวะยุทธศาสตร์ ➔
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-slate-350">
+            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/80 space-y-1">
+              <span className="text-slate-400 font-medium">จังหวะหลักของวันนี้:</span>
+              <p className="text-violet-300 font-bold text-xs">
+                {strategyMode === "Pause & Calibrate" ? "ชะลอและปรับทิศ (Pause)" : "ประคองและจัดระบบ (Stabilize)"}
+              </p>
+            </div>
+            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/80 space-y-1">
+              <span className="text-slate-400 font-medium">ช่วงเวลาส่งเสริม (Supportive):</span>
+              <p className="text-emerald-400 font-bold text-xs">14:00 น. — 15:30 น.</p>
+            </div>
+            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/80 space-y-1">
+              <span className="text-slate-400 font-medium">ช่วงควรชะลอ (Caution):</span>
+              <p className="text-rose-450 font-bold text-xs">16:30 น. — 18:00 น.</p>
+            </div>
+          </div>
+          
+          <p className="text-[10px] text-slate-450 leading-relaxed italic">
+            *ข้อมูลจำลองใน V1: หากต้องการประเมินเป้าหมายกิจกรรมเฉพาะ (เช่น เดินทาง เจรจา ชำระเงิน) หรือใช้ระบบนำทางวางกำหนดการคงที่ กรุณากดปุ่มด้านบนเพื่อเปิดหน้าวิเคราะห์เต็มรูปแบบ
+          </p>
+        </div>
 
         {/* Work Recommendation */}
         <div className="bg-slate-950/70 border border-slate-700/80 p-6 rounded-xl space-y-3 hover:border-slate-650 transition-all">
