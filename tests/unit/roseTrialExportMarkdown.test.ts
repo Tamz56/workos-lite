@@ -82,6 +82,15 @@ describe("generateRoseTrialMarkdown", () => {
     expect(markdown).toContain("- [x] ผ่านเงื่อนไขความพร้อมที่ระบบกำหนด");
   });
 
+  it("exports clarified checklist status labels", () => {
+    const state = createReadyState();
+    state.checklistItems[0] = { ...state.checklistItems[0], status: "have" };
+
+    const markdown = exportState(state);
+
+    expect(markdown).toContain("มีของแล้ว — รอตรวจพร้อมใช้");
+  });
+
   it("exports a partially ready state", () => {
     const state = createReadyState();
     state.checklistItems[2] = {

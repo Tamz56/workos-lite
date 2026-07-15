@@ -197,6 +197,13 @@ export interface Day0WorkflowStepState {
 
 export interface Day0WorkflowState {
   steps: Day0WorkflowStepState[];
+  currentStep: number;
+  completedChecklist: string[];
+  sampleConfirmations: string[];
+  groupConfirmations: string[];
+  placementConfirmations: string[];
+  finalConfirm: boolean;
+  notes: string;
 }
 
 export interface PilotStartRecord {

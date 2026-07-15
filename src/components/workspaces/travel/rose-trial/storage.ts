@@ -1,6 +1,12 @@
 import type { RoseTrialLoadResult, RoseTrialStateV2 } from "./types";
-import { createDefaultRoseTrialState } from "./defaults";
+import {
+  createDefaultRoseTrialState,
+  createDefaultPilotStartRecord,
+  createDefaultTreatmentProduct,
+} from "./defaults";
+import { normalizeDay0Workflow } from "./day0SetupWorkflow";
 import { normalizeSamplePreparationFields } from "./samplePreparation";
+import { mergeInventoryWithDefaults } from "./inventory";
 import {
   isRoseTrialStateV1,
   isRoseTrialStateV2,
@@ -47,9 +53,22 @@ export function loadRoseTrialState(): RoseTrialLoadResult {
   }
 
   if (isRoseTrialStateV2(parsed)) {
+    const day0Workflow = normalizeDay0Workflow(parsed.day0Workflow);
+    const pilotStart = {
+      ...createDefaultPilotStartRecord(),
+      ...parsed.pilotStart,
+    };
+    const treatmentProduct = {
+      ...createDefaultTreatmentProduct(),
+      ...parsed.treatmentProduct,
+    };
     return {
       state: {
         ...parsed,
+        day0Workflow,
+        pilotStart,
+        treatmentProduct,
+        inventory: mergeInventoryWithDefaults(parsed.inventory),
         samples: normalizeSamplePreparationFields(parsed.samples),
       },
       status: "valid",

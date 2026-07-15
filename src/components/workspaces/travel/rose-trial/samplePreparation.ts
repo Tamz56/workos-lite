@@ -82,15 +82,56 @@ function parseCondition(value: string): SampleInitialCondition | null {
 export function normalizeSamplePreparationFields(
   samples: readonly TrialSample[]
 ): TrialSample[] {
-  return samples.map((sample) => ({
-    ...sample,
-    baseline: {
+  return samples.map((sample) => {
+    const defaultBaseline = {
+      sampleLabel: "",
+      source: "",
+      motherPlantId: "",
+      cuttingPosition: "",
+      cuttingDate: "",
+      cuttingTime: "",
+      length: "",
+      stemDiameter: "",
+      nodeCount: "",
+      leafCount: "",
+      stemMaturity: "",
+      initialCondition: "normal",
+      stemColor: "",
+      basalCutAppearance: "",
+      existingDamage: "",
+      note: "",
+      photoChecklist: {
+        wholeCutting: false,
+        basalCut: false,
+        sampleLabel: false,
+      },
+    };
+
+    const baseline = {
+      ...defaultBaseline,
       ...sample.baseline,
       sampleLabel: sample.baseline.sampleLabel ?? "",
-      initialCondition: sample.baseline.initialCondition === "" ? "normal" : sample.baseline.initialCondition,
-      photoChecklist: { ...sample.baseline.photoChecklist },
-    },
-  }));
+      length: typeof sample.baseline.length === "string" ? sample.baseline.length : "",
+      nodeCount: typeof sample.baseline.nodeCount === "string" ? sample.baseline.nodeCount : "",
+      initialCondition: (["normal", "observe", "unsuitable"] as readonly string[]).includes(sample.baseline.initialCondition)
+        ? sample.baseline.initialCondition
+        : "normal",
+      note: sample.baseline.note ?? "",
+      photoChecklist: sample.baseline.photoChecklist
+        ? { ...defaultBaseline.photoChecklist, ...sample.baseline.photoChecklist }
+        : { ...defaultBaseline.photoChecklist },
+    };
+
+    return {
+      ...sample,
+      status: ["pending", "ready", "excluded", "replaced"].includes(sample.status)
+        ? sample.status
+        : "pending",
+      baseline,
+      replacementFor: sample.replacementFor ?? null,
+      excludedReason: sample.excludedReason ?? "",
+    };
+  });
 }
 
 export function updateTrialSamples(

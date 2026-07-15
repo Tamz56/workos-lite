@@ -122,4 +122,108 @@ describe("Rose Trial v1 to v2 migration", () => {
     expect(setItem).not.toHaveBeenCalled();
     expect(store.get(ROSE_TRIAL_STORAGE_KEY)).toBe(before);
   });
+
+  it("loads v2 and normalizes optional fields missing in storage", () => {
+    const rawState = createDefaultRoseTrialState();
+    delete (rawState.treatmentProduct as unknown as Record<string, unknown>).brand;
+    delete (rawState.treatmentProduct as unknown as Record<string, unknown>).productUrl;
+    for (const item of rawState.inventory) {
+      delete (item as unknown as Record<string, unknown>).note;
+      delete (item as unknown as Record<string, unknown>).availableQuantity;
+      delete (item as unknown as Record<string, unknown>).usableQuantity;
+    }
+    for (const sample of rawState.samples) {
+      delete (sample.baseline as unknown as Record<string, unknown>).note;
+    }
+
+    const { setItem } = installStorage(JSON.stringify(rawState));
+    const result = loadRoseTrialState();
+
+    expect(result.status).toBe("valid");
+    expect(result.state.treatmentProduct.brand).toBe("Clonex");
+    expect(result.state.treatmentProduct.productUrl).toBe("");
+    expect(result.state.inventory.every((item) => item.note === "")).toBe(true);
+    expect(result.state.inventory.every((item) => item.availableQuantity === 0)).toBe(true);
+    expect(result.state.inventory.every((item) => item.usableQuantity === 0)).toBe(true);
+    expect(result.state.samples.every((sample) => sample.baseline.note === "")).toBe(true);
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["decimal", 1.5, 0],
+    ["valid integer", 3, 3],
+  ])("normalizes a stored %s quantity without rewriting raw storage", (_label, storedValue, expectedValue) => {
+    const rawState = createDefaultRoseTrialState();
+    const target = rawState.inventory.find((item) => item.id === "inventory-clonex");
+    expect(target).toBeDefined();
+    if (!target) return;
+    target.availableQuantity = storedValue;
+    target.usableQuantity = storedValue;
+    const raw = JSON.stringify(rawState);
+    const { store, setItem } = installStorage(raw);
+
+    const result = loadRoseTrialState();
+    const normalized = result.state.inventory.find((item) => item.id === "inventory-clonex");
+
+    expect(result.status).toBe("valid");
+    expect(normalized?.availableQuantity).toBe(expectedValue);
+    expect(normalized?.usableQuantity).toBe(expectedValue);
+    expect(store.get(ROSE_TRIAL_STORAGE_KEY)).toBe(raw);
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["string", "3"],
+    ["object", {}],
+    ["array", []],
+    ["null", null],
+  ])("rejects a stored quantity with wrong structural type: %s", (_label, malformedValue) => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const rawState = createDefaultRoseTrialState();
+    const target = rawState.inventory.find((item) => item.id === "inventory-clonex");
+    expect(target).toBeDefined();
+    if (!target) return;
+    (target as unknown as Record<string, unknown>).availableQuantity = malformedValue;
+    const raw = JSON.stringify(rawState);
+    const { store, setItem } = installStorage(raw);
+
+    const result = loadRoseTrialState();
+
+    expect(result.status).toBe("corrupt");
+    expect(store.get(ROSE_TRIAL_STORAGE_KEY)).toBe(raw);
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it("rejects v2 payload with structural corruption", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const stateWithBadQuantity = createDefaultRoseTrialState();
+    (stateWithBadQuantity.inventory[0] as unknown as Record<string, unknown>).availableQuantity = { amount: 5 };
+    installStorage(JSON.stringify(stateWithBadQuantity));
+    expect(loadRoseTrialState().status).toBe("corrupt");
+
+    const stateWithBadSamples = createDefaultRoseTrialState();
+    (stateWithBadSamples as unknown as Record<string, unknown>).samples = "bad-string";
+    installStorage(JSON.stringify(stateWithBadSamples));
+    expect(loadRoseTrialState().status).toBe("corrupt");
+
+    const stateWithBadUnknown = createDefaultRoseTrialState();
+    (stateWithBadUnknown.inventory as unknown as unknown[]).push({
+      id: "unknown-bad-item",
+      category: "equipment",
+      name: "อุปกรณ์ไม่ดี",
+      requiredQuantity: 1,
+      availableQuantity: 1,
+      usableQuantity: 1,
+      status: "ready",
+      priority: "B",
+      note: "",
+      lastCheckedAt: null,
+    });
+    const { store } = installStorage(JSON.stringify(stateWithBadUnknown));
+    const loadedResult = loadRoseTrialState();
+    expect(loadedResult.status).toBe("valid");
+    expect(loadedResult.state.inventory.find((i) => i.id === "unknown-bad-item")).toBeUndefined();
+    expect(store.get(ROSE_TRIAL_STORAGE_KEY)).toContain("unknown-bad-item");
+  });
 });

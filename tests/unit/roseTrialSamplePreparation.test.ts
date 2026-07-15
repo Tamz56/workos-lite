@@ -284,6 +284,9 @@ describe("Rose Trial Sample Preparation persistence and rendering", () => {
     for (const sample of oldState.samples) {
       delete sample.baseline.sampleLabel;
       sample.baseline.initialCondition = "";
+      delete (sample.baseline as unknown as Record<string, unknown>).length;
+      delete (sample.baseline as unknown as Record<string, unknown>).nodeCount;
+      delete (sample.baseline as unknown as Record<string, unknown>).note;
     }
     store.set(ROSE_TRIAL_STORAGE_KEY, JSON.stringify(oldState));
 
@@ -292,6 +295,9 @@ describe("Rose Trial Sample Preparation persistence and rendering", () => {
     expect(loaded.status).toBe("valid");
     expect(loaded.state.samples.every((sample) => sample.baseline.sampleLabel === "")).toBe(true);
     expect(loaded.state.samples.every((sample) => sample.baseline.initialCondition === "normal")).toBe(true);
+    expect(loaded.state.samples.every((sample) => sample.baseline.length === "")).toBe(true);
+    expect(loaded.state.samples.every((sample) => sample.baseline.nodeCount === "")).toBe(true);
+    expect(loaded.state.samples.every((sample) => sample.baseline.note === "")).toBe(true);
     expect(setItem).not.toHaveBeenCalled();
   });
 

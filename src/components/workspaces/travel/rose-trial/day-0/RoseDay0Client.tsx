@@ -50,10 +50,12 @@ import {
   type Day0MarkdownPreview,
 } from "./logic";
 import { loadRoseTrialState } from "../storage";
+import { determineDay0Mode, shouldAccessLegacyDay0Storage } from "../day0SetupWorkflow";
 import { calculateReadiness as calculatePrepReadiness } from "../readiness";
 import { Toast } from "@/components/ui/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
+import Day0SetupWorkflow from "./Day0SetupWorkflow";
 
 // ─── Completion Validation Logic ──────────────────────────────────────────────
 
@@ -110,7 +112,7 @@ export function validateCompletion(state: RoseDay0State): { isValid: boolean; re
 export default function RoseDay0Client() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [prepReady, setPrepReady] = useState(false);
+  const [mode, setMode] = useState<"loading" | "blocker" | "setup" | "legacy">("loading");
 
   // States
   const [state, setState] = useState<RoseDay0State | null>(null);
@@ -142,18 +144,78 @@ export default function RoseDay0Client() {
   });
 
   // Load state on mount
+  const initializeOrLoadDay0State = () => {
+    const prep = loadRoseTrialState().state;
+    const readiness = calculatePrepReadiness(prep);
+    const result = loadRoseDay0State();
+    if (result.isCorrupt) {
+      setIsCorrupt(true);
+      setCorruptJson(result.rawJson);
+      return;
+    }
+
+    if (result.state) {
+      setSnapshotChangeReasons(getPreparationSnapshotChangeReasons(result.state.trialSnapshot, prep));
+      setState(result.state);
+    } else {
+      // Create initial snapshot from Prep
+      const treatmentsSnapshot: Day0TreatmentSnapshot[] = prep.treatments.map((t) => ({
+        code: t.code,
+        name: t.name,
+        description: t.description,
+        cuttingCount: t.cuttingCount || 0,
+        inputName: t.inputName || "",
+        notes: t.notes || "",
+      }));
+
+      const snapshot: Day0TrialSnapshot = {
+        trialName: prep.pilot.trialName,
+        cropName: prep.pilot.cropName,
+        goal: prep.pilot.goal,
+        batchName: prep.batch.batchName,
+        plannedStartDate: prep.batch.plannedStartDate,
+        totalCuttings: prep.batch.totalCuttings || 0,
+        treatments: treatmentsSnapshot,
+        readinessStatus: readiness.status,
+        sourceUpdatedAt: prep.updatedAt,
+      };
+
+      const freshState = createDefaultRoseDay0State(snapshot);
+      // Initialize treatments in Day 0 with snapshot values
+      freshState.treatments = prep.treatments.map((t) => ({
+        id: t.id,
+        code: t.code,
+        name: t.name,
+        description: t.description,
+        cuttingCount: t.cuttingCount || 0,
+        inputName: t.inputName || "",
+        notes: t.notes || "",
+        source: t.source || "default",
+      }));
+
+      saveRoseDay0State(freshState);
+      setSnapshotChangeReasons(getPreparationSnapshotChangeReasons(freshState.trialSnapshot, prep));
+      setState(freshState);
+    }
+  };
+
+  const handleWorkflowStarted = () => {
+    setMode("legacy");
+    initializeOrLoadDay0State();
+  };
+
   useEffect(() => {
     setMounted(true);
 
     // 1. Load Preparation state to check readiness gate
     const prep = loadRoseTrialState().state;
     const readiness = calculatePrepReadiness(prep);
+    const currentMode = determineDay0Mode(prep.pilotStart, readiness.canStart);
+    setMode(currentMode);
 
-    if (!readiness.canStart) {
-      setPrepReady(false);
+    if (!shouldAccessLegacyDay0Storage(currentMode)) {
       return;
     }
-    setPrepReady(true);
 
     // 2. Load Day 0 state
     const result = loadRoseDay0State();
@@ -586,7 +648,7 @@ export default function RoseDay0Client() {
     window.location.reload();
   };
 
-  if (!mounted) {
+  if (!mounted || mode === "loading") {
     return (
       <div className="flex h-64 items-center justify-center">
         <p className="text-sm font-semibold text-neutral-400">กำลังโหลดข้อมูลระบบ...</p>
@@ -595,7 +657,7 @@ export default function RoseDay0Client() {
   }
 
   // Gate check screen
-  if (!prepReady) {
+  if (mode === "blocker") {
     return (
       <div className="w-full max-w-xl mx-auto px-4 py-12 space-y-6">
         <div className="rounded-2xl border border-rose-200 dark:border-rose-950 bg-rose-50 dark:bg-rose-950/20 p-6 text-center space-y-4 shadow-sm">
@@ -652,6 +714,10 @@ export default function RoseDay0Client() {
         </div>
       </div>
     );
+  }
+
+  if (mode === "setup") {
+    return <Day0SetupWorkflow onStarted={handleWorkflowStarted} />;
   }
 
   if (!state) return null;

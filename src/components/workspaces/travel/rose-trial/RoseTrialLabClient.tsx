@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Edit2,
   Check,
+  Eye,
 } from "lucide-react";
 
 import type {
@@ -47,6 +48,7 @@ import {
 } from "./storage";
 import { calculateReadiness, parseIntegerInput } from "./readiness";
 import { mergeInventoryWithDefaults, updateInventoryItems } from "./inventory";
+import { hasPilotStarted } from "./day0SetupWorkflow";
 import { InventorySection } from "./InventorySection";
 import { TreatmentProductSection } from "./TreatmentProductSection";
 import { SamplePreparationSection } from "./SamplePreparationSection";
@@ -73,6 +75,15 @@ import {
 import type { ActualLoadState } from "../../../../lib/rose-trial-domain/types";
 import { TrialModeSummary } from "./TrialModeSummary";
 import { TrialComparisonPanel } from "./TrialComparisonPanel";
+
+const CHECKLIST_READINESS_FEEDBACK: Record<ChecklistStatus, { passed: boolean; message: string }> = {
+  have: { passed: false, message: "ยังไม่ผ่านความพร้อม — มีของแล้วแต่ยังต้องตรวจว่าสามารถใช้งานได้" },
+  to_buy: { passed: false, message: "ยังไม่ผ่านความพร้อม — ยังต้องจัดซื้อ" },
+  ordered: { passed: false, message: "ยังไม่ผ่านความพร้อม — อยู่ระหว่างรอรับ" },
+  received: { passed: false, message: "ยังไม่ผ่านความพร้อม — ได้รับแล้วแต่ยังต้องตรวจพร้อมใช้" },
+  ready: { passed: true, message: "ผ่านความพร้อม — พร้อมใช้สำหรับ Day 0" },
+  not_needed: { passed: true, message: "ผ่านความพร้อม — ระบุว่าไม่จำเป็นสำหรับการทดลองนี้" },
+};
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
@@ -750,6 +761,10 @@ export default function RoseTrialLabClient() {
           </div>
         </div>
 
+        <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+          ส่วนนี้ใช้ติดตามขั้นตอนการจัดหาและตรวจพร้อมใช้ ส่วนจำนวนของที่มีและใช้ได้จริงตรวจในหัวข้อ Inventory Check ด้านบน
+        </p>
+
         {/* Filter Toolbar */}
         <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200/50 dark:border-neutral-800 max-w-sm">
           <button
@@ -1135,6 +1150,15 @@ export default function RoseTrialLabClient() {
             </div>
           )}
 
+          <div className="border-b border-neutral-100 px-4 py-3 dark:border-neutral-900">
+            <p className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
+              ความพร้อมของรายการเตรียมการ (Preparation Checklist)
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+              นับผ่านเฉพาะรายการที่ระบุว่า “พร้อมใช้” หรือ “ไม่จำเป็น” ตัวเลขนี้ไม่ใช่ผลของ Inventory Check
+            </p>
+          </div>
+
           {/* Stats grid */}
           <div className="grid grid-cols-2 divide-y divide-neutral-100 dark:divide-neutral-800 sm:grid-cols-2 md:grid-cols-4 sm:divide-y-0 md:divide-x border-b border-neutral-100 dark:border-neutral-900">
             <div className="flex flex-col items-center px-4 py-4 text-center">
@@ -1144,13 +1168,13 @@ export default function RoseTrialLabClient() {
                   : 0}
                 %
               </span>
-              <span className="mt-0.5 text-xs text-neutral-400">สัดส่วนพร้อมใช้</span>
+              <span className="mt-0.5 text-xs text-neutral-400">Checklist พร้อมใช้</span>
             </div>
             <div className="flex flex-col items-center px-4 py-4 text-center">
               <span className="text-2xl font-bold text-neutral-900 dark:text-white">
                 {readiness.readyItems}/{readiness.totalItems}
               </span>
-              <span className="mt-0.5 text-xs text-neutral-400">รายการพร้อม</span>
+              <span className="mt-0.5 text-xs text-neutral-400">Checklist ผ่านเกณฑ์</span>
             </div>
             <div className="flex flex-col items-center px-4 py-4 text-center">
               <span
@@ -1162,7 +1186,7 @@ export default function RoseTrialLabClient() {
               >
                 {readiness.criticalMissingItems.length}
               </span>
-              <span className="mt-0.5 text-xs text-neutral-400">ขาดรายการจำเป็น</span>
+              <span className="mt-0.5 text-xs text-neutral-400">Checklist จำเป็นค้าง</span>
             </div>
             <div className="flex flex-col items-center px-4 py-4 text-center">
               <span className="text-2xl font-bold text-neutral-900 dark:text-white">
@@ -1226,19 +1250,35 @@ export default function RoseTrialLabClient() {
               ส่งออก Markdown
             </button>
 
-            {/* Ready Day 0 Button */}
-            <button
-              onClick={() => setDay0DialogOpen(true)}
-              disabled={!readiness.canStart}
-              className={`w-full sm:w-auto sm:ml-auto flex-shrink-0 flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all ${
-                readiness.canStart
-                  ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md active:scale-95 cursor-pointer"
-                  : "bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 border border-neutral-200/50 dark:border-neutral-800/80 cursor-not-allowed"
-              }`}
-            >
-              <Play className="h-4 w-4" />
-              พร้อมเริ่ม Day 0
-            </button>
+            {/* Ready Day 0 / Started Status */}
+            {hasPilotStarted(state.pilotStart) ? (
+              <div className="w-full sm:w-auto sm:ml-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                  <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Day 0 เริ่มแล้ว: {state.pilotStart.startedAt ? new Date(state.pilotStart.startedAt).toLocaleString("th-TH") : ""}</span>
+                </div>
+                <button
+                  onClick={() => router.push("/workspaces/travel/rose-trial/day-0")}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 px-4 py-2.5 text-sm font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  <Eye className="h-4 w-4" />
+                  ดูย้อนหลัง Day 0 Workflow
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setDay0DialogOpen(true)}
+                disabled={!readiness.canStart}
+                className={`w-full sm:w-auto sm:ml-auto flex-shrink-0 flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all ${
+                  readiness.canStart
+                    ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md active:scale-95 cursor-pointer"
+                    : "bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 border border-neutral-200/50 dark:border-neutral-800/80 cursor-not-allowed"
+                }`}
+              >
+                <Play className="h-4 w-4" />
+                พร้อมเริ่ม Day 0
+              </button>
+            )}
           </div>
 
           {isDirty && (
@@ -1263,7 +1303,7 @@ export default function RoseTrialLabClient() {
             <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
               ชื่อรายการ <span className="text-rose-500">*</span>
             </label>
-            <input
+                  <input
               type="text"
               value={newChecklistItem.name}
               onChange={(e) => setNewChecklistItem((prev) => ({ ...prev, name: e.target.value }))}
@@ -1453,7 +1493,7 @@ export default function RoseTrialLabClient() {
             </div>
 
             {/* Quantity & Unit */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
                   จำนวนที่ต้องการ
@@ -1484,11 +1524,14 @@ export default function RoseTrialLabClient() {
                 />
               </div>
             </div>
+            <p className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+              จำนวนนี้ใช้สำหรับวางแผนการเตรียม ไม่ใช่จำนวนคงเหลือ และไม่ได้ใช้ตัดสินความพร้อมของรายการ
+            </p>
 
             {/* Status */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                สถานะความพร้อม
+                ขั้นตอนการจัดหาและตรวจพร้อมใช้
               </label>
               <select
                 value={editingItem.status}
@@ -1506,6 +1549,16 @@ export default function RoseTrialLabClient() {
                   </option>
                 ))}
               </select>
+              <p className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                ระบบนับรายการนี้ว่าพร้อมเมื่อเลือก “พร้อมใช้” หรือ “ไม่จำเป็น” เท่านั้น
+              </p>
+              <div className={`rounded-lg px-3 py-2 text-xs font-semibold leading-relaxed ${
+                CHECKLIST_READINESS_FEEDBACK[editingItem.status].passed
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300"
+                  : "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-300"
+              }`}>
+                {CHECKLIST_READINESS_FEEDBACK[editingItem.status].message}
+              </div>
             </div>
 
             {/* Critical toggle */}
@@ -1565,7 +1618,11 @@ export default function RoseTrialLabClient() {
                     setEditChecklistItemOpen(false);
                     setEditingItem(null);
                     setToastType("success");
-                    setToastMessage("อัปเดตข้อมูลรายการแล้ว (บันทึกร่าง)");
+                    setToastMessage(
+                      CHECKLIST_READINESS_FEEDBACK[editingItem.status].passed
+                        ? "อัปเดตรายการในร่างแล้ว — รายการนี้ผ่านความพร้อม"
+                        : "อัปเดตรายการในร่างแล้ว — รายการนี้ยังไม่ผ่านความพร้อม"
+                    );
                     setToastVisible(true);
                   }
                 }}

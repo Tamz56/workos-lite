@@ -107,6 +107,13 @@ const WORKFLOW_STEP_IDS: readonly Day0WorkflowStepId[] = [
 export function createDefaultDay0Workflow(): Day0WorkflowState {
   return {
     steps: WORKFLOW_STEP_IDS.map((id) => ({ id, completed: false, completedAt: null })),
+    currentStep: 1,
+    completedChecklist: [],
+    sampleConfirmations: [],
+    groupConfirmations: [],
+    placementConfirmations: [],
+    finalConfirm: false,
+    notes: "",
   };
 }
 
@@ -363,12 +370,12 @@ export const DEFAULT_ROSE_TRIAL_STATE: RoseTrialStateV2 = {
 // ---- UI Maps ----
 
 export const CHECKLIST_STATUS_LABELS: Record<ChecklistStatus, string> = {
-  have: "มีแล้ว",
+  have: "มีของแล้ว — รอตรวจพร้อมใช้",
   to_buy: "ต้องซื้อ",
   ordered: "สั่งซื้อแล้ว",
-  received: "ได้รับแล้ว",
-  ready: "พร้อมใช้",
-  not_needed: "ไม่จำเป็น",
+  received: "ได้รับแล้ว — รอตรวจพร้อมใช้",
+  ready: "พร้อมใช้ — นับผ่าน Day 0",
+  not_needed: "ไม่จำเป็น — นับผ่าน Day 0",
 };
 
 export const CHECKLIST_CATEGORY_LABELS: Record<ChecklistCategory, string> = {

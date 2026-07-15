@@ -99,6 +99,93 @@ describe("Rose Trial Inventory helpers", () => {
     expect(merged.length).toBeGreaterThan(1);
     expect(merged[0]).toMatchObject({ status: "ready", note: "เก็บข้อความนี้", usableQuantity: 8 });
   });
+
+  it("defaults undefined/NaN quantities and invalid status safely during merge", () => {
+    const item = {
+      id: "inventory-clonex",
+      category: "treatment_product" as const,
+      name: "สารเร่งราก",
+      requiredQuantity: 1,
+      availableQuantity: undefined as unknown as number,
+      usableQuantity: NaN,
+      unit: "ชุด",
+      status: "invalid-status" as unknown as InventoryStatus,
+      priority: "A" as const,
+      note: null as unknown as string,
+      lastCheckedAt: undefined as unknown as string | null,
+    };
+    const merged = mergeInventoryWithDefaults([item]);
+    const target = merged.find((i) => i.id === "inventory-clonex");
+    expect(target).toBeDefined();
+    expect(target?.availableQuantity).toBe(0);
+    expect(target?.usableQuantity).toBe(0);
+    expect(target?.status).toBe("procure");
+    expect(target?.note).toBe("");
+    expect(target?.lastCheckedAt).toBeNull();
+  });
+
+  it("preserves canonical unit/requiredQuantity and drops incomplete unknown items", () => {
+    const canonicalItem = {
+      id: "inventory-clonex",
+      category: "equipment" as const,
+      name: "wrong name",
+      requiredQuantity: 99,
+      availableQuantity: 1,
+      usableQuantity: 1,
+      unit: "wrong unit",
+      status: "ready" as const,
+      priority: "B" as const,
+      note: "user note",
+      lastCheckedAt: null,
+    };
+    const validUnknownItem = {
+      id: "unknown-item-1",
+      category: "equipment" as const,
+      name: "อุปกรณ์นอกสารบบ",
+      requiredQuantity: 1,
+      availableQuantity: 2,
+      usableQuantity: 2,
+      unit: "เครื่อง",
+      status: "ready" as const,
+      priority: "B" as const,
+      note: "",
+      lastCheckedAt: null,
+    };
+    const invalidUnknownItem = {
+      id: "unknown-item-2",
+      category: "equipment" as const,
+      name: "อุปกรณ์เสีย",
+      requiredQuantity: 1,
+      availableQuantity: 2,
+      usableQuantity: 2,
+      status: "ready" as const,
+      priority: "B" as const,
+      note: "",
+      lastCheckedAt: null,
+    };
+
+    const merged = mergeInventoryWithDefaults([
+      canonicalItem,
+      validUnknownItem,
+      invalidUnknownItem as unknown as InventoryItem
+    ]);
+
+    const hormone = merged.find((i) => i.id === "inventory-clonex");
+    expect(hormone).toBeDefined();
+    expect(hormone?.category).toBe("treatment_product");
+    expect(hormone?.requiredQuantity).toBe(1);
+    expect(hormone?.unit).toBe("ชุด");
+    expect(hormone?.priority).toBe("A");
+    expect(hormone?.usableQuantity).toBe(1);
+    expect(hormone?.note).toBe("user note");
+
+    const keptUnknown = merged.find((i) => i.id === "unknown-item-1");
+    expect(keptUnknown).toBeDefined();
+    expect(keptUnknown?.name).toBe("อุปกรณ์นอกสารบบ");
+
+    const droppedUnknown = merged.find((i) => i.id === "unknown-item-2");
+    expect(droppedUnknown).toBeUndefined();
+  });
 });
 
 describe("Rose Trial Treatment Product readiness", () => {
@@ -157,6 +244,10 @@ describe("Rose Trial Inventory and Product components", () => {
     expect(html).toContain("สถานที่ทดลอง");
     expect(html).toContain("จำนวนที่ใช้ได้จริง");
     expect(html).toContain("ยังขาด");
+    expect(html).toContain("จำเป็น");
+    expect(html).toContain("ทางเลือก");
+    expect(html).not.toContain("Critical");
+    expect(html).not.toContain("Optional");
   });
 
   it("renders Clonex identity, packaging note, and cautious Pilot application summary", () => {
@@ -171,6 +262,30 @@ describe("Rose Trial Inventory and Product components", () => {
     expect(html).toContain("ผลิตภัณฑ์ในสภาพที่ผู้ใช้ซื้อได้จริง");
     expect(html).toContain("ไม่เติมลงน้ำและไม่ผสมลงพีทมอส");
     expect(html).not.toContain("เร่งรากแน่นอน");
+  });
+
+  it("renders QuantityInput with undefined value as empty input value in HTML", () => {
+    const html = renderToStaticMarkup(React.createElement(InventorySection, {
+      items: [
+        {
+          id: "item-test",
+          category: "equipment",
+          name: "กิ่งชำทดสอบ",
+          requiredQuantity: 8,
+          availableQuantity: undefined as unknown as number,
+          usableQuantity: undefined as unknown as number,
+          unit: "กิ่ง",
+          status: "procure",
+          priority: "A",
+          note: "",
+          lastCheckedAt: null,
+        }
+      ],
+      sectionStatus: "blocked",
+      onUpdateItem: vi.fn(),
+    }));
+
+    expect(html).toContain('value=""');
   });
 });
 

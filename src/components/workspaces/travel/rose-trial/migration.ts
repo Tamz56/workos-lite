@@ -60,6 +60,10 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || isString(value);
 }
 
+function isNumber(value: unknown): value is number {
+  return typeof value === "number";
+}
+
 function isFiniteNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= 0;
 }
@@ -137,11 +141,18 @@ function isValidCanonicalGroupConfig(value: unknown): boolean {
 }
 
 function isValidInventoryItem(value: unknown): boolean {
-  return isRecord(value) && isString(value.id) && isOneOf(value.category, INVENTORY_CATEGORIES) &&
-    isString(value.name) && isFiniteNonNegativeNumber(value.requiredQuantity) &&
-    isFiniteNonNegativeNumber(value.availableQuantity) && isFiniteNonNegativeNumber(value.usableQuantity) &&
-    isString(value.unit) && isOneOf(value.status, INVENTORY_STATUSES) &&
-    isOneOf(value.priority, INVENTORY_PRIORITIES) && isString(value.note) && isNullableString(value.lastCheckedAt);
+  return isRecord(value) &&
+    isString(value.id) &&
+    isOneOf(value.category, INVENTORY_CATEGORIES) &&
+    isString(value.name) &&
+    isOneOf(value.priority, INVENTORY_PRIORITIES) &&
+    (value.requiredQuantity === undefined || isNumber(value.requiredQuantity)) &&
+    (value.availableQuantity === undefined || isNumber(value.availableQuantity)) &&
+    (value.usableQuantity === undefined || isNumber(value.usableQuantity)) &&
+    (value.status === undefined || isOneOf(value.status, INVENTORY_STATUSES)) &&
+    (value.unit === undefined || isString(value.unit)) &&
+    (value.note === undefined || isString(value.note)) &&
+    (value.lastCheckedAt === undefined || isNullableString(value.lastCheckedAt));
 }
 
 function isValidTreatmentProduct(value: unknown): boolean {
@@ -151,9 +162,14 @@ function isValidTreatmentProduct(value: unknown): boolean {
     "purchasedSize", "purchaseDate", "receivedDate", "openedDate", "expiryNote", "storageNote",
     "appearanceNote", "applicationMethod", "limitationNote",
   ];
-  return stringFields.every((field) => isString(value[field])) &&
-    isOneOf(value.packagingType, PRODUCT_PACKAGING) && isOneOf(value.status, PRODUCT_STATUSES) &&
-    (value.purchasePrice === null || isFiniteNonNegativeNumber(value.purchasePrice));
+  const checkStrings = stringFields.every(
+    (field) => value[field] === undefined || isString(value[field])
+  );
+  return isString(value.productName) &&
+    checkStrings &&
+    (value.packagingType === undefined || isOneOf(value.packagingType, PRODUCT_PACKAGING)) &&
+    isOneOf(value.status, PRODUCT_STATUSES) &&
+    (value.purchasePrice === undefined || value.purchasePrice === null || isFiniteNonNegativeNumber(value.purchasePrice));
 }
 
 function isValidBaseline(value: unknown): boolean {
@@ -163,7 +179,10 @@ function isValidBaseline(value: unknown): boolean {
     "stemDiameter", "nodeCount", "leafCount", "stemMaturity", "initialCondition", "stemColor",
     "basalCutAppearance", "existingDamage", "note",
   ];
-  return stringFields.every((field) => isString(value[field])) &&
+  const checkStrings = stringFields.every(
+    (field) => value[field] === undefined || isString(value[field])
+  );
+  return checkStrings &&
     (value.sampleLabel === undefined || isString(value.sampleLabel)) &&
     typeof value.photoChecklist.wholeCutting === "boolean" &&
     typeof value.photoChecklist.basalCut === "boolean" &&
@@ -175,7 +194,8 @@ function isValidSample(value: unknown): boolean {
     isOneOf(value.medium, ROOTING_MEDIA) && isOneOf(value.treatmentRole, TREATMENT_ROLES) &&
     isString(value.treatmentCode) && isFiniteNonNegativeInteger(value.replicate) && value.replicate > 0 &&
     isOneOf(value.status, SAMPLE_STATUSES) && isValidBaseline(value.baseline) &&
-    isNullableString(value.replacementFor) && isString(value.excludedReason);
+    (value.replacementFor === undefined || isNullableString(value.replacementFor)) &&
+    (value.excludedReason === undefined || isString(value.excludedReason));
 }
 
 function isValidWorkflow(value: unknown): boolean {

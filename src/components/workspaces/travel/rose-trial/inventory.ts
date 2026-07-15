@@ -116,20 +116,78 @@ export function mergeInventoryWithDefaults(items: readonly InventoryItem[]): Inv
   const defaults = createDefaultInventory();
   const existingById = new Map(items.map((item) => [item.id, item]));
   const defaultIds = new Set(defaults.map((item) => item.id));
-  const merged = defaults.map((item) => {
-    const existing = existingById.get(item.id);
-    return existing ? {
-      ...item,
-      availableQuantity: existing.availableQuantity,
-      usableQuantity: existing.usableQuantity,
-      status: existing.status,
-      note: existing.note,
-      lastCheckedAt: existing.lastCheckedAt,
-    } : item;
+
+  const isNonNegativeInteger = (value: unknown): boolean => {
+    return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= 0;
+  };
+
+  const normalizeQuantity = (value: unknown): number => {
+    return isNonNegativeInteger(value) ? (value as number) : 0;
+  };
+
+  const isValidStatus = (status: unknown): status is InventoryStatus => {
+    return typeof status === "string" && ["procure", "available", "ready", "not_needed"].includes(status);
+  };
+
+  const merged = defaults.map((defaultItem) => {
+    const existing = existingById.get(defaultItem.id);
+    if (!existing) return defaultItem;
+
+    return {
+      ...defaultItem, // Strictly preserve category, name, unit, requiredQuantity, priority from canonical default
+      availableQuantity: normalizeQuantity(existing.availableQuantity),
+      usableQuantity: normalizeQuantity(existing.usableQuantity),
+      status: isValidStatus(existing.status) ? existing.status : "procure",
+      note: typeof existing.note === "string" ? existing.note : "",
+      lastCheckedAt: typeof existing.lastCheckedAt === "string" || existing.lastCheckedAt === null
+        ? existing.lastCheckedAt
+        : null,
+    };
   });
+
+  const INVENTORY_CATEGORIES = [
+    "growing_medium", "container", "treatment_product", "equipment",
+    "labeling", "sanitation", "trial_area", "plant_material"
+  ];
+  const INVENTORY_PRIORITIES = ["A", "B"];
+
   const unknown = items
     .filter((item) => !defaultIds.has(item.id))
-    .map((item) => ({ ...item }))
+    .filter((item) => {
+      // Structural minimum checks for unknown items
+      return typeof item.id === "string" && item.id.trim() !== "" &&
+        typeof item.name === "string" && item.name.trim() !== "" &&
+        typeof item.unit === "string" && item.unit.trim() !== "" &&
+        isNonNegativeInteger(item.availableQuantity) &&
+        isNonNegativeInteger(item.usableQuantity) &&
+        isNonNegativeInteger(item.requiredQuantity) &&
+        isValidStatus(item.status) &&
+        typeof item.category === "string" && INVENTORY_CATEGORIES.includes(item.category) &&
+        typeof item.priority === "string" && INVENTORY_PRIORITIES.includes(item.priority);
+    })
+    .map((item) => {
+      return {
+        ...item,
+        availableQuantity: normalizeQuantity(item.availableQuantity),
+        usableQuantity: normalizeQuantity(item.usableQuantity),
+        requiredQuantity: normalizeQuantity(item.requiredQuantity),
+        note: typeof item.note === "string" ? item.note : "",
+        lastCheckedAt: typeof item.lastCheckedAt === "string" || item.lastCheckedAt === null
+          ? item.lastCheckedAt
+          : null,
+      };
+    })
     .sort((left, right) => left.id.localeCompare(right.id));
-  return [...merged, ...unknown];
+
+  // Deduplicate unknown items by id
+  const seenIds = new Set(merged.map((i) => i.id));
+  const uniqueUnknown: InventoryItem[] = [];
+  for (const item of unknown) {
+    if (!seenIds.has(item.id)) {
+      seenIds.add(item.id);
+      uniqueUnknown.push(item);
+    }
+  }
+
+  return [...merged, ...uniqueUnknown];
 }

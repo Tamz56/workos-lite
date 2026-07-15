@@ -33,12 +33,18 @@ function QuantityInput({
   onCommit,
 }: {
   label: string;
-  value: number;
+  value: number | undefined | null;
   onCommit: (value: number) => void;
 }) {
-  const [draft, setDraft] = useState(String(value));
+  const getSafeDisplayValue = (val: number | undefined | null): string => {
+    return typeof val === "number" && Number.isFinite(val) ? String(val) : "";
+  };
 
-  useEffect(() => setDraft(String(value)), [value]);
+  const [draft, setDraft] = useState(() => getSafeDisplayValue(value));
+
+  useEffect(() => {
+    setDraft(getSafeDisplayValue(value));
+  }, [value]);
 
   return (
     <label className="min-w-0 space-y-1">
@@ -54,10 +60,32 @@ function QuantityInput({
           const next = event.target.value;
           if (next !== "" && !/^\d+$/.test(next)) return;
           setDraft(next);
-          if (next !== "") onCommit(Number(next));
+          if (next !== "") {
+            const num = Number(next);
+            if (Number.isFinite(num) && !Number.isNaN(num) && num >= 0) {
+              if (value !== num) {
+                onCommit(num);
+              }
+            }
+          }
         }}
         onBlur={() => {
-          if (draft === "") setDraft(String(value));
+          if (draft === "") {
+            setDraft("0");
+            if (value !== 0) {
+              onCommit(0);
+            }
+          } else {
+            const num = Number(draft);
+            if (Number.isFinite(num) && !Number.isNaN(num) && num >= 0) {
+              setDraft(String(num));
+              if (value !== num) {
+                onCommit(num);
+              }
+            } else {
+              setDraft(getSafeDisplayValue(value));
+            }
+          }
         }}
         className="w-full min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
       />
@@ -90,14 +118,15 @@ export function InventorySection({ items, sectionStatus, onUpdateItem }: Invento
 
       <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
         Inventory Check ใช้ตรวจความพร้อมของของจริงสำหรับ Pilot นี้ ส่วน Preparation Checklist เดิมยังคงใช้เป็นรายการเตรียมงานทั่วไปในช่วงเปลี่ยนผ่าน
+        ป้าย “จำเป็น” และ “ทางเลือก” แสดงระดับความสำคัญของรายการ ส่วนสถานะด้านล่างแสดงว่าของพร้อมใช้งานหรือไม่
       </p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          ["Critical ready", `${summary.criticalReady} / ${summary.criticalTotal}`],
+          ["รายการจำเป็นพร้อม", `${summary.criticalReady} / ${summary.criticalTotal}`],
           ["ต้องซื้อ", String(summary.procureCount)],
           ["ต้องตรวจ", String(summary.checkCount)],
-          ["Optional warning", String(summary.optionalWarningCount)],
+          ["คำเตือนรายการทางเลือก", String(summary.optionalWarningCount)],
         ].map(([label, value]) => (
           <div key={label} className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950">
             <p className="break-words text-[10px] font-bold uppercase tracking-wider text-neutral-400">{label}</p>
@@ -110,7 +139,7 @@ export function InventorySection({ items, sectionStatus, onUpdateItem }: Invento
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
           <div className="flex items-center gap-2 text-sm font-bold text-rose-700 dark:text-rose-300">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            Critical blockers {summary.blockers.length} รายการ
+            รายการจำเป็นที่ยังไม่พร้อม {summary.blockers.length} รายการ
           </div>
           <ul className="mt-2 space-y-1 text-xs text-rose-600 dark:text-rose-400">
             {summary.blockers.slice(0, 5).map((message) => <li key={message} className="break-words">• {message}</li>)}
@@ -142,7 +171,7 @@ export function InventorySection({ items, sectionStatus, onUpdateItem }: Invento
                             ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
                             : "bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300"
                         }`}>
-                          {item.priority === "A" ? "Critical" : "Optional"}
+                          {item.priority === "A" ? "จำเป็น" : "ทางเลือก"}
                         </span>
                       </div>
 

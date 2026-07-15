@@ -4,6 +4,7 @@ import type {
   ReadinessResult,
   ReadinessSectionStatus,
   RoseTrialState,
+  RoseTrialStateV2,
   TreatmentProductRecord,
 } from "./types";
 
@@ -193,5 +194,18 @@ export function calculateReadiness(state: RoseTrialState): ReadinessResult {
     assignedCuttings,
     cuttingDifference,
     reasons: blockers,
+  };
+}
+
+export function checkDay0EntryConditions(state: RoseTrialStateV2): {
+  canStart: boolean;
+  blockers: string[];
+  warnings: string[];
+} {
+  const readiness = calculateReadiness(state);
+  return {
+    canStart: readiness.canStart,
+    blockers: [...new Set(readiness.blockers)],
+    warnings: [...new Set(readiness.warnings)],
   };
 }
