@@ -244,14 +244,60 @@ describe("Rose Trial Inventory and Product components", () => {
     }));
 
     expect(html).toContain("Inventory Check");
+    expect(html).toContain("รายการทั้งหมด");
+    expect(html).toContain("รายการจำเป็นพร้อม");
+    expect(html).toContain("รายการจำเป็นยังไม่พร้อม");
+    expect(html).toContain("ต้องจัดซื้อ");
+    expect(html).toContain("มีแล้ว — ต้องตรวจ");
+    expect(html).toContain("รายการทางเลือก");
+    expect(html).toContain("ยังต้องจัดการ");
+    expect(html).toContain("พร้อมใช้");
+    expect(html).toContain("ขาดจำนวน");
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain("ดูทั้งหมด");
+    expect(html).toContain("กำลังแสดง");
     expect(html).toContain("กิ่งและวัสดุพืช");
     expect(html).toContain("สถานที่ทดลอง");
+    expect(html).toContain("จำนวนที่ต้องใช้");
+    expect(html).toContain("จำนวนที่มี");
     expect(html).toContain("จำนวนที่ใช้ได้จริง");
-    expect(html).toContain("ยังขาด");
+    expect(html).toContain("จำนวนที่ยังขาด");
+    expect(html).toContain("<details");
+    expect(html).toContain("รายละเอียดเพิ่มเติม");
     expect(html).toContain("จำเป็น");
     expect(html).toContain("ทางเลือก");
     expect(html).not.toContain("Critical");
     expect(html).not.toContain("Optional");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("undefined");
+    expect(html).not.toContain("[object Object]");
+  });
+
+  it("does not render categories with no results in the default action-required view", () => {
+    const html = renderToStaticMarkup(React.createElement(InventorySection, {
+      items: [
+        readyItem(),
+        {
+          ...readyItem("B"),
+          id: "location-ready",
+          category: "trial_area",
+          name: "พื้นที่พร้อมแล้ว",
+        },
+        {
+          ...readyItem(),
+          id: "tool-procure",
+          status: "procure",
+          name: "เครื่องมือที่ต้องซื้อ",
+        },
+      ],
+      sectionStatus: "blocked",
+      onUpdateItem: vi.fn(),
+    }));
+
+    expect(html).toContain("เครื่องมือ");
+    expect(html).toContain("เครื่องมือที่ต้องซื้อ");
+    expect(html).not.toContain("สถานที่ทดลอง");
+    expect(html).not.toContain("พื้นที่พร้อมแล้ว");
   });
 
   it("renders Clonex identity, packaging note, and cautious Pilot application summary", () => {

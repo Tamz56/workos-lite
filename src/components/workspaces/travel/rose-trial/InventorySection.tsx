@@ -8,6 +8,13 @@ import {
   INVENTORY_STATUS_LABELS,
   summarizeInventoryReadiness,
 } from "./inventory";
+import {
+  filterInventoryItems,
+  getInventoryItemDisplayMessage,
+  INVENTORY_VIEW_FILTERS,
+  summarizeInventoryDisplay,
+  type InventoryViewFilter,
+} from "./inventoryView";
 import type {
   InventoryItem,
   InventoryStatus,
@@ -94,7 +101,19 @@ function QuantityInput({
 }
 
 export function InventorySection({ items, sectionStatus, onUpdateItem }: InventorySectionProps) {
-  const summary = summarizeInventoryReadiness(items);
+  const [activeFilter, setActiveFilter] = useState<InventoryViewFilter>("action_required");
+  const readinessSummary = summarizeInventoryReadiness(items);
+  const displaySummary = summarizeInventoryDisplay(items);
+  const filteredItems = filterInventoryItems(items, activeFilter);
+
+  const summaryItems = [
+    ["รายการทั้งหมด", displaySummary.totalCount],
+    ["รายการจำเป็นพร้อม", displaySummary.criticalReadyCount],
+    ["รายการจำเป็นยังไม่พร้อม", displaySummary.criticalNeedsActionCount],
+    ["ต้องจัดซื้อ", displaySummary.purchaseNeededCount],
+    ["มีแล้ว — ต้องตรวจ", displaySummary.checkCount],
+    ["รายการทางเลือก", displaySummary.optionalCount],
+  ] as const;
 
   return (
     <section className="space-y-3" aria-labelledby="inventory-heading">
@@ -121,38 +140,72 @@ export function InventorySection({ items, sectionStatus, onUpdateItem }: Invento
         ป้าย “จำเป็น” และ “ทางเลือก” แสดงระดับความสำคัญของรายการ ส่วนสถานะด้านล่างแสดงว่าของพร้อมใช้งานหรือไม่
       </p>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          ["รายการจำเป็นพร้อม", `${summary.criticalReady} / ${summary.criticalTotal}`],
-          ["ต้องซื้อ", String(summary.procureCount)],
-          ["ต้องตรวจ", String(summary.checkCount)],
-          ["คำเตือนรายการทางเลือก", String(summary.optionalWarningCount)],
-        ].map(([label, value]) => (
+      <div className="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-3">
+        {summaryItems.map(([label, value]) => (
           <div key={label} className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950">
-            <p className="break-words text-[10px] font-bold uppercase tracking-wider text-neutral-400">{label}</p>
+            <p className="break-words text-[10px] font-bold tracking-wide text-neutral-500 dark:text-neutral-400">{label}</p>
             <p className="mt-1 text-lg font-black text-neutral-900 dark:text-white">{value}</p>
           </div>
         ))}
       </div>
 
-      {summary.blockers.length > 0 && (
+      {readinessSummary.blockers.length > 0 && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
           <div className="flex items-center gap-2 text-sm font-bold text-rose-700 dark:text-rose-300">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            รายการจำเป็นที่ยังไม่พร้อม {summary.blockers.length} รายการ
+            รายการจำเป็นที่ยังไม่พร้อม {readinessSummary.blockers.length} รายการ
           </div>
           <ul className="mt-2 space-y-1 text-xs text-rose-600 dark:text-rose-400">
-            {summary.blockers.slice(0, 5).map((message) => <li key={message} className="break-words">• {message}</li>)}
+            {readinessSummary.blockers.slice(0, 5).map((message) => <li key={message} className="break-words">• {message}</li>)}
           </ul>
         </div>
       )}
 
+      <div className="min-w-0 max-w-full space-y-2">
+        <div className="max-w-full overflow-x-auto pb-1">
+          <div className="flex min-w-max gap-2">
+            {INVENTORY_VIEW_FILTERS.map((filter) => {
+              const isActive = activeFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setActiveFilter(filter.id)}
+                  className={`min-h-11 rounded-full border px-3 py-2 text-xs font-bold transition-colors ${
+                    isActive
+                      ? "border-sky-600 bg-sky-600 text-white shadow-sm"
+                      : "border-neutral-200 bg-white text-neutral-600 hover:border-sky-300 hover:text-sky-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300"
+                  }`}
+                >
+                  {isActive && <span aria-hidden="true" className="mr-1">✓</span>}
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="break-words">
+            กำลังแสดง <strong className="text-neutral-800 dark:text-neutral-200">{filteredItems.length}</strong> จาก {items.length} รายการ
+          </p>
+          <button
+            type="button"
+            onClick={() => setActiveFilter("all")}
+            className="min-h-11 rounded-lg px-3 py-2 font-bold text-sky-700 hover:bg-sky-50 disabled:cursor-default disabled:text-neutral-400 disabled:hover:bg-transparent dark:text-sky-300 dark:hover:bg-sky-950/30"
+            disabled={activeFilter === "all"}
+          >
+            ดูทั้งหมด
+          </button>
+        </div>
+      </div>
+
       <div className="space-y-3">
         {INVENTORY_CATEGORY_GROUPS.map((group) => {
-          const groupItems = items.filter((item) => group.categories.includes(item.category));
+          const groupItems = filteredItems.filter((item) => group.categories.includes(item.category));
           if (groupItems.length === 0) return null;
           return (
-            <details key={group.id} className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+            <details open key={group.id} className="overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
               <summary className="cursor-pointer select-none bg-neutral-50 px-4 py-3 text-sm font-bold text-neutral-800 dark:bg-neutral-900 dark:text-neutral-200">
                 {group.label} <span className="font-medium text-neutral-400">({groupItems.length})</span>
               </summary>
@@ -160,11 +213,16 @@ export function InventorySection({ items, sectionStatus, onUpdateItem }: Invento
                 {groupItems.map((item) => {
                   const assessment = assessInventoryItem(item);
                   return (
-                    <article key={item.id} className="min-w-0 space-y-3 bg-white p-4 dark:bg-neutral-950">
-                      <div className="flex min-w-0 items-start justify-between gap-3">
-                        <div className="min-w-0">
+                    <article key={item.id} className={`min-w-0 space-y-3 p-4 ${
+                      assessment.level === "blocked"
+                        ? "bg-rose-50/40 dark:bg-rose-950/10"
+                        : assessment.level === "ready"
+                          ? "bg-emerald-50/30 dark:bg-emerald-950/10"
+                          : "bg-white dark:bg-neutral-950"
+                    }`}>
+                      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1 basis-48">
                           <h3 className="break-words text-sm font-bold text-neutral-900 dark:text-white">{item.name}</h3>
-                          <p className="mt-1 text-xs text-neutral-400">ต้องใช้ {item.requiredQuantity} {item.unit}</p>
                         </div>
                         <span className={`flex-shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${
                           item.priority === "A"
@@ -175,57 +233,66 @@ export function InventorySection({ items, sectionStatus, onUpdateItem }: Invento
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className={`flex min-w-0 items-start gap-2 rounded-lg px-3 py-2 text-xs ${
+                        assessment.level === "blocked"
+                          ? "bg-rose-100/70 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300"
+                          : assessment.level === "warning"
+                            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-300"
+                            : "bg-emerald-100/70 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      }`}>
+                        {assessment.level === "ready" ? <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> : <AlertTriangle className="h-4 w-4 flex-shrink-0" />}
+                        <span className="min-w-0 break-words">{getInventoryItemDisplayMessage(item)}</span>
+                      </div>
+
+                      <div className="grid min-w-0 grid-cols-2 gap-3">
+                        <div className="min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+                          <p className="break-words text-[10px] font-bold tracking-wider text-neutral-500 dark:text-neutral-400">จำนวนที่ต้องใช้</p>
+                          <p className="mt-1 break-words text-sm font-bold text-neutral-800 dark:text-neutral-200">{item.requiredQuantity} {item.unit}</p>
+                        </div>
+                        <div className="min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+                          <p className="break-words text-[10px] font-bold tracking-wider text-neutral-500 dark:text-neutral-400">จำนวนที่ยังขาด</p>
+                          <p className="mt-1 break-words text-sm font-bold text-neutral-800 dark:text-neutral-200">{assessment.missingQuantity} {item.unit}</p>
+                        </div>
                         <QuantityInput label="จำนวนที่มี" value={item.availableQuantity} onCommit={(value) => onUpdateItem(item.id, { availableQuantity: value })} />
                         <QuantityInput label="จำนวนที่ใช้ได้จริง" value={item.usableQuantity} onCommit={(value) => onUpdateItem(item.id, { usableQuantity: value })} />
                       </div>
 
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="min-w-0 space-y-1">
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">สถานะ</span>
-                          <select
-                            value={item.status}
-                            onChange={(event) => onUpdateItem(item.id, { status: event.target.value as InventoryStatus })}
-                            className="w-full min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
-                          >
-                            {Object.entries(INVENTORY_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                          </select>
-                        </label>
-                        <label className="min-w-0 space-y-1">
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">วันที่ตรวจล่าสุด</span>
-                          <input
-                            type="date"
-                            value={item.lastCheckedAt ?? ""}
-                            onChange={(event) => onUpdateItem(item.id, { lastCheckedAt: event.target.value || null })}
-                            className="w-full min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
-                          />
-                        </label>
-                      </div>
-
                       <label className="block min-w-0 space-y-1">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">หมายเหตุ</span>
-                        <textarea
-                          rows={2}
-                          value={item.note}
-                          onChange={(event) => onUpdateItem(item.id, { note: event.target.value })}
-                          className="w-full min-w-0 resize-y rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
-                        />
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">สถานะ</span>
+                        <select
+                          value={item.status}
+                          onChange={(event) => onUpdateItem(item.id, { status: event.target.value as InventoryStatus })}
+                          className="w-full min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
+                        >
+                          {Object.entries(INVENTORY_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
                       </label>
 
-                      <div className={`flex min-w-0 items-start gap-2 rounded-lg px-3 py-2 text-xs ${
-                        assessment.level === "blocked"
-                          ? "bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-300"
-                          : assessment.level === "warning"
-                            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-300"
-                            : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300"
-                      }`}>
-                        {assessment.level === "ready" ? <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> : <AlertTriangle className="h-4 w-4 flex-shrink-0" />}
-                        <span className="min-w-0 break-words">
-                          {assessment.messages.length > 0
-                            ? assessment.messages.join(" • ")
-                            : `จำนวนที่ขาด: ${assessment.missingQuantity} ${item.unit}`}
-                        </span>
-                      </div>
+                      <details className="min-w-0 rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+                        <summary className="min-h-11 cursor-pointer select-none px-3 py-2 text-xs font-bold text-neutral-600 dark:text-neutral-300">
+                          รายละเอียดเพิ่มเติม
+                        </summary>
+                        <div className="min-w-0 space-y-3 border-t border-neutral-200 p-3 dark:border-neutral-800">
+                          <label className="block min-w-0 space-y-1">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">วันที่ตรวจล่าสุด</span>
+                            <input
+                              type="date"
+                              value={item.lastCheckedAt ?? ""}
+                              onChange={(event) => onUpdateItem(item.id, { lastCheckedAt: event.target.value || null })}
+                              className="w-full min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
+                            />
+                          </label>
+                          <label className="block min-w-0 space-y-1">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">หมายเหตุ</span>
+                            <textarea
+                              rows={2}
+                              value={item.note}
+                              onChange={(event) => onUpdateItem(item.id, { note: event.target.value })}
+                              className="w-full min-w-0 resize-y rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
+                            />
+                          </label>
+                        </div>
+                      </details>
                     </article>
                   );
                 })}
@@ -233,6 +300,12 @@ export function InventorySection({ items, sectionStatus, onUpdateItem }: Invento
             </details>
           );
         })}
+        {filteredItems.length === 0 && (
+          <div className="min-w-0 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-6 text-center dark:border-neutral-700 dark:bg-neutral-900/60">
+            <p className="text-sm font-bold text-neutral-700 dark:text-neutral-200">ไม่มีรายการในมุมมองนี้</p>
+            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">ลองเลือกตัวกรองอื่นหรือกด “ดูทั้งหมด”</p>
+          </div>
+        )}
       </div>
     </section>
   );
