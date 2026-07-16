@@ -23,7 +23,11 @@ import {
   ROSE_TRIAL_STORAGE_KEY,
   saveRoseTrialState,
 } from "@/components/workspaces/travel/rose-trial/storage";
-import type { InventoryItem, TreatmentProductRecord } from "@/components/workspaces/travel/rose-trial/types";
+import type {
+  InventoryItem,
+  InventoryStatus,
+  TreatmentProductRecord,
+} from "@/components/workspaces/travel/rose-trial/types";
 
 function readyProduct(overrides: Partial<TreatmentProductRecord> = {}): TreatmentProductRecord {
   return {

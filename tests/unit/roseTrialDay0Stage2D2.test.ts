@@ -8,7 +8,7 @@ import {
   regenerateRoseDay0TrialUnits,
 } from "@/components/workspaces/travel/rose-trial/day-0/logic";
 import type { RoseDay0State } from "@/components/workspaces/travel/rose-trial/day-0/types";
-import type { RoseTrialState } from "@/components/workspaces/travel/rose-trial/types";
+import type { RoseTrialStateV1 } from "@/components/workspaces/travel/rose-trial/types";
 
 function createDay0State(): RoseDay0State {
   const state = createDefaultRoseDay0State({
@@ -112,8 +112,8 @@ function createDay0State(): RoseDay0State {
   };
 }
 
-function createPreparationState(overrides: Partial<RoseTrialState> = {}): RoseTrialState {
-  const base: RoseTrialState = {
+function createPreparationState(overrides: Partial<RoseTrialStateV1> = {}): RoseTrialStateV1 {
+  const base: RoseTrialStateV1 = {
     version: 1,
     pilot: {
       trialName: "Rose Trial",

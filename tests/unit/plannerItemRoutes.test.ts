@@ -45,8 +45,8 @@ beforeEach(() => {
 afterEach(() => { db.close(); });
 afterAll(() => { vi.restoreAllMocks(); });
 
-function patch(body: object) {
-    return PATCH(
+async function patch(body: object) {
+    const response = await PATCH(
         new NextRequest("http://localhost/api/planner/2026-07-13/items/PI-1", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -54,6 +54,12 @@ function patch(body: object) {
         }),
         { params: Promise.resolve({ date: "2026-07-13", id: "PI-1" }) }
     );
+
+    if (!response) {
+        throw new Error("Expected planner PATCH response");
+    }
+
+    return response;
 }
 
 describe("Planner item exact-time PATCH route", () => {

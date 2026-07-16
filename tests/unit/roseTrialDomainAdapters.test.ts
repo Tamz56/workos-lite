@@ -311,11 +311,12 @@ describe("Rose Trial Domain Adapters (GF-APP-077B)", () => {
     it("should preserve valid timestamps and never synthesize missing or invalid values", () => {
       const valid = mapRosePreparationToPlannedRecord(validPrepState);
       const missing = mapRosePreparationToPlannedRecord({ ...validPrepState, updatedAt: null });
-      const invalid = mapRosePreparationToPlannedRecord({
+      const invalidState = {
         ...validPrepState,
         version: 0,
         updatedAt: "not-a-timestamp",
-      });
+      } as unknown as RoseTrialState;
+      const invalid = mapRosePreparationToPlannedRecord(invalidState);
       expect(valid!.metadata.updatedAt).toBe(validPrepState.updatedAt);
       expect(valid!.metadata.createdAt).toBeNull();
       expect(missing!.metadata.updatedAt).toBeNull();
@@ -525,14 +526,16 @@ describe("Rose Trial Domain Adapters (GF-APP-077B)", () => {
         initialCondition: "ปกติ",
         notes: "",
       };
+      const explicitUnit = { ...baseUnit, status: "failed" };
+      const invalidUnit = { ...baseUnit, status: "unknown" };
       const explicit = mapRoseDay0ToActualRecord({
         ...validDay0State,
-        trialUnits: [{ ...baseUnit, status: "failed" }],
-      } as RoseDay0State);
+        trialUnits: [explicitUnit],
+      });
       const invalid = mapRoseDay0ToActualRecord({
         ...validDay0State,
-        trialUnits: [{ ...baseUnit, status: "unknown" }],
-      } as RoseDay0State);
+        trialUnits: [invalidUnit],
+      });
       expect(explicit!.trialUnits[0].status).toBe("failed");
       expect(invalid!.trialUnits[0].status).toBe("active");
       expect(invalid!.dataIssues).toContain("invalid_trial_unit_status");
