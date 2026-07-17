@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, FlaskConical } from "lucide-react";
+import { useId, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, FlaskConical } from "lucide-react";
 import {
   getSampleFieldValidation,
   isValidCuttingLengthInput,
@@ -46,38 +47,81 @@ const TREATMENT_LABELS: Record<TreatmentRole, string> = {
 const INPUT_CLASS = "w-full min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200";
 
 function SampleCard({
+  group,
   sample,
   onUpdate,
 }: {
+  group: PilotGroupConfig;
   sample: TrialSample;
   onUpdate: (patch: SamplePreparationPatch) => void;
 }) {
+  const reactId = useId();
+  const [expanded, setExpanded] = useState(false);
   const validation = getSampleFieldValidation(sample);
   const condition = sample.baseline.initialCondition === "observe" ||
     sample.baseline.initialCondition === "unsuitable"
     ? sample.baseline.initialCondition
     : "normal";
   const fieldId = (field: string) => `${sample.id}-${field}`;
+  const detailsId = `${reactId}-${sample.id}-details`;
+  const hasFieldError = Boolean(validation.cuttingLengthError || validation.nodeCountError);
+  const validationLabel = hasFieldError || condition === "unsuitable"
+    ? "ต้องแก้ข้อมูล"
+    : condition === "observe"
+      ? "ควรสังเกต"
+      : "ข้อมูลปกติ";
 
   return (
-    <article className="min-w-0 space-y-3 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="break-words font-mono text-sm font-black text-neutral-900 dark:text-white">{sample.id}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">กิ่งลำดับที่ {sample.replicate}</p>
+    <article className="min-w-0 rounded-xl border border-emerald-100 bg-white dark:border-emerald-950/70 dark:bg-neutral-950">
+      <div className="flex min-w-0 flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <p className="break-words font-mono text-sm font-black text-neutral-900 dark:text-white">{sample.id}</p>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+              sample.status === "ready"
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                : sample.status === "excluded"
+                  ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                  : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+            }`}>
+              {sample.status === "replaced" ? "ข้อมูลเดิมต้องตรวจ" : SAMPLE_STATUS_LABELS[sample.status]}
+            </span>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+              hasFieldError || condition === "unsuitable"
+                ? "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
+                : condition === "observe"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                  : "bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300"
+            }`}>
+              {validationLabel}
+            </span>
+          </div>
+          <p className="break-words text-xs text-neutral-500 dark:text-neutral-400">
+            กิ่ง {sample.replicate} · {group.id} · {MEDIUM_LABELS[group.medium]} · {TREATMENT_LABELS[group.treatmentRole]} ({group.treatmentCode})
+          </p>
+          <p className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+            <span>{SAMPLE_CONDITION_LABELS[condition]}</span>
+            {sample.baseline.length && <span>· {sample.baseline.length} ซม.</span>}
+            {sample.baseline.nodeCount && <span>· {sample.baseline.nodeCount} ข้อ</span>}
+          </p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-          sample.status === "ready"
-            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-            : sample.status === "excluded"
-              ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-              : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-        }`}>
-          {sample.status === "replaced" ? "ข้อมูลเดิมต้องตรวจ" : SAMPLE_STATUS_LABELS[sample.status]}
-        </span>
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          onClick={() => setExpanded((current) => !current)}
+          className="inline-flex min-h-11 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+        >
+          {expanded ? "ปิดรายละเอียด" : "แก้ไข"}
+        </button>
       </div>
 
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+      <div
+        id={detailsId}
+        hidden={!expanded}
+        className="min-w-0 space-y-3 border-t border-emerald-100 bg-amber-50/30 p-3 dark:border-emerald-950/70 dark:bg-neutral-900/40"
+      >
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <label className="min-w-0 space-y-1" htmlFor={fieldId("status")}>
           <span className="block text-xs font-bold text-neutral-600 dark:text-neutral-300">สถานะการเตรียม</span>
           <select
@@ -173,18 +217,19 @@ function SampleCard({
             placeholder="บันทึกสิ่งที่สังเกตได้"
           />
         </label>
-      </div>
+        </div>
 
-      {condition === "unsuitable" && sample.status !== "excluded" && (
-        <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-          สภาพเริ่มต้นไม่เหมาะใช้ กรุณาตัดออกจากการทดลองหรือเลือกกิ่งที่เหมาะสม
-        </p>
-      )}
-      {condition === "observe" && sample.status === "ready" && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-          ตัวอย่างนี้พร้อมโดยมีจุดที่ควรสังเกตต่อ
-        </p>
-      )}
+        {condition === "unsuitable" && sample.status !== "excluded" && (
+          <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+            สภาพเริ่มต้นไม่เหมาะใช้ กรุณาตัดออกจากการทดลองหรือเลือกกิ่งที่เหมาะสม
+          </p>
+        )}
+        {condition === "observe" && sample.status === "ready" && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+            ตัวอย่างนี้พร้อมโดยมีจุดที่ควรสังเกตต่อ
+          </p>
+        )}
+      </div>
     </article>
   );
 }
@@ -195,26 +240,43 @@ export function SamplePreparationSection({
   sectionStatus,
   onUpdateSample,
 }: SamplePreparationSectionProps) {
+  const sectionPanelId = `${useId()}-sample-preparation-panel`;
+  const [isSectionOpen, setIsSectionOpen] = useState(true);
   const summary = summarizeSamplePreparation(samples, groupConfig);
 
   return (
-    <section className="min-w-0 space-y-3" aria-labelledby="sample-preparation-heading">
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
-          <FlaskConical className="h-5 w-5 flex-shrink-0 text-violet-500" />
-          <h2 id="sample-preparation-heading" className="break-words text-base font-bold text-neutral-900 dark:text-white">
-            การเตรียมตัวอย่างกิ่งชำ (Sample Preparation)
-          </h2>
-        </div>
-        <span className={`self-start rounded-full px-3 py-1 text-xs font-bold ${
-          sectionStatus === "ready" || sectionStatus === "warning"
-            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-            : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-        }`}>
-          {SECTION_STATUS_LABELS[sectionStatus]}
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-emerald-200 bg-white dark:border-emerald-900/60 dark:bg-neutral-950" aria-labelledby="sample-preparation-heading">
+      <button
+        type="button"
+        aria-expanded={isSectionOpen}
+        aria-controls={sectionPanelId}
+        onClick={() => setIsSectionOpen((current) => !current)}
+        className="flex min-h-11 w-full min-w-0 items-start justify-between gap-3 bg-emerald-50/70 px-4 py-3 text-left hover:bg-emerald-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35"
+      >
+        <span className="flex min-w-0 items-start gap-2">
+          <FlaskConical className="mt-0.5 h-5 w-5 flex-shrink-0 text-violet-500" />
+          <span className="min-w-0">
+            <span id="sample-preparation-heading" className="block break-words text-base font-bold text-neutral-900 dark:text-white">
+              การเตรียมตัวอย่างกิ่งชำ (Sample Preparation)
+            </span>
+            <span className="mt-1 block break-words text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+              กิ่งชำ {summary.totalCount} กิ่ง • พร้อม {summary.readyCount} • ต้องตรวจ {summary.notReadyCount}
+            </span>
+          </span>
         </span>
-      </div>
+        <span className="flex flex-shrink-0 items-center gap-2">
+          <span className={`hidden rounded-full px-3 py-1 text-xs font-bold sm:inline-flex ${
+            sectionStatus === "ready" || sectionStatus === "warning"
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+          }`}>
+            {SECTION_STATUS_LABELS[sectionStatus]}
+          </span>
+          <ChevronDown className={`mt-0.5 h-5 w-5 text-emerald-700 dark:text-emerald-300 ${isSectionOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+        </span>
+      </button>
 
+      <div id={sectionPanelId} hidden={!isSectionOpen} className="min-w-0 space-y-3 border-t border-emerald-100 p-4 dark:border-emerald-950/60">
       <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
         ตรวจตัวอย่างตาม Sample ID ที่ล็อกไว้จากแผนเดิม การแก้ข้อมูลภายใน card จะไม่เปลี่ยนรหัสหรือย้ายกลุ่มตัวอย่าง
       </p>
@@ -268,7 +330,7 @@ export function SamplePreparationSection({
           const readyInGroup = groupSamples.filter((sample) => sample.status === "ready").length;
 
           return (
-            <section key={group.id} className="min-w-0 rounded-2xl border border-neutral-200 bg-neutral-50/60 p-3 dark:border-neutral-800 dark:bg-neutral-900/30" aria-labelledby={`sample-group-${group.id}`}>
+            <section key={group.id} className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3 dark:border-emerald-950/60 dark:bg-emerald-950/10" aria-labelledby={`sample-group-${group.id}`}>
               <div className="mb-3 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <h3 id={`sample-group-${group.id}`} className="font-mono text-sm font-black text-neutral-900 dark:text-white">{group.id}</h3>
@@ -284,6 +346,7 @@ export function SamplePreparationSection({
                 {groupSamples.map((sample) => (
                   <SampleCard
                     key={sample.id}
+                    group={group}
                     sample={sample}
                     onUpdate={(patch) => onUpdateSample(sample.id, patch)}
                   />
@@ -292,6 +355,7 @@ export function SamplePreparationSection({
             </section>
           );
         })}
+      </div>
       </div>
     </section>
   );

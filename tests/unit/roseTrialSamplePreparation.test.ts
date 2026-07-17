@@ -1,5 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import fs from "node:fs";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SamplePreparationSection } from "@/components/workspaces/travel/rose-trial/SamplePreparationSection";
 import {
@@ -308,7 +310,7 @@ describe("Rose Trial Sample Preparation persistence and rendering", () => {
     expect(reset.samples.every((sample) => sample.baseline.initialCondition === "normal")).toBe(true);
   });
 
-  it("renders all four groups, eight IDs, labels, and summary without local storage", () => {
+  it("renders four groups and eight collapsed accessible sample rows in stable order", () => {
     const state = createDefaultRoseTrialState();
     const html = renderToStaticMarkup(React.createElement(SamplePreparationSection, {
       groupConfig: state.groupConfig,
@@ -319,11 +321,71 @@ describe("Rose Trial Sample Preparation persistence and rendering", () => {
 
     expect(html).toContain("Sample Preparation");
     expect(html).toContain("0 / 8 ตัวอย่างพร้อม");
+    expect(html).toContain("กิ่งชำ 8 กิ่ง • พร้อม 0 • ต้องตรวจ 8");
     for (const id of EXPECTED_IDS) expect(html).toContain(id);
+    for (let index = 1; index < EXPECTED_IDS.length; index += 1) {
+      expect(html.indexOf(EXPECTED_IDS[index - 1])).toBeLessThan(html.indexOf(EXPECTED_IDS[index]));
+    }
     expect(html).toContain("ระบบชำในน้ำ");
     expect(html).toContain("ระบบชำในพีทมอส");
+    expect(html.match(/type="button"/g)).toHaveLength(9);
+    expect(html).toContain('aria-expanded="true"');
+    const sectionPanelId = html.match(/aria-controls="([^"]+-sample-preparation-panel)"/)?.[1];
+    expect(sectionPanelId).toBeTruthy();
+    expect(html).toContain(`id="${sectionPanelId}"`);
+    expect(html.match(/aria-expanded="false"/g)).toHaveLength(8);
+    const panelIds = [...html.matchAll(/aria-controls="([^"]+-details)"/g)].map((match) => match[1]);
+    expect(panelIds).toHaveLength(8);
+    expect(new Set(panelIds).size).toBe(8);
+    for (const panelId of panelIds) {
+      expect(html).toContain(`id="${panelId}"`);
+    }
+    expect(html.match(/hidden=""/g)).toHaveLength(8);
     expect(html).toContain("Sample Label");
     expect(html).toContain("ความยาวกิ่ง");
     expect(html).toContain("จำนวนข้อ");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("undefined");
+    expect(html).not.toContain("[object Object]");
+  });
+
+  it("shows populated length, node count, status, condition, and validation in compact rows", () => {
+    const samples = readySamples();
+    samples[0] = {
+      ...samples[0],
+      baseline: { ...samples[0].baseline, initialCondition: "observe" },
+    };
+    const html = renderToStaticMarkup(React.createElement(SamplePreparationSection, {
+      groupConfig: createDefaultPilotGroupConfig(),
+      samples,
+      sectionStatus: "warning",
+      onUpdateSample: vi.fn(),
+    }));
+
+    expect(html).toContain("พร้อม");
+    expect(html).toContain("ควรสังเกต");
+    expect(html).toContain("12.5 ซม.");
+    expect(html).toContain("3 ข้อ");
+    expect(html).toContain("ตัวอย่างนี้พร้อมโดยมีจุดที่ควรสังเกตต่อ");
+  });
+
+  it("keeps disclosure state local and preserves every existing update callback", () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "src/components/workspaces/travel/rose-trial/SamplePreparationSection.tsx"),
+      "utf8"
+    );
+
+    expect(source).toContain("useState(false)");
+    expect(source).toContain("useState(true)");
+    expect(source).toContain("setExpanded((current) => !current)");
+    expect(source).toContain("setIsSectionOpen((current) => !current)");
+    expect(source).toContain("onUpdate({ status:");
+    expect(source).toContain("onUpdate({ initialCondition:");
+    expect(source).toContain("onUpdate({ sampleLabel:");
+    expect(source).toContain("onUpdate({ cuttingLength:");
+    expect(source).toContain("onUpdate({ nodeCount:");
+    expect(source).toContain("onUpdate({ notes:");
+    expect(source).not.toContain("localStorage");
+    expect(source).not.toContain("sessionStorage");
   });
 });

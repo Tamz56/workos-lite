@@ -8,19 +8,16 @@ import { useRouter } from "next/navigation";
 import {
   Flower2,
   Layers,
-  CheckSquare,
   FlaskConical,
   ShieldAlert,
   Save,
   FileText,
   Play,
-  Tag,
   AlertTriangle,
   Info,
   Plus,
   Trash2,
   RotateCcw,
-  Edit2,
   Check,
   Eye,
 } from "lucide-react";
@@ -50,6 +47,7 @@ import { calculateReadiness, parseIntegerInput } from "./readiness";
 import { mergeInventoryWithDefaults, updateInventoryItems } from "./inventory";
 import { hasPilotStarted } from "./day0SetupWorkflow";
 import { InventorySection } from "./InventorySection";
+import { PreparationChecklistSection } from "./PreparationChecklistSection";
 import { TreatmentProductSection } from "./TreatmentProductSection";
 import { SamplePreparationSection } from "./SamplePreparationSection";
 import {
@@ -106,8 +104,6 @@ export default function RoseTrialLabClient() {
   const [exportMarkdownOpen, setExportMarkdownOpen] = useState(false);
   const [exportedAt, setExportedAt] = useState<string | null>(null);
   const [exportedMarkdown, setExportedMarkdown] = useState("");
-  const [checklistFilter, setChecklistFilter] = useState<"all" | "pending" | "ready">("all");
-
   // Checklist modals
   const [addChecklistItemOpen, setAddChecklistItemOpen] = useState(false);
   const [editChecklistItemOpen, setEditChecklistItemOpen] = useState(false);
@@ -402,17 +398,6 @@ export default function RoseTrialLabClient() {
       </div>
     );
   }
-
-  // Filter checklist items
-  const filteredChecklistItems = state.checklistItems.filter((item) => {
-    if (checklistFilter === "pending") {
-      return item.status !== "ready" && item.status !== "not_needed";
-    }
-    if (checklistFilter === "ready") {
-      return item.status === "ready" || item.status === "not_needed";
-    }
-    return true;
-  });
 
   // Map read-only summaries behind a failure boundary; storage is never mutated here.
   const trialSummaries = buildTrialModeSummariesSafely(state, day0State, day0Corrupt);
@@ -721,18 +706,6 @@ export default function RoseTrialLabClient() {
         </div>
       </section>
 
-      <InventorySection
-        items={state.inventory}
-        sectionStatus={readiness.sections.inventory}
-        onUpdateItem={updateInventoryItem}
-      />
-
-      <TreatmentProductSection
-        product={state.treatmentProduct}
-        sectionStatus={readiness.sections.treatmentProduct}
-        onUpdate={updateTreatmentProduct}
-      />
-
       <SamplePreparationSection
         groupConfig={state.groupConfig}
         samples={state.samples}
@@ -740,196 +713,29 @@ export default function RoseTrialLabClient() {
         onUpdateSample={updateSample}
       />
 
-      {/* ─── Section C: Preparation Checklist ─────────────────────────────────── */}
-      <section className="space-y-3" aria-labelledby="checklist-heading">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="h-5 w-5 text-teal-500" />
-            <h2 id="checklist-heading" className="text-base font-bold text-neutral-900 dark:text-white">
-              ค. รายการเตรียมอุปกรณ์และวัสดุ
-            </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setAddChecklistItemOpen(true)}
-              className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/40 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800 transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              เพิ่มรายการ
-            </button>
-            <span className="text-xs text-neutral-400">Section C</span>
-          </div>
-        </div>
+      <InventorySection
+        items={state.inventory}
+        sectionStatus={readiness.sections.inventory}
+        onUpdateItem={updateInventoryItem}
+      />
 
-        <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-          ส่วนนี้ใช้ติดตามขั้นตอนการจัดหาและตรวจพร้อมใช้ ส่วนจำนวนของที่มีและใช้ได้จริงตรวจในหัวข้อ Inventory Check ด้านบน
-        </p>
+      <PreparationChecklistSection
+        items={state.checklistItems}
+        readiness={readiness}
+        onAddItem={() => setAddChecklistItemOpen(true)}
+        onEditItem={(item) => {
+          setEditingItem(item);
+          setEditChecklistItemOpen(true);
+        }}
+        onDeleteItem={deleteChecklistItem}
+        onUpdateItem={updateChecklistItem}
+      />
 
-        {/* Filter Toolbar */}
-        <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200/50 dark:border-neutral-800 max-w-sm">
-          <button
-            onClick={() => setChecklistFilter("all")}
-            className={`flex-1 text-center py-1.5 px-3 rounded-lg text-xs font-bold uppercase transition-all ${
-              checklistFilter === "all"
-                ? "bg-white dark:bg-neutral-800 text-neutral-800 dark:text-white shadow-sm"
-                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-            }`}
-          >
-            ทั้งหมด ({state.checklistItems.length})
-          </button>
-          <button
-            onClick={() => setChecklistFilter("pending")}
-            className={`flex-1 text-center py-1.5 px-3 rounded-lg text-xs font-bold uppercase transition-all ${
-              checklistFilter === "pending"
-                ? "bg-white dark:bg-neutral-800 text-neutral-800 dark:text-white shadow-sm"
-                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-            }`}
-          >
-            ยังไม่พร้อม ({state.checklistItems.filter((i) => i.status !== "ready" && i.status !== "not_needed").length})
-          </button>
-          <button
-            onClick={() => setChecklistFilter("ready")}
-            className={`flex-1 text-center py-1.5 px-3 rounded-lg text-xs font-bold uppercase transition-all ${
-              checklistFilter === "ready"
-                ? "bg-white dark:bg-neutral-800 text-neutral-800 dark:text-white shadow-sm"
-                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-            }`}
-          >
-            พร้อมแล้ว ({state.checklistItems.filter((i) => i.status === "ready" || i.status === "not_needed").length})
-          </button>
-        </div>
-
-        {/* Grouped Checklist */}
-        <div className="space-y-4">
-          {(Object.entries(CHECKLIST_CATEGORY_LABELS) as [ChecklistCategory, string][]).map(([catKey, catLabel]) => {
-            const catItems = filteredChecklistItems.filter((item) => item.category === catKey);
-            if (catItems.length === 0) return null;
-
-            const categoryTotalReady = catItems.filter(
-              (i) => i.status === "ready" || i.status === "not_needed"
-            ).length;
-
-            return (
-              <div
-                key={catKey}
-                className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 overflow-hidden shadow-sm"
-              >
-                {/* Category Header */}
-                <div className="flex items-center justify-between gap-3 px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 w-full min-w-0">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Tag className="h-4 w-4 text-neutral-400 flex-shrink-0" />
-                    <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 break-words">
-                      {catLabel}
-                    </span>
-                  </div>
-                  <span className="text-xs font-semibold text-neutral-400 flex-shrink-0">
-                    พร้อม: {categoryTotalReady} / {catItems.length}
-                  </span>
-                </div>
-
-                {/* Category Items */}
-                <ul className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-neutral-200 dark:bg-neutral-800 divide-y-0 divide-x-0">
-                  {catItems.map((item) => {
-                    const isItemReady = item.status === "ready" || item.status === "not_needed";
-                    return (
-                      <li
-                        key={item.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 bg-white dark:bg-neutral-950 hover:bg-neutral-50/50 dark:hover:bg-neutral-900/30 transition-colors odd:last:lg:col-span-2"
-                      >
-                        {/* Name & Critical */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-2.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateChecklistItem(item.id, { isCritical: !item.isCritical });
-                              }}
-                              title={item.isCritical ? "เปลี่ยนเป็นไม่จำเป็นต่อ Day 0" : "ทำเครื่องหมายเป็นอุปกรณ์จำเป็นต่อ Day 0"}
-                              className={`mt-0.5 flex-shrink-0 flex items-center justify-center text-[10px] font-black uppercase px-2 py-0.5 rounded border transition-colors ${
-                                item.isCritical
-                                  ? "bg-rose-50 dark:bg-rose-950/30 text-rose-500 dark:text-rose-400 border-rose-200 dark:border-rose-900/30"
-                                  : "bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-500 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300"
-                              }`}
-                            >
-                              {item.isCritical ? "จำเป็น" : "เลือกได้"}
-                            </button>
-                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 leading-snug break-words">
-                              {item.name}
-                            </span>
-                          </div>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-neutral-400">
-                            {item.requiredQuantity !== null && (
-                              <span className="font-semibold bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded">
-                                จำนวน: {item.requiredQuantity} {item.unit}
-                              </span>
-                            )}
-                            {item.notes && <span className="break-words max-w-full">| {item.notes}</span>}
-                          </div>
-                        </div>
-
-                        {/* Status Select & Action buttons */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {/* Status Picker */}
-                          <select
-                            value={item.status}
-                            onChange={(e) =>
-                              updateChecklistItem(item.id, {
-                                status: e.target.value as ChecklistStatus,
-                              })
-                            }
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
-                              isItemReady
-                                ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40"
-                                : "bg-neutral-50 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800"
-                            } focus:outline-none focus:ring-1 focus:ring-rose-500`}
-                          >
-                            {Object.entries(CHECKLIST_STATUS_LABELS).map(([k, label]) => (
-                              <option key={k} value={k}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
-
-                          {/* Edit Item Button */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingItem(item);
-                              setEditChecklistItemOpen(true);
-                            }}
-                            className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-900 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
-                            title="แก้ไขรายละเอียด"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-
-                          {/* Delete Item Button (User-created only) */}
-                          {item.source === "user" ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm("ต้องการลบรายการนี้หรือไม่?")) {
-                                  deleteChecklistItem(item.id);
-                                }
-                              }}
-                              className="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-                              title="ลบรายการ"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          ) : (
-                            <div className="w-8 h-8 flex-shrink-0" />
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <TreatmentProductSection
+        product={state.treatmentProduct}
+        sectionStatus={readiness.sections.treatmentProduct}
+        onUpdate={updateTreatmentProduct}
+      />
 
       {/* ─── Section D: Treatment Setup ──────────────────────────────────────── */}
       <section className="space-y-3" aria-labelledby="treatments-heading">
@@ -1404,7 +1210,7 @@ export default function RoseTrialLabClient() {
               className="h-4 w-4 rounded border-neutral-300 text-rose-600 focus:ring-rose-500"
             />
             <label htmlFor="new-item-critical" className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
-              จำเป็นต่อการเริ่ม Day 0 (Critical)
+              จำเป็นต่อการเริ่ม Day 0
             </label>
           </div>
 
@@ -1573,7 +1379,7 @@ export default function RoseTrialLabClient() {
                 className="h-4 w-4 rounded border-neutral-300 text-rose-600 focus:ring-rose-500"
               />
               <label htmlFor="edit-item-critical" className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
-                จำเป็นต่อการเริ่ม Day 0 (Critical)
+                จำเป็นต่อการเริ่ม Day 0
               </label>
             </div>
 

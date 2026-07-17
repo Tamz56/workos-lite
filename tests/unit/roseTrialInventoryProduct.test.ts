@@ -301,17 +301,45 @@ describe("Rose Trial Inventory and Product components", () => {
   });
 
   it("renders Clonex identity, packaging note, and cautious Pilot application summary", () => {
+    const onUpdate = vi.fn();
     const html = renderToStaticMarkup(React.createElement(TreatmentProductSection, {
       product: readyProduct({ packagingType: "repacked" }),
       sectionStatus: "warning",
-      onUpdate: vi.fn(),
+      onUpdate,
     }));
 
+    expect(html).toContain('type="button"');
+    expect(html).toContain('aria-expanded="false"');
+    const panelId = html.match(/aria-controls="([^"]+-treatment-product-panel)"/)?.[1];
+    expect(panelId).toBeTruthy();
+    expect(html).toContain(`id="${panelId}" hidden=""`);
+    expect(html).toContain("บันทึกแล้ว • Clonex Rooting Gel • ต้องตรวจ");
     expect(html).toContain("Clonex Rooting Gel");
     expect(html).toContain("Commercial Rooting Treatment");
     expect(html).toContain("ผลิตภัณฑ์ในสภาพที่ผู้ใช้ซื้อได้จริง");
     expect(html).toContain("ไม่เติมลงน้ำและไม่ผสมลงพีทมอส");
     expect(html).not.toContain("เร่งรากแน่นอน");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("undefined");
+    expect(html).not.toContain("[object Object]");
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("shows the existing empty state without claiming readiness", () => {
+    const product = {
+      ...createDefaultTreatmentProduct(),
+      productName: "",
+      status: "not_selected" as const,
+    };
+    const html = renderToStaticMarkup(React.createElement(TreatmentProductSection, {
+      product,
+      sectionStatus: "blocked",
+      onUpdate: vi.fn(),
+    }));
+
+    expect(html).toContain("ยังไม่ได้บันทึกผลิตภัณฑ์");
+    expect(html).toContain("มีสิ่งที่ต้องแก้");
+    expect(html).not.toContain("บันทึกแล้ว •");
   });
 
   it("renders QuantityInput with undefined value as empty input value in HTML", () => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, FlaskConical } from "lucide-react";
+import { useId, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, FlaskConical } from "lucide-react";
 import { evaluateTreatmentProductReadiness } from "./readiness";
 import type {
   ReadinessSectionStatus,
@@ -42,30 +43,49 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function TreatmentProductSection({ product, sectionStatus, onUpdate }: TreatmentProductSectionProps) {
+  const sectionPanelId = `${useId()}-treatment-product-panel`;
+  const [isSectionOpen, setIsSectionOpen] = useState(false);
   const readiness = evaluateTreatmentProductReadiness(product);
   const isRepacked = product.packagingType === "repacked" || product.packagingType === "repacked_unknown";
   const inputClass = "w-full min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-rose-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200";
+  const hasRecordedProduct = product.status !== "not_selected" && Boolean(product.productName.trim());
+  const summary = hasRecordedProduct
+    ? `บันทึกแล้ว • ${product.productName.trim()} • ${SECTION_STATUS_LABELS[readiness.status]}`
+    : "ยังไม่ได้บันทึกผลิตภัณฑ์";
 
   return (
-    <section className="space-y-3" aria-labelledby="treatment-product-heading">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
-          <FlaskConical className="h-5 w-5 flex-shrink-0 text-fuchsia-500" />
-          <h2 id="treatment-product-heading" className="text-base font-bold text-neutral-900 dark:text-white">
-            บันทึกผลิตภัณฑ์ Treatment (Treatment Product Record)
-          </h2>
-        </div>
-        <span className={`self-start rounded-full px-3 py-1 text-xs font-bold ${
-          sectionStatus === "ready"
-            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-            : sectionStatus === "blocked"
-              ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-              : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-        }`}>
-          {SECTION_STATUS_LABELS[sectionStatus]}
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-emerald-200 bg-white dark:border-emerald-900/60 dark:bg-neutral-950" aria-labelledby="treatment-product-heading">
+      <button
+        type="button"
+        aria-expanded={isSectionOpen}
+        aria-controls={sectionPanelId}
+        onClick={() => setIsSectionOpen((current) => !current)}
+        className="flex min-h-11 w-full min-w-0 items-start justify-between gap-3 bg-emerald-50/70 px-4 py-3 text-left hover:bg-emerald-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35"
+      >
+        <span className="flex min-w-0 items-start gap-2">
+          <FlaskConical className="mt-0.5 h-5 w-5 flex-shrink-0 text-fuchsia-500" />
+          <span className="min-w-0">
+            <span id="treatment-product-heading" className="block break-words text-base font-bold text-neutral-900 dark:text-white">
+              บันทึกผลิตภัณฑ์ Treatment (Treatment Product Record)
+            </span>
+            <span className="mt-1 block break-words text-xs font-semibold text-neutral-600 dark:text-neutral-300">{summary}</span>
+          </span>
         </span>
-      </div>
+        <span className="flex flex-shrink-0 items-center gap-2">
+          <span className={`hidden rounded-full px-3 py-1 text-xs font-bold sm:inline-flex ${
+            sectionStatus === "ready"
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : sectionStatus === "blocked"
+                ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+          }`}>
+            {SECTION_STATUS_LABELS[sectionStatus]}
+          </span>
+          <ChevronDown className={`mt-0.5 h-5 w-5 text-emerald-700 dark:text-emerald-300 ${isSectionOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+        </span>
+      </button>
 
+      <div id={sectionPanelId} hidden={!isSectionOpen} className="min-w-0 border-t border-emerald-100 p-4 dark:border-emerald-950/60">
       <div className="min-w-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
         <div className="space-y-4 border-b border-neutral-200 bg-gradient-to-r from-fuchsia-50 to-rose-50 p-4 dark:border-neutral-800 dark:from-fuchsia-950/20 dark:to-rose-950/20 md:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -227,6 +247,7 @@ export function TreatmentProductSection({ product, sectionStatus, onUpdate }: Tr
             </dl>
           </div>
         </div>
+      </div>
       </div>
     </section>
   );
