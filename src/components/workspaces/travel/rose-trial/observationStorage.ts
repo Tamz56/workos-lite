@@ -40,6 +40,32 @@ function invalidEnvelope(message: string): RoseTrialObservationStoreParseResult 
   };
 }
 
+const CONTEXTUAL_OBSERVATION_ISSUE_CODES = new Set([
+  "cross_batch_reference",
+  "unknown_treatment",
+  "unknown_sample",
+  "sample_treatment_mismatch",
+]);
+
+function createStructuralValidationContext(
+  candidate: unknown
+): RoseTrialObservationValidationContext {
+  const record = typeof candidate === "object" && candidate !== null && !Array.isArray(candidate)
+    ? candidate as Record<string, unknown>
+    : {};
+  const batchId = typeof record.batchId === "string" ? record.batchId : "";
+  const treatmentId = typeof record.treatmentId === "string" ? record.treatmentId : undefined;
+  const sampleId = typeof record.sampleId === "string" ? record.sampleId : undefined;
+
+  return {
+    batchId,
+    treatments: treatmentId ? [{ id: treatmentId, batchId }] : [],
+    samples: sampleId
+      ? [{ id: sampleId, batchId, ...(treatmentId ? { treatmentId } : {}) }]
+      : [],
+  };
+}
+
 export function parseObservationStore(
   raw: string | null,
   context: RoseTrialObservationValidationContext
@@ -89,17 +115,46 @@ export function parseObservationStore(
   const observationIds = new Set<string>();
 
   envelope.observations.forEach((candidate, index) => {
-    const validation = validateRoseTrialObservation(candidate, context);
-    if (!validation.valid || !isRoseTrialObservationRecord(candidate)) {
-      warnings.push(...validation.issues.map((item) => ({ ...item, severity: "warning" as const, index })));
+    const structuralValidation = validateRoseTrialObservation(
+      candidate,
+      createStructuralValidationContext(candidate)
+    );
+    if (!structuralValidation.valid || !isRoseTrialObservationRecord(candidate)) {
+      warnings.push(...structuralValidation.issues.map((item) => ({
+        ...item,
+        severity: "warning" as const,
+        index,
+      })));
       return;
     }
     if (observationIds.has(candidate.id)) {
       warnings.push(warning("id", "duplicate_observation_id", "เก็บ Observation แรกและข้าม ID ที่ซ้ำ", candidate.id, index));
       return;
     }
+
+    const contextualValidation = validateRoseTrialObservation(candidate, context);
+    const contextualIssues = contextualValidation.issues.filter((item) =>
+      CONTEXTUAL_OBSERVATION_ISSUE_CODES.has(item.code)
+    );
+    const unexpectedIssues = contextualValidation.issues.filter((item) =>
+      !CONTEXTUAL_OBSERVATION_ISSUE_CODES.has(item.code)
+    );
+    if (unexpectedIssues.length > 0) {
+      warnings.push(...unexpectedIssues.map((item) => ({
+        ...item,
+        severity: "warning" as const,
+        index,
+      })));
+      return;
+    }
+
     observationIds.add(candidate.id);
     observations.push({ ...candidate, photoIds: [...candidate.photoIds] });
+    warnings.push(...contextualIssues.map((item) => ({
+      ...item,
+      severity: "warning" as const,
+      index,
+    })));
   });
 
   const photos: RoseTrialObservationPhoto[] = [];

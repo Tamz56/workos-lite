@@ -115,6 +115,172 @@ describe("Rose Trial observation storage", () => {
     expect(values.get(ROSE_TRIAL_OBSERVATION_STORAGE_KEY)).toBe(before);
   });
 
+  it("retains structurally valid observations with orphaned Treatment references", () => {
+    const orphan = observation({
+      id: "obs-orphan-treatment",
+      scope: "treatment",
+      treatmentId: "deleted-treatment",
+      sampleId: undefined,
+    });
+    const result = parseObservationStore(JSON.stringify(store({ observations: [orphan] })), context);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.status).toBe("partial");
+      expect(result.value.observations).toEqual([orphan]);
+      expect(result.warnings).toContainEqual(expect.objectContaining({
+        code: "unknown_treatment",
+        field: "treatmentId",
+        recordId: orphan.id,
+        severity: "warning",
+      }));
+    }
+  });
+
+  it("retains structurally valid observations with orphaned Sample references", () => {
+    const orphan = observation({ id: "obs-orphan-sample", sampleId: "deleted-sample" });
+    const result = parseObservationStore(JSON.stringify(store({ observations: [orphan] })), context);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.status).toBe("partial");
+      expect(result.value.observations).toEqual([orphan]);
+      expect(result.warnings).toContainEqual(expect.objectContaining({
+        code: "unknown_sample",
+        field: "sampleId",
+        recordId: orphan.id,
+        severity: "warning",
+      }));
+    }
+  });
+
+  it("retains Sample observations whose current Treatment relationship no longer matches", () => {
+    const mismatch = observation({
+      id: "obs-mismatch",
+      treatmentId: "t1",
+      sampleId: "sample-1",
+    });
+    const mismatchContext: RoseTrialObservationValidationContext = {
+      ...context,
+      treatments: [...context.treatments, { id: "t1", batchId: "batch-1" }],
+    };
+    const result = parseObservationStore(
+      JSON.stringify(store({ observations: [mismatch] })),
+      mismatchContext
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.status).toBe("partial");
+      expect(result.value.observations).toEqual([mismatch]);
+      expect(result.warnings).toContainEqual(expect.objectContaining({
+        code: "sample_treatment_mismatch",
+        recordId: mismatch.id,
+        severity: "warning",
+      }));
+    }
+  });
+
+  it("retains structurally valid cross-batch observations with contextual warnings", () => {
+    const crossBatch = observation({
+      id: "obs-cross-batch",
+      batchId: "previous-batch",
+      scope: "batch",
+      sampleId: undefined,
+    });
+    const result = parseObservationStore(
+      JSON.stringify(store({ observations: [crossBatch] })),
+      context
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.status).toBe("partial");
+      expect(result.value.observations).toEqual([crossBatch]);
+      expect(result.warnings).toContainEqual(expect.objectContaining({
+        code: "cross_batch_reference",
+        field: "batchId",
+        recordId: crossBatch.id,
+        severity: "warning",
+      }));
+    }
+  });
+
+  it.each([
+    [
+      "Treatment",
+      observation({
+        id: "obs-cross-treatment",
+        scope: "treatment",
+        treatmentId: "foreign-treatment",
+        sampleId: undefined,
+      }),
+      {
+        ...context,
+        treatments: [...context.treatments, { id: "foreign-treatment", batchId: "batch-2" }],
+      },
+      "treatmentId",
+    ],
+    [
+      "Sample",
+      observation({ id: "obs-cross-sample", sampleId: "foreign-sample" }),
+      {
+        ...context,
+        samples: [...context.samples, { id: "foreign-sample", batchId: "batch-2" }],
+      },
+      "sampleId",
+    ],
+  ])("retains observations with cross-batch %s references", (_kind, record, parseContext, field) => {
+    const result = parseObservationStore(
+      JSON.stringify(store({ observations: [record] })),
+      parseContext
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.status).toBe("partial");
+      expect(result.value.observations).toEqual([record]);
+      expect(result.warnings).toContainEqual(expect.objectContaining({
+        code: "cross_batch_reference",
+        field,
+        recordId: record.id,
+        severity: "warning",
+      }));
+    }
+  });
+
+  it("retains photo metadata attached to an orphaned observation without writing raw storage", () => {
+    const orphan = observation({
+      id: "obs-orphan-photo",
+      scope: "treatment",
+      treatmentId: "deleted-treatment",
+      sampleId: undefined,
+      photoIds: ["photo-orphan"],
+    });
+    const value = store({
+      observations: [orphan],
+      photos: [{
+        id: "photo-orphan",
+        observationId: orphan.id,
+        filename: "orphan.jpg",
+        sortOrder: 0,
+        createdAt: "2026-07-11T09:05:00.000Z",
+      }],
+    });
+    const raw = JSON.stringify(value);
+    const installed = installStorage(raw);
+    const result = loadObservationStore(context);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.status).toBe("partial");
+      expect(result.value.observations).toEqual([orphan]);
+      expect(result.value.photos).toEqual(value.photos);
+    }
+    expect(installed.setItem).not.toHaveBeenCalled();
+    expect(installed.values.get(ROSE_TRIAL_OBSERVATION_STORAGE_KEY)).toBe(raw);
+  });
+
   it("keeps the first duplicate observation and warns about later records", () => {
     const result = parseObservationStore(JSON.stringify(store({
       observations: [observation({ observedFacts: "first" }), observation({ observedFacts: "second" })],
@@ -185,6 +351,52 @@ describe("Rose Trial observation storage", () => {
     const installed = installStorage();
     const result = saveObservationStore(store({ observations: [observation({ trialDay: -1 })] }), context);
     expect(result).toMatchObject({ ok: false, error: { code: "invalid_store" } });
+    expect(installed.setItem).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["orphaned Treatment", observation({ scope: "treatment", treatmentId: "deleted-treatment", sampleId: undefined })],
+    ["orphaned Sample", observation({ sampleId: "deleted-sample" })],
+    ["Sample/Treatment mismatch", observation({ treatmentId: "t1" })],
+    ["cross-batch Observation", observation({ batchId: "previous-batch", scope: "batch", sampleId: undefined })],
+  ])("keeps strict save validation for %s", (_scenario, invalidObservation) => {
+    const installed = installStorage();
+    const strictContext: RoseTrialObservationValidationContext = {
+      ...context,
+      treatments: [...context.treatments, { id: "t1", batchId: "batch-1" }],
+    };
+    const result = saveObservationStore(
+      store({ observations: [invalidObservation] }),
+      strictContext
+    );
+
+    expect(result).toMatchObject({ ok: false, error: { code: "invalid_store" } });
+    expect(installed.setItem).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "Treatment",
+      observation({ scope: "treatment", treatmentId: "foreign-treatment", sampleId: undefined }),
+      {
+        ...context,
+        treatments: [...context.treatments, { id: "foreign-treatment", batchId: "batch-2" }],
+      },
+    ],
+    [
+      "Sample",
+      observation({ sampleId: "foreign-sample" }),
+      {
+        ...context,
+        samples: [...context.samples, { id: "foreign-sample", batchId: "batch-2" }],
+      },
+    ],
+  ])("keeps strict save validation for cross-batch %s references", (_kind, record, saveContext) => {
+    const installed = installStorage();
+    expect(saveObservationStore(store({ observations: [record] }), saveContext)).toMatchObject({
+      ok: false,
+      error: { code: "invalid_store" },
+    });
     expect(installed.setItem).not.toHaveBeenCalled();
   });
 
