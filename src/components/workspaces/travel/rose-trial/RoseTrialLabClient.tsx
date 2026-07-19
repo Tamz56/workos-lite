@@ -3,7 +3,7 @@
 // GF-APP-075 — Rose Trial Lab Client Component
 // Stage 2B: Form State + localStorage persistence
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Flower2,
@@ -20,6 +20,7 @@ import {
   RotateCcw,
   Check,
   Eye,
+  ClipboardList,
 } from "lucide-react";
 
 import type {
@@ -73,6 +74,7 @@ import {
 import type { ActualLoadState } from "../../../../lib/rose-trial-domain/types";
 import { TrialModeSummary } from "./TrialModeSummary";
 import { TrialComparisonPanel } from "./TrialComparisonPanel";
+import { ObservationWorkspace } from "./ObservationWorkspace";
 
 const CHECKLIST_READINESS_FEEDBACK: Record<ChecklistStatus, { passed: boolean; message: string }> = {
   have: { passed: false, message: "ยังไม่ผ่านความพร้อม — มีของแล้วแต่ยังต้องตรวจว่าสามารถใช้งานได้" },
@@ -87,6 +89,10 @@ const CHECKLIST_READINESS_FEEDBACK: Record<ChecklistStatus, { passed: boolean; m
 
 export default function RoseTrialLabClient() {
   const router = useRouter();
+  const tabIdPrefix = `rose-trial-workspace-${useId().replace(/:/g, "")}`;
+  const setupTabRef = useRef<HTMLButtonElement>(null);
+  const observationTabRef = useRef<HTMLButtonElement>(null);
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"setup" | "observations">("setup");
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<RoseTrialStateV2>(() => createDefaultRoseTrialState());
   const [isDirty, setIsDirty] = useState(false);
@@ -472,6 +478,69 @@ export default function RoseTrialLabClient() {
           </p>
         )}
       </div>
+
+      <div
+        role="tablist"
+        aria-label="พื้นที่ทำงาน Rose Trial Lab"
+        className="grid min-w-0 grid-cols-2 gap-2 rounded-2xl border border-neutral-200 bg-neutral-100 p-1.5 dark:border-neutral-800 dark:bg-neutral-900"
+      >
+        <button
+          ref={setupTabRef}
+          id={`${tabIdPrefix}-setup-tab`}
+          type="button"
+          role="tab"
+          aria-selected={activeWorkspaceTab === "setup"}
+          aria-controls={`${tabIdPrefix}-setup-panel`}
+          tabIndex={activeWorkspaceTab === "setup" ? 0 : -1}
+          onClick={() => setActiveWorkspaceTab("setup")}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+            event.preventDefault();
+            setActiveWorkspaceTab("observations");
+            observationTabRef.current?.focus();
+          }}
+          className={`flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+            activeWorkspaceTab === "setup"
+              ? "bg-white text-rose-700 shadow-sm dark:bg-neutral-950 dark:text-rose-300"
+              : "text-neutral-500 hover:bg-white/60 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-950/60 dark:hover:text-neutral-100"
+          }`}
+        >
+          <FlaskConical className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 break-words">เตรียมการทดลอง</span>
+        </button>
+        <button
+          ref={observationTabRef}
+          id={`${tabIdPrefix}-observations-tab`}
+          type="button"
+          role="tab"
+          aria-selected={activeWorkspaceTab === "observations"}
+          aria-controls={`${tabIdPrefix}-observations-panel`}
+          tabIndex={activeWorkspaceTab === "observations" ? 0 : -1}
+          onClick={() => setActiveWorkspaceTab("observations")}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+            event.preventDefault();
+            setActiveWorkspaceTab("setup");
+            setupTabRef.current?.focus();
+          }}
+          className={`flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+            activeWorkspaceTab === "observations"
+              ? "bg-white text-rose-700 shadow-sm dark:bg-neutral-950 dark:text-rose-300"
+              : "text-neutral-500 hover:bg-white/60 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-950/60 dark:hover:text-neutral-100"
+          }`}
+        >
+          <ClipboardList className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 break-words">บันทึกการสังเกต</span>
+        </button>
+      </div>
+
+      <div
+        id={`${tabIdPrefix}-setup-panel`}
+        role="tabpanel"
+        aria-labelledby={`${tabIdPrefix}-setup-tab`}
+        hidden={activeWorkspaceTab !== "setup"}
+        className="space-y-6"
+      >
 
       {/* Trial Mode Summary Cards */}
       <TrialModeSummary summaries={trialSummaries} />
@@ -1520,6 +1589,23 @@ export default function RoseTrialLabClient() {
         type={toastType}
         onClose={() => setToastVisible(false)}
       />
+      </div>
+
+      <div
+        id={`${tabIdPrefix}-observations-panel`}
+        role="tabpanel"
+        aria-labelledby={`${tabIdPrefix}-observations-tab`}
+        hidden={activeWorkspaceTab !== "observations"}
+        className="min-w-0"
+      >
+        {activeWorkspaceTab === "observations" && (
+          <ObservationWorkspace
+            pilotStart={state.pilotStart}
+            treatments={state.treatments}
+            samples={state.samples}
+          />
+        )}
+      </div>
     </div>
   );
 }
