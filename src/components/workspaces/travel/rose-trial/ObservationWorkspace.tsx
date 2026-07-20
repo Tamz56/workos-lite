@@ -1,8 +1,22 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ClipboardList, Clock3, Info, Sprout } from "lucide-react";
-import { loadObservationStore } from "./observationStorage";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock3, Info, Plus, Sprout } from "lucide-react";
+import {
+  addRoseTrialObservation,
+  createRoseTrialObservation,
+} from "./observationCrud";
+import { ObservationForm, type ObservationFormSubmitResult } from "./ObservationForm";
+import {
+  createObservationFormDraft,
+  mapObservationIssuesToFormErrors,
+  validateObservationFormDraft,
+  type ObservationFormDraft,
+} from "./observationFormState";
+import {
+  loadObservationStore,
+  saveObservationStore,
+} from "./observationStorage";
 import type {
   RoseTrialObservationStoreV1,
   RoseTrialObservationValidationIssue,
@@ -37,11 +51,17 @@ interface ObservationWorkspaceProps {
   pilotStart: PilotStartRecord;
   treatments: readonly Treatment[];
   samples: readonly TrialSample[];
+  onFormDirtyChange?: (dirty: boolean) => void;
 }
 
 interface ObservationWorkspaceViewProps {
   referenceContext: ObservationReferenceContextResult;
   loadState: ObservationWorkspaceLoadState;
+  form?: React.ReactNode;
+  formOpen?: boolean;
+  successMessage?: string | null;
+  onOpenForm?: () => void;
+  openButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 const FAILED_STATE_COPY: Record<ObservationWorkspaceFailureStatus, string> = {
@@ -51,16 +71,135 @@ const FAILED_STATE_COPY: Record<ObservationWorkspaceFailureStatus, string> = {
   storage_unavailable: "ไม่สามารถอ่านพื้นที่จัดเก็บ Observation บนอุปกรณ์นี้ได้",
 };
 
+const GENERIC_SAVE_FAILURE = "ยังบันทึกไม่ได้ ข้อมูลที่กรอกยังอยู่ กรุณาตรวจสอบแล้วลองอีกครั้ง";
+const STORAGE_SAVE_FAILURE = "ไม่สามารถบันทึกลงพื้นที่จัดเก็บบนอุปกรณ์นี้ได้";
+const PARTIAL_STORE_LOCK = "พบข้อมูลบางรายการที่อ่านได้ไม่สมบูรณ์ จึงปิดการเพิ่มบันทึกชั่วคราวเพื่อป้องกันข้อมูลเดิม";
+
+interface ObservationIdCrypto {
+  randomUUID?: () => string;
+  getRandomValues?: <T extends ArrayBufferView | null>(array: T) => T;
+}
+
+export function createObservationId(cryptoApi: ObservationIdCrypto | undefined = globalThis.crypto): string {
+  if (cryptoApi?.randomUUID) return `obs-${cryptoApi.randomUUID()}`;
+  if (cryptoApi?.getRandomValues) {
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+    return `obs-${Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("")}`;
+  }
+  throw new Error("secure-random-unavailable");
+}
+
+interface ObservationSaveDependencies {
+  loadStore: typeof loadObservationStore;
+  createRecord: typeof createRoseTrialObservation;
+  addRecord: typeof addRoseTrialObservation;
+  saveStore: typeof saveObservationStore;
+  createId: () => string;
+}
+
+const DEFAULT_SAVE_DEPENDENCIES: ObservationSaveDependencies = {
+  loadStore: loadObservationStore,
+  createRecord: createRoseTrialObservation,
+  addRecord: addRoseTrialObservation,
+  saveStore: saveObservationStore,
+  createId: createObservationId,
+};
+
+export type CommitObservationDraftResult =
+  | { ok: true; store: RoseTrialObservationStoreV1 }
+  | { ok: false; message: string; errors?: ReturnType<typeof mapObservationIssuesToFormErrors> };
+
+export function commitObservationDraft(
+  draft: ObservationFormDraft,
+  submittedAt: Date,
+  pilotStartedAt: string,
+  referenceContext: Extract<ObservationReferenceContextResult, { ok: true }>,
+  dependencies: ObservationSaveDependencies = DEFAULT_SAVE_DEPENDENCIES
+): CommitObservationDraftResult {
+  try {
+    const validation = validateObservationFormDraft(
+      draft,
+      referenceContext,
+      pilotStartedAt,
+      submittedAt
+    );
+    if (!validation.valid) {
+      return { ok: false, message: GENERIC_SAVE_FAILURE, errors: validation.errors };
+    }
+
+    const latest = dependencies.loadStore(referenceContext.validationContext);
+    if (!latest.ok) {
+      return {
+        ok: false,
+        message: latest.status === "storage_unavailable"
+          ? STORAGE_SAVE_FAILURE
+          : "ข้อมูล Observation เดิมอ่านไม่สมบูรณ์ จึงยังไม่บันทึกข้อมูลใหม่เพื่อป้องกันข้อมูลเดิม",
+      };
+    }
+    if (latest.status === "partial") {
+      return { ok: false, message: PARTIAL_STORE_LOCK };
+    }
+
+    const timestamp = submittedAt.toISOString();
+    const created = dependencies.createRecord(
+      validation.input,
+      { id: dependencies.createId(), timestamp },
+      referenceContext.validationContext
+    );
+    if (!created.ok) {
+      return {
+        ok: false,
+        message: GENERIC_SAVE_FAILURE,
+        errors: mapObservationIssuesToFormErrors(created.issues),
+      };
+    }
+
+    const added = dependencies.addRecord(
+      latest.value,
+      created.value,
+      referenceContext.validationContext,
+      timestamp
+    );
+    if (!added.ok) {
+      return {
+        ok: false,
+        message: GENERIC_SAVE_FAILURE,
+        errors: mapObservationIssuesToFormErrors(added.issues),
+      };
+    }
+
+    const saved = dependencies.saveStore(added.value, referenceContext.validationContext);
+    if (!saved.ok) {
+      return {
+        ok: false,
+        message: saved.error.code === "storage_unavailable"
+          ? STORAGE_SAVE_FAILURE
+          : GENERIC_SAVE_FAILURE,
+      };
+    }
+
+    return { ok: true, store: added.value };
+  } catch {
+    return { ok: false, message: GENERIC_SAVE_FAILURE };
+  }
+}
+
 export function ObservationWorkspace({
   pilotStart,
   treatments,
   samples,
+  onFormDirtyChange = () => undefined,
 }: ObservationWorkspaceProps) {
   const referenceContext = useMemo(
     () => createObservationReferenceContext(pilotStart, treatments, samples),
     [pilotStart, samples, treatments]
   );
   const [loadState, setLoadState] = useState<ObservationWorkspaceLoadState>({ kind: "loading" });
+  const [formDraft, setFormDraft] = useState<ObservationFormDraft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const saveInFlightRef = useRef(false);
+  const openButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!referenceContext.ok) return;
@@ -78,10 +217,78 @@ export function ObservationWorkspace({
     });
   }, [referenceContext]);
 
+  const closeForm = useCallback(() => {
+    setFormDraft(null);
+    setSuccessMessage(null);
+    onFormDirtyChange(false);
+    window.requestAnimationFrame(() => openButtonRef.current?.focus());
+  }, [onFormDirtyChange]);
+
+  const openForm = () => {
+    if (!referenceContext.ok || typeof pilotStart.startedAt !== "string") return;
+    setSuccessMessage(null);
+    setFormDraft(createObservationFormDraft(new Date(), pilotStart.startedAt));
+  };
+
+  const submitForm = async (
+    draft: ObservationFormDraft,
+    submittedAt: Date
+  ): Promise<ObservationFormSubmitResult> => {
+    if (
+      saveInFlightRef.current
+      || !referenceContext.ok
+      || typeof pilotStart.startedAt !== "string"
+      || (loadState.kind !== "empty" && loadState.kind !== "valid")
+    ) {
+      return { ok: false, message: GENERIC_SAVE_FAILURE };
+    }
+
+    saveInFlightRef.current = true;
+    setSaving(true);
+    try {
+      const result = commitObservationDraft(
+        draft,
+        submittedAt,
+        pilotStart.startedAt,
+        referenceContext
+      );
+      if (!result.ok) return result;
+
+      setLoadState({ kind: "valid", store: result.store, warnings: [] });
+      setFormDraft(null);
+      onFormDirtyChange(false);
+      setSuccessMessage("บันทึกการสังเกตแล้ว");
+      window.requestAnimationFrame(() => openButtonRef.current?.focus());
+      return { ok: true };
+    } finally {
+      saveInFlightRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  const form = formDraft && referenceContext.ok && typeof pilotStart.startedAt === "string"
+    ? (
+        <ObservationForm
+          initialDraft={formDraft}
+          pilotStartedAt={pilotStart.startedAt}
+          referenceContext={referenceContext}
+          saving={saving}
+          onCancel={closeForm}
+          onDirtyChange={onFormDirtyChange}
+          onSubmit={submitForm}
+        />
+      )
+    : null;
+
   return (
     <ObservationWorkspaceView
       referenceContext={referenceContext}
       loadState={loadState}
+      form={form}
+      formOpen={formDraft !== null}
+      successMessage={successMessage}
+      onOpenForm={openForm}
+      openButtonRef={openButtonRef}
     />
   );
 }
@@ -89,6 +296,11 @@ export function ObservationWorkspace({
 export function ObservationWorkspaceView({
   referenceContext,
   loadState,
+  form,
+  formOpen = false,
+  successMessage,
+  onOpenForm,
+  openButtonRef,
 }: ObservationWorkspaceViewProps) {
   if (!referenceContext.ok) {
     return (
@@ -144,15 +356,35 @@ export function ObservationWorkspaceView({
   return (
     <div className="min-w-0 space-y-6">
       <section className="min-w-0 space-y-4" aria-labelledby="observation-dashboard-heading">
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-wider text-rose-500">Observation Workspace</p>
-          <h2 id="observation-dashboard-heading" className="mt-1 break-words text-xl font-black text-neutral-900 dark:text-white">
-            บันทึกการสังเกต
-          </h2>
-          <p className="mt-1 break-words text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-            หลักฐานตามวันของ Batch นี้ แยกสิ่งที่สังเกตเห็นออกจากข้อสังเกตหรือการตีความ
-          </p>
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-wider text-rose-500">Observation Workspace</p>
+            <h2 id="observation-dashboard-heading" className="mt-1 break-words text-xl font-black text-neutral-900 dark:text-white">
+              บันทึกการสังเกต
+            </h2>
+            <p className="mt-1 break-words text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+              หลักฐานตามวันของ Batch นี้ แยกสิ่งที่สังเกตเห็นออกจากข้อสังเกตหรือการตีความ
+            </p>
+          </div>
+          {!formOpen && (loadState.kind === "empty" || loadState.kind === "valid") && (
+            <button
+              ref={openButtonRef}
+              type="button"
+              onClick={onOpenForm}
+              className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-black text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 sm:w-auto"
+            >
+              <Plus className="h-4 w-4" />
+              เพิ่มบันทึกการสังเกต
+            </button>
+          )}
         </div>
+
+        {successMessage && (
+          <div role="status" className="flex min-w-0 items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="break-words">{successMessage}</p>
+          </div>
+        )}
 
         {referenceContext.warnings.length > 0 && (
           <div role="status" className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
@@ -168,9 +400,11 @@ export function ObservationWorkspaceView({
         {loadState.kind === "partial" && (
           <div role="status" className="flex min-w-0 items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p className="break-words">พบข้อมูลบางรายการที่อ่านได้ไม่สมบูรณ์ ระบบยังไม่เขียนทับข้อมูลเดิม</p>
+            <p className="break-words">{PARTIAL_STORE_LOCK}</p>
           </div>
         )}
+
+        {form}
 
         <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
           <DashboardMetric label="Observation ทั้งหมด" value={summary.total} />
@@ -190,10 +424,10 @@ export function ObservationWorkspaceView({
           <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
             การบันทึกตาม Trial Day ช่วยเก็บหลักฐานของ Batch กลุ่มทดลอง และกิ่งชำไว้ตามเวลาที่สังเกตจริง
           </p>
-          <p className="mt-3 text-xs font-bold text-neutral-400">การเพิ่มบันทึกจะเปิดในขั้นถัดไป</p>
         </section>
       ) : (
         <ObservationTimeline
+          key={loadState.store.updatedAt ?? "observation-timeline"}
           observations={observations}
           warnings={loadState.warnings}
           validationContext={referenceContext.validationContext}
@@ -204,7 +438,7 @@ export function ObservationWorkspaceView({
 
       <div className="flex min-w-0 items-start gap-2 rounded-xl bg-emerald-50 p-3 text-xs font-semibold leading-relaxed text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-200">
         <Sprout className="mt-0.5 h-4 w-4 shrink-0" />
-        <p className="break-words">พื้นที่นี้แสดงข้อมูลแบบอ่านอย่างเดียว การเปิดแท็บ กรองข้อมูล หรือเปิดรายละเอียดจะไม่บันทึกข้อมูลใหม่</p>
+        <p className="break-words">การเปิดแท็บ กรองข้อมูล หรือเปิดรายละเอียดจะไม่เขียน storage ระบบจะบันทึกเมื่อยืนยันแบบฟอร์มสำเร็จเท่านั้น</p>
       </div>
     </div>
   );

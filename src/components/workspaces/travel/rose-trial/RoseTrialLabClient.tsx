@@ -93,6 +93,7 @@ export default function RoseTrialLabClient() {
   const setupTabRef = useRef<HTMLButtonElement>(null);
   const observationTabRef = useRef<HTMLButtonElement>(null);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"setup" | "observations">("setup");
+  const [observationFormDirty, setObservationFormDirty] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<RoseTrialStateV2>(() => createDefaultRoseTrialState());
   const [isDirty, setIsDirty] = useState(false);
@@ -114,6 +115,20 @@ export default function RoseTrialLabClient() {
   const [addChecklistItemOpen, setAddChecklistItemOpen] = useState(false);
   const [editChecklistItemOpen, setEditChecklistItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PreparationChecklistItem | null>(null);
+
+  const requestWorkspaceTab = (nextTab: "setup" | "observations"): boolean => {
+    if (
+      activeWorkspaceTab === "observations"
+      && nextTab === "setup"
+      && observationFormDirty
+      && !window.confirm("ข้อมูลที่กรอกยังไม่ได้บันทึก ต้องการออกจากแบบฟอร์มหรือไม่")
+    ) {
+      return false;
+    }
+    if (nextTab === "setup") setObservationFormDirty(false);
+    setActiveWorkspaceTab(nextTab);
+    return true;
+  };
 
   // New Checklist Item Form State
   const [newChecklistItem, setNewChecklistItem] = useState<{
@@ -492,12 +507,11 @@ export default function RoseTrialLabClient() {
           aria-selected={activeWorkspaceTab === "setup"}
           aria-controls={`${tabIdPrefix}-setup-panel`}
           tabIndex={activeWorkspaceTab === "setup" ? 0 : -1}
-          onClick={() => setActiveWorkspaceTab("setup")}
+          onClick={() => requestWorkspaceTab("setup")}
           onKeyDown={(event) => {
             if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
             event.preventDefault();
-            setActiveWorkspaceTab("observations");
-            observationTabRef.current?.focus();
+            if (requestWorkspaceTab("observations")) observationTabRef.current?.focus();
           }}
           className={`flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
             activeWorkspaceTab === "setup"
@@ -516,12 +530,11 @@ export default function RoseTrialLabClient() {
           aria-selected={activeWorkspaceTab === "observations"}
           aria-controls={`${tabIdPrefix}-observations-panel`}
           tabIndex={activeWorkspaceTab === "observations" ? 0 : -1}
-          onClick={() => setActiveWorkspaceTab("observations")}
+          onClick={() => requestWorkspaceTab("observations")}
           onKeyDown={(event) => {
             if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
             event.preventDefault();
-            setActiveWorkspaceTab("setup");
-            setupTabRef.current?.focus();
+            if (requestWorkspaceTab("setup")) setupTabRef.current?.focus();
           }}
           className={`flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
             activeWorkspaceTab === "observations"
@@ -1603,6 +1616,7 @@ export default function RoseTrialLabClient() {
             pilotStart={state.pilotStart}
             treatments={state.treatments}
             samples={state.samples}
+            onFormDirtyChange={setObservationFormDirty}
           />
         )}
       </div>
