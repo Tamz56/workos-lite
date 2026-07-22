@@ -374,6 +374,46 @@ function ensureMigrations() {
         console.log("✅ project_items table migrated successfully (BACKLOG-001).");
     }
 
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS planner_import_batches (
+            id               TEXT PRIMARY KEY,
+            fingerprint      TEXT NOT NULL UNIQUE,
+            project_id       TEXT NOT NULL,
+            source_text_hash TEXT NOT NULL,
+            conflict_policy  TEXT NOT NULL CHECK (conflict_policy IN ('append','skip')),
+            result_json      TEXT NOT NULL,
+            created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        DROP INDEX IF EXISTS idx_planner_import_batches_fingerprint;
+    `);
+
+    const plannerImportBatchSchema = db.prepare(`
+        SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'planner_import_batches'
+    `).get() as { sql: string } | undefined;
+    if (plannerImportBatchSchema && !plannerImportBatchSchema.sql.includes("CHECK (conflict_policy IN ('append','skip'))")) {
+        const rebuildPlannerImportBatches = db.transaction(() => {
+            db.exec(`
+                ALTER TABLE planner_import_batches RENAME TO planner_import_batches_legacy_001b;
+                CREATE TABLE planner_import_batches (
+                    id               TEXT PRIMARY KEY,
+                    fingerprint      TEXT NOT NULL UNIQUE,
+                    project_id       TEXT NOT NULL,
+                    source_text_hash TEXT NOT NULL,
+                    conflict_policy  TEXT NOT NULL CHECK (conflict_policy IN ('append','skip')),
+                    result_json      TEXT NOT NULL,
+                    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                INSERT INTO planner_import_batches (
+                    id, fingerprint, project_id, source_text_hash, conflict_policy, result_json, created_at
+                )
+                SELECT id, fingerprint, project_id, source_text_hash, conflict_policy, result_json, created_at
+                FROM planner_import_batches_legacy_001b;
+                DROP TABLE planner_import_batches_legacy_001b;
+            `);
+        });
+        rebuildPlannerImportBatches();
+    }
+
     migrated = true;
 }
 
@@ -544,6 +584,7 @@ function ensureProjectsAndSprints() {
           workstream TEXT NULL,
           dod_text TEXT NULL,
           notes TEXT NULL,
+          import_fingerprint TEXT NULL,
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now')),
           FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -559,7 +600,6 @@ function ensureProjectsAndSprints() {
         CREATE INDEX IF NOT EXISTS idx_project_items_project_status ON project_items(project_id, status);
         CREATE INDEX IF NOT EXISTS idx_project_items_project_start_date ON project_items(project_id, start_date);
         CREATE INDEX IF NOT EXISTS idx_project_items_workstream ON project_items(project_id, workstream, start_date);
-
         CREATE TABLE IF NOT EXISTS sprints (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL,
@@ -920,6 +960,18 @@ function cleanupLegacyAvaDemoDataOnce() {
 }
 
 ensureProjectsAndSprints();
+function ensurePlannerImportTaskIdentity() {
+    const columns = db.prepare("PRAGMA table_info(project_items)").all() as { name: string }[];
+    if (!columns.some(column => column.name === "import_fingerprint")) {
+        db.exec("ALTER TABLE project_items ADD COLUMN import_fingerprint TEXT NULL");
+    }
+    db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_project_items_import_fingerprint
+        ON project_items(import_fingerprint)
+        WHERE import_fingerprint IS NOT NULL;
+    `);
+}
+ensurePlannerImportTaskIdentity();
 ensureProjectContext();
 ensureProjectLoops();
 function ensureGreenFinenessModel() {

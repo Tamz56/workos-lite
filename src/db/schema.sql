@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS project_items (
   workstream      TEXT NULL,
   dod_text        TEXT NULL,
   notes           TEXT NULL,
+  import_fingerprint TEXT NULL,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -195,6 +196,9 @@ END;
 CREATE INDEX IF NOT EXISTS idx_project_items_project_status ON project_items(project_id, status);
 CREATE INDEX IF NOT EXISTS idx_project_items_project_start_date ON project_items(project_id, start_date);
 CREATE INDEX IF NOT EXISTS idx_project_items_workstream ON project_items(project_id, workstream, start_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_project_items_import_fingerprint
+  ON project_items(import_fingerprint)
+  WHERE import_fingerprint IS NOT NULL;
 
 -- Events
 CREATE TABLE IF NOT EXISTS events (
@@ -710,3 +714,14 @@ WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
 BEGIN
   UPDATE planner_items SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
+
+-- Planner Import Batches (ARBOR-PLANNER-IMPORT-001A)
+CREATE TABLE IF NOT EXISTS planner_import_batches (
+  id               TEXT PRIMARY KEY,
+  fingerprint      TEXT NOT NULL UNIQUE,
+  project_id       TEXT NOT NULL,
+  source_text_hash TEXT NOT NULL,
+  conflict_policy  TEXT NOT NULL CHECK (conflict_policy IN ('append','skip')),
+  result_json      TEXT NOT NULL,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);

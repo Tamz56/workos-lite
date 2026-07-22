@@ -17,6 +17,7 @@ import type {
 import { calculateTimeRangeMinutes } from "@/lib/planner/time";
 import type { AIResourceProfile } from "@/lib/assignment/types";
 import { getAIProviderOptions } from "@/components/arbor-planner/assignmentUi";
+import { ImportScheduleModal } from "@/components/arbor-planner/ImportScheduleModal";
 
 type DayData = PlannerDay | PlannerDayTemplate;
 type Source = { id: string; title: string; status: string; type: PlannerSourceType; context: string; projectSlug?: string };
@@ -54,6 +55,7 @@ export default function ArborPlannerClient() {
     const [editing, setEditing] = useState<EnrichedPlannerItem | null>(null);
     const [deleting, setDeleting] = useState<EnrichedPlannerItem | null>(null);
     const [itemBusy, setItemBusy] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true); setError(null);
@@ -118,6 +120,7 @@ export default function ArborPlannerClient() {
                     <input type="date" value={date} onChange={event => setDate(event.target.value)} className={fieldClass + " w-auto"} />
                     <button onClick={() => setDate(getBangkokDate())} className="rounded-lg border border-theme-border px-3 py-2 text-sm text-theme-secondary hover:bg-theme-hover">วันนี้</button>
                     <button onClick={() => setDate(value => shiftPlannerDate(value, 1))} className="rounded-lg border border-theme-border px-3 py-2 text-sm text-theme-secondary hover:bg-theme-hover">วันถัดไป →</button>
+                    <button onClick={() => setShowImportModal(true)} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 shadow-sm transition">📥 นำเข้าตารางงาน</button>
                     <span className="rounded-full bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-500">สถานะ: {day?.status ?? "planning"}</span>
                 </div>
             </header>
@@ -177,6 +180,7 @@ export default function ArborPlannerClient() {
             <PlannerItemModal date={date} open={showAdd} onClose={() => setShowAdd(false)} onSaved={async () => { setShowAdd(false); await load(); }} />
             <PlannerItemModal date={date} open={editing != null} item={editing ?? undefined} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await load(); }} />
             <ConfirmDialog isOpen={deleting != null} title="นำงานออกจาก Planner" message={DELETE_CONFIRMATION} confirmText={itemBusy ? "กำลังนำออก..." : "นำออกจากแผน"} cancelText="ยกเลิก" danger onCancel={() => setDeleting(null)} onConfirm={deleteItem} />
+            <ImportScheduleModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} onImportSuccess={load} />
         </PageShell>
     );
 }
