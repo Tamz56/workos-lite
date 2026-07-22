@@ -76,12 +76,43 @@ describe("Rose Trial Observation Form", () => {
     expect(html).not.toContain("เลือกกลุ่มทดลอง");
   });
 
-  it("keeps status optional and exposes no photo, edit, or delete controls", () => {
+  it("keeps status optional, adds draft-only photo controls, and exposes no persisted edit or delete controls", () => {
     const html = renderForm();
     expect(html).toContain("ยังไม่ระบุสถานะ");
-    expect(html).not.toMatch(/type="file"/);
+    expect(html).toContain('type="file"');
+    expect(html).toContain("รูปประกอบ Observation");
+    expect(html).toContain("เลือกรูปจากอุปกรณ์");
     expect(html).not.toContain("แก้ไข Observation");
     expect(html).not.toContain("ลบ Observation");
+  });
+
+  it("combines text, photo, touched, and processing dirty state without changing the text-only validator", () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "src/components/workspaces/travel/rose-trial/ObservationForm.tsx"),
+      "utf8"
+    );
+    expect(source).toContain("isObservationFormDirty(draft, initialDraft)");
+    expect(source).toContain("photoDrafts.length > 0");
+    expect(source).toContain("photoTouched");
+    expect(source).toContain("photoProcessing");
+    expect(source).toContain("onTouched={() => setPhotoTouched(true)}");
+    expect(source).toContain("saving || photoProcessing");
+    expect(source).toContain("validatePhotoEvidenceDrafts(photoDrafts)");
+    expect(source).toContain("photoIssues.length > 0");
+    expect(source).toContain('window.addEventListener("beforeunload"');
+  });
+
+  it("keeps photo drafts in Form state until successful parent unmount and reports save progress", () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "src/components/workspaces/travel/rose-trial/ObservationForm.tsx"),
+      "utf8"
+    );
+    expect(source).toContain("const [photoDrafts, setPhotoDrafts]");
+    expect(source).toContain("const result = await onSubmit(draft, photoDrafts, submittedAt)");
+    expect(source).toContain('saveStage === "saving_photos"');
+    expect(source).toContain("กำลังบันทึกรูป");
+    expect(source).toContain("กำลังบันทึก Observation");
+    expect(source).not.toContain("persisted photo");
   });
 
   it("contains no persistence or autosave path", () => {

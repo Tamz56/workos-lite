@@ -17,6 +17,14 @@ import {
   loadObservationStore,
   saveObservationStore,
 } from "./observationStorage";
+import { createPhotoEvidenceStorage } from "./photoEvidenceStorage";
+import {
+  bindPhotoEvidenceDrafts,
+  composeObservationStoreWithPhotos,
+  mapPhotoDraftIssuesToObservationIssues,
+  validatePhotoEvidenceDrafts,
+  type PhotoEvidenceDraft,
+} from "./photoEvidenceDraft";
 import type {
   RoseTrialObservationStoreV1,
   RoseTrialObservationValidationIssue,
@@ -80,13 +88,24 @@ interface ObservationIdCrypto {
   getRandomValues?: <T extends ArrayBufferView | null>(array: T) => T;
 }
 
-export function createObservationId(cryptoApi: ObservationIdCrypto | undefined = globalThis.crypto): string {
-  if (cryptoApi?.randomUUID) return `obs-${cryptoApi.randomUUID()}`;
+function createSecureRecordId(
+  prefix: "obs" | "photo",
+  cryptoApi: ObservationIdCrypto | undefined
+): string {
+  if (cryptoApi?.randomUUID) return `${prefix}-${cryptoApi.randomUUID()}`;
   if (cryptoApi?.getRandomValues) {
     const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
-    return `obs-${Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("")}`;
+    return `${prefix}-${Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("")}`;
   }
   throw new Error("secure-random-unavailable");
+}
+
+export function createObservationId(cryptoApi: ObservationIdCrypto | undefined = globalThis.crypto): string {
+  return createSecureRecordId("obs", cryptoApi);
+}
+
+export function createPhotoEvidenceId(cryptoApi: ObservationIdCrypto | undefined = globalThis.crypto): string {
+  return createSecureRecordId("photo", cryptoApi);
 }
 
 interface ObservationSaveDependencies {
@@ -108,6 +127,30 @@ const DEFAULT_SAVE_DEPENDENCIES: ObservationSaveDependencies = {
 export type CommitObservationDraftResult =
   | { ok: true; store: RoseTrialObservationStoreV1 }
   | { ok: false; message: string; errors?: ReturnType<typeof mapObservationIssuesToFormErrors> };
+
+type PhotoEvidenceStorageAdapter = Pick<
+  ReturnType<typeof createPhotoEvidenceStorage>,
+  "putPending" | "promote" | "deleteIds"
+>;
+
+export interface ObservationPhotoSaveDependencies extends ObservationSaveDependencies {
+  createPhotoId: () => string;
+  photoStorage: PhotoEvidenceStorageAdapter;
+}
+
+export type CommitObservationDraftWithPhotosResult =
+  | { ok: true; store: RoseTrialObservationStoreV1; withPhotos: boolean }
+  | { ok: false; message: string; errors?: ReturnType<typeof mapObservationIssuesToFormErrors> };
+
+const PHOTO_SAVE_FAILURE = "ยังบันทึกรูปไม่ได้ ข้อมูลและรูปที่เตรียมไว้ยังอยู่";
+const PHOTO_STORAGE_UNAVAILABLE = "ไม่สามารถบันทึกรูปในเบราว์เซอร์นี้ได้ คุณยังเก็บข้อความไว้และลองใหม่ได้";
+const PHOTO_STORAGE_QUOTA = "พื้นที่จัดเก็บรูปบนอุปกรณ์นี้ไม่เพียงพอ กรุณานำรูปบางส่วนออกแล้วลองอีกครั้ง";
+
+function photoStorageFailureMessage(code: string): string {
+  if (code === "unavailable" || code === "open_failed") return PHOTO_STORAGE_UNAVAILABLE;
+  if (code === "quota_exceeded") return PHOTO_STORAGE_QUOTA;
+  return PHOTO_SAVE_FAILURE;
+}
 
 export function commitObservationDraft(
   draft: ObservationFormDraft,
@@ -184,6 +227,117 @@ export function commitObservationDraft(
   }
 }
 
+export async function commitObservationDraftWithPhotos(
+  draft: ObservationFormDraft,
+  photoDrafts: readonly PhotoEvidenceDraft[],
+  submittedAt: Date,
+  pilotStartedAt: string,
+  referenceContext: Extract<ObservationReferenceContextResult, { ok: true }>,
+  dependencies: ObservationPhotoSaveDependencies
+): Promise<CommitObservationDraftWithPhotosResult> {
+  if (photoDrafts.length === 0) {
+    const result = commitObservationDraft(draft, submittedAt, pilotStartedAt, referenceContext, dependencies);
+    return result.ok ? { ...result, withPhotos: false } : result;
+  }
+
+  try {
+    const formValidation = validateObservationFormDraft(
+      draft,
+      referenceContext,
+      pilotStartedAt,
+      submittedAt
+    );
+    if (!formValidation.valid) {
+      return { ok: false, message: GENERIC_SAVE_FAILURE, errors: formValidation.errors };
+    }
+    const photoValidation = validatePhotoEvidenceDrafts(photoDrafts);
+    if (!photoValidation.ok) {
+      return {
+        ok: false,
+        message: PHOTO_SAVE_FAILURE,
+        errors: mapObservationIssuesToFormErrors(mapPhotoDraftIssuesToObservationIssues(photoValidation.issues)),
+      };
+    }
+
+    const latest = dependencies.loadStore(referenceContext.validationContext);
+    if (!latest.ok) {
+      return {
+        ok: false,
+        message: latest.status === "storage_unavailable"
+          ? STORAGE_SAVE_FAILURE
+          : "ข้อมูล Observation เดิมอ่านไม่สมบูรณ์ จึงยังไม่บันทึกข้อมูลใหม่เพื่อป้องกันข้อมูลเดิม",
+      };
+    }
+    if (latest.status === "partial") return { ok: false, message: PARTIAL_STORE_LOCK };
+
+    const observationId = dependencies.createId();
+    const photoIds = photoDrafts.map(() => dependencies.createPhotoId());
+    const timestamp = submittedAt.toISOString();
+    const created = dependencies.createRecord(
+      { ...formValidation.input, photoIds },
+      { id: observationId, timestamp },
+      referenceContext.validationContext
+    );
+    if (!created.ok) {
+      return {
+        ok: false,
+        message: GENERIC_SAVE_FAILURE,
+        errors: mapObservationIssuesToFormErrors(created.issues),
+      };
+    }
+
+    const bound = bindPhotoEvidenceDrafts({
+      drafts: photoDrafts,
+      photoIds,
+      observationId,
+      scope: created.value.scope,
+      ...(created.value.scope === "sample" && created.value.sampleId
+        ? { sampleId: created.value.sampleId }
+        : {}),
+      createdAt: timestamp,
+    });
+    if (!bound.ok) return { ok: false, message: PHOTO_SAVE_FAILURE };
+
+    const composed = composeObservationStoreWithPhotos(
+      latest.value,
+      created.value,
+      bound.value.metadata,
+      referenceContext.validationContext,
+      timestamp
+    );
+    if (!composed.ok) return { ok: false, message: GENERIC_SAVE_FAILURE };
+
+    const pending = await dependencies.photoStorage.putPending(bound.value.envelopes);
+    if (!pending.ok) {
+      return { ok: false, message: photoStorageFailureMessage(pending.error.code) };
+    }
+
+    const saved = dependencies.saveStore(composed.value, referenceContext.validationContext);
+    if (!saved.ok) {
+      try {
+        await dependencies.photoStorage.deleteIds(photoIds);
+      } catch {
+        // Rollback is best-effort; reconciliation can remove an orphan later.
+      }
+      return {
+        ok: false,
+        message: saved.error.code === "storage_unavailable"
+          ? STORAGE_SAVE_FAILURE
+          : GENERIC_SAVE_FAILURE,
+      };
+    }
+
+    try {
+      await dependencies.photoStorage.promote(photoIds);
+    } catch {
+      // A referenced pending Blob remains readable and will be reconciled on a later load.
+    }
+    return { ok: true, store: composed.value, withPhotos: true };
+  } catch {
+    return { ok: false, message: PHOTO_SAVE_FAILURE };
+  }
+}
+
 export function ObservationWorkspace({
   pilotStart,
   treatments,
@@ -197,9 +351,16 @@ export function ObservationWorkspace({
   const [loadState, setLoadState] = useState<ObservationWorkspaceLoadState>({ kind: "loading" });
   const [formDraft, setFormDraft] = useState<ObservationFormDraft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveStage, setSaveStage] = useState<"saving_photos" | "saving_observation" | "promoting" | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const saveInFlightRef = useRef(false);
   const openButtonRef = useRef<HTMLButtonElement>(null);
+  const photoStorageRef = useRef<ReturnType<typeof createPhotoEvidenceStorage> | null>(null);
+
+  const getPhotoStorage = useCallback(() => {
+    photoStorageRef.current ??= createPhotoEvidenceStorage();
+    return photoStorageRef.current;
+  }, []);
 
   useEffect(() => {
     if (!referenceContext.ok) return;
@@ -215,7 +376,15 @@ export function ObservationWorkspace({
       store: result.value,
       warnings: result.warnings,
     });
-  }, [referenceContext]);
+    if (result.status !== "partial") {
+      const referencedPhotoIds = result.value.observations.flatMap((observation) => observation.photoIds);
+      void getPhotoStorage().reconcile(referencedPhotoIds, "valid", new Date().toISOString());
+    }
+  }, [getPhotoStorage, referenceContext]);
+
+  useEffect(() => () => {
+    void photoStorageRef.current?.close();
+  }, []);
 
   const closeForm = useCallback(() => {
     setFormDraft(null);
@@ -232,6 +401,7 @@ export function ObservationWorkspace({
 
   const submitForm = async (
     draft: ObservationFormDraft,
+    photoDrafts: readonly PhotoEvidenceDraft[],
     submittedAt: Date
   ): Promise<ObservationFormSubmitResult> => {
     if (
@@ -246,23 +416,59 @@ export function ObservationWorkspace({
     saveInFlightRef.current = true;
     setSaving(true);
     try {
-      const result = commitObservationDraft(
-        draft,
-        submittedAt,
-        pilotStart.startedAt,
-        referenceContext
-      );
+      let result: CommitObservationDraftWithPhotosResult;
+      if (photoDrafts.length === 0) {
+        setSaveStage("saving_observation");
+        const zeroPhotoResult = commitObservationDraft(
+          draft,
+          submittedAt,
+          pilotStart.startedAt,
+          referenceContext
+        );
+        result = zeroPhotoResult.ok
+          ? { ...zeroPhotoResult, withPhotos: false }
+          : zeroPhotoResult;
+      } else {
+        setSaveStage("saving_photos");
+        const storage = getPhotoStorage();
+        result = await commitObservationDraftWithPhotos(
+          draft,
+          photoDrafts,
+          submittedAt,
+          pilotStart.startedAt,
+          referenceContext,
+          {
+            ...DEFAULT_SAVE_DEPENDENCIES,
+            createPhotoId: createPhotoEvidenceId,
+            photoStorage: {
+              putPending: async (records) => {
+                const pending = await storage.putPending(records);
+                if (pending.ok) setSaveStage("saving_observation");
+                return pending;
+              },
+              deleteIds: storage.deleteIds,
+              promote: async (ids) => {
+                setSaveStage("promoting");
+                return storage.promote(ids);
+              },
+            },
+          }
+        );
+      }
       if (!result.ok) return result;
 
       setLoadState({ kind: "valid", store: result.store, warnings: [] });
       setFormDraft(null);
       onFormDirtyChange(false);
-      setSuccessMessage("บันทึกการสังเกตแล้ว");
+      setSuccessMessage(result.withPhotos
+        ? "บันทึกการสังเกตและรูปประกอบแล้ว"
+        : "บันทึกการสังเกตแล้ว");
       window.requestAnimationFrame(() => openButtonRef.current?.focus());
       return { ok: true };
     } finally {
       saveInFlightRef.current = false;
       setSaving(false);
+      setSaveStage(null);
     }
   };
 
@@ -273,6 +479,7 @@ export function ObservationWorkspace({
           pilotStartedAt={pilotStart.startedAt}
           referenceContext={referenceContext}
           saving={saving}
+          saveStage={saveStage}
           onCancel={closeForm}
           onDirtyChange={onFormDirtyChange}
           onSubmit={submitForm}

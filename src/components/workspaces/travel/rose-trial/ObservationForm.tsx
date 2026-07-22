@@ -9,6 +9,14 @@ import {
 } from "./observationPresentation";
 import type { ObservationReferenceContextResult } from "./observationReferenceContext";
 import {
+  PhotoEvidencePicker,
+  type PhotoEvidencePickerIssue,
+} from "./PhotoEvidencePicker";
+import {
+  validatePhotoEvidenceDrafts,
+  type PhotoEvidenceDraft,
+} from "./photoEvidenceDraft";
+import {
   changeObservationDateTime,
   changeObservationScope,
   isObservationFormDirty,
@@ -38,10 +46,12 @@ interface ObservationFormProps {
   pilotStartedAt: string;
   referenceContext: Extract<ObservationReferenceContextResult, { ok: true }>;
   saving: boolean;
+  saveStage?: "saving_photos" | "saving_observation" | "promoting" | null;
   onCancel: () => void;
   onDirtyChange: (dirty: boolean) => void;
   onSubmit: (
     draft: ObservationFormDraft,
+    photoDrafts: readonly PhotoEvidenceDraft[],
     submittedAt: Date
   ) => Promise<ObservationFormSubmitResult>;
 }
@@ -51,6 +61,7 @@ export function ObservationForm({
   pilotStartedAt,
   referenceContext,
   saving,
+  saveStage = null,
   onCancel,
   onDirtyChange,
   onSubmit,
@@ -61,9 +72,17 @@ export function ObservationForm({
   const [draft, setDraft] = useState(initialDraft);
   const [errors, setErrors] = useState<ObservationFormErrors>({});
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [photoDrafts, setPhotoDrafts] = useState<readonly PhotoEvidenceDraft[]>([]);
+  const [photoTouched, setPhotoTouched] = useState(false);
+  const [photoIssues, setPhotoIssues] = useState<readonly PhotoEvidencePickerIssue[]>([]);
+  const [photoProcessing, setPhotoProcessing] = useState(false);
+  const [photoSubmitError, setPhotoSubmitError] = useState<string | null>(null);
   const dirty = useMemo(
-    () => isObservationFormDirty(draft, initialDraft),
-    [draft, initialDraft]
+    () => isObservationFormDirty(draft, initialDraft)
+      || photoDrafts.length > 0
+      || photoTouched
+      || photoProcessing,
+    [draft, initialDraft, photoDrafts.length, photoProcessing, photoTouched]
   );
 
   useEffect(() => {
@@ -114,7 +133,7 @@ export function ObservationForm({
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (saving) return;
+    if (saving || photoProcessing) return;
 
     const submittedAt = new Date();
     const validation = validateObservationFormDraft(
@@ -130,9 +149,18 @@ export function ObservationForm({
       return;
     }
 
+    const photoValidation = validatePhotoEvidenceDrafts(photoDrafts);
+    if (!photoValidation.ok) {
+      setPhotoSubmitError("ข้อมูลภาพประกอบไม่ถูกต้อง กรุณาตรวจสอบรูปและคำอธิบายก่อนบันทึก");
+      setSubmitMessage(null);
+      focusErrorSummary();
+      return;
+    }
+
     setErrors({});
+    setPhotoSubmitError(null);
     setSubmitMessage(null);
-    const result = await onSubmit(draft, submittedAt);
+    const result = await onSubmit(draft, photoDrafts, submittedAt);
     if (result.ok) return;
     setErrors(result.errors ?? {});
     setSubmitMessage(result.message ?? "ยังบันทึกไม่ได้ ข้อมูลที่กรอกยังอยู่ กรุณาตรวจสอบแล้วลองอีกครั้ง");
@@ -141,7 +169,12 @@ export function ObservationForm({
 
   return (
     <section className="min-w-0 rounded-2xl border border-rose-200 bg-rose-50/60 p-4 shadow-sm dark:border-rose-900/60 dark:bg-rose-950/20 sm:p-6">
-      <form noValidate onSubmit={handleSubmit} className="min-w-0 space-y-5">
+      <form
+        noValidate
+        onSubmit={handleSubmit}
+        aria-busy={saving || photoProcessing}
+        className="min-w-0 space-y-5"
+      >
         <div className="min-w-0">
           <h3
             ref={headingRef}
@@ -409,7 +442,21 @@ export function ObservationForm({
           {errors.followUpRequired && <FieldError id={errorId("followUpRequired")} message={errors.followUpRequired} />}
         </div>
 
-        {(errorEntries.length > 0 || submitMessage) && (
+        <div id={`${idPrefix}-photo-evidence`} className="min-w-0">
+          <PhotoEvidencePicker
+            drafts={photoDrafts}
+            disabled={saving}
+            onDraftsChange={(nextDrafts) => {
+              setPhotoDrafts(nextDrafts);
+              setPhotoSubmitError(null);
+            }}
+            onTouched={() => setPhotoTouched(true)}
+            onProcessingChange={setPhotoProcessing}
+            onIssuesChange={setPhotoIssues}
+          />
+        </div>
+
+        {(errorEntries.length > 0 || submitMessage || photoSubmitError || photoIssues.length > 0) && (
           <div
             ref={errorSummaryRef}
             tabIndex={-1}
@@ -421,11 +468,27 @@ export function ObservationForm({
               กรุณาตรวจสอบข้อมูลก่อนบันทึก
             </p>
             {submitMessage && <p className="mt-2 break-words">{submitMessage}</p>}
+            {photoSubmitError && (
+              <p className="mt-2 break-words">
+                <a href={`#${idPrefix}-photo-evidence`} className="underline underline-offset-2">
+                  {photoSubmitError}
+                </a>
+              </p>
+            )}
             {errorEntries.length > 0 && (
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 {errorEntries.map(([field, message]) => (
                   <li key={field} className="break-words">
                     <a href={`#${fieldId(field)}`} className="underline underline-offset-2">{message}</a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {photoIssues.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {photoIssues.map((issue, index) => (
+                  <li key={`${issue.code}-${issue.filename}-${index}`} className="break-words">
+                    {issue.filename}: {issue.message}
                   </li>
                 ))}
               </ul>
@@ -445,11 +508,15 @@ export function ObservationForm({
           </button>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || photoProcessing || photoIssues.some((issue) => issue.blocking)}
             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-black text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {saving ? <Save className="h-4 w-4 animate-pulse" /> : <CheckCircle2 className="h-4 w-4" />}
-            {saving ? "กำลังบันทึก..." : "บันทึกการสังเกต"}
+            {saving
+              ? saveStage === "saving_photos"
+                ? "กำลังบันทึกรูป"
+                : "กำลังบันทึก Observation"
+              : "บันทึกการสังเกต"}
           </button>
         </div>
       </form>

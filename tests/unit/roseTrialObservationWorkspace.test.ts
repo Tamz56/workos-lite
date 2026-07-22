@@ -6,11 +6,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   commitObservationDraft,
+  commitObservationDraftWithPhotos,
   createObservationId,
+  createPhotoEvidenceId,
   ObservationWorkspaceView,
   type ObservationWorkspaceLoadState,
 } from "@/components/workspaces/travel/rose-trial/ObservationWorkspace";
+import type { PhotoEvidenceDraft } from "@/components/workspaces/travel/rose-trial/photoEvidenceDraft";
 import type { ObservationReferenceContextResult } from "@/components/workspaces/travel/rose-trial/observationReferenceContext";
+import { createRoseTrialObservation } from "@/components/workspaces/travel/rose-trial/observationCrud";
 import { createObservationFormDraft } from "@/components/workspaces/travel/rose-trial/observationFormState";
 import type { RoseTrialObservation } from "@/components/workspaces/travel/rose-trial/observationTypes";
 
@@ -44,6 +48,62 @@ function observation(overrides: Partial<RoseTrialObservation> = {}): RoseTrialOb
     photoIds: [],
     createdAt: "2026-07-19T09:01:00.000Z",
     updatedAt: "2026-07-19T09:01:00.000Z",
+    ...overrides,
+  };
+}
+
+function validDraft() {
+  return {
+    ...createObservationFormDraft(new Date(2026, 6, 20, 10, 0), "2026-07-19T03:04:05.000Z"),
+    observedFacts: "กิ่งยังเขียว",
+  };
+}
+
+function photoDraft(index = 1): PhotoEvidenceDraft {
+  const blob = new Blob([new Uint8Array([index, 2, 3])], { type: "image/jpeg" });
+  return {
+    localId: `draft-${index}`,
+    fingerprint: `photo-${index}.jpg\u00003\u0000${index}`,
+    sourceLabel: `photo-${index}.jpg`,
+    blob,
+    mimeType: "image/jpeg",
+    originalSizeBytes: 3,
+    storedSizeBytes: blob.size,
+    width: 800,
+    height: 600,
+    caption: index === 1 ? "  รากใหม่  " : "",
+  };
+}
+
+function photoSaveDependencies(overrides: Record<string, unknown> = {}) {
+  const createRecord = vi.fn(createRoseTrialObservation);
+  return {
+    loadStore: vi.fn(() => ({
+      ok: true as const,
+      status: "empty" as const,
+      value: { version: 1 as const, observations: [], photos: [], updatedAt: null },
+      warnings: [],
+    })),
+    createRecord,
+    addRecord: vi.fn(),
+    saveStore: vi.fn((store?: unknown) => {
+      void store;
+      return { ok: true as const };
+    }),
+    createId: vi.fn(() => "obs-new"),
+    createPhotoId: vi.fn()
+      .mockReturnValueOnce("photo-1")
+      .mockReturnValueOnce("photo-2")
+      .mockReturnValueOnce("photo-3")
+      .mockReturnValueOnce("photo-4"),
+    photoStorage: {
+      putPending: vi.fn(async (records) => ({
+        ok: true as const,
+        value: { storedIds: records.map((record: { id: string }) => record.id) },
+      })),
+      promote: vi.fn(async (ids) => ({ ok: true as const, value: { promotedIds: [...ids], missingIds: [] } })),
+      deleteIds: vi.fn(async (ids) => ({ ok: true as const, value: { deletedIds: [...ids], missingIds: [] } })),
+    },
     ...overrides,
   };
 }
@@ -263,5 +323,134 @@ describe("Rose Trial Observation Workspace", () => {
     })).toBe(`obs-${"0f".repeat(16)}`);
     expect(() => createObservationId(undefined)).not.toThrow();
     expect(() => createObservationId({})).toThrow("secure-random-unavailable");
+    expect(createPhotoEvidenceId({ randomUUID: () => "uuid-photo" })).toBe("photo-uuid-photo");
+  });
+
+  it("keeps the zero-photo path synchronous and never opens Photo Evidence storage", async () => {
+    const dependencies = photoSaveDependencies();
+    const result = await commitObservationDraftWithPhotos(
+      validDraft(),
+      [],
+      new Date(2026, 6, 20, 12, 0),
+      "2026-07-19T03:04:05.000Z",
+      validReference,
+      {
+        ...dependencies,
+        addRecord: vi.fn((_store, record) => ({
+          ok: true as const,
+          value: {
+            version: 1 as const,
+            observations: [record],
+            photos: [],
+            updatedAt: "2026-07-20T05:00:00.000Z",
+          },
+        })),
+      }
+    );
+    expect(result).toMatchObject({ ok: true, withPhotos: false });
+    expect(dependencies.photoStorage.putPending).not.toHaveBeenCalled();
+    expect(dependencies.photoStorage.promote).not.toHaveBeenCalled();
+    expect(dependencies.photoStorage.deleteIds).not.toHaveBeenCalled();
+  });
+
+  it.each([1, 4])("saves %s photo drafts with ordered IDs and metadata", async (count) => {
+    const events: string[] = [];
+    const dependencies = photoSaveDependencies();
+    dependencies.photoStorage.putPending.mockImplementation(async (records: readonly { id: string }[]) => {
+      events.push("pending");
+      return { ok: true as const, value: { storedIds: records.map((record) => record.id) } };
+    });
+    dependencies.saveStore.mockImplementation((store?: unknown) => {
+      events.push("local-storage");
+      expect(JSON.stringify(store)).not.toMatch(/data:image|blob:/i);
+      return { ok: true as const };
+    });
+    dependencies.photoStorage.promote.mockImplementation(async (ids) => {
+      events.push("promote");
+      return { ok: true as const, value: { promotedIds: [...ids], missingIds: [] } };
+    });
+    const result = await commitObservationDraftWithPhotos(
+      validDraft(),
+      Array.from({ length: count }, (_, index) => photoDraft(index + 1)),
+      new Date(2026, 6, 20, 12, 0),
+      "2026-07-19T03:04:05.000Z",
+      validReference,
+      dependencies
+    );
+    expect(result).toMatchObject({ ok: true, withPhotos: true });
+    if (!result.ok) return;
+    const expectedIds = Array.from({ length: count }, (_, index) => `photo-${index + 1}`);
+    expect(result.store.observations[0].photoIds).toEqual(expectedIds);
+    expect(result.store.photos.map((item) => item.id)).toEqual(expectedIds);
+    expect(result.store.photos.map((item) => item.sortOrder)).toEqual(expectedIds.map((_, index) => index));
+    expect(result.store.photos[0].caption).toBe("รากใหม่");
+    expect(events).toEqual(["pending", "local-storage", "promote"]);
+  });
+
+  it("blocks a partial latest store before writing pending Blobs", async () => {
+    const dependencies = photoSaveDependencies({
+      loadStore: vi.fn(() => ({
+        ok: true as const,
+        status: "partial" as const,
+        value: { version: 1 as const, observations: [], photos: [], updatedAt: null },
+        warnings: [],
+      })),
+    });
+    const result = await commitObservationDraftWithPhotos(
+      validDraft(), [photoDraft()], new Date(2026, 6, 20, 12, 0),
+      "2026-07-19T03:04:05.000Z", validReference, dependencies
+    );
+    expect(result).toMatchObject({ ok: false, message: expect.stringContaining("ปิดการเพิ่มบันทึก") });
+    expect(dependencies.photoStorage.putPending).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["unavailable", "ไม่สามารถบันทึกรูปในเบราว์เซอร์นี้ได้"],
+    ["quota_exceeded", "พื้นที่จัดเก็บรูปบนอุปกรณ์นี้ไม่เพียงพอ"],
+    ["transaction_failed", "ยังบันทึกรูปไม่ได้"],
+  ])("maps %s pending failures to safe Thai copy and retains the caller draft", async (code, copy) => {
+    const inputPhotos = [photoDraft()];
+    const before = inputPhotos.map((item) => ({ ...item }));
+    const dependencies = photoSaveDependencies();
+    dependencies.photoStorage.putPending.mockResolvedValue({ ok: false as const, error: { code } } as never);
+    const result = await commitObservationDraftWithPhotos(
+      validDraft(), inputPhotos, new Date(2026, 6, 20, 12, 0),
+      "2026-07-19T03:04:05.000Z", validReference, dependencies
+    );
+    expect(result).toMatchObject({ ok: false, message: expect.stringContaining(copy) });
+    expect(JSON.stringify(result)).not.toContain("private");
+    expect(dependencies.saveStore).not.toHaveBeenCalled();
+    expect(inputPhotos).toEqual(before);
+  });
+
+  it("rolls back pending IDs after Local Storage failure without replacing the main error", async () => {
+    const dependencies = photoSaveDependencies();
+    dependencies.saveStore.mockReturnValue({
+      ok: false as const,
+      error: { code: "storage_unavailable" as const, message: "private quota detail" },
+    } as never);
+    dependencies.photoStorage.deleteIds.mockRejectedValue(new Error("private rollback detail"));
+    const result = await commitObservationDraftWithPhotos(
+      validDraft(), [photoDraft()], new Date(2026, 6, 20, 12, 0),
+      "2026-07-19T03:04:05.000Z", validReference, dependencies
+    );
+    expect(result).toEqual({ ok: false, message: "ไม่สามารถบันทึกลงพื้นที่จัดเก็บบนอุปกรณ์นี้ได้" });
+    expect(dependencies.photoStorage.deleteIds).toHaveBeenCalledWith(["photo-1"]);
+    expect(JSON.stringify(result)).not.toMatch(/private|rollback/i);
+  });
+
+  it("completes Observation save when promotion fails and leaves referenced pending data for reconciliation", async () => {
+    const dependencies = photoSaveDependencies();
+    dependencies.photoStorage.promote.mockResolvedValue({
+      ok: false as const,
+      error: { code: "transaction_failed" },
+    } as never);
+    const result = await commitObservationDraftWithPhotos(
+      validDraft(), [photoDraft()], new Date(2026, 6, 20, 12, 0),
+      "2026-07-19T03:04:05.000Z", validReference, dependencies
+    );
+    expect(result).toMatchObject({ ok: true, withPhotos: true });
+    expect(dependencies.saveStore).toHaveBeenCalledTimes(1);
+    expect(dependencies.photoStorage.deleteIds).not.toHaveBeenCalled();
   });
 });
