@@ -264,3 +264,16 @@ export function saveObservationStore(
     };
   }
 }
+
+export function clearObservationStore(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    window.localStorage.removeItem(ROSE_TRIAL_OBSERVATION_STORAGE_KEY);
+    return window.localStorage.getItem(ROSE_TRIAL_OBSERVATION_STORAGE_KEY) === null;
+  } catch {
+    return false;
+  }
+}

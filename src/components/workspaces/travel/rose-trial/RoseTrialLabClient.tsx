@@ -42,8 +42,12 @@ import {
 import {
   loadRoseTrialState,
   saveRoseTrialState,
-  clearRoseTrialState,
 } from "./storage";
+import {
+  canConfirmRoseTrialCompleteReset,
+  resetRoseTrialCompletely,
+  type RoseTrialResetPhase,
+} from "./completeReset";
 import { calculateReadiness, parseIntegerInput } from "./readiness";
 import { mergeInventoryWithDefaults, updateInventoryItems } from "./inventory";
 import { hasPilotStarted } from "./day0SetupWorkflow";
@@ -92,6 +96,7 @@ export default function RoseTrialLabClient() {
   const tabIdPrefix = `rose-trial-workspace-${useId().replace(/:/g, "")}`;
   const setupTabRef = useRef<HTMLButtonElement>(null);
   const observationTabRef = useRef<HTMLButtonElement>(null);
+  const resetInFlightRef = useRef(false);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"setup" | "observations">("setup");
   const [observationFormDirty, setObservationFormDirty] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -107,6 +112,9 @@ export default function RoseTrialLabClient() {
 
   // Dialog/Modal states
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetAcknowledged, setResetAcknowledged] = useState(false);
+  const [resetRunning, setResetRunning] = useState(false);
+  const [resetFailure, setResetFailure] = useState<RoseTrialResetPhase | null>(null);
   const [day0DialogOpen, setDay0DialogOpen] = useState(false);
   const [exportMarkdownOpen, setExportMarkdownOpen] = useState(false);
   const [exportedAt, setExportedAt] = useState<string | null>(null);
@@ -358,22 +366,53 @@ export default function RoseTrialLabClient() {
     setToastVisible(true);
   };
 
-  const handleReset = () => {
-    const success = clearRoseTrialState();
-    if (!success) {
-      setResetDialogOpen(false);
-      setToastType("error");
-      setToastMessage("ไม่สามารถล้างข้อมูลในเครื่องได้ ข้อมูลเดิมยังคงอยู่");
-      setToastVisible(true);
-      return;
-    }
+  const openResetDialog = () => {
+    setResetAcknowledged(false);
+    setResetFailure(null);
+    setResetDialogOpen(true);
+  };
 
-    setState(createDefaultRoseTrialState());
-    setIsDirty(false);
+  const closeResetDialog = () => {
+    if (resetRunning) return;
     setResetDialogOpen(false);
-    setToastType("success");
-    setToastMessage("รีเซ็ตข้อมูลเป็นค่าเริ่มต้นแล้ว");
-    setToastVisible(true);
+    setResetAcknowledged(false);
+    setResetFailure(null);
+  };
+
+  const handleReset = async () => {
+    if (
+      resetInFlightRef.current
+      || !canConfirmRoseTrialCompleteReset(resetAcknowledged, resetRunning)
+    ) return;
+
+    resetInFlightRef.current = true;
+    setResetRunning(true);
+    setResetFailure(null);
+    try {
+      const result = await resetRoseTrialCompletely();
+      if (!result.ok) {
+        setResetFailure(result.failedPhase);
+        setToastType("error");
+        setToastMessage("รีเซ็ต Rose Trial ได้บางส่วน กรุณากดลองอีกครั้งเพื่อดำเนินการต่อ");
+        setToastVisible(true);
+        return;
+      }
+
+      setState(createDefaultRoseTrialState());
+      setDay0State(null);
+      setDay0Corrupt(false);
+      setActiveWorkspaceTab("setup");
+      setObservationFormDirty(false);
+      setIsDirty(false);
+      setResetDialogOpen(false);
+      setResetAcknowledged(false);
+      setToastType("success");
+      setToastMessage("ล้างข้อมูล Rose Trial ทั้งหมดแล้ว พร้อมเริ่มการทดลองใหม่");
+      setToastVisible(true);
+    } finally {
+      resetInFlightRef.current = false;
+      setResetRunning(false);
+    }
   };
 
   const handleDay0Confirm = () => {
@@ -1109,7 +1148,7 @@ export default function RoseTrialLabClient() {
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center w-full">
             {/* Reset Button */}
             <button
-              onClick={() => setResetDialogOpen(true)}
+              onClick={openResetDialog}
               className="w-full sm:w-auto flex-shrink-0 flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 px-4 py-3 text-sm font-semibold text-neutral-600 dark:text-neutral-300 transition-colors"
             >
               <RotateCcw className="h-4 w-4" />
@@ -1572,17 +1611,79 @@ export default function RoseTrialLabClient() {
         </div>
       </Modal>
 
-      {/* ─── Reset Dialog Confirmation ────────────────────────────────────────── */}
-      <ConfirmDialog
+      {/* ─── Complete Reset Confirmation ──────────────────────────────────────── */}
+      <Modal
         isOpen={resetDialogOpen}
-        title="รีเซ็ตข้อมูลการเตรียมตัวทดลอง?"
-        message="การกระทำนี้จะล้างข้อมูลที่คุณกรอกทั้งหมดในหน้านี้ รวมถึงประวัติการบันทึกใน localStorage และกลับไปใช้ค่าเริ่มต้นสำหรับการทดลองปักชำกุหลาบ คุณต้องการรีเซ็ตข้อมูลใช่หรือไม่?"
-        confirmText="ยืนยันการรีเซ็ต"
-        cancelText="ยกเลิก"
-        danger
-        onConfirm={handleReset}
-        onCancel={() => setResetDialogOpen(false)}
-      />
+        title="รีเซ็ตข้อมูล Rose Trial ทั้งหมด?"
+        onClose={closeResetDialog}
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-5">
+          <div className="space-y-3 text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+            <p>การกระทำนี้จะลบข้อมูล Rose Trial ต่อไปนี้อย่างถาวร:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>Preparation Plan, Checklist และ Inventory</li>
+              <li>Treatments และ Samples</li>
+              <li>Day 0 ทั้งแบบร่างและข้อมูลจริง</li>
+              <li>Batch และ Cutting records</li>
+              <li>Snapshot และ Deviations</li>
+              <li>Observations และรูปภาพที่แนบทั้งหมด</li>
+            </ul>
+            <p className="font-bold text-neutral-800 dark:text-neutral-100">
+              Planner และข้อมูล WorkOS โมดูลอื่นจะไม่ถูกลบ
+            </p>
+            <p className="font-bold text-red-600 dark:text-red-400">
+              การกระทำนี้ไม่สามารถย้อนกลับได้
+            </p>
+          </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/20">
+            <input
+              type="checkbox"
+              checked={resetAcknowledged}
+              disabled={resetRunning}
+              onChange={(event) => setResetAcknowledged(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+            />
+            <span className="text-sm font-semibold leading-relaxed text-red-800 dark:text-red-200">
+              ฉันเข้าใจว่าข้อมูล Rose Trial และรูปภาพทั้งหมดจะถูกลบอย่างถาวร
+            </span>
+          </label>
+
+          {resetFailure && (
+            <div
+              role="alert"
+              className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
+            >
+              การล้างข้อมูลหยุดที่ขั้นตอน {resetFailure} ระบบเก็บสถานะไว้แล้ว
+              กรุณากด “ลองรีเซ็ตอีกครั้ง” เพื่อดำเนินการต่ออย่างปลอดภัย
+            </div>
+          )}
+
+          <div className="flex flex-col-reverse gap-3 border-t border-neutral-100 pt-4 dark:border-neutral-800 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={closeResetDialog}
+              disabled={resetRunning}
+              className="rounded-xl px-5 py-2.5 text-sm font-bold text-neutral-500 transition-colors hover:bg-neutral-100 disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-900"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={!canConfirmRoseTrialCompleteReset(resetAcknowledged, resetRunning)}
+              className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-red-200 transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-none"
+            >
+              {resetRunning
+                ? "กำลังล้างข้อมูล..."
+                : resetFailure
+                  ? "ลองรีเซ็ตอีกครั้ง"
+                  : "ยืนยันรีเซ็ตทั้งหมด"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* ─── Day 0 Dialog Confirmation ────────────────────────────────────────── */}
       <ConfirmDialog

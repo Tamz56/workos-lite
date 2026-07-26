@@ -3,7 +3,7 @@
 
 import type { RoseDay0State } from "./types";
 
-const DAY0_STORAGE_KEY = "gf:rose-trial:day0:v1";
+export const DAY0_STORAGE_KEY = "gf:rose-trial:day0:v1";
 
 export interface LoadResult {
   state: RoseDay0State | null;
@@ -78,13 +78,15 @@ export function saveRoseDay0State(state: RoseDay0State): boolean {
 /**
  * ล้างข้อมูล Day 0 จาก localStorage
  */
-export function clearRoseDay0State(): void {
+export function clearRoseDay0State(): boolean {
   if (typeof window === "undefined") {
-    return;
+    return false;
   }
   try {
     window.localStorage.removeItem(DAY0_STORAGE_KEY);
+    return window.localStorage.getItem(DAY0_STORAGE_KEY) === null;
   } catch (error) {
     console.error("Failed to clear Rose Day 0 state:", error);
+    return false;
   }
 }

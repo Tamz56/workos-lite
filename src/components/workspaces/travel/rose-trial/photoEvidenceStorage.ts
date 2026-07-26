@@ -48,6 +48,10 @@ export interface PhotoEvidenceDeleteResult {
   missingIds: string[];
 }
 
+export interface PhotoEvidenceClearResult {
+  deletedCount: number;
+}
+
 export interface PhotoEvidenceReconcileResult extends PhotoEvidenceReconciliationDecision {
   promotedIds: string[];
   deletedIds: string[];
@@ -371,6 +375,27 @@ export function createPhotoEvidenceStorage(options: PhotoEvidenceStorageOptions 
     });
   };
 
+  const clearAll = async (): Promise<PhotoEvidenceStorageResult<PhotoEvidenceClearResult>> => {
+    const listed = await listAll();
+    if (!listed.ok) return listed;
+
+    const deleted = await deleteIds(listed.value.map((record) => record.id));
+    if (!deleted.ok) return deleted;
+
+    const remaining = await listAll();
+    if (!remaining.ok) return remaining;
+    if (remaining.value.length > 0) {
+      return { ok: false, error: { code: "transaction_failed" } };
+    }
+
+    return { ok: true, value: { deletedCount: deleted.value.deletedIds.length } };
+  };
+
+  const isEmpty = async (): Promise<PhotoEvidenceStorageResult<boolean>> => {
+    const listed = await listAll();
+    return listed.ok ? { ok: true, value: listed.value.length === 0 } : listed;
+  };
+
   const reconcile = async (
     referencedPhotoIds: readonly string[],
     observationLoadState: PhotoEvidenceObservationLoadState,
@@ -419,6 +444,8 @@ export function createPhotoEvidenceStorage(options: PhotoEvidenceStorageOptions 
     listBefore,
     promote,
     deleteIds,
+    clearAll,
+    isEmpty,
     reconcile,
     cleanupEligibleOrphans: reconcile,
   };
