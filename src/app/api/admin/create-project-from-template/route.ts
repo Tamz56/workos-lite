@@ -18,8 +18,14 @@ export async function POST(req: Request) {
         const createProjectTx = db.transaction(() => {
             // 1. Create Project
             db.prepare(`
-                INSERT INTO projects (id, slug, name, status, created_at, updated_at)
-                VALUES (?, ?, ?, 'planned', datetime('now'), datetime('now'))
+                INSERT INTO projects (
+                    id, slug, name, status, registry_status, priority, progress_stage,
+                    metadata_updated_at, created_at, updated_at
+                )
+                VALUES (
+                    ?, ?, ?, 'inbox', 'idea', 'none', 'Concept',
+                    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), datetime('now'), datetime('now')
+                )
             `).run(projectId, projectSlug, projectName);
 
             // 2. Create Lists and Tasks for each template list

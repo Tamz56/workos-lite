@@ -153,6 +153,15 @@ CREATE TABLE IF NOT EXISTS projects (
   end_date    TEXT NULL,
   owner       TEXT NULL,
   is_seed     INTEGER DEFAULT 0,
+  category    TEXT NULL,
+  registry_status TEXT NULL,
+  priority    TEXT NULL,
+  current_goal TEXT NULL,
+  progress_stage TEXT NULL,
+  next_action TEXT NULL,
+  cadence TEXT NULL,
+  risk_or_blocked_by TEXT NULL,
+  metadata_updated_at TEXT NULL,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );

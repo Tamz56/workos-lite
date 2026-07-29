@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { ensureProjectRegistryMetadataColumns } from "@/lib/projects/registryMetadata";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -288,6 +289,7 @@ function ensureMigrations() {
     if (!hasProjectIsSeed) {
         db.exec("ALTER TABLE projects ADD COLUMN is_seed INTEGER DEFAULT 0");
     }
+    ensureProjectRegistryMetadataColumns(db);
 
     // Create lists table ensuring it exists during runtime migration safely
     db.exec(`
@@ -559,6 +561,15 @@ function ensureProjectsAndSprints() {
           end_date TEXT NULL,
           owner TEXT NULL,
           is_seed INTEGER DEFAULT 0,
+          category TEXT NULL,
+          registry_status TEXT NULL,
+          priority TEXT NULL,
+          current_goal TEXT NULL,
+          progress_stage TEXT NULL,
+          next_action TEXT NULL,
+          cadence TEXT NULL,
+          risk_or_blocked_by TEXT NULL,
+          metadata_updated_at TEXT NULL,
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );

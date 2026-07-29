@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { registryStatusForCoreStatus } from "@/lib/projects/registryMetadata";
 
 const CreateProjectSchema = z.object({
-    name: z.string().min(1),
+    name: z.string().trim().min(1),
     slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
-    status: z.enum(["inbox", "planned", "done"]).default("planned"),
+    status: z.enum(["inbox", "planned", "done"]).optional(),
     start_date: z.string().nullable().optional(),
     end_date: z.string().nullable().optional(),
     owner: z.string().nullable().optional(),
@@ -38,10 +39,20 @@ export async function POST(req: NextRequest) {
         const db = getDb();
         const body = await req.json();
         const parsed = CreateProjectSchema.parse(body);
+        const status = parsed.status ?? "inbox";
+        const registryStatus = registryStatusForCoreStatus(status);
 
         const stmt = db.prepare(`
-            INSERT INTO projects (id, slug, name, status, start_date, end_date, owner)
-            VALUES (@id, @slug, @name, @status, @start_date, @end_date, @owner)
+            INSERT INTO projects (
+                id, slug, name, status, start_date, end_date, owner,
+                category, registry_status, priority, current_goal, progress_stage,
+                next_action, cadence, risk_or_blocked_by, metadata_updated_at
+            )
+            VALUES (
+                @id, @slug, @name, @status, @start_date, @end_date, @owner,
+                NULL, @registry_status, 'none', NULL, 'Concept',
+                NULL, NULL, NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            )
         `);
 
         const id = nanoid();
@@ -49,7 +60,8 @@ export async function POST(req: NextRequest) {
             id,
             slug: parsed.slug,
             name: parsed.name,
-            status: parsed.status,
+            status,
+            registry_status: registryStatus,
             start_date: parsed.start_date || null,
             end_date: parsed.end_date || null,
             owner: parsed.owner || null

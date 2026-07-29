@@ -92,6 +92,16 @@ export interface Project {
     start_date: string | null;
     end_date: string | null;
     owner: string | null;
+    is_seed?: number;
+    category: string | null;
+    registry_status: ProjectRegistryStatus | null;
+    priority: ProjectPriority | null;
+    current_goal: string | null;
+    progress_stage: string | null;
+    next_action: string | null;
+    cadence: string | null;
+    risk_or_blocked_by: string | null;
+    metadata_updated_at: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -118,10 +128,24 @@ export type ProjectProgressStage =
     | "Needs Improvement"
     | "Paused";
 
+export type ProjectPriority = "high" | "medium" | "low" | "none";
+
+export interface CanonicalProjectRegistryMetadata {
+    category: string | null;
+    registry_status: ProjectRegistryStatus | null;
+    priority: ProjectPriority | null;
+    current_goal: string | null;
+    progress_stage: string | null;
+    next_action: string | null;
+    cadence: string | null;
+    risk_or_blocked_by: string | null;
+    metadata_updated_at: string | null;
+}
+
 export interface ProjectRegistryMetadata {
     category: string;
     status: ProjectRegistryStatus;
-    priority: "high" | "medium" | "low" | "none";
+    priority: ProjectPriority;
     currentGoal: string;
     progressStage: ProjectProgressStage;
     nextAction: string;

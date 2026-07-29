@@ -17,6 +17,11 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ProjectLoopsTab from "@/components/projects/ProjectLoopsTab";
+import {
+    buildProjectRegistryUpdatePayload,
+    canonicalProjectToLegacyMetadata,
+    resolveProjectRegistryMetadata,
+} from "@/lib/projects/registryMetadata";
 
 const STATUS_LABELS: Record<ProjectRegistryStatus, string> = {
     idea: "Idea",
@@ -202,12 +207,14 @@ function getStoredMetadata(): Record<string, ProjectRegistryMetadata> {
     }
 }
 
-function saveStoredMetadata(metadata: Record<string, ProjectRegistryMetadata>) {
-    if (typeof window === "undefined") return;
+function saveStoredMetadata(metadata: Record<string, ProjectRegistryMetadata>): boolean {
+    if (typeof window === "undefined") return false;
     try {
         localStorage.setItem(METADATA_KEY, JSON.stringify(metadata));
+        return true;
     } catch (e) {
         console.error("Failed to save metadata", e);
+        return false;
     }
 }
 
@@ -881,21 +888,6 @@ export default function ProjectDetailClient() {
         }
     }, [slug]);
 
-    // Default metadata helper
-    const defaultMetadataForProject = useCallback((proj: Project): ProjectRegistryMetadata => {
-        return {
-            category: "Other",
-            status: proj.status === "done" ? "completed" : "planning",
-            priority: "medium",
-            currentGoal: "โปรเจกต์เพื่อการติดตามงานส่วนบุคคล",
-            progressStage: proj.status === "done" ? "In Use" : "Concept",
-            nextAction: "วางแผนขั้นตอนถัดไป",
-            cadence: "Weekly",
-            riskOrBlockedBy: "ไม่มี",
-            lastUpdated: proj.updated_at || new Date().toISOString()
-        };
-    }, []);
-
     const loadData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
@@ -1435,15 +1427,18 @@ export default function ProjectDetailClient() {
     const generateArborContextMarkdown = () => {
         if (!project) return "";
 
-        const activeMeta = (metadata[slug] || {}) as any;
-        const cat = activeMeta.category || "N/A";
-        const detStatus = activeMeta.status || "N/A";
-        const prio = activeMeta.priority || "N/A";
-        const goal = activeMeta.currentGoal || "N/A";
-        const next = activeMeta.nextAction || "N/A";
-        const cadence = activeMeta.cadence || "N/A";
-        const risk = activeMeta.riskOrBlockedBy || "N/A";
-        const updated = activeMeta.lastUpdated || "N/A";
+        const registryMeta = resolveProjectRegistryMetadata(
+            project,
+            metadata[slug],
+        ).metadata;
+        const cat = registryMeta.category || "N/A";
+        const detStatus = registryMeta.status || "N/A";
+        const prio = registryMeta.priority || "N/A";
+        const goal = registryMeta.currentGoal || "N/A";
+        const next = registryMeta.nextAction || "N/A";
+        const cadence = registryMeta.cadence || "N/A";
+        const risk = registryMeta.riskOrBlockedBy || "N/A";
+        const updated = registryMeta.lastUpdated || "N/A";
 
         // Filter doc blocks
         const systemStructureBlock = docBlocks.find(b => b.type === "structure");
@@ -2006,38 +2001,50 @@ ${suggestedNextStr}
 
     const activeMeta = useMemo(() => {
         if (!project) return null;
-        return metadata[project.slug] || defaultMetadataForProject(project);
-    }, [project, metadata, defaultMetadataForProject]);
+        return resolveProjectRegistryMetadata(project, metadata[project.slug]).metadata;
+    }, [project, metadata]);
 
     const handleArchive = async () => {
         if (!project) return;
         setActionLoading(true);
         try {
+            const currentMeta = resolveProjectRegistryMetadata(
+                project,
+                metadata[project.slug],
+            ).metadata;
+            const archiveMeta: ProjectRegistryMetadata = {
+                ...currentMeta,
+                status: "completed",
+                progressStage: "In Use",
+            };
             const res = await fetch(`/api/projects/${slug}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "done" })
+                body: JSON.stringify(
+                    buildProjectRegistryUpdatePayload(project.name, archiveMeta),
+                ),
             });
-            if (res.ok) {
-                // Update detailed status in local storage to completed
-                const currentMeta = metadata[project.slug] || defaultMetadataForProject(project);
-                const updatedMeta = {
-                    ...metadata,
-                    [project.slug]: {
-                        ...currentMeta,
-                        status: "completed" as const,
-                        progressStage: "In Use" as const,
-                        lastUpdated: new Date().toISOString()
-                    }
-                };
-                setMetadata(updatedMeta);
-                saveStoredMetadata(updatedMeta);
-
-                setToastMessage(`Project "${project.name}" archived successfully`);
-                setShowToast(true);
-                setIsArchiveOpen(false);
-                loadData();
+            const responseBody = await res.json();
+            if (!res.ok) {
+                throw new Error(responseBody.error || "ไม่สามารถจัดเก็บโปรเจกต์ได้");
             }
+            const updatedProject = responseBody as Project;
+            const updatedMeta = {
+                ...metadata,
+                [updatedProject.slug]: canonicalProjectToLegacyMetadata(updatedProject),
+            };
+            setProject(updatedProject);
+            setMetadata(updatedMeta);
+            if (!saveStoredMetadata(updatedMeta)) {
+                console.warn("Canonical project saved, but compatibility metadata mirror failed");
+            }
+            setToastMessage(`Project "${project.name}" archived successfully`);
+            setShowToast(true);
+            setIsArchiveOpen(false);
+        } catch (e) {
+            console.error("Error archiving project:", e);
+            setToastMessage(e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการจัดเก็บโปรเจกต์");
+            setShowToast(true);
         } finally {
             setActionLoading(false);
         }
@@ -2061,57 +2068,44 @@ ${suggestedNextStr}
         if (!project) return;
         setActionLoading(true);
         try {
-            // Update name in DB if changed
-            if (editName.trim() !== project.name) {
-                await fetch(`/api/projects/${project.slug}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: editName.trim() })
-                });
-            }
-
-            // Sync with SQLite status
-            let dbStatus: "inbox" | "planned" | "done" = "planned";
-            if (editStatus === "completed") {
-                dbStatus = "done";
-            } else if (editStatus === "idea") {
-                dbStatus = "inbox";
-            }
-
-            await fetch(`/api/projects/${project.slug}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: dbStatus })
-            });
-
-            // Update metadata store
             const newMeta: ProjectRegistryMetadata = {
-                category: editCategory.trim() || "Other",
+                category: editCategory,
                 status: editStatus,
                 priority: editPriority,
-                currentGoal: editCurrentGoal.trim(),
+                currentGoal: editCurrentGoal,
                 progressStage: editProgressStage,
-                nextAction: editNextAction.trim(),
-                cadence: editCadence.trim() || "Weekly",
-                riskOrBlockedBy: editRiskOrBlockedBy.trim() || "None",
-                lastUpdated: new Date().toISOString()
+                nextAction: editNextAction,
+                cadence: editCadence,
+                riskOrBlockedBy: editRiskOrBlockedBy,
+                lastUpdated: project.metadata_updated_at ?? project.updated_at,
             };
-
+            const res = await fetch(`/api/projects/${project.slug}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(buildProjectRegistryUpdatePayload(editName, newMeta)),
+            });
+            const responseBody = await res.json();
+            if (!res.ok) {
+                throw new Error(responseBody.error || "ไม่สามารถบันทึกข้อมูลโปรเจกต์ได้");
+            }
+            const updatedProject = responseBody as Project;
             const updatedMetadata = {
                 ...metadata,
-                [project.slug]: newMeta
+                [updatedProject.slug]: canonicalProjectToLegacyMetadata(updatedProject),
             };
 
+            setProject(updatedProject);
             setMetadata(updatedMetadata);
-            saveStoredMetadata(updatedMetadata);
+            if (!saveStoredMetadata(updatedMetadata)) {
+                console.warn("Canonical project saved, but compatibility metadata mirror failed");
+            }
 
             setToastMessage("บันทึกการปรับปรุงโปรเจกต์สำเร็จ");
             setShowToast(true);
             setIsRegistryEditOpen(false);
-            loadData();
         } catch (e) {
             console.error("Error updating project metadata:", e);
-            setToastMessage("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+            setToastMessage(e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
             setShowToast(true);
         } finally {
             setActionLoading(false);
