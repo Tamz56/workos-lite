@@ -3,12 +3,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
-import { Project, ProjectItem, ProjectRegistryStatus, ProjectProgressStage, ProjectRegistryMetadata, Note, ProjectDocBlockType, ProjectDocumentationBlock, ProjectContentRoadmapStatus, ProjectContentType, ProjectContentLayer, ProjectContentRoadmapItem } from "@/lib/types";
-import { 
-    MoreVertical, Edit2, Archive, Trash2, ChevronLeft, Target, ChevronDown, ChevronRight,
+import { Project, ProjectItem, ProjectRegistryStatus, ProjectProgressStage, ProjectRegistryMetadata, Note, Doc, ProjectDocBlockType, ProjectDocumentationBlock, ProjectContentRoadmapStatus, ProjectContentType, ProjectContentLayer, ProjectContentRoadmapItem } from "@/lib/types";
+import {
+    Edit2, Archive, Trash2, ChevronLeft, Target, ChevronDown, ChevronRight,
     Plus, CheckCircle2, Layout, Calendar, FileText, Info,
     BookOpen, Sparkles, Search, LayoutGrid, Table, FileCode, Check, ExternalLink, RefreshCw,
-    Copy, Layers, Tv, Tag, PlusCircle, ArrowUp, ArrowDown
+    Copy, Layers, Tv, Tag, PlusCircle
 } from "lucide-react";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { Toast } from "@/components/ui/Toast";
@@ -17,6 +17,19 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ProjectLoopsTab from "@/components/projects/ProjectLoopsTab";
+import {
+    ProjectDocBlocksEmptyState,
+    ProjectDocBlocksReadOnlyActions,
+    ProjectDocBlocksSourceStatus
+} from "@/components/projects/ProjectDocBlocksSourceStatus";
+import { useProjectDocBlocks } from "@/lib/project-doc-blocks/useProjectDocBlocks";
+import {
+    createProjectDocBlockOnClient,
+    updateProjectDocBlockOnClient,
+    archiveProjectDocBlockOnClient,
+    restoreProjectDocBlockOnClient,
+    ProjectDocBlockMutationException
+} from "@/lib/project-doc-blocks/client";
 import {
     buildProjectRegistryUpdatePayload,
     canonicalProjectToLegacyMetadata,
@@ -55,7 +68,6 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 const METADATA_KEY = "workos_projects_metadata_v1";
-const DOCS_STORAGE_KEY = "workos_projects_docs_v1";
 
 const BLOCK_TYPE_LABELS: Record<ProjectDocBlockType, string> = {
     brief: "Project Brief",
@@ -80,6 +92,96 @@ const BLOCK_TYPE_COLORS: Record<ProjectDocBlockType, string> = {
     publish: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/30",
     qa_review: "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-900/30"
 };
+
+type ProjectDecision = {
+    id: string;
+    title: string;
+    decision: string;
+    reason: string | null;
+    impact: string | null;
+    created_at: string;
+};
+
+type LoopApiRecord = Record<string, unknown>;
+
+const PROJECT_DOC_BLOCK_TYPES = new Set<ProjectDocBlockType>(Object.keys(BLOCK_TYPE_LABELS) as ProjectDocBlockType[]);
+const PROJECT_ITEM_STATUSES = new Set<ProjectItem["status"]>([
+    "inbox", "planned", "in_progress", "drafted", "ready_for_review", "done", "blocked", "archived"
+]);
+const SCHEDULE_BUCKETS = new Set<NonNullable<ProjectItem["schedule_bucket"]>>([
+    "morning", "afternoon", "evening", "none"
+]);
+const ROADMAP_PRIORITIES = new Set<ProjectContentRoadmapItem["priority"]>(["high", "medium", "low", "none"]);
+const ROADMAP_STATUSES = new Set<ProjectContentRoadmapStatus>([
+    "idea", "planned", "drafting", "review", "ready_to_publish", "published", "tracking", "needs_update", "paused"
+]);
+const CONTENT_TYPES = new Set<ProjectContentType>([
+    "narrative_article", "knowledge_article", "group_post", "page_post", "personal_post",
+    "infographic", "short_video", "follow_up_post", "supporting_article", "legacy_article"
+]);
+const CONTENT_LAYERS = new Set<ProjectContentLayer>([
+    "core_episode", "supporting_article", "social_post", "performance_followup",
+    "visual_asset", "video_asset", "legacy_shell"
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function isProjectDecision(value: unknown): value is ProjectDecision {
+    return isRecord(value) &&
+        typeof value.id === "string" &&
+        typeof value.title === "string" &&
+        typeof value.decision === "string" &&
+        (typeof value.reason === "string" || value.reason === null) &&
+        (typeof value.impact === "string" || value.impact === null) &&
+        typeof value.created_at === "string";
+}
+
+function projectDecisionsFrom(value: unknown): ProjectDecision[] {
+    return Array.isArray(value) ? value.filter(isProjectDecision) : [];
+}
+
+function recordArrayProperty(value: unknown, key: string): LoopApiRecord[] {
+    if (!isRecord(value) || !Array.isArray(value[key])) return [];
+    return value[key].filter(isRecord);
+}
+
+function stringProperty(value: unknown, key: string): string | undefined {
+    return isRecord(value) && typeof value[key] === "string" ? value[key] : undefined;
+}
+
+function isProjectDocBlockTypeOrAuto(value: string): value is ProjectDocBlockType | "auto" {
+    return value === "auto" || PROJECT_DOC_BLOCK_TYPES.has(value as ProjectDocBlockType);
+}
+
+function isProjectItemStatus(value: string): value is ProjectItem["status"] {
+    return PROJECT_ITEM_STATUSES.has(value as ProjectItem["status"]);
+}
+
+function isScheduleBucket(value: string): value is NonNullable<ProjectItem["schedule_bucket"]> {
+    return SCHEDULE_BUCKETS.has(value as NonNullable<ProjectItem["schedule_bucket"]>);
+}
+
+function isRoadmapPriority(value: string): value is ProjectContentRoadmapItem["priority"] {
+    return ROADMAP_PRIORITIES.has(value as ProjectContentRoadmapItem["priority"]);
+}
+
+function isRoadmapStatus(value: string): value is ProjectContentRoadmapStatus {
+    return ROADMAP_STATUSES.has(value as ProjectContentRoadmapStatus);
+}
+
+function isContentType(value: string): value is ProjectContentType {
+    return CONTENT_TYPES.has(value as ProjectContentType);
+}
+
+function isContentLayer(value: string): value is ProjectContentLayer {
+    return CONTENT_LAYERS.has(value as ProjectContentLayer);
+}
 
 const DOC_TEMPLATES: Record<ProjectDocBlockType, { summary: string; details: string }> = {
     brief: {
@@ -218,25 +320,6 @@ function saveStoredMetadata(metadata: Record<string, ProjectRegistryMetadata>): 
     }
 }
 
-function getStoredDocBlocks(): ProjectDocumentationBlock[] {
-    if (typeof window === "undefined") return [];
-    try {
-        const data = localStorage.getItem(DOCS_STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
-    } catch (e) {
-        console.error("Failed to load doc blocks", e);
-        return [];
-    }
-}
-
-function saveStoredDocBlocks(blocks: ProjectDocumentationBlock[]) {
-    if (typeof window === "undefined") return;
-    try {
-        localStorage.setItem(DOCS_STORAGE_KEY, JSON.stringify(blocks));
-    } catch (e) {
-        console.error("Failed to save doc blocks", e);
-    }
-}
 const ROADMAP_STORAGE_KEY = "workos_project_content_roadmap_v1";
 
 const ROADMAP_STATUS_LABELS: Record<ProjectContentRoadmapStatus, string> = {
@@ -390,7 +473,7 @@ function parseRoadmapTextToItems(text: string, projectSlug: string): ProjectCont
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const isPipeRow = line.includes("|");
-        
+
         // Skip header line if it looks like one
         if (i === 0 && isPipeRow) {
             const firstCol = line.split("|")[0].trim().toLowerCase();
@@ -691,21 +774,45 @@ function isBacklogText(input: string): boolean {
     return hasBacklogFields && !hasLogIndicators;
 }
 
+export function countTopLevelHeadings(text: string): number {
+    const lines = text.split(/\r?\n/);
+    let count = 0;
+    let inCodeBlock = false;
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("```")) {
+            inCodeBlock = !inCodeBlock;
+            continue;
+        }
+        if (inCodeBlock) continue;
+
+        if (/^#[ \t]+\S/.test(trimmed)) {
+            count++;
+        }
+    }
+    return count;
+}
+
 function parseProjectLogFromText(input: string): ParsedProjectLog {
     const lines = input.split(/\r?\n/);
     let title = "";
-    
+    let inCodeBlock = false;
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        if (line.startsWith("# ")) {
-            title = line.substring(2).trim();
-            break;
-        } else if (line.startsWith("#")) {
-            title = line.substring(1).trim();
+        if (line.startsWith("```")) {
+            inCodeBlock = !inCodeBlock;
+            continue;
+        }
+        if (inCodeBlock) continue;
+
+        if (/^#[ \t]+\S/.test(line)) {
+            title = line.replace(/^#[ \t]+/, "").trim();
             break;
         }
     }
-    
+
     if (!title) {
         title = "Project Log — Imported Arbor Summary";
     }
@@ -757,7 +864,13 @@ export default function ProjectDetailClient() {
     const [editRiskOrBlockedBy, setEditRiskOrBlockedBy] = useState("None");
 
     // --- Documentation Blocks State ---
-    const [docBlocks, setDocBlocks] = useState<ProjectDocumentationBlock[]>([]);
+    const [docStatusFilter, setDocStatusFilter] = useState<"active" | "archived" | "all">("active");
+    const docBlocksState = useProjectDocBlocks(
+        project?.slug === slug ? project.id : null,
+        slug,
+        docStatusFilter
+    );
+    const docBlocks = docBlocksState.blocks;
     const [docSearch, setDocSearch] = useState("");
     const [docTypeFilter, setDocTypeFilter] = useState<string>("all");
     const [docViewMode, setDocViewMode] = useState<"card" | "table">("card");
@@ -766,7 +879,6 @@ export default function ProjectDetailClient() {
     const [isDocModalOpen, setIsDocModalOpen] = useState(false);
     const [activeDocBlock, setActiveDocBlock] = useState<ProjectDocumentationBlock | null>(null);
     const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
-    const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
     // Form fields state
     const [formTitle, setFormTitle] = useState("");
@@ -774,8 +886,8 @@ export default function ProjectDetailClient() {
     const [formType, setFormType] = useState<ProjectDocBlockType>("brief");
     const [formSummary, setFormSummary] = useState("");
     const [formDetails, setFormDetails] = useState("");
-    const [formEvidence, setFormEvidence] = useState(""); 
-    const [formFiles, setFormFiles] = useState("");       
+    const [formEvidence, setFormEvidence] = useState("");
+    const [formFiles, setFormFiles] = useState("");
     const [formNextAction, setFormNextAction] = useState("");
     const [formStatus, setFormStatus] = useState("active");
     const [formOrderIndex, setFormOrderIndex] = useState("");
@@ -787,7 +899,7 @@ export default function ProjectDetailClient() {
     const [arborDraftBlock, setArborDraftBlock] = useState<ProjectDocumentationBlock | null>(null);
     const [showArborPreview, setShowArborPreview] = useState(false);
     // OPS-002D: Project Context Summary state
-    const [projectDocs, setProjectDocs] = useState<Note[]>([]);
+    const [projectDocs, setProjectDocs] = useState<Doc[]>([]);
     const [isContextSummaryOpen, setIsContextSummaryOpen] = useState(false);
     // --- Content Roadmap State ---
     const [roadmapItems, setRoadmapItems] = useState<ProjectContentRoadmapItem[]>([]);
@@ -854,8 +966,8 @@ export default function ProjectDetailClient() {
     const [contextOutputStandards, setContextOutputStandards] = useState("");
     const [contextDecisionRules, setContextDecisionRules] = useState("");
     const [contextSourceOfTruth, setContextSourceOfTruth] = useState("");
-    
-    const [decisions, setDecisions] = useState<any[]>([]);
+
+    const [decisions, setDecisions] = useState<ProjectDecision[]>([]);
     const [isAddingDecision, setIsAddingDecision] = useState(false);
     const [newDecisionTitle, setNewDecisionTitle] = useState("");
     const [newDecisionText, setNewDecisionText] = useState("");
@@ -866,9 +978,9 @@ export default function ProjectDetailClient() {
     const [savingDecision, setSavingDecision] = useState(false);
 
     // --- Project Loops Tab State (ARBOR-AGENT-003) ---
-    const [loops, setLoops] = useState<any[]>([]);
-    const [loopTemplates, setLoopTemplates] = useState<any[]>([]);
-    const [gateEvents, setGateEvents] = useState<any[]>([]);
+    const [loops, setLoops] = useState<LoopApiRecord[]>([]);
+    const [loopTemplates, setLoopTemplates] = useState<LoopApiRecord[]>([]);
+    const [gateEvents, setGateEvents] = useState<LoopApiRecord[]>([]);
     const [loadingLoops, setLoadingLoops] = useState(false);
 
     const refreshLoops = useCallback(async (includeArchived = false) => {
@@ -876,10 +988,10 @@ export default function ProjectDetailClient() {
         try {
             const res = await fetch(`/api/projects/${slug}/loops?include_archived=${includeArchived ? "1" : "0"}`);
             if (res.ok) {
-                const data = await res.json();
-                setLoops(data.loops || []);
-                setLoopTemplates(data.templates || []);
-                setGateEvents(data.gateEvents || []);
+                const data: unknown = await res.json();
+                setLoops(recordArrayProperty(data, "loops"));
+                setLoopTemplates(recordArrayProperty(data, "templates"));
+                setGateEvents(recordArrayProperty(data, "gateEvents"));
             }
         } catch (err) {
             console.error("Failed to load loops:", err);
@@ -901,7 +1013,7 @@ export default function ProjectDetailClient() {
             if (projRes.ok) {
                 const projData: Project = await projRes.json();
                 setProject(projData);
-                
+
                 // Load metadata from localStorage
                 const storedMeta = getStoredMetadata();
                 setMetadata(storedMeta);
@@ -910,8 +1022,18 @@ export default function ProjectDetailClient() {
                 try {
                     const docsRes = await fetch(`/api/docs?project_id=${projData.id}`, { cache: "no-store" });
                     if (docsRes.ok) {
-                        const docsData = await docsRes.json();
-                        setProjectDocs(docsData.docs || []);
+                        const docsData: unknown = await docsRes.json();
+                        const docs = isRecord(docsData) && Array.isArray(docsData.docs)
+                            ? docsData.docs.filter((value): value is Doc => (
+                                isRecord(value) &&
+                                typeof value.id === "string" &&
+                                typeof value.title === "string" &&
+                                typeof value.content_md === "string" &&
+                                typeof value.created_at === "string" &&
+                                typeof value.updated_at === "string"
+                            ))
+                            : [];
+                        setProjectDocs(docs);
                     }
                 } catch { /* ignore docs fetch failure */ }
             }
@@ -933,7 +1055,8 @@ export default function ProjectDetailClient() {
             }
 
             if (decisionsRes.ok) {
-                setDecisions(await decisionsRes.json());
+                const decisionsData: unknown = await decisionsRes.json();
+                setDecisions(projectDecisionsFrom(decisionsData));
             }
 
             await refreshLoops(false);
@@ -941,76 +1064,6 @@ export default function ProjectDetailClient() {
             setLoading(false);
         }
     }, [slug, refreshLoops]);
-
-    const loadDocBlocks = useCallback(() => {
-        let allBlocks = getStoredDocBlocks();
-        let modified = false;
-
-        // 1. Rename block if found
-        allBlocks = allBlocks.map(b => {
-            if (
-                b.projectSlug === "green-fineness-content" &&
-                b.title === "Decision Log — Green Fineness Content Project Structure"
-            ) {
-                modified = true;
-                return {
-                    ...b,
-                    title: "Decision Log — Project Structure and Data Ownership",
-                    updatedAt: new Date().toISOString()
-                };
-            }
-            return b;
-        });
-
-        // 2. Set default orderIndex for existing Green Fineness Content docs
-        allBlocks = allBlocks.map(b => {
-            if (b.projectSlug === "green-fineness-content" && (b.orderIndex === undefined || b.orderIndex === null)) {
-                if (b.title.startsWith("System Structure — Green Fineness Content")) {
-                    modified = true;
-                    return { ...b, orderIndex: 10 };
-                }
-                if (b.title.startsWith("SOP — Green Fineness Content Production")) {
-                    modified = true;
-                    return { ...b, orderIndex: 20 };
-                }
-                if (b.title.startsWith("Process Note — Current Workflow")) {
-                    modified = true;
-                    return { ...b, orderIndex: 30 };
-                }
-                if (
-                    b.title === "Decision Log — Project Structure and Data Ownership" ||
-                    b.title === "Decision Log — Green Fineness Content Project Structure"
-                ) {
-                    modified = true;
-                    return { ...b, orderIndex: 40 };
-                }
-            }
-            return b;
-        });
-
-        if (modified) {
-            saveStoredDocBlocks(allBlocks);
-        }
-
-        const projectBlocks = allBlocks.filter(b => b.projectSlug === slug);
-
-        // Sort by orderIndex ascending if present, fallback to date descending, then createdAt descending
-        projectBlocks.sort((a, b) => {
-            const hasA = a.orderIndex !== undefined && a.orderIndex !== null;
-            const hasB = b.orderIndex !== undefined && b.orderIndex !== null;
-            if (hasA && hasB) {
-                return (a.orderIndex || 0) - (b.orderIndex || 0);
-            }
-            if (hasA) return -1;
-            if (hasB) return 1;
-
-            const dateCompare = b.date.localeCompare(a.date);
-            if (dateCompare !== 0) return dateCompare;
-            return b.createdAt.localeCompare(a.createdAt);
-        });
-
-        setDocBlocks(projectBlocks);
-    }, [slug]);
 
     const loadRoadmapItems = useCallback(() => {
         const allItems = getStoredRoadmapItems();
@@ -1026,12 +1079,23 @@ export default function ProjectDetailClient() {
 
     useEffect(() => {
         loadData();
-        loadDocBlocks();
         loadRoadmapItems();
-    }, [loadData, loadDocBlocks, loadRoadmapItems]);
+    }, [loadData, loadRoadmapItems]);
 
     // --- Doc Blocks Helpers ---
-    const handleOpenAddManual = () => {
+    const handleLoadTemplate = (type: ProjectDocBlockType) => {
+        const template = DOC_TEMPLATES[type];
+        if (template) {
+            setFormSummary(template.summary);
+            setFormDetails(template.details);
+        }
+    };
+
+    const [savingDocBlock, setSavingDocBlock] = useState(false);
+    const [isArchiveDocOpen, setIsArchiveDocOpen] = useState(false);
+    const [docBlockToArchive, setDocBlockToArchive] = useState<ProjectDocumentationBlock | null>(null);
+
+    const handleOpenAddBlock = () => {
         setActiveDocBlock(null);
         setFormTitle("");
         setFormDate(new Date().toISOString().split("T")[0]);
@@ -1046,15 +1110,7 @@ export default function ProjectDetailClient() {
         setIsDocModalOpen(true);
     };
 
-    const handleLoadTemplate = (type: ProjectDocBlockType) => {
-        const template = DOC_TEMPLATES[type];
-        if (template) {
-            setFormSummary(template.summary);
-            setFormDetails(template.details);
-        }
-    };
-
-    const handleOpenEdit = (block: ProjectDocumentationBlock) => {
+    const handleOpenEditDocBlock = (block: ProjectDocumentationBlock) => {
         setActiveDocBlock(block);
         setFormTitle(block.title);
         setFormDate(block.date);
@@ -1065,98 +1121,157 @@ export default function ProjectDetailClient() {
         setFormFiles(block.relatedFiles ? block.relatedFiles.join("\n") : "");
         setFormNextAction(block.nextAction || "");
         setFormStatus(block.status);
-        setFormOrderIndex(block.orderIndex !== undefined && block.orderIndex !== null ? block.orderIndex.toString() : "");
+        setFormOrderIndex(block.orderIndex !== undefined ? String(block.orderIndex) : "");
         setIsDocModalOpen(true);
     };
 
-    const handleSaveBlock = () => {
+    const handleOpenImportLog = () => {
+        setLogImportText("");
+        setParsedLog(null);
+        setIsLogImportOpen(true);
+    };
+
+    const handleOpenArborAssistant = () => {
+        setArborSourceText("");
+        setArborSelectedType("auto");
+        setArborDraftBlock(null);
+        setShowArborPreview(false);
+        setIsArborModalOpen(true);
+    };
+
+    const handleSaveBlock = async () => {
+        if (!project) return;
         if (!formTitle.trim()) {
-            alert("กรุณากรอกหัวข้อ");
+            setToastMessage("กรุณากรอกหัวข้อเอกสาร");
+            setShowToast(true);
+            return;
+        }
+        if (!formDate.trim()) {
+            setToastMessage("กรุณากรอกวันที่");
+            setShowToast(true);
             return;
         }
 
-        const evidenceLinks = formEvidence
-            .split(/[\n,]/)
-            .map(s => s.trim())
-            .filter(Boolean);
+        setSavingDocBlock(true);
 
-        const relatedFiles = formFiles
-            .split(/[\n,]/)
-            .map(s => s.trim())
-            .filter(Boolean);
-
-        const allBlocks = getStoredDocBlocks();
-        const now = new Date().toISOString();
-        const parsedOrderVal = formOrderIndex.trim() ? parseInt(formOrderIndex.trim(), 10) : undefined;
-        const orderIndex = (parsedOrderVal !== undefined && !isNaN(parsedOrderVal)) ? parsedOrderVal : undefined;
-
-        if (activeDocBlock) {
-            // Update
-            const updated = allBlocks.map(b => {
-                if (b.id === activeDocBlock.id) {
-                    return {
-                        ...b,
-                        title: formTitle.trim(),
-                        date: formDate,
-                        type: formType,
-                        summary: formSummary.trim(),
-                        details: formDetails.trim(),
-                        evidenceLinks,
-                        relatedFiles,
-                        nextAction: formNextAction.trim(),
-                        status: formStatus,
-                        orderIndex,
-                        updatedAt: now
-                    };
-                }
-                return b;
-            });
-            saveStoredDocBlocks(updated);
-            setToastMessage("บันทึกการแก้ไขเอกสารเรียบร้อยแล้ว");
-        } else {
-            // Create
-            const newId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-            const newBlock: ProjectDocumentationBlock = {
-                id: newId,
-                projectSlug: slug,
-                type: formType,
-                title: formTitle.trim(),
-                date: formDate,
-                summary: formSummary.trim(),
-                details: formDetails.trim(),
-                evidenceLinks,
-                relatedFiles,
-                nextAction: formNextAction.trim(),
-                status: formStatus,
-                orderIndex,
-                createdAt: now,
-                updatedAt: now
-            };
-            allBlocks.push(newBlock);
-            saveStoredDocBlocks(allBlocks);
-            setToastMessage("สร้างบล็อกเอกสารเรียบร้อยแล้ว");
+        try {
+            if (activeDocBlock) {
+                const updatePayload = {
+                    type: formType,
+                    title: formTitle.trim(),
+                    date: formDate,
+                    summary: formSummary.trim(),
+                    details: formDetails,
+                    evidenceLinks: formEvidence.split("\n").map(l => l.trim()).filter(Boolean),
+                    relatedFiles: formFiles.split("\n").map(f => f.trim()).filter(Boolean),
+                    status: formStatus,
+                    nextAction: formNextAction.trim() || undefined,
+                    generatedBy: activeDocBlock.generatedBy,
+                    reviewedByUser: activeDocBlock.reviewedByUser
+                };
+                await updateProjectDocBlockOnClient(
+                    project.id,
+                    slug,
+                    activeDocBlock.id,
+                    activeDocBlock.updatedAt,
+                    updatePayload
+                );
+                setToastMessage("แก้ไขบล็อกเอกสารสำเร็จ");
+            } else {
+                const createPayload = {
+                    projectSlug: slug,
+                    type: formType,
+                    title: formTitle.trim(),
+                    date: formDate,
+                    summary: formSummary.trim(),
+                    details: formDetails,
+                    evidenceLinks: formEvidence.split("\n").map(l => l.trim()).filter(Boolean),
+                    relatedFiles: formFiles.split("\n").map(f => f.trim()).filter(Boolean),
+                    status: formStatus,
+                    nextAction: formNextAction.trim() || undefined,
+                    generatedBy: undefined,
+                    reviewedByUser: true
+                };
+                await createProjectDocBlockOnClient(
+                    project.id,
+                    slug,
+                    createPayload
+                );
+                setToastMessage("สร้างบล็อกเอกสารสำเร็จ");
+            }
+            setShowToast(true);
+            setIsDocModalOpen(false);
+            docBlocksState.refetch();
+        } catch (err: unknown) {
+            console.error(err);
+            if (err instanceof ProjectDocBlockMutationException) {
+                setToastMessage(`บันทึกไม่สำเร็จ: ${err.message}`);
+            } else {
+                setToastMessage("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+            }
+            setShowToast(true);
+        } finally {
+            setSavingDocBlock(false);
         }
-
-        setShowToast(true);
-        setIsDocModalOpen(false);
-        loadDocBlocks();
     };
 
-    const handleTriggerDelete = (id: string) => {
-        setDocToDelete(id);
-        setIsDeleteDocOpen(true);
+    const handleOpenArchiveDoc = (block: ProjectDocumentationBlock) => {
+        setDocBlockToArchive(block);
+        setIsArchiveDocOpen(true);
+    };
+
+    const handleConfirmArchiveBlock = async () => {
+        if (!project || !docBlockToArchive) return;
+        try {
+            await archiveProjectDocBlockOnClient(
+                project.id,
+                slug,
+                docBlockToArchive.id,
+                docBlockToArchive.updatedAt
+            );
+            setToastMessage("จัดเก็บเอกสารสำเร็จ");
+            setShowToast(true);
+            setIsArchiveDocOpen(false);
+            setDocBlockToArchive(null);
+            docBlocksState.refetch();
+        } catch (err: unknown) {
+            console.error(err);
+            if (err instanceof ProjectDocBlockMutationException) {
+                setToastMessage(`จัดเก็บไม่สำเร็จ: ${err.message}`);
+            } else {
+                setToastMessage("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+            }
+            setShowToast(true);
+        }
     };
 
     const handleConfirmDeleteBlock = () => {
-        if (!docToDelete) return;
-        const allBlocks = getStoredDocBlocks();
-        const filtered = allBlocks.filter(b => b.id !== docToDelete);
-        saveStoredDocBlocks(filtered);
-        setToastMessage("ลบบล็อกเอกสารเรียบร้อยแล้ว");
+        setToastMessage("โหมดอ่านอย่างเดียว — การลบ Project Documentation ยังไม่เปิดใช้");
         setShowToast(true);
         setIsDeleteDocOpen(false);
-        setDocToDelete(null);
-        loadDocBlocks();
+    };
+
+    const handleRestoreBlock = async (block: ProjectDocumentationBlock) => {
+        if (!project) return;
+        try {
+            await restoreProjectDocBlockOnClient(
+                project.id,
+                slug,
+                block.id,
+                block.updatedAt
+            );
+            setToastMessage("กู้คืนเอกสารสำเร็จ");
+            setShowToast(true);
+            docBlocksState.refetch();
+        } catch (err: unknown) {
+            console.error(err);
+            if (err instanceof ProjectDocBlockMutationException) {
+                setToastMessage(`กู้คืนไม่สำเร็จ: ${err.message}`);
+            } else {
+                setToastMessage("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+            }
+            setShowToast(true);
+        }
     };
 
     // --- Project Context and Decisions Actions (ARBOR-AGENT-001) ---
@@ -1185,8 +1300,8 @@ export default function ProjectDetailClient() {
                 const data = await res.json();
                 alert(`ล้มเหลว: ${data.error}`);
             }
-        } catch (err: any) {
-            alert(`เกิดข้อผิดพลาด: ${err.message}`);
+        } catch (error: unknown) {
+            alert(`เกิดข้อผิดพลาด: ${errorMessage(error, "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้")}`);
         } finally {
             setSavingContext(false);
         }
@@ -1221,13 +1336,16 @@ export default function ProjectDetailClient() {
                 setNewDecisionImpact("");
                 // Reload decisions list
                 const decRes = await fetch(`/api/projects/${slug}/decisions`);
-                if (decRes.ok) setDecisions(await decRes.json());
+                if (decRes.ok) {
+                    const decisionsData: unknown = await decRes.json();
+                    setDecisions(projectDecisionsFrom(decisionsData));
+                }
             } else {
                 const data = await res.json();
                 alert(`ล้มเหลว: ${data.error}`);
             }
-        } catch (err: any) {
-            alert(`เกิดข้อผิดพลาด: ${err.message}`);
+        } catch (error: unknown) {
+            alert(`เกิดข้อผิดพลาด: ${errorMessage(error, "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้")}`);
         } finally {
             setSavingDecision(false);
         }
@@ -1248,25 +1366,20 @@ export default function ProjectDetailClient() {
                 setShowToast(true);
                 // Reload decisions list
                 const decRes = await fetch(`/api/projects/${slug}/decisions`);
-                if (decRes.ok) setDecisions(await decRes.json());
+                if (decRes.ok) {
+                    const decisionsData: unknown = await decRes.json();
+                    setDecisions(projectDecisionsFrom(decisionsData));
+                }
             } else {
                 const data = await res.json();
                 alert(`ล้มเหลว: ${data.error}`);
             }
-        } catch (err: any) {
-            alert(`เกิดข้อผิดพลาด: ${err.message}`);
+        } catch (error: unknown) {
+            alert(`เกิดข้อผิดพลาด: ${errorMessage(error, "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้")}`);
         }
     };
 
     // --- Arbor Assistant Parser Engine & Methods ---
-    const handleOpenArbor = () => {
-        setArborSourceText("");
-        setArborSelectedType("auto");
-        setArborDraftBlock(null);
-        setShowArborPreview(false);
-        setIsArborModalOpen(true);
-    };
-
     const handleGenerateArborDraft = () => {
         if (!arborSourceText.trim()) {
             alert("กรุณาวางข้อความดิบ");
@@ -1274,7 +1387,7 @@ export default function ProjectDetailClient() {
         }
 
         const cleanText = arborSourceText.trim();
-        
+
         // 1. Detect Type
         let detectedType: ProjectDocBlockType = "process_note";
         if (arborSelectedType === "auto") {
@@ -1321,9 +1434,9 @@ export default function ProjectDetailClient() {
         const lines = cleanText.split("\n");
         const nextActionLine = lines.find(l => {
             const lowerLine = l.toLowerCase();
-            return lowerLine.includes("todo") || 
-                   lowerLine.includes("next step") || 
-                   lowerLine.includes("next action") || 
+            return lowerLine.includes("todo") ||
+                   lowerLine.includes("next step") ||
+                   lowerLine.includes("next action") ||
                    lowerLine.includes("future work") ||
                    lowerLine.includes("todo list");
         });
@@ -1378,14 +1491,14 @@ export default function ProjectDetailClient() {
             status: "active",
             createdAt: activeDocBlock ? activeDocBlock.createdAt : now,
             updatedAt: now,
-            
+
             // source metadata
             sourceText: cleanText,
             sourceExcerpt: cleanText.length > 300 ? cleanText.substring(0, 297) + "..." : cleanText,
-            sourceType: cleanText.toLowerCase().includes("walkthrough") ? "walkthrough" : 
-                        cleanText.toLowerCase().includes("commit") ? "commit_log" : 
+            sourceType: cleanText.toLowerCase().includes("walkthrough") ? "walkthrough" :
+                        cleanText.toLowerCase().includes("commit") ? "commit_log" :
                         cleanText.toLowerCase().includes("qa") ? "qa_report" : "manual_paste",
-            generatedBy: "arbor",
+            generatedBy: "arbor_assistant",
             reviewedByUser: true,
             appliedAt: now
         };
@@ -1394,34 +1507,47 @@ export default function ProjectDetailClient() {
         setShowArborPreview(true);
     };
 
-    const handleApplyArborDraft = () => {
-        if (!arborDraftBlock) return;
-        
-        const allBlocks = getStoredDocBlocks();
-        
-        if (activeDocBlock) {
-            // Edit existing block
-            const updated = allBlocks.map(b => {
-                if (b.id === activeDocBlock.id) {
-                    return arborDraftBlock;
+    const handleApplyArborDraft = async () => {
+        if (!project || !arborDraftBlock) return;
+        try {
+            await createProjectDocBlockOnClient(
+                project.id,
+                slug,
+                {
+                    projectSlug: slug,
+                    type: arborDraftBlock.type,
+                    title: arborDraftBlock.title.trim(),
+                    date: arborDraftBlock.date,
+                    summary: arborDraftBlock.summary.trim(),
+                    details: arborDraftBlock.details,
+                    evidenceLinks: arborDraftBlock.evidenceLinks,
+                    relatedFiles: arborDraftBlock.relatedFiles,
+                    status: "active",
+                    nextAction: arborDraftBlock.nextAction || undefined,
+                    generatedBy: "arbor_assistant",
+                    reviewedByUser: true,
+                    sourceText: arborDraftBlock.sourceText,
+                    sourceExcerpt: arborDraftBlock.sourceExcerpt,
+                    sourceType: arborDraftBlock.sourceType,
+                    appliedAt: new Date().toISOString()
                 }
-                return b;
-            });
-            saveStoredDocBlocks(updated);
-            setToastMessage("อัปเดตบล็อกเอกสารด้วย Arbor สำเร็จ");
-        } else {
-            // New block
-            allBlocks.push(arborDraftBlock);
-            saveStoredDocBlocks(allBlocks);
-            setToastMessage("สร้างบล็อกเอกสารด้วย Arbor สำเร็จ");
-        }
+            );
 
-        setShowToast(true);
-        setIsArborModalOpen(false);
-        setArborDraftBlock(null);
-        setShowArborPreview(false);
-        setActiveDocBlock(null);
-        loadDocBlocks();
+            setToastMessage("บันทึกเอกสารจาก Arbor Assistant สำเร็จ");
+            setShowToast(true);
+            setIsArborModalOpen(false);
+            setArborDraftBlock(null);
+            setShowArborPreview(false);
+            docBlocksState.refetch();
+        } catch (err: unknown) {
+            console.error(err);
+            if (err instanceof ProjectDocBlockMutationException) {
+                setToastMessage(`บันทึกไม่สำเร็จ: ${err.message}`);
+            } else {
+                setToastMessage("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+            }
+            setShowToast(true);
+        }
     };
 
     const generateArborContextMarkdown = () => {
@@ -1469,9 +1595,9 @@ export default function ProjectDetailClient() {
         const roadmapDoc = projectDocs.find(d => d.title?.includes("Content Roadmap"));
         const publishLogDoc = projectDocs.find(d => d.title?.includes("Publish Log"));
 
-        const extractDocExcerpt = (doc: any, maxLines: number = 30): string => {
+        const extractDocExcerpt = (doc: Doc | undefined, maxLines: number = 30): string => {
             if (!doc) return "N/A";
-            const md = (doc as any).content_md;
+            const md = doc.content_md;
             if (!md || typeof md !== "string") return `(Document exists: ${doc.title}, but content not loaded)`;
             const lines = md.split("\n").filter((l: string) => l.trim().length > 0);
             const excerpt = lines.slice(0, maxLines).join("\n");
@@ -1520,7 +1646,7 @@ export default function ProjectDetailClient() {
 - Name: ${project.name}
 - Slug: ${slug}
 - Category: ${cat}
-- Description: ${(project as any).description || "N/A"}
+- Description: ${stringProperty(project, "description") || "N/A"}
 
 # Current Status
 - Detailed Status: ${detStatus}
@@ -1578,7 +1704,7 @@ ${suggestedNextStr}
     // Filter & Search computation
     const filteredDocBlocks = useMemo(() => {
         return docBlocks.filter(b => {
-            const matchSearch = b.title.toLowerCase().includes(docSearch.toLowerCase()) || 
+            const matchSearch = b.title.toLowerCase().includes(docSearch.toLowerCase()) ||
                                 b.summary.toLowerCase().includes(docSearch.toLowerCase()) ||
                                 b.details.toLowerCase().includes(docSearch.toLowerCase());
             const matchType = docTypeFilter === "all" || b.type === docTypeFilter;
@@ -1716,7 +1842,7 @@ ${suggestedNextStr}
         const allItems = getStoredRoadmapItems();
         const now = new Date().toISOString();
         const newId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-        
+
         const newOrder = (item.orderIndex || 0) + 5;
 
         const clonedItem: ProjectContentRoadmapItem = {
@@ -1823,10 +1949,10 @@ ${suggestedNextStr}
     const handleOpenEditDeliverable = (item: ProjectItem) => {
         setActiveDelItem(item);
         setDelTitle(item.title);
-        setDelStatus(item.status as any);
+        setDelStatus(item.status);
         setDelIsMilestone(item.is_milestone === 1);
         setDelWorkstream(item.workstream || "");
-        setDelScheduleBucket(item.schedule_bucket as any || "none");
+        setDelScheduleBucket(item.schedule_bucket || "none");
         setDelStartDate(item.start_date || "");
         setDelEndDate(item.end_date || "");
         setDelNotes(item.notes || "");
@@ -1929,10 +2055,10 @@ ${suggestedNextStr}
     const handleApplyArborRoadmap = () => {
         if (arborRoadmapDrafts.length === 0) return;
         const allItems = getStoredRoadmapItems();
-        
+
         const merged = [...allItems, ...arborRoadmapDrafts];
         saveStoredRoadmapItems(merged);
-        
+
         setToastMessage(`นำเข้าแผนงานคอนเทนต์สำเร็จ ${arborRoadmapDrafts.length} รายการ`);
         setShowToast(true);
         setIsArborRoadmapOpen(false);
@@ -1941,7 +2067,11 @@ ${suggestedNextStr}
         loadRoadmapItems();
     };
 
-    const handleUpdateDraftCell = (index: number, field: keyof ProjectContentRoadmapItem, value: any) => {
+    const handleUpdateDraftCell = <Key extends keyof ProjectContentRoadmapItem>(
+        index: number,
+        field: Key,
+        value: ProjectContentRoadmapItem[Key]
+    ) => {
         setArborRoadmapDrafts(prev => {
             const copy = [...prev];
             copy[index] = {
@@ -1985,12 +2115,12 @@ ${suggestedNextStr}
     // Filter & Search Roadmap Items
     const filteredRoadmapItems = useMemo(() => {
         return roadmapItems.filter(item => {
-            const matchSearch = 
+            const matchSearch =
                 item.episodeCode.toLowerCase().includes(roadmapSearch.toLowerCase()) ||
                 item.title.toLowerCase().includes(roadmapSearch.toLowerCase()) ||
                 (item.seriesOrTheme && item.seriesOrTheme.toLowerCase().includes(roadmapSearch.toLowerCase())) ||
                 (item.notes && item.notes.toLowerCase().includes(roadmapSearch.toLowerCase()));
-            
+
             const matchStatus = roadmapStatusFilter === "all" || item.status === roadmapStatusFilter;
             const matchType = roadmapTypeFilter === "all" || item.contentType === roadmapTypeFilter;
             const matchPriority = roadmapPriorityFilter === "all" || item.priority === roadmapPriorityFilter;
@@ -2137,9 +2267,9 @@ ${suggestedNextStr}
                 setToastMessage(`ล้มเหลวในการสร้างรายการ: ${errorMsg}`);
                 setShowToast(true);
             }
-        } catch (err: any) {
-            console.error("Error creating backlog item:", err);
-            setToastMessage(`เกิดข้อผิดพลาดในการเชื่อมต่อ: ${err.message || "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้"}`);
+        } catch (error: unknown) {
+            console.error("Error creating backlog item:", error);
+            setToastMessage(`เกิดข้อผิดพลาดในการเชื่อมต่อ: ${errorMessage(error, "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้")}`);
             setShowToast(true);
         } finally {
             setAddingItem(false);
@@ -2209,8 +2339,8 @@ ${suggestedNextStr}
                         } catch {}
                         failedItems.push(`"${item.title}" (${errText})`);
                     }
-                } catch (err: any) {
-                    failedItems.push(`"${item.title}" (${err.message || "Network Error"})`);
+                } catch (error: unknown) {
+                    failedItems.push(`"${item.title}" (${errorMessage(error, "Network Error")})`);
                 }
             }
 
@@ -2241,7 +2371,13 @@ ${suggestedNextStr}
             return;
         }
 
-        // Backlog-shaped rejection check
+        const headingCount = countTopLevelHeadings(text);
+        if (headingCount > 1) {
+            setToastMessage("ระบบรองรับการนำเข้าครั้งละ 1 บันทึกเท่านั้น (Single-record Import Log) กรุณาลดข้อมูลให้เหลือหัวข้อเดียวเพื่อนำเข้า หรือนำเข้าทีละบันทึก");
+            setShowToast(true);
+            return;
+        }
+
         if (isBacklogText(text)) {
             setToastMessage("ข้อความนี้ดูเหมือนรายการ Backlog กรุณาใช้ Backlog Import");
             setShowToast(true);
@@ -2252,39 +2388,47 @@ ${suggestedNextStr}
         setParsedLog(parsed);
     };
 
-    const handleSaveLogImport = () => {
-        if (!parsedLog || !parsedLog.title.trim()) return;
+    const handleSaveLogImport = async () => {
+        if (!project) return;
+        if (!parsedLog || !parsedLog.title.trim() || !parsedLog.details.trim()) {
+            return;
+        }
 
-        const allBlocks = getStoredDocBlocks();
-        const now = new Date().toISOString();
-        const newId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-        
-        const newBlock: ProjectDocumentationBlock = {
-            id: newId,
-            projectSlug: slug,
-            type: "process_note",
-            title: parsedLog.title.trim(),
-            date: new Date().toISOString().split("T")[0],
-            summary: "นำเข้าจาก Arbor Project Log",
-            details: parsedLog.details.trim(),
-            evidenceLinks: [],
-            relatedFiles: [],
-            status: "active",
-            createdAt: now,
-            updatedAt: now
-        };
-        
-        allBlocks.push(newBlock);
-        saveStoredDocBlocks(allBlocks);
-        
-        loadDocBlocks();
-        
-        setToastMessage("นำเข้าบล็อกประวัติ (Project Log) เรียบร้อยแล้ว");
-        setShowToast(true);
-        
-        setIsLogImportOpen(false);
-        setLogImportText("");
-        setParsedLog(null);
+        try {
+            await createProjectDocBlockOnClient(
+                project.id,
+                slug,
+                {
+                    projectSlug: slug,
+                    type: "process_note",
+                    title: parsedLog.title.trim(),
+                    date: new Date().toISOString().split("T")[0],
+                    summary: "Imported from Arbor Log",
+                    details: parsedLog.details,
+                    evidenceLinks: [],
+                    relatedFiles: [],
+                    status: "active",
+                    nextAction: undefined,
+                    generatedBy: undefined,
+                    reviewedByUser: true
+                }
+            );
+
+            setToastMessage("นำเข้าบล็อกเอกสารสำเร็จ");
+            setShowToast(true);
+            setIsLogImportOpen(false);
+            setLogImportText("");
+            setParsedLog(null);
+            docBlocksState.refetch();
+        } catch (err: unknown) {
+            console.error(err);
+            if (err instanceof ProjectDocBlockMutationException) {
+                setToastMessage(`นำเข้าไม่สำเร็จ: ${err.message}`);
+            } else {
+                setToastMessage("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+            }
+            setShowToast(true);
+        }
     };
 
     if (loading) return <PageShell><div className="p-20 text-center text-neutral-400 italic font-medium">Loading project details...</div></PageShell>;
@@ -2348,7 +2492,7 @@ ${suggestedNextStr}
                 }
                 actions={
                     <div className="flex items-center gap-2">
-                        <button 
+                        <button
                             onClick={openRegistryEdit}
                             className="flex items-center gap-1.5 px-4 py-2 bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 rounded-xl text-xs font-black hover:opacity-90 transition-all shadow-sm active:scale-95"
                             title="Edit Project Registry Info"
@@ -2356,7 +2500,7 @@ ${suggestedNextStr}
                             <Edit2 className="w-3.5 h-3.5" />
                             แก้ไข Registry
                         </button>
-                        <button 
+                        <button
                             onClick={() => setIsArchiveOpen(true)}
                             className={`p-2.5 rounded-xl bg-white border border-neutral-200 transition-all active:scale-95 shadow-sm dark:bg-neutral-900 dark:border-neutral-800 ${
                                 project.status === 'done' ? "text-green-600 border-green-200 bg-green-50 dark:bg-green-950/20" : "text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
@@ -2366,7 +2510,7 @@ ${suggestedNextStr}
                         >
                             <Archive className="w-4 h-4" />
                         </button>
-                        <button 
+                        <button
                             onClick={() => setIsDeleteOpen(true)}
                             className="p-2.5 rounded-xl bg-white border border-neutral-200 text-neutral-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 dark:bg-neutral-900 dark:border-neutral-800 transition-all active:scale-95 shadow-sm"
                             title="Delete Project"
@@ -2379,33 +2523,33 @@ ${suggestedNextStr}
 
             {/* Tabs selector */}
             <div className="w-full max-w-[1600px] mx-auto flex items-center gap-1 bg-neutral-100 dark:bg-neutral-900/60 p-1 rounded-2xl w-fit mt-6 border border-neutral-200 dark:border-neutral-800">
-                <button 
+                <button
                     onClick={() => setActiveTab("deliverables")}
                     className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all ${
-                        activeTab === "deliverables" 
-                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm" 
+                        activeTab === "deliverables"
+                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm"
                             : "text-neutral-400 hover:text-neutral-600 dark:hover:text-slate-200"
                     }`}
                 >
                     <Layout className="w-3.5 h-3.5" />
                     Deliverables & Docs
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab("context")}
                     className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all ${
-                        activeTab === "context" 
-                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm" 
+                        activeTab === "context"
+                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm"
                             : "text-neutral-400 hover:text-neutral-600 dark:hover:text-slate-200"
                     }`}
                 >
                     <BookOpen className="w-3.5 h-3.5" />
                     Context & Decisions
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab("loops")}
                     className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all ${
-                        activeTab === "loops" 
-                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm" 
+                        activeTab === "loops"
+                            ? "bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-sm"
                             : "text-neutral-400 hover:text-neutral-600 dark:hover:text-slate-200"
                     }`}
                 >
@@ -2417,10 +2561,10 @@ ${suggestedNextStr}
             {/* Main content grid */}
             {activeTab === "deliverables" && (
                 <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
-                
+
                 {/* Main Deliverables & Milestones (Left side) */}
                 <div className="xl:col-span-9 space-y-10">
-                    
+
                     {/* Project Items Form */}
                     <div className="bg-theme-panel p-4 rounded-3xl border border-neutral-200 shadow-sm focus-within:shadow-md transition-shadow">
                         <form onSubmit={handleAddItem} className="flex gap-2">
@@ -2434,8 +2578,8 @@ ${suggestedNextStr}
                                 />
                                 <Plus className="absolute left-3.5 top-3.5 h-5 w-5 text-neutral-400" />
                             </div>
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 disabled={!newItemTitle.trim() || addingItem}
                                 className="bg-black text-white dark:bg-white dark:text-black px-6 py-3 rounded-2xl text-sm font-black disabled:opacity-50 transition-all hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-lg active:scale-95"
                             >
@@ -2474,7 +2618,7 @@ ${suggestedNextStr}
                             </div>
                             <span className="text-[10px] font-black text-neutral-300 uppercase">{otherItems.length} Items</span>
                         </div>
-                        
+
                         {otherItems.length === 0 ? (
                             <div className="text-center py-20 bg-neutral-50/50 dark:bg-neutral-900/10 rounded-3xl border border-dashed border-neutral-200">
                                 <p className="text-neutral-400 font-medium italic text-sm">No items yet. Quick add above to start building.</p>
@@ -2501,27 +2645,12 @@ ${suggestedNextStr}
                                 <p className="text-xs text-neutral-400 font-medium">บันทึกขั้นตอนการทำงาน ประวัติการตัดสินใจ ข้อตกลง และประวัติระบบ</p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button
-                                    onClick={handleOpenAddManual}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-neutral-200 text-xs font-black uppercase tracking-wider hover:border-neutral-900 hover:text-black dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white dark:hover:border-neutral-700 shadow-sm active:scale-95 transition-all"
-                                >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    Add Block
-                                </button>
-                                <button
-                                    onClick={() => setIsLogImportOpen(true)}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-neutral-200 text-xs font-black uppercase tracking-wider hover:border-neutral-900 hover:text-black dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white dark:hover:border-neutral-700 shadow-sm active:scale-95 transition-all"
-                                >
-                                    <FileText className="w-3.5 h-3.5 text-blue-500" />
-                                    Import Log
-                                </button>
-                                <button
-                                    onClick={handleOpenArbor}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black text-xs font-black uppercase tracking-wider hover:opacity-90 shadow-lg active:scale-95 transition-all"
-                                >
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    Arbor Assistant
-                                </button>
+                                <ProjectDocBlocksReadOnlyActions
+                                    source={docBlocksState.source}
+                                    onAddBlock={handleOpenAddBlock}
+                                    onImportLog={handleOpenImportLog}
+                                    onArborAssistant={handleOpenArborAssistant}
+                                />
                                 <button
                                     onClick={() => setIsContextSummaryOpen(true)}
                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 text-white text-xs font-black uppercase tracking-wider hover:bg-purple-700 shadow-lg active:scale-95 transition-all"
@@ -2530,6 +2659,15 @@ ${suggestedNextStr}
                                     Project Context
                                 </button>
                             </div>
+                        </div>
+
+                        <div className="px-2 space-y-1">
+                            <ProjectDocBlocksSourceStatus state={docBlocksState} />
+                            {docBlocksState.source !== "api" && (
+                                <p className="text-[11px] text-amber-700 font-semibold">
+                                    ไม่สามารถบันทึกได้ขณะใช้ข้อมูลสำรองจากเบราว์เซอร์
+                                </p>
+                            )}
                         </div>
 
                         {/* Search and Filters Controls */}
@@ -2545,6 +2683,15 @@ ${suggestedNextStr}
                                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
                             </div>
                             <div className="flex gap-2">
+                                <select
+                                    value={docStatusFilter}
+                                    onChange={e => setDocStatusFilter(e.target.value as "active" | "archived" | "all")}
+                                    className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-neutral-400"
+                                >
+                                    <option value="active">ใช้งานอยู่ (Active)</option>
+                                    <option value="archived">จัดเก็บแล้ว (Archived)</option>
+                                    <option value="all">ทั้งหมด (All)</option>
+                                </select>
                                 <select
                                     value={docTypeFilter}
                                     onChange={e => setDocTypeFilter(e.target.value)}
@@ -2575,19 +2722,22 @@ ${suggestedNextStr}
                         </div>
 
                         {/* Blocks list */}
-                        {filteredDocBlocks.length === 0 ? (
+                        {docBlocksState.status !== "ready" ? null : filteredDocBlocks.length === 0 ? (
                             <div className="text-center py-16 bg-neutral-50/50 dark:bg-neutral-900/10 rounded-3xl border border-dashed border-neutral-200/80">
                                 <BookOpen className="w-8 h-8 text-neutral-300 mx-auto mb-2.5" />
-                                <p className="text-neutral-400 font-medium italic text-sm dark:text-neutral-500">
-                                    {docSearch || docTypeFilter !== "all" 
-                                        ? "ไม่พบบล็อกเอกสารที่สอดคล้องกับตัวกรอง"
-                                        : "ยังไม่มีประวัติหรือบล็อกเอกสารใด ๆ เริ่มเพิ่มข้อมูลหรือให้ Arbor ช่วยถอดความ"}
-                                </p>
+                                <ProjectDocBlocksEmptyState filtered={Boolean(docSearch || docTypeFilter !== "all")} />
                             </div>
                         ) : docViewMode === "card" ? (
                             <div className="grid grid-cols-1 gap-4">
                                 {filteredDocBlocks.map(block => (
-                                    <DocBlockCard key={block.id} block={block} onEdit={handleOpenEdit} onDelete={handleTriggerDelete} />
+                                    <DocBlockCard
+                                        key={block.id}
+                                        block={block}
+                                        source={docBlocksState.source}
+                                        onEdit={handleOpenEditDocBlock}
+                                        onArchive={handleOpenArchiveDoc}
+                                        onRestore={handleRestoreBlock}
+                                    />
                                 ))}
                             </div>
                         ) : (
@@ -2601,7 +2751,7 @@ ${suggestedNextStr}
                                                 <th className="px-4 py-3">หัวข้อ</th>
                                                 <th className="px-4 py-3">สรุปย่อ</th>
                                                 <th className="px-4 py-3">สถานะ</th>
-                                                <th className="px-4 py-3 text-right">จัดการ</th>
+                                                <th className="px-4 py-3"></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-neutral-200/60 dark:divide-neutral-800/60">
@@ -2614,14 +2764,7 @@ ${suggestedNextStr}
                                                         </span>
                                                     </td>
                                                     <td className="px-4 py-3 max-w-[200px] truncate">
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => handleOpenEdit(block)} 
-                                                            className="font-black text-neutral-900 dark:text-neutral-100 hover:text-black dark:hover:text-white hover:underline cursor-pointer transition-colors text-left outline-none focus:underline"
-                                                            title={`ดู/แก้ไขเอกสาร ${block.title}`}
-                                                        >
-                                                            {block.title}
-                                                        </button>
+                                                        <span className="font-black text-neutral-900 dark:text-neutral-100">{block.title}</span>
                                                     </td>
                                                     <td className="px-4 py-3 max-w-[250px] truncate text-neutral-500 dark:text-neutral-400">{block.summary}</td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
@@ -2629,13 +2772,37 @@ ${suggestedNextStr}
                                                             {block.status}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
-                                                        <button onClick={() => handleOpenEdit(block)} className="text-neutral-400 hover:text-black dark:hover:text-white inline-block p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-colors" title="แก้ไข">
-                                                            <Edit2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button onClick={() => handleTriggerDelete(block.id)} className="text-neutral-400 hover:text-red-600 inline-block p-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors" title="ลบ">
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                                                        {docBlocksState.source === "api" && (
+                                                            <div className="flex justify-end gap-1.5">
+                                                                {block.status === "archived" ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleRestoreBlock(block)}
+                                                                        className="px-2 py-0.5 text-[9px] font-black uppercase text-green-600 bg-green-50 rounded hover:bg-green-100 transition-all cursor-pointer"
+                                                                    >
+                                                                        Restore
+                                                                    </button>
+                                                                ) : (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleOpenEditDocBlock(block)}
+                                                                            className="px-2 py-0.5 text-[9px] font-black uppercase text-neutral-600 bg-neutral-100 rounded hover:bg-neutral-200 transition-all cursor-pointer"
+                                                                        >
+                                                                            Edit
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleOpenArchiveDoc(block)}
+                                                                            className="px-2 py-0.5 text-[9px] font-black uppercase text-amber-700 bg-amber-50 rounded hover:bg-amber-100 transition-all cursor-pointer"
+                                                                        >
+                                                                            Archive
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -2834,16 +3001,16 @@ ${suggestedNextStr}
                                                         )}
                                                     </td>
                                                     <td className="px-3.5 py-3 whitespace-nowrap text-right space-x-1.5">
-                                                        <button 
-                                                            onClick={() => handleDuplicateRoadmap(item)} 
+                                                        <button
+                                                            onClick={() => handleDuplicateRoadmap(item)}
                                                             className="text-neutral-400 hover:text-black dark:hover:text-white p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
                                                             title="Duplicate"
                                                         >
                                                             <Copy className="w-3.5 h-3.5" />
                                                         </button>
                                                         {item.status !== "published" && item.status !== "tracking" && (
-                                                            <button 
-                                                                onClick={() => handleMarkAsPublished(item)} 
+                                                            <button
+                                                                onClick={() => handleMarkAsPublished(item)}
                                                                 className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 p-1 rounded-md transition-colors font-black text-[9px] border border-green-200 dark:border-green-900/30 uppercase tracking-widest px-1.5"
                                                                 title="Mark as Published"
                                                             >
@@ -2851,23 +3018,23 @@ ${suggestedNextStr}
                                                             </button>
                                                         )}
                                                         {item.status === "published" && (
-                                                            <button 
-                                                                onClick={() => handleMarkAsTracking(item)} 
+                                                            <button
+                                                                onClick={() => handleMarkAsTracking(item)}
                                                                 className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 p-1 rounded-md transition-colors font-black text-[9px] border border-blue-200 dark:border-blue-900/30 uppercase tracking-widest px-1.5"
                                                                 title="Mark as Tracking"
                                                             >
                                                                 Track
                                                             </button>
                                                         )}
-                                                        <button 
-                                                            onClick={() => handleOpenEditRoadmap(item)} 
+                                                        <button
+                                                            onClick={() => handleOpenEditRoadmap(item)}
                                                             className="text-neutral-400 hover:text-black dark:hover:text-white p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
                                                             title="Edit"
                                                         >
                                                             <Edit2 className="w-3.5 h-3.5" />
                                                         </button>
-                                                        <button 
-                                                            onClick={() => handleTriggerDeleteRoadmap(item.id)} 
+                                                        <button
+                                                            onClick={() => handleTriggerDeleteRoadmap(item.id)}
                                                             className="text-neutral-400 hover:text-red-650 p-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors"
                                                             title="Delete"
                                                         >
@@ -3199,8 +3366,8 @@ ${suggestedNextStr}
                             ) : (
                                 <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
                                     {decisions.map((dec) => (
-                                        <div 
-                                            key={dec.id} 
+                                        <div
+                                            key={dec.id}
                                             className="p-4 bg-neutral-50 dark:bg-neutral-950/20 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 space-y-3 relative group"
                                         >
                                             <div className="flex justify-between items-start gap-4">
@@ -3336,7 +3503,7 @@ ${suggestedNextStr}
             {/* Registry Edit Panel Modal */}
             <Modal isOpen={isRegistryEditOpen} onClose={() => setIsRegistryEditOpen(false)} title="แก้ไขข้อมูลโครงการ (Project Registry)">
                 <div className="p-3 space-y-5 max-h-[82vh] overflow-y-auto">
-                    
+
                     {/* Project Name */}
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">ชื่อโครงการ (Project Name)</label>
@@ -3464,16 +3631,16 @@ ${suggestedNextStr}
 
                     {/* Buttons */}
                     <div className="flex gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
-                        <button 
-                            type="button" 
-                            onClick={() => setIsRegistryEditOpen(false)} 
+                        <button
+                            type="button"
+                            onClick={() => setIsRegistryEditOpen(false)}
                             className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all"
                         >
                             ยกเลิก
                         </button>
-                        <button 
-                            type="button" 
-                            onClick={handleSaveRegistryMetadata} 
+                        <button
+                            type="button"
+                            onClick={handleSaveRegistryMetadata}
                             disabled={actionLoading || !editName.trim()}
                             className="flex-1 px-4 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black text-sm font-black hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all disabled:opacity-50 shadow-md"
                         >
@@ -3498,6 +3665,18 @@ ${suggestedNextStr}
                 confirmText="จัดเก็บโครงการ"
                 onConfirm={handleArchive}
                 onCancel={() => setIsArchiveOpen(false)}
+            />
+
+            <ConfirmDialog
+                isOpen={isArchiveDocOpen}
+                title="Archive Documentation Block"
+                message={`คุณแน่ใจหรือไม่ว่าต้องการจัดเก็บเอกสาร "${docBlockToArchive?.title}"?`}
+                confirmText="จัดเก็บเอกสาร (Archive)"
+                onConfirm={handleConfirmArchiveBlock}
+                onCancel={() => {
+                    setIsArchiveDocOpen(false);
+                    setDocBlockToArchive(null);
+                }}
             />
 
             {/* Manual Add / Edit Block Modal */}
@@ -3643,10 +3822,11 @@ ${suggestedNextStr}
                         </button>
                         <button
                             type="button"
+                            disabled={savingDocBlock}
                             onClick={handleSaveBlock}
-                            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl text-xs font-black transition-all active:scale-95 shadow-sm"
+                            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl text-xs font-black transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            บันทึกบล็อก (Save Block)
+                            {savingDocBlock ? "กำลังบันทึก..." : "บันทึกบล็อก (Save Block)"}
                         </button>
                     </div>
                 </div>
@@ -3675,7 +3855,11 @@ ${suggestedNextStr}
                                 <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ประเภทเอกสารปลายทาง</label>
                                 <select
                                     value={arborSelectedType}
-                                    onChange={e => setArborSelectedType(e.target.value as any)}
+                                    onChange={e => {
+                                        if (isProjectDocBlockTypeOrAuto(e.target.value)) {
+                                            setArborSelectedType(e.target.value);
+                                        }
+                                    }}
                                     className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2.5 text-xs font-bold outline-none focus:border-neutral-400"
                                 >
                                     <option value="auto">ตรวจจับอัตโนมัติ (Auto Detect Type)</option>
@@ -3782,15 +3966,15 @@ ${suggestedNextStr}
                                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-semibold outline-none font-mono"
                                         />
                                     </div>
-                                    
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-medium">
                                         <div className="space-y-1">
                                             <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider block">Evidence Links (บรรทัดละ 1 ลิงก์)</span>
                                             <textarea
                                                 value={arborDraftBlock.evidenceLinks.join("\n")}
-                                                onChange={e => setArborDraftBlock({ 
-                                                    ...arborDraftBlock, 
-                                                    evidenceLinks: e.target.value.split("\n").map(s => s.trim()).filter(Boolean) 
+                                                onChange={e => setArborDraftBlock({
+                                                    ...arborDraftBlock,
+                                                    evidenceLinks: e.target.value.split("\n").map(s => s.trim()).filter(Boolean)
                                                 })}
                                                 rows={2}
                                                 className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs outline-none font-mono"
@@ -3800,9 +3984,9 @@ ${suggestedNextStr}
                                             <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider block">Related Files (บรรทัดละ 1 ไฟล์)</span>
                                             <textarea
                                                 value={arborDraftBlock.relatedFiles.join("\n")}
-                                                onChange={e => setArborDraftBlock({ 
-                                                    ...arborDraftBlock, 
-                                                    relatedFiles: e.target.value.split("\n").map(s => s.trim()).filter(Boolean) 
+                                                onChange={e => setArborDraftBlock({
+                                                    ...arborDraftBlock,
+                                                    relatedFiles: e.target.value.split("\n").map(s => s.trim()).filter(Boolean)
                                                 })}
                                                 rows={2}
                                                 className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs outline-none font-mono"
@@ -3863,7 +4047,6 @@ ${suggestedNextStr}
                 onConfirm={handleConfirmDeleteBlock}
                 onCancel={() => {
                     setIsDeleteDocOpen(false);
-                    setDocToDelete(null);
                 }}
             />
 
@@ -3959,7 +4142,11 @@ ${suggestedNextStr}
                             <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">ระดับความสำคัญ (Priority)</label>
                             <select
                                 value={rmPriority}
-                                onChange={e => setRmPriority(e.target.value as any)}
+                                onChange={e => {
+                                    if (isRoadmapPriority(e.target.value)) {
+                                        setRmPriority(e.target.value);
+                                    }
+                                }}
                                 className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                             >
                                 <option value="high">High</option>
@@ -4215,7 +4402,11 @@ ${suggestedNextStr}
                                                     <td className="px-2 py-1.5">
                                                         <select
                                                             value={draft.contentType}
-                                                            onChange={e => handleUpdateDraftCell(idx, "contentType", e.target.value)}
+                                                            onChange={e => {
+                                                                if (isContentType(e.target.value)) {
+                                                                    handleUpdateDraftCell(idx, "contentType", e.target.value);
+                                                                }
+                                                            }}
                                                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         >
                                                             {Object.entries(CONTENT_TYPE_LABELS).map(([k, label]) => (
@@ -4226,7 +4417,11 @@ ${suggestedNextStr}
                                                     <td className="px-2 py-1.5">
                                                         <select
                                                             value={draft.contentLayer}
-                                                            onChange={e => handleUpdateDraftCell(idx, "contentLayer", e.target.value)}
+                                                            onChange={e => {
+                                                                if (isContentLayer(e.target.value)) {
+                                                                    handleUpdateDraftCell(idx, "contentLayer", e.target.value);
+                                                                }
+                                                            }}
                                                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         >
                                                             {Object.entries(CONTENT_LAYER_LABELS).map(([k, label]) => (
@@ -4245,7 +4440,11 @@ ${suggestedNextStr}
                                                     <td className="px-2 py-1.5">
                                                         <select
                                                             value={draft.priority}
-                                                            onChange={e => handleUpdateDraftCell(idx, "priority", e.target.value)}
+                                                            onChange={e => {
+                                                                if (isRoadmapPriority(e.target.value)) {
+                                                                    handleUpdateDraftCell(idx, "priority", e.target.value);
+                                                                }
+                                                            }}
                                                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         >
                                                             <option value="high">High</option>
@@ -4257,7 +4456,11 @@ ${suggestedNextStr}
                                                     <td className="px-2 py-1.5">
                                                         <select
                                                             value={draft.status}
-                                                            onChange={e => handleUpdateDraftCell(idx, "status", e.target.value)}
+                                                            onChange={e => {
+                                                                if (isRoadmapStatus(e.target.value)) {
+                                                                    handleUpdateDraftCell(idx, "status", e.target.value);
+                                                                }
+                                                            }}
                                                             className="w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded px-2 py-1.5 text-[10px]"
                                                         >
                                                             {Object.entries(ROADMAP_STATUS_LABELS).map(([k, label]) => (
@@ -4376,7 +4579,7 @@ ${suggestedNextStr}
                     {parsedLog && (
                         <div className="space-y-4 text-left">
                             <h3 className="text-xs font-black uppercase tracking-widest text-neutral-500">Preview Parsed Project Log</h3>
-                            
+
                             <div className="border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 bg-theme-card space-y-4">
                                 {docBlocks.some(existing => existing.title.toLowerCase().trim() === parsedLog.title.toLowerCase().trim()) && (
                                     <div className="inline-flex items-center gap-1 text-[10px] font-black text-amber-600 bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 rounded-lg border border-amber-100 dark:border-amber-900/30">
@@ -4574,8 +4777,8 @@ ${suggestedNextStr}
             </Modal>
 
             {/* Deliverable / Backlog Edit Modal */}
-            <Modal 
-                isOpen={isDelModalOpen} 
+            <Modal
+                isOpen={isDelModalOpen}
                 onClose={() => setIsDelModalOpen(false)}
                 title="แก้ไข Deliverable / Backlog Item"
             >
@@ -4598,7 +4801,11 @@ ${suggestedNextStr}
                                 <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">สถานะ (Status)</label>
                                 <select
                                     value={delStatus}
-                                    onChange={(e) => setDelStatus(e.target.value as any)}
+                                    onChange={(e) => {
+                                        if (isProjectItemStatus(e.target.value)) {
+                                            setDelStatus(e.target.value);
+                                        }
+                                    }}
                                     className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
                                 >
                                     <option value="inbox">Inbox</option>
@@ -4629,7 +4836,11 @@ ${suggestedNextStr}
                                 <label className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">ช่วงเวลาประจำวัน (Schedule Bucket)</label>
                                 <select
                                     value={delScheduleBucket}
-                                    onChange={(e) => setDelScheduleBucket(e.target.value as any)}
+                                    onChange={(e) => {
+                                        if (isScheduleBucket(e.target.value)) {
+                                            setDelScheduleBucket(e.target.value);
+                                        }
+                                    }}
                                     className="w-full px-4 py-2.5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-sm font-semibold outline-none focus:border-neutral-400 dark:focus:border-neutral-700 transition-all"
                                 >
                                     <option value="none">None / ไม่ระบุ</option>
@@ -4780,23 +4991,27 @@ ${suggestedNextStr}
                 </div>
             </Modal>
 
-            <Toast 
-                isVisible={showToast} 
-                message={toastMessage} 
-                onClose={() => setShowToast(false)} 
+            <Toast
+                isVisible={showToast}
+                message={toastMessage}
+                onClose={() => setShowToast(false)}
             />
         </PageShell>
     );
 }
 
-function DocBlockCard({ 
-    block, 
-    onEdit, 
-    onDelete 
-}: { 
-    block: ProjectDocumentationBlock; 
-    onEdit: (b: ProjectDocumentationBlock) => void;
-    onDelete: (id: string) => void;
+function DocBlockCard({
+    block,
+    source,
+    onEdit,
+    onArchive,
+    onRestore
+}: {
+    block: ProjectDocumentationBlock;
+    source: "api" | "fallback" | null;
+    onEdit: (block: ProjectDocumentationBlock) => void;
+    onArchive: (block: ProjectDocumentationBlock) => void;
+    onRestore: (block: ProjectDocumentationBlock) => void;
 }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -4809,7 +5024,7 @@ function DocBlockCard({
                             {BLOCK_TYPE_LABELS[block.type]}
                         </span>
                         <span className="text-[10px] font-bold text-neutral-400">{block.date}</span>
-                        {block.generatedBy === "arbor" && (
+                        {(block.generatedBy === "arbor" || block.generatedBy === "arbor_assistant") && (
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-300 text-[9px] font-black uppercase tracking-widest border border-purple-100/50 dark:border-purple-900/30">
                                 <Sparkles className="w-2.5 h-2.5" />
                                 Arbor Draft
@@ -4822,33 +5037,49 @@ function DocBlockCard({
                         )}
                     </div>
                     <h3 className="font-black text-base text-neutral-900 dark:text-neutral-100 tracking-tight pt-1">
-                        <button 
+                        <button
                             type="button"
-                            onClick={() => onEdit(block)} 
+                            onClick={() => setIsExpanded(!isExpanded)}
                             className="hover:underline hover:text-black dark:hover:text-white transition-colors text-left outline-none cursor-pointer focus:underline"
-                            title={`ดู/แก้ไขเอกสาร ${block.title}`}
+                            title={`ดูรายละเอียดเอกสาร ${block.title}`}
                         >
                             {block.title}
                         </button>
                     </h3>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                    <button 
-                        onClick={() => onEdit(block)}
-                        className="p-2 rounded-xl text-neutral-400 hover:text-black hover:bg-neutral-50 dark:hover:bg-neutral-850 transition-all active:scale-95"
-                        title="Edit Documentation Block"
-                    >
-                        <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                        onClick={() => onDelete(block.id)}
-                        className="p-2 rounded-xl text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all active:scale-95"
-                        title="Delete Documentation Block"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                </div>
+                {source !== "api" ? (
+                    <span className="text-[10px] font-semibold text-neutral-400">Read only</span>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        {block.status === "archived" ? (
+                            <button
+                                type="button"
+                                onClick={() => onRestore(block)}
+                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-green-600 bg-green-50 dark:bg-green-950/20 rounded-xl hover:bg-green-100 transition-all cursor-pointer"
+                            >
+                                Restore
+                            </button>
+                        ) : (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => onEdit(block)}
+                                    className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-neutral-600 bg-neutral-100 hover:bg-neutral-200 dark:text-neutral-400 dark:bg-neutral-800 dark:hover:bg-neutral-700 rounded-xl transition-all cursor-pointer"
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onArchive(block)}
+                                    className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-400 dark:bg-amber-950/20 dark:hover:bg-amber-900/30 rounded-xl transition-all cursor-pointer"
+                                >
+                                    Archive
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
 
             <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 mt-2 line-clamp-2 leading-relaxed">
@@ -4879,9 +5110,9 @@ function DocBlockCard({
                                 </span>
                                 <div className="flex flex-wrap gap-1.5">
                                     {block.evidenceLinks.map((link, idx) => (
-                                        <a 
-                                            key={idx} 
-                                            href={link.startsWith("http") ? link : undefined} 
+                                        <a
+                                            key={idx}
+                                            href={link.startsWith("http") ? link : undefined}
                                             target={link.startsWith("http") ? "_blank" : undefined}
                                             rel="noopener noreferrer"
                                             className={`px-2 py-0.5 rounded-lg text-[10px] font-bold truncate max-w-[200px] ${link.startsWith("http") ? "bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400 hover:underline" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"}`}
@@ -4902,8 +5133,8 @@ function DocBlockCard({
                                 </span>
                                 <div className="flex flex-wrap gap-1.5">
                                     {block.relatedFiles.map((file, idx) => (
-                                        <span 
-                                            key={idx} 
+                                        <span
+                                            key={idx}
                                             className="px-2 py-0.5 rounded-lg bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[10px] text-neutral-600 dark:text-neutral-400 font-bold"
                                         >
                                             {file}
@@ -4913,7 +5144,7 @@ function DocBlockCard({
                             </div>
                         )}
                     </div>
-                    
+
                     {/* Source tracking details */}
                     {block.sourceType && (
                         <div className="text-[9px] font-semibold text-neutral-400 dark:text-neutral-500 pt-2 flex items-center gap-1 border-t border-neutral-100 dark:border-neutral-800/60 w-fit">
@@ -4946,7 +5177,7 @@ function ItemCard({ item, onEdit }: { item: ProjectItem; onEdit: (item: ProjectI
     };
 
     return (
-        <div 
+        <div
             role="button"
             tabIndex={0}
             onClick={() => onEdit(item)}
@@ -4981,8 +5212,8 @@ function ItemCard({ item, onEdit }: { item: ProjectItem; onEdit: (item: ProjectI
             <div className="flex items-center gap-6">
                 <div className="flex flex-col items-end">
                     <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                        item.status === 'inbox' ? 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400' : 
-                        item.status === 'planned' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' : 
+                        item.status === 'inbox' ? 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400' :
+                        item.status === 'planned' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' :
                         'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300'
                     }`}>
                         {item.status}
@@ -4993,7 +5224,7 @@ function ItemCard({ item, onEdit }: { item: ProjectItem; onEdit: (item: ProjectI
                         </span>
                     )}
                 </div>
-                <div 
+                <div
                     className="p-2 rounded-xl text-neutral-400 group-hover:text-black group-hover:bg-neutral-100 dark:group-hover:text-neutral-300 dark:group-hover:bg-neutral-800 transition-all opacity-0 group-hover:opacity-100"
                     title="แก้ไข"
                 >
@@ -5149,7 +5380,7 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
                     <FileText className="w-4 h-4 text-neutral-400" />
                     <h2 className="text-xs font-black uppercase tracking-widest text-neutral-500">Related Notes & Knowledge</h2>
                 </div>
-                <button 
+                <button
                     onClick={handleCreateNote}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-neutral-200 text-[10px] font-black uppercase tracking-widest hover:border-neutral-900 transition-all shadow-sm active:scale-95 dark:bg-neutral-900 dark:border-neutral-800 dark:hover:border-neutral-700"
                 >
@@ -5215,12 +5446,12 @@ function RelatedNotesSection({ projectId }: { projectId: string }) {
                                         </span>
                                     </div>
                                 </button>
-                                
+
                                 {!isCollapsed && (
                                     <div className="p-3 pt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-3 transition-all">
                                         {sortedNotes.map(note => (
-                                            <div 
-                                                key={note.id} 
+                                            <div
+                                                key={note.id}
                                                 onClick={() => router.push(`/docs/${note.id}`)}
                                                 className="bg-theme-card border border-neutral-200 rounded-2xl p-4 hover:border-neutral-900 transition-all group cursor-pointer shadow-sm hover:shadow-md active:scale-[0.98] dark:border-neutral-800 dark:hover:border-neutral-700"
                                             >

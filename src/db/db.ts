@@ -75,7 +75,7 @@ function ensureMigrations() {
         db.exec(`
             -- Cleanup any leftover from previous failed migration
             DROP TABLE IF EXISTS tasks_new;
-            
+
             -- Step 1: Create new table without workspace CHECK constraint
             CREATE TABLE tasks_new (
                 id TEXT PRIMARY KEY,
@@ -93,29 +93,29 @@ function ensureMigrations() {
                 updated_at TEXT NOT NULL,
                 done_at TEXT NULL
             );
-            
+
             -- Step 2: Copy data with explicit columns and COALESCE for timestamps
             INSERT INTO tasks_new (id, title, workspace, status, scheduled_date, schedule_bucket, start_time, end_time, priority, notes, doc_id, created_at, updated_at, done_at)
-            SELECT 
+            SELECT
                 id, title, workspace, status, scheduled_date, schedule_bucket, start_time, end_time, priority, notes, doc_id,
                 COALESCE(NULLIF(created_at,''), datetime('now')) AS created_at,
                 COALESCE(NULLIF(updated_at,''), NULLIF(created_at,''), datetime('now')) AS updated_at,
-                done_at 
+                done_at
             FROM tasks;
-            
+
             -- Step 3: Drop old table
             DROP TABLE tasks;
-            
+
             -- Step 4: Rename new table
             ALTER TABLE tasks_new RENAME TO tasks;
-            
+
             -- Step 5: Recreate indexes
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
             CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace);
             CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_date ON tasks(scheduled_date);
             CREATE INDEX IF NOT EXISTS idx_tasks_bucket ON tasks(schedule_bucket);
             CREATE INDEX IF NOT EXISTS idx_tasks_done_at ON tasks(done_at);
-            
+
             -- Step 6: Recreate trigger
             CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
             AFTER UPDATE ON tasks
@@ -187,10 +187,10 @@ function ensureMigrations() {
         db.exec(`
             -- Backup existing data
             CREATE TABLE tasks_backup AS SELECT * FROM tasks;
-            
+
             -- Drop old table
             DROP TABLE tasks;
-            
+
             -- Recreate from schema.sql (this is safe because we just updated schema.sql)
             -- But easier to just define it here to be explicit
             CREATE TABLE tasks (
@@ -232,16 +232,16 @@ function ensureMigrations() {
 
             -- Restore data (handling missing columns gracefully)
             INSERT INTO tasks (
-                id, title, workspace, list_id, status, scheduled_date, schedule_bucket, 
-                start_time, end_time, priority, notes, parent_task_id, sort_order, 
-                doc_id, is_seed, created_at, updated_at, done_at, sprint_id, 
+                id, title, workspace, list_id, status, scheduled_date, schedule_bucket,
+                start_time, end_time, priority, notes, parent_task_id, sort_order,
+                doc_id, is_seed, created_at, updated_at, done_at, sprint_id,
                 published_at, distribution_channels, performance_metrics, review_status
             )
-            SELECT 
-                id, title, workspace, list_id, status, scheduled_date, schedule_bucket, 
-                start_time, end_time, priority, notes, parent_task_id, sort_order, 
-                doc_id, is_seed, created_at, updated_at, done_at, sprint_id, 
-                published_at, distribution_channels, performance_metrics, 
+            SELECT
+                id, title, workspace, list_id, status, scheduled_date, schedule_bucket,
+                start_time, end_time, priority, notes, parent_task_id, sort_order,
+                doc_id, is_seed, created_at, updated_at, done_at, sprint_id,
+                published_at, distribution_channels, performance_metrics,
                 COALESCE(review_status, 'draft')
             FROM tasks_backup;
 
@@ -305,7 +305,7 @@ function ensureMigrations() {
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_lists_workspace_slug ON lists(workspace, slug);
         CREATE INDEX IF NOT EXISTS idx_lists_workspace ON lists(workspace);
-        
+
         CREATE TRIGGER IF NOT EXISTS trg_lists_updated_at
         AFTER UPDATE ON lists
         FOR EACH ROW
@@ -757,7 +757,7 @@ function ensureProjectLoops() {
     // Seed templates
     db.prepare(`
         INSERT OR IGNORE INTO project_loop_templates (
-            id, template_name, loop_type, description, steps_json, expected_outputs_json, 
+            id, template_name, loop_type, description, steps_json, expected_outputs_json,
             default_risk_level, default_review_gate_level, is_active, created_at, updated_at
         ) VALUES (
             'tpl-gf-article-loop-v1',
@@ -776,7 +776,7 @@ function ensureProjectLoops() {
 
     db.prepare(`
         INSERT OR IGNORE INTO project_loop_templates (
-            id, template_name, loop_type, description, steps_json, expected_outputs_json, 
+            id, template_name, loop_type, description, steps_json, expected_outputs_json,
             default_risk_level, default_review_gate_level, is_active, created_at, updated_at
         ) VALUES (
             'tpl-claim-tone-review-loop-v1',
@@ -795,7 +795,7 @@ function ensureProjectLoops() {
 
     db.prepare(`
         INSERT OR IGNORE INTO project_loop_templates (
-            id, template_name, loop_type, description, steps_json, expected_outputs_json, 
+            id, template_name, loop_type, description, steps_json, expected_outputs_json,
             default_risk_level, default_review_gate_level, is_active, created_at, updated_at
         ) VALUES (
             'tpl-workos-dev-loop-v1',
@@ -985,6 +985,56 @@ function ensurePlannerImportTaskIdentity() {
 ensurePlannerImportTaskIdentity();
 ensureProjectContext();
 ensureProjectLoops();
+function ensureProjectDocBlocks() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS project_doc_blocks (
+          id                  TEXT PRIMARY KEY,
+          project_id          TEXT NOT NULL,
+          legacy_project_slug TEXT NULL,
+          import_source       TEXT NULL CHECK(import_source IN ('localstorage_recovery', 'google_sheet', 'manual', 'arbor_summary') OR import_source IS NULL),
+          import_batch_id     TEXT NULL,
+          migrated_at         TEXT NULL,
+          source_row_number   INTEGER NULL,
+          source_record_id    TEXT NULL,
+          block_type          TEXT NOT NULL CHECK (block_type IN ('brief', 'structure', 'sop', 'process_note', 'decision', 'milestone', 'issue_fix', 'publish', 'qa_review')),
+          title               TEXT NOT NULL,
+          block_date          TEXT NOT NULL, -- YYYY-MM-DD
+          summary             TEXT NOT NULL,
+          details_md          TEXT NOT NULL,
+          evidence_links_json TEXT NOT NULL DEFAULT '[]',
+          related_files_json  TEXT NOT NULL DEFAULT '[]',
+          next_action         TEXT NULL,
+          status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+          order_index         INTEGER NULL,
+
+          -- Source tracking & Arbor Assistant
+          source_text         TEXT NULL,
+          source_excerpt      TEXT NULL,
+          source_type         TEXT NULL CHECK (source_type IN ('manual_paste', 'walkthrough', 'commit_log', 'qa_report', 'publish_log', 'chat_summary') OR source_type IS NULL),
+          generated_by        TEXT NULL CHECK (generated_by IN ('arbor') OR generated_by IS NULL),
+          reviewed_by_user    INTEGER NOT NULL DEFAULT 0 CHECK (reviewed_by_user IN (0, 1)),
+          applied_at          TEXT NULL,
+
+          created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+
+          FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE RESTRICT
+        );
+
+        CREATE TRIGGER IF NOT EXISTS trg_project_doc_blocks_updated_at
+        AFTER UPDATE ON project_doc_blocks
+        FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+        BEGIN
+          UPDATE project_doc_blocks SET updated_at = datetime('now') WHERE id = NEW.id;
+        END;
+
+        CREATE INDEX IF NOT EXISTS idx_project_doc_blocks_proj_order ON project_doc_blocks(project_id, order_index, block_date);
+        CREATE INDEX IF NOT EXISTS idx_project_doc_blocks_proj_date ON project_doc_blocks(project_id, block_date);
+    `);
+}
+ensureProjectDocBlocks();
+
 function ensureGreenFinenessModel() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS seasons (
@@ -1072,7 +1122,7 @@ function ensureGreenFinenessModel() {
 
         CREATE INDEX IF NOT EXISTS idx_articles_topic_id ON articles(topic_id);
         CREATE INDEX IF NOT EXISTS idx_articles_season_episode ON articles(season_id, episode_id);
-        
+
         -- Triggers for updated_at
         CREATE TRIGGER IF NOT EXISTS trg_seasons_updated_at
         AFTER UPDATE ON seasons
@@ -1147,7 +1197,7 @@ function ensureGreenFinenessModel() {
 export function seedGreenFinenessSeason1() {
     const seasonId = "GF-SEASON-01";
     const seasonTitle = "ชีวิตของพืชหนึ่งต้น";
-    
+
     db.prepare(`
         INSERT INTO seasons (season_id, season_title, season_description, status)
         VALUES (?, ?, ?, 'active')
@@ -2017,7 +2067,7 @@ function ensurePromptRunLogs() {
           FOREIGN KEY(prompt_template_id) REFERENCES prompt_templates(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_prompt_run_logs_template_id ON prompt_run_logs(prompt_template_id);
-        
+
         CREATE TRIGGER IF NOT EXISTS trg_prompt_run_logs_updated_at
         AFTER UPDATE ON prompt_run_logs
         FOR EACH ROW
@@ -2064,9 +2114,9 @@ function ensurePromptVersions() {
           FOREIGN KEY(prompt_template_id) REFERENCES prompt_templates(id) ON DELETE CASCADE,
           FOREIGN KEY(created_from_run_log_id) REFERENCES prompt_run_logs(id) ON DELETE SET NULL
         );
-        
+
         CREATE INDEX IF NOT EXISTS idx_prompt_versions_template_id ON prompt_versions(prompt_template_id);
-        
+
         CREATE TRIGGER IF NOT EXISTS trg_prompt_versions_updated_at
         AFTER UPDATE ON prompt_versions
         FOR EACH ROW

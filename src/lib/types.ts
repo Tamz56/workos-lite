@@ -202,7 +202,7 @@ export interface NoteLink {
     created_at: string;
 }
 
-export type ProjectDocBlockType = 
+export type ProjectDocBlockType =
     | "brief"
     | "process_note"
     | "sop"
@@ -213,17 +213,19 @@ export type ProjectDocBlockType =
     | "publish"
     | "qa_review";
 
-export type DocBlockSourceType = 
-    | "manual_paste" 
-    | "walkthrough" 
-    | "commit_log" 
-    | "qa_report" 
-    | "publish_log" 
+export type DocBlockSourceType =
+    | "manual_paste"
+    | "walkthrough"
+    | "commit_log"
+    | "qa_report"
+    | "publish_log"
     | "chat_summary";
 
 export interface ProjectDocumentationBlock {
     id: string;
     projectSlug: string;
+    projectId?: string;
+    legacyProjectSlug?: string | null;
     type: ProjectDocBlockType;
     title: string;
     date: string;
@@ -240,11 +242,36 @@ export interface ProjectDocumentationBlock {
     sourceText?: string;
     sourceExcerpt?: string;
     sourceType?: DocBlockSourceType;
-    generatedBy?: "arbor";
+    generatedBy?: "arbor" | "arbor_assistant";
     reviewedByUser?: boolean;
     appliedAt?: string;
     orderIndex?: number;
+    importSource?: string | null;
+    importBatchId?: string | null;
+    migratedAt?: string | null;
+    sourceRowNumber?: number | null;
+    sourceRecordId?: string | null;
 }
+
+export type ProjectDocBlockEditablePayload = {
+    type?: ProjectDocBlockType;
+    title?: string;
+    date?: string;
+    summary?: string;
+    details?: string;
+    evidenceLinks?: string[];
+    relatedFiles?: string[];
+    nextAction?: string;
+    status?: string;
+    sourceText?: string;
+    sourceExcerpt?: string;
+    sourceType?: DocBlockSourceType;
+    generatedBy?: "arbor" | "arbor_assistant";
+    reviewedByUser?: boolean;
+    appliedAt?: string;
+    orderIndex?: number;
+};
+
 
 export type ProjectContentRoadmapStatus =
   | "idea"
