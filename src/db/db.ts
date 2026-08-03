@@ -628,10 +628,254 @@ function ensureProjectDocBlocks() {
     `);
 }
 
+function ensureArborWritingLab() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS gf_story_sets (
+          id           TEXT PRIMARY KEY,
+          slug         TEXT NULL,
+          title        TEXT NOT NULL,
+          description  TEXT NULL,
+          status       TEXT NOT NULL DEFAULT 'active',
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS gf_episodes (
+          id                      TEXT PRIMARY KEY,
+          story_set_id            TEXT NOT NULL,
+          title                   TEXT NOT NULL,
+          slug                    TEXT NULL,
+          description             TEXT NULL,
+          role                    TEXT NOT NULL CHECK (role IN ('core_episode', 'supporting_article', 'bridge_article', 'practical_guide', 'journal_note', 'social_only_piece')),
+          journey_stage           TEXT NULL,
+          attached_to_episode_id  TEXT NULL,
+          sort_order              INTEGER NOT NULL DEFAULT 0,
+          narrative_status        TEXT NOT NULL DEFAULT 'unmapped',
+          status                  TEXT NOT NULL DEFAULT 'planned',
+          created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE CASCADE,
+          FOREIGN KEY(attached_to_episode_id) REFERENCES gf_episodes(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS gf_writing_projects (
+          id                TEXT PRIMARY KEY,
+          topic_id          TEXT NULL,
+          title             TEXT NOT NULL,
+          slug              TEXT NULL,
+          story_set_id      TEXT NULL,
+          episode_id        TEXT NULL,
+          writing_mode      TEXT NOT NULL CHECK (writing_mode IN ('knowledge_article', 'knowledge_journey_article', 'documentary_chapter', 'writers_journal', 'social_story_copy', 'journey_chapter')),
+          episode_role      TEXT NULL,
+          journey_stage     TEXT NULL,
+          status            TEXT NOT NULL DEFAULT 'draft',
+          summary           TEXT NULL,
+          notes             TEXT NULL,
+          attached_to       TEXT NULL,
+          tone_profile      TEXT NULL,
+          web_voice_guideline TEXT NULL,
+          group_voice_guideline TEXT NULL,
+          page_voice_guideline TEXT NULL,
+          personal_voice_guideline TEXT NULL,
+          claim_guardrail_note TEXT NULL,
+          narrative_body    TEXT NULL,
+          knowledge_body    TEXT NULL,
+          narrative_title   TEXT NULL,
+          narrative_slug    TEXT NULL,
+          narrative_hero_subtitle TEXT NULL,
+          narrative_featured_image_url TEXT NULL,
+          narrative_short_summary TEXT NULL,
+          narrative_meta_title TEXT NULL,
+          narrative_meta_description TEXT NULL,
+          narrative_keywords TEXT NULL,
+          narrative_schema_jsonld TEXT NULL,
+          narrative_status  TEXT NULL,
+          narrative_editors_pick INTEGER NULL,
+          narrative_related_knowledge_article TEXT NULL,
+          narrative_journey_stage TEXT NULL,
+          knowledge_title   TEXT NULL,
+          knowledge_slug    TEXT NULL,
+          knowledge_hero_subtitle TEXT NULL,
+          knowledge_featured_image_url TEXT NULL,
+          knowledge_short_summary TEXT NULL,
+          knowledge_meta_title TEXT NULL,
+          knowledge_meta_description TEXT NULL,
+          knowledge_keywords TEXT NULL,
+          knowledge_schema_jsonld TEXT NULL,
+          knowledge_status  TEXT NULL,
+          knowledge_editors_pick INTEGER NULL,
+          knowledge_related_narrative_article TEXT NULL,
+          knowledge_primary_keyword TEXT NULL,
+          knowledge_secondary_keywords TEXT NULL,
+          knowledge_category TEXT NULL,
+          created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE SET NULL,
+          FOREIGN KEY(episode_id) REFERENCES gf_episodes(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS gf_writing_blocks (
+          id                  TEXT PRIMARY KEY,
+          writing_project_id  TEXT NOT NULL,
+          block_type          TEXT NOT NULL DEFAULT 'text',
+          label               TEXT NULL,
+          placeholder         TEXT NULL,
+          content_md          TEXT NOT NULL DEFAULT '',
+          sort_order          INTEGER NOT NULL DEFAULT 0,
+          created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(writing_project_id) REFERENCES gf_writing_projects(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS gf_article_relationships (
+          id                TEXT PRIMARY KEY,
+          source_id         TEXT NOT NULL,
+          target_id         TEXT NOT NULL,
+          relationship_type TEXT NOT NULL CHECK (relationship_type IN ('bridge_from', 'bridge_to', 'related', 'prerequisite', 'next_step', 'supports', 'expands', 'same_story_set')),
+          created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY(source_id) REFERENCES gf_episodes(id) ON DELETE CASCADE,
+          FOREIGN KEY(target_id) REFERENCES gf_episodes(id) ON DELETE CASCADE
+        );
+    `);
+}
+
+type ArborStorySetSeed = {
+    id: string;
+    slug?: string;
+    title: string;
+    description: string;
+};
+
+function normalizeStorySetName(name: string) {
+    return name
+        .normalize("NFKC")
+        .replace(/\s+/g, "")
+        .trim()
+        .toLocaleLowerCase("th-TH");
+}
+
+function seedStorySetsWithoutDuplicates(storySets: ArborStorySetSeed[]) {
+    const existingRows = db.prepare("SELECT id, slug, title FROM gf_story_sets").all() as {
+        id: string;
+        slug: string | null;
+        title: string;
+    }[];
+
+    const bySlug = new Map<string, string>();
+    const byNormalizedTitle = new Map<string, string>();
+
+    for (const row of existingRows) {
+        if (row.slug) bySlug.set(row.slug, row.id);
+        byNormalizedTitle.set(normalizeStorySetName(row.title), row.id);
+    }
+
+    const insertStmt = db.prepare(`
+        INSERT INTO gf_story_sets (id, slug, title, description, status, created_at, updated_at)
+        VALUES (@id, @slug, @title, @description, 'active', datetime('now'), datetime('now'))
+    `);
+
+    const updateStmt = db.prepare(`
+        UPDATE gf_story_sets
+        SET
+            slug = COALESCE(NULLIF(slug, ''), @slug),
+            description = CASE
+                WHEN description IS NULL OR TRIM(description) = '' THEN @description
+                ELSE description
+            END,
+            status = 'active',
+            updated_at = datetime('now')
+        WHERE id = @id
+    `);
+
+    const tx = db.transaction(() => {
+        for (const storySet of storySets) {
+            const slug = storySet.slug ?? null;
+            const matchId = (slug ? bySlug.get(slug) : undefined)
+                ?? byNormalizedTitle.get(normalizeStorySetName(storySet.title));
+
+            if (matchId) {
+                updateStmt.run({ ...storySet, id: matchId, slug });
+                continue;
+            }
+
+            insertStmt.run({ ...storySet, slug });
+            if (slug) bySlug.set(slug, storySet.id);
+            byNormalizedTitle.set(normalizeStorySetName(storySet.title), storySet.id);
+        }
+    });
+
+    tx();
+}
+
+export function seedArborWritingLab() {
+    const storySets = [
+        { id: "STORY-SET-01", title: "ชีวิตของพืชหนึ่งต้น", description: "The core journey of a single plant from seed to seed." },
+        { id: "STORY-SET-02", title: "โลกใต้พื้นดิน", description: "Exploring the hidden complexity beneath the soil surface." },
+        { id: "STORY-SET-03", title: "ธาตุอาหารพืช", description: "Understanding essential nutrients and their roles in plant life." },
+        { id: "STORY-SET-04", title: "จุลินทรีย์และไรโซสเฟียร์", description: "The intricate relationship between microbes and plant roots." },
+        { id: "STORY-SET-05", title: "การดูแลพืชอย่างเข้าใจ", description: "Practical guide to plant care based on scientific understanding." }
+    ];
+
+    const greenFinenessTopicStorySets = [
+        {
+            id: "plant-observation",
+            slug: "plant-observation",
+            title: "การสังเกตอาการพืช",
+            description: "ชุดบทความสำหรับอ่านใบ ลำต้น ราก และสภาพแวดล้อมแบบ System-Level Observation โดยไม่รีบสรุปจากอาการเดียว"
+        },
+        {
+            id: "soil-organic-matter",
+            slug: "soil-organic-matter",
+            title: "ดินและอินทรียวัตถุ",
+            description: "ชุดบทความเกี่ยวกับโครงสร้างดิน อินทรียวัตถุ น้ำ อากาศ ราก และชีวิตในดิน ซึ่งเป็นฐานของระบบปลูก"
+        },
+        {
+            id: "water-environment",
+            slug: "water-environment",
+            title: "น้ำและสภาพแวดล้อม",
+            description: "ชุดบทความเกี่ยวกับน้ำ แสง อุณหภูมิ อากาศ ความชื้น ปากใบ และสภาพแวดล้อมที่กำหนดจังหวะการทำงานของพืช"
+        },
+        {
+            id: "root-growth",
+            slug: "root-growth",
+            title: "รากและการเจริญเติบโต",
+            description: "ชุดบทความเกี่ยวกับระบบราก การตั้งตัวของพืช ลำต้น ใบ ฮอร์โมน ระบบลำเลียง และการเจริญเติบโตทั้งต้น"
+        },
+        {
+            id: "plant-nutrition",
+            slug: "plant-nutrition",
+            title: "ธาตุอาหารพืช",
+            description: "ชุดบทความเกี่ยวกับบทบาทของธาตุอาหารต่อการสร้างเนื้อเยื่อ การเติบโต การลำเลียง และการจัดการให้พืชใช้ได้จริง"
+        },
+        {
+            id: "growing-system",
+            slug: "growing-system",
+            title: "ระบบการปลูก",
+            description: "ชุดบทความที่เชื่อมความรู้เรื่องดิน น้ำ แสง ราก พืช และการดูแล ให้กลายเป็นการจัดการระบบปลูกอย่างเป็นเหตุเป็นผล"
+        },
+        {
+            id: "ecology-relationships",
+            slug: "ecology-relationships",
+            title: "นิเวศวิทยาและความสัมพันธ์",
+            description: "ชุดบทความที่มองความสัมพันธ์ระหว่างดิน พืช น้ำ อากาศ จุลินทรีย์ อินทรียวัตถุ และสิ่งมีชีวิตรอบข้างในระบบธรรมชาติ"
+        }
+    ];
+
+    seedStorySetsWithoutDuplicates([...storySets, ...greenFinenessTopicStorySets]);
+
+    db.prepare(`
+        INSERT INTO gf_episodes (id, story_set_id, title, role, status, created_at, updated_at)
+        VALUES ('GF-S01-E07', 'STORY-SET-01', 'ธาตุอาหาร: วัตถุดิบที่พืชใช้สร้างชีวิต', 'core_episode', 'planned', datetime('now'), datetime('now'))
+        ON CONFLICT(id) DO NOTHING
+    `).run();
+}
+
 ensureProjectsAndSprints();
 ensureNotes();
 ensureProjectDocBlocks();
+ensureArborWritingLab();
 if (!shouldSkipSeed) {
     ensureSeedProjects();
+    seedArborWritingLab();
 }
 

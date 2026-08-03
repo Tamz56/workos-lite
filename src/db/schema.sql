@@ -295,3 +295,111 @@ CREATE TABLE IF NOT EXISTS note_links (
 
 CREATE INDEX IF NOT EXISTS idx_note_links_note_id ON note_links(note_id);
 CREATE INDEX IF NOT EXISTS idx_note_links_entity ON note_links(linked_entity_type, linked_entity_id);
+
+-- Arbor Writing Lab Entities
+CREATE TABLE IF NOT EXISTS gf_story_sets (
+  id           TEXT PRIMARY KEY,
+  slug         TEXT NULL,
+  title        TEXT NOT NULL,
+  description  TEXT NULL,
+  status       TEXT NOT NULL DEFAULT 'active',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS gf_episodes (
+  id                      TEXT PRIMARY KEY,
+  story_set_id            TEXT NOT NULL,
+  title                   TEXT NOT NULL,
+  slug                    TEXT NULL,
+  description             TEXT NULL,
+  role                    TEXT NOT NULL CHECK (role IN ('core_episode', 'supporting_article', 'bridge_article', 'practical_guide', 'journal_note', 'social_only_piece')),
+  journey_stage           TEXT NULL,
+  attached_to_episode_id  TEXT NULL,
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  narrative_status        TEXT NOT NULL DEFAULT 'unmapped',
+  status                  TEXT NOT NULL DEFAULT 'planned',
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE CASCADE,
+  FOREIGN KEY(attached_to_episode_id) REFERENCES gf_episodes(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS gf_writing_projects (
+  id                TEXT PRIMARY KEY,
+  topic_id          TEXT NULL,
+  title             TEXT NOT NULL,
+  slug              TEXT NULL,
+  story_set_id      TEXT NULL,
+  episode_id        TEXT NULL,
+  writing_mode      TEXT NOT NULL CHECK (writing_mode IN ('knowledge_article', 'knowledge_journey_article', 'documentary_chapter', 'writers_journal', 'social_story_copy', 'journey_chapter')),
+  episode_role      TEXT NULL,
+  journey_stage     TEXT NULL,
+  status            TEXT NOT NULL DEFAULT 'draft',
+  summary           TEXT NULL,
+  notes             TEXT NULL,
+  attached_to       TEXT NULL,
+  tone_profile      TEXT NULL,
+  web_voice_guideline TEXT NULL,
+  group_voice_guideline TEXT NULL,
+  page_voice_guideline TEXT NULL,
+  personal_voice_guideline TEXT NULL,
+  claim_guardrail_note TEXT NULL,
+  narrative_body    TEXT NULL,
+  knowledge_body    TEXT NULL,
+  narrative_title   TEXT NULL,
+  narrative_slug    TEXT NULL,
+  narrative_hero_subtitle TEXT NULL,
+  narrative_featured_image_url TEXT NULL,
+  narrative_short_summary TEXT NULL,
+  narrative_meta_title TEXT NULL,
+  narrative_meta_description TEXT NULL,
+  narrative_keywords TEXT NULL,
+  narrative_schema_jsonld TEXT NULL,
+  narrative_status  TEXT NULL,
+  narrative_editors_pick INTEGER NULL,
+  narrative_related_knowledge_article TEXT NULL,
+  narrative_journey_stage TEXT NULL,
+  knowledge_title   TEXT NULL,
+  knowledge_slug    TEXT NULL,
+  knowledge_hero_subtitle TEXT NULL,
+  knowledge_featured_image_url TEXT NULL,
+  knowledge_short_summary TEXT NULL,
+  knowledge_meta_title TEXT NULL,
+  knowledge_meta_description TEXT NULL,
+  knowledge_keywords TEXT NULL,
+  knowledge_schema_jsonld TEXT NULL,
+  knowledge_status  TEXT NULL,
+  knowledge_editors_pick INTEGER NULL,
+  knowledge_related_narrative_article TEXT NULL,
+  knowledge_primary_keyword TEXT NULL,
+  knowledge_secondary_keywords TEXT NULL,
+  knowledge_category TEXT NULL,
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(story_set_id) REFERENCES gf_story_sets(id) ON DELETE SET NULL,
+  FOREIGN KEY(episode_id) REFERENCES gf_episodes(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS gf_writing_blocks (
+  id                  TEXT PRIMARY KEY,
+  writing_project_id  TEXT NOT NULL,
+  block_type          TEXT NOT NULL DEFAULT 'text',
+  label               TEXT NULL,
+  placeholder         TEXT NULL,
+  content_md          TEXT NOT NULL DEFAULT '',
+  sort_order          INTEGER NOT NULL DEFAULT 0,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(writing_project_id) REFERENCES gf_writing_projects(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS gf_article_relationships (
+  id                TEXT PRIMARY KEY,
+  source_id         TEXT NOT NULL,
+  target_id         TEXT NOT NULL,
+  relationship_type TEXT NOT NULL CHECK (relationship_type IN ('bridge_from', 'bridge_to', 'related', 'prerequisite', 'next_step', 'supports', 'expands', 'same_story_set')),
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(source_id) REFERENCES gf_episodes(id) ON DELETE CASCADE,
+  FOREIGN KEY(target_id) REFERENCES gf_episodes(id) ON DELETE CASCADE
+);
