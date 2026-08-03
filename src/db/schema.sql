@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   published_at    TEXT NULL,
   distribution_channels TEXT NULL,
   performance_metrics TEXT NULL,
+  review_status   TEXT DEFAULT 'draft',
   -- Agent Automation (MVP)
   agent_enabled   INTEGER DEFAULT 0,
   agent_mode      TEXT NULL,
