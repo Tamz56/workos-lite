@@ -57,6 +57,7 @@ export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
     { 
         id: "travel", label: "Green Fineness — Nutrient Planner App", type: "ops", 
         iconKey: "Box", colorKey: "emerald",
+        href: "/workspaces/travel/rose-trial",
         emptyState: { title: "Plan your App MVP", description: "Product spec, MVP planning, and experiments.", actionLabel: "Add Spec", actionType: "quickAdd" }
     },
     { 
