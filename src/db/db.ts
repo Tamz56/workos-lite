@@ -42,12 +42,18 @@ let migrated = false;
 function ensureMigrations() {
     if (migrated) return;
 
-    const cols = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
-    const hasDoneAt = cols.some((c) => c.name === "done_at");
+    const safeAddColumn = (table: string, column: string, sqlDef: string) => {
+        const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+        if (!columns.some((c) => c.name === column)) {
+            try {
+                db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${sqlDef}`);
+            } catch (e: any) {
+                if (!e?.message?.includes("duplicate column name")) throw e;
+            }
+        }
+    };
 
-    if (!hasDoneAt) {
-        db.exec("ALTER TABLE tasks ADD COLUMN done_at TEXT NULL");
-    }
+    safeAddColumn("tasks", "done_at", "TEXT NULL");
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_done_at ON tasks(done_at)");
 
     // Migration: Remove workspace CHECK constraint (SQLite requires table recreation)
@@ -116,52 +122,28 @@ function ensureMigrations() {
     }
 
     // Phase 1: Lists implementation
-    const hasListId = cols.some((c) => c.name === "list_id");
-    if (!hasListId) {
-        db.exec("ALTER TABLE tasks ADD COLUMN list_id TEXT NULL");
-    }
+    safeAddColumn("tasks", "list_id", "TEXT NULL");
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_list_id ON tasks(list_id)");
 
-    const hasParentTaskId = cols.some((c) => c.name === "parent_task_id");
-    if (!hasParentTaskId) {
-        db.exec("ALTER TABLE tasks ADD COLUMN parent_task_id TEXT NULL");
-        db.exec("ALTER TABLE tasks ADD COLUMN sort_order INTEGER NULL");
-    }
+    safeAddColumn("tasks", "parent_task_id", "TEXT NULL");
+    safeAddColumn("tasks", "sort_order", "INTEGER NULL");
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_parent_task_id ON tasks(parent_task_id)");
 
-    const hasIsSeed = cols.some((c) => c.name === "is_seed");
-    if (!hasIsSeed) {
-        db.exec("ALTER TABLE tasks ADD COLUMN is_seed INTEGER DEFAULT 0");
-    }
+    safeAddColumn("tasks", "is_seed", "INTEGER DEFAULT 0");
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_is_seed ON tasks(is_seed)");
 
-    const hasDocIsSeed = db.prepare("PRAGMA table_info(docs)").all().some((c: any) => c.name === "is_seed");
-    if (!hasDocIsSeed) {
-        db.exec("ALTER TABLE docs ADD COLUMN is_seed INTEGER DEFAULT 0");
-    }
+    safeAddColumn("docs", "is_seed", "INTEGER DEFAULT 0");
 
-    const hasReviewStatus = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "review_status");
-    if (!hasReviewStatus) {
-        db.exec("ALTER TABLE tasks ADD COLUMN review_status TEXT DEFAULT 'draft'");
-    }
+    safeAddColumn("tasks", "review_status", "TEXT DEFAULT 'draft'");
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_review_status ON tasks(review_status)");
 
-    const hasPublishedAt = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "published_at");
-    if (!hasPublishedAt) {
-        db.exec("ALTER TABLE tasks ADD COLUMN published_at TEXT NULL");
-    }
+    safeAddColumn("tasks", "published_at", "TEXT NULL");
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_published_at ON tasks(published_at)");
 
-    const hasDistributionChannels = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "distribution_channels");
-    if (!hasDistributionChannels) {
-        db.exec("ALTER TABLE tasks ADD COLUMN distribution_channels TEXT NULL");
-    }
+    safeAddColumn("tasks", "distribution_channels", "TEXT NULL");
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_distribution_channels ON tasks(distribution_channels)");
 
-    const hasPerformanceMetrics = db.prepare("PRAGMA table_info(tasks)").all().some((c: any) => c.name === "performance_metrics");
-    if (!hasPerformanceMetrics) {
-        db.exec("ALTER TABLE tasks ADD COLUMN performance_metrics TEXT NULL");
-    }
+    safeAddColumn("tasks", "performance_metrics", "TEXT NULL");
     db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_performance_metrics ON tasks(performance_metrics)");
 
     // Agent Automation MVP Migration
@@ -269,13 +251,21 @@ function ensureMigrations() {
     if (hasListIsSeed === false) { // Table exists but column might be missing if it was created before my changes
         const listsTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lists'").get();
         if (listsTableExists) {
-            db.exec("ALTER TABLE lists ADD COLUMN is_seed INTEGER DEFAULT 0");
+            try {
+                db.exec("ALTER TABLE lists ADD COLUMN is_seed INTEGER DEFAULT 0");
+            } catch (e: any) {
+                if (!e?.message?.includes("duplicate column name")) throw e;
+            }
         }
     }
 
     const hasProjectIsSeed = db.prepare("PRAGMA table_info(projects)").all().some((c: any) => c.name === "is_seed");
     if (!hasProjectIsSeed) {
-        db.exec("ALTER TABLE projects ADD COLUMN is_seed INTEGER DEFAULT 0");
+        try {
+            db.exec("ALTER TABLE projects ADD COLUMN is_seed INTEGER DEFAULT 0");
+        } catch (e: any) {
+            if (!e?.message?.includes("duplicate column name")) throw e;
+        }
     }
 
     // Create lists table ensuring it exists during runtime migration safely
