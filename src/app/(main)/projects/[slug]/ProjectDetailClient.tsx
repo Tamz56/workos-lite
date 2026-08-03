@@ -11,6 +11,7 @@ import { Toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ProjectDocBlocksSection } from "@/components/projects/ProjectDocBlocksSection";
 
 export default function ProjectDetailClient() {
     const params = useParams();
@@ -222,6 +223,7 @@ export default function ProjectDetailClient() {
                 </section>
 
                 <RelatedNotesSection projectId={project.id} />
+                <ProjectDocBlocksSection projectId={project.id} projectSlug={slug} />
             </div>
 
             <DeleteProjectDialog
