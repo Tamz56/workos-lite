@@ -631,7 +631,8 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const handleWorkspaceSelect = useCallback((newId: string) => {
         setIsSwitcherOpen(false);
         if (newId === workspaceId) return;
-        router.push(`/workspaces/${newId}`);
+        const ws = WORKSPACES_LIST.find(w => w.id === newId);
+        router.push(ws?.href || `/workspaces/${newId}`);
     }, [workspaceId, router]);
 
     useEffect(() => {

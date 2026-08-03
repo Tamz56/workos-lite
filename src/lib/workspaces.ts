@@ -10,6 +10,8 @@ export const WORKSPACES = [
     "system",
     "inbox",
     "other",
+    "astro-strategy",
+    "writing-lab",
 ] as const;
 
 export interface WorkspaceConfig {
@@ -19,6 +21,7 @@ export interface WorkspaceConfig {
     iconKey: string;
     colorKey: string;
     description?: string;
+    href?: string;
     isHidden?: boolean; // RCRestruct: Hide from main flows
     emptyState?: {
         title: string;
@@ -55,6 +58,20 @@ export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
         id: "travel", label: "Green Fineness — Nutrient Planner App", type: "ops", 
         iconKey: "Box", colorKey: "emerald",
         emptyState: { title: "Plan your App MVP", description: "Product spec, MVP planning, and experiments.", actionLabel: "Add Spec", actionType: "quickAdd" }
+    },
+    { 
+        id: "astro-strategy", label: "Astro Strategy Lab", type: "strategy", 
+        iconKey: "Sparkles", colorKey: "violet",
+        href: "/workspaces/astro-strategy",
+        description: "Personal astrology & strategic timing laboratory",
+        emptyState: { title: "Astro Strategy Lab", description: "Strategic timing and astrological reflection.", actionLabel: "Open Lab", actionType: "quickAdd" }
+    },
+    { 
+        id: "writing-lab", label: "Writing Lab", type: "content", 
+        iconKey: "BookOpen", colorKey: "blue",
+        href: "/workspaces/content/writing-lab",
+        description: "Story map, writing studio & content library",
+        emptyState: { title: "Writing Lab", description: "Create and manage your articles and story sets.", actionLabel: "Open Studio", actionType: "newPackage" }
     },
     { 
         id: "admin", label: "Personal Admin", type: "admin", 
@@ -103,6 +120,12 @@ const ALIASES: Record<string, Workspace> = {
     // content
     "content": "content",
     "cnt": "content",
+    "writing-lab": "writing-lab",
+    "writing": "writing-lab",
+
+    // strategy
+    "astro-strategy": "astro-strategy",
+    "astro": "astro-strategy",
 
     // others
     "finance": "finance",
@@ -139,6 +162,8 @@ export function workspaceLabel(w: Workspace | string): string {
         case "marketing": return "Business / Marketing";
         case "finance": return "Finance";
         case "travel": return "Green Fineness — Nutrient Planner App";
+        case "astro-strategy": return "Astro Strategy Lab";
+        case "writing-lab": return "Writing Lab";
         case "system": return "System/Archive";
         case "inbox": return "Inbox";
         case "other": return "Other";

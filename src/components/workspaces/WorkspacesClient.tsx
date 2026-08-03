@@ -33,7 +33,8 @@ export default function WorkspacesClient() {
 
     const handleResume = () => {
         if (resumeData) {
-            router.push(`/workspaces/${resumeData.id}`);
+            const ws = WORKSPACES_LIST.find(w => w.id === resumeData.id);
+            router.push(ws?.href || `/workspaces/${resumeData.id}`);
         }
     };
 
@@ -153,7 +154,7 @@ export default function WorkspacesClient() {
                             return (
                                 <button
                                     key={ws.id}
-                                    onClick={() => router.push(`/workspaces/${ws.id}`)}
+                                    onClick={() => router.push(ws.href || `/workspaces/${ws.id}`)}
                                     className="group relative bg-white border border-neutral-200 rounded-3xl p-6 text-left transition-all duration-300 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 flex flex-col h-full"
                                 >
                                     <div className="flex items-start justify-between mb-4">
