@@ -52,9 +52,9 @@ export const WORKSPACES_LIST: readonly WorkspaceConfig[] = [
         emptyState: { title: "Finance queue is empty", description: "Keep your books clean and budgets updated.", actionLabel: "Record Expense", actionType: "quickAdd" }
     },
     { 
-        id: "travel", label: "Travel", type: "admin", 
-        iconKey: "Plane", colorKey: "rose",
-        emptyState: { title: "Plan your next journey", description: "No upcoming travel tasks planned.", actionLabel: "Add Itinerary", actionType: "quickAdd" }
+        id: "travel", label: "Green Fineness — Nutrient Planner App", type: "ops", 
+        iconKey: "Box", colorKey: "emerald",
+        emptyState: { title: "Plan your App MVP", description: "Product spec, MVP planning, and experiments.", actionLabel: "Add Spec", actionType: "quickAdd" }
     },
     { 
         id: "admin", label: "Personal Admin", type: "admin", 
@@ -138,7 +138,7 @@ export function workspaceLabel(w: Workspace | string): string {
         case "admin": return "Personal Admin";
         case "marketing": return "Business / Marketing";
         case "finance": return "Finance";
-        case "travel": return "Travel";
+        case "travel": return "Green Fineness — Nutrient Planner App";
         case "system": return "System/Archive";
         case "inbox": return "Inbox";
         case "other": return "Other";
