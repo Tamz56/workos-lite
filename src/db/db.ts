@@ -510,36 +510,6 @@ function ensureProjectsAndSprints() {
     `);
 }
 
-function ensureSeedProjects() {
-    const defaultProjects = [
-        "avaone-q1",
-        "avaone-q1-sales",
-        "avaone-homeforest-q1",
-        "avafarm888-fb-content-q1",
-        "avaone-fb-content-q1",
-        "avaone-tiktok-q1"
-    ];
-
-    const insertStmt = db.prepare(`
-        INSERT INTO projects (id, slug, name, status, is_seed, created_at, updated_at)
-        VALUES (@id, @slug, @name, 'planned', 1, datetime('now'), datetime('now'))
-        ON CONFLICT(slug) DO NOTHING
-    `);
-
-    const runTx = db.transaction(() => {
-        for (const slug of defaultProjects) {
-            insertStmt.run({
-                id: crypto.randomUUID(),
-                slug: slug,
-                // Simple formatting for demonstration (e.g., 'avaone-q1' -> 'Avaone Q1')
-                name: slug.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase())
-            });
-        }
-    });
-
-    runTx();
-}
-
 function ensureNotes() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS notes (
@@ -865,7 +835,6 @@ ensureNotes();
 ensureProjectDocBlocks();
 ensureArborWritingLab();
 if (!shouldSkipSeed) {
-    ensureSeedProjects();
     seedArborWritingLab();
 }
 
