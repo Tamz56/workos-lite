@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "workos-writing-lab-update-v0.1",
+  "source": "Arbor",
+  "importBatchTitle": "Green Fineness Feedback Snapshot - June 2026",
+  "target": {
+    "type": "writing_lab_project",
+    "projectSlug": "gf-article-example"
+  },
+  "fields": {
+    "performanceFeedback": {
+      "snapshots": {
+        "snap24h": {
+          "snapshotDate": "2026-06-25",
+          "views": "150",
+          "users": "120",
+          "events": "210",
+          "engagementTime": "1m 15s",
+          "sourceMedium": "Facebook / post",
+          "fbReach": "1200",
+          "fbReactions": "45",
+          "fbComments": "12",
+          "fbShares": "8",
+          "fbClicks": "72",
+          "notes": "24-hour launch stats showed strong initial click-through rate from Facebook page share."
+        },
+        "snap7d": {
+          "snapshotDate": "2026-07-02",
+          "views": "820",
+          "users": "680",
+          "events": "1050",
+          "engagementTime": "1m 32s",
+          "sourceMedium": "google / organic",
+          "fbReach": "2500",
+          "fbReactions": "98",
+          "fbComments": "24",
+          "fbShares": "15",
+          "fbClicks": "180",
+          "notes": "7-day organic search traffic is rising, search engines are beginning to index the target slug."
+        },
+        "snap30d": {
+          "snapshotDate": "2026-07-25",
+          "views": "2450",
+          "users": "1980",
+          "events": "3200",
+          "engagementTime": "1m 45s",
+          "sourceMedium": "google / organic",
+          "fbReach": "3100",
+          "fbReactions": "115",
+          "fbComments": "32",
+          "fbShares": "18",
+          "fbClicks": "210",
+          "notes": "30-day performance confirms the article is acting as a solid evergreen asset. Traffic is highly search-centric."
+        }
+      },
+      "notableFeedback": {
+        "comments": "User comments highlight that the explanation of organic farming techniques is very easy to follow.",
+        "questions": "Is there a specific certification agency recommended for Thailand?",
+        "confusion": "Some readers asked if the organic standards apply to hydroponics as well.",
+        "language": "Tone is engaging, friendly, and authoritative.",
+        "followupTopic": "Consider a follow-up article comparing organic standards vs GAP standards."
+      },
+      "arborInsight": {
+        "whatWorked": "Strong engagement on Facebook due to dynamic introductory hook.",
+        "whatDidNotWork": "Hydroponics comparison confusion suggests clarity is needed on soil requirements.",
+        "topicSignal": "Highly popular topic, organic certification search queries are strong.",
+        "trafficSignal": "Strong search longevity, showing classic evergreen path.",
+        "engagementSignal": "Average engagement time of 1m 45s indicates users read the full explanation.",
+        "repostPotential": "High potential for reposting on Facebook Group during national agriculture week.",
+        "followupPotential": "High potential for infographic summary.",
+        "recommendedAction": "Create a cheat sheet comparing Organic vs GAP standard rules."
+      },
+      "nextDecision": {
+        "decision": "Make infographic",
+        "priority": "High",
+        "targetDate": "2026-07-10",
+        "notes": "Assign designer to create GAP vs Organic standard comparison chart based on reader confusion."
+      }
+    }
+  }
+}

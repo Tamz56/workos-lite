@@ -37,13 +37,13 @@ import * as LucideIcons from "lucide-react";
 import { ChevronRight, LayoutGrid, X, Play, ArrowRight, CheckCircle2, Clock, List, Zap } from "lucide-react";
 
 // RC47: Intelligence Layer
-import { 
-    resolveBestNextTask, 
-    IntelligenceContext, 
-    scoreTask, 
-    RecommendationMode, 
-    TuningPreferences, 
-    FeedbackSignal 
+import {
+    resolveBestNextTask,
+    IntelligenceContext,
+    scoreTask,
+    RecommendationMode,
+    TuningPreferences,
+    FeedbackSignal
 } from "../../lib/smart/intelligence/nextTaskEngine";
 import { calculateWorkspaceUrgency, UrgencySignal } from "../../lib/smart/intelligence/workspaceUrgency";
 
@@ -70,17 +70,17 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const ws = WORKSPACES_LIST.find(w => w.id === workspaceId);
     const wsColor = ws ? getWorkspaceColor(ws.colorKey) : getWorkspaceColor("neutral");
     const WsIcon = (LucideIcons as any)[ws?.iconKey || "LayoutGrid"] || LayoutGrid;
-    
+
     const { state, updateState } = useAreasState(workspaceId, {
         selectedTaskId: activeTaskIdFromUrl,
     });
     const [tasks, setTasks] = useState<Task[]>([]);
-    
+
     // RC49: Mode & Preferences state with Persistence
     const [mode, setMode] = useState<RecommendationMode>('balanced');
     const [preferences, setPreferences] = useState<TuningPreferences>(DEFAULT_PREFERENCES);
     const [pinnedTaskId, setPinnedTaskId] = useState<string | null>(null);
-    
+
     // RC47/RC48/RC49: Intelligence State (Granular)
     const [skips, setSkips] = useState<Record<string, number>>({});
     const [viewed, setViewed] = useState<string[]>([]);
@@ -172,7 +172,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         if (current && current.status !== 'done') {
             return scoreTask(current, intelligence, tasks);
         }
-        
+
         // Priority 2: Pinned recommendation
         if (pinnedTaskId) {
             const pinned = tasks.find(t => t.id === pinnedTaskId);
@@ -244,7 +244,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         } else if (action.type === 'pin_task' && action.payload.taskId) {
             handlePinTask(action.payload.taskId);
         }
-        
+
         recordActionDismissal(action.id);
     }, [handleModeChange, handleTogglePreference, handlePinTask]);
 
@@ -277,8 +277,8 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const ensureTaskVisible = useCallback((taskId: string) => {
         const task = tasks.find(t => t.id === taskId);
         if (task?.package_id && state.collapsedTopicIds.includes(task.package_id)) {
-            updateState({ 
-                collapsedTopicIds: state.collapsedTopicIds.filter(id => id !== task.package_id) 
+            updateState({
+                collapsedTopicIds: state.collapsedTopicIds.filter(id => id !== task.package_id)
             });
         }
     }, [tasks, state.collapsedTopicIds, updateState]);
@@ -287,7 +287,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         isSystemSelecting.current = true;
         const currentSelected = tasks.find(t => t.id === state.selectedTaskId);
         const lastActive = tasks.find(t => t.id === state.lastActiveTaskId);
-        
+
         const bestNext = smartRecommendation?.task;
 
         const toResume = (lastActive && lastActive.status !== 'done' && tasks.some(tx => tx.id === lastActive.id))
@@ -295,12 +295,12 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             : (currentSelected && currentSelected.status !== 'done')
                 ? currentSelected
                 : bestNext;
-        
+
         if (toResume) {
             ensureTaskVisible(toResume.id);
-            updateState({ 
+            updateState({
                 selectedTaskId: toResume.id,
-                isFlowMode: true 
+                isFlowMode: true
             });
             router.push(`?taskId=${toResume.id}`);
             setToast({ isVisible: true, message: `🚀 กลับเข้าสู่การทำงาน: ${toResume.title}` });
@@ -369,7 +369,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             try {
                 const [lRes, sRes] = await Promise.all([
                     fetch(`/api/lists?workspace=${workspaceId}`),
-                    fetch(`/api/sprints`) 
+                    fetch(`/api/sprints`)
                 ]);
                 const lData = await lRes.json();
                 const sData = await sRes.json();
@@ -391,17 +391,17 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             const params = new URLSearchParams();
             if (state.statusFilter.length > 0) params.set("statuses", state.statusFilter.join(","));
             if (state.workspaceFilter.length > 0) params.set("workspaces", state.workspaceFilter.join(","));
-            else params.set("workspace", workspaceId); 
-            
+            else params.set("workspace", workspaceId);
+
             if (state.listFilter.length > 0) params.set("list_ids", state.listFilter.join(","));
             if (state.sprintFilter.length > 0) params.set("sprint_ids", state.sprintFilter.join(","));
             if (state.templateFilter.length > 0) params.set("template_keys", state.templateFilter.join(","));
-            if (state.reviewStatusFilter.length > 0) params.set("review_statuses", state.reviewStatusFilter.join(",")); 
+            if (state.reviewStatusFilter.length > 0) params.set("review_statuses", state.reviewStatusFilter.join(","));
             if (state.scheduleFilter !== "all") params.set("schedule_state", state.scheduleFilter);
             if (state.dateRange.start) params.set("start", state.dateRange.start);
             if (state.dateRange.end) params.set("end", state.dateRange.end);
             if (state.search) params.set("q", state.search);
-            
+
             params.set("limit", LIMIT.toString());
             params.set("offset", currentOffset.toString());
 
@@ -413,7 +413,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             } else {
                 setTasks(data);
             }
-            
+
             setOffset(currentOffset);
             setHasMore(data.length === LIMIT);
         } catch (e) {
@@ -434,10 +434,10 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
             }
 
             const target = e.target as HTMLElement;
-            const isTyping = 
-                target.tagName === "INPUT" || 
-                target.tagName === "TEXTAREA" || 
-                target.tagName === "SELECT" || 
+            const isTyping =
+                target.tagName === "INPUT" ||
+                target.tagName === "TEXTAREA" ||
+                target.tagName === "SELECT" ||
                 target.isContentEditable ||
                 target.closest('[role="combobox"]');
 
@@ -452,9 +452,9 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
             if (e.key === "Escape") {
                 if (state.isTableQuickAddOpen || state.inlineQuickAddTopicId) {
-                    updateState({ 
-                        isTableQuickAddOpen: false, 
-                        inlineQuickAddTopicId: null 
+                    updateState({
+                        isTableQuickAddOpen: false,
+                        inlineQuickAddTopicId: null
                     });
                     return;
                 }
@@ -478,7 +478,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 }
                 if (e.key === "ArrowRight") {
                     e.preventDefault();
-                    handleFlowNext(true); 
+                    handleFlowNext(true);
                     return;
                 }
                 if (e.key === "o") {
@@ -492,7 +492,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isCommandPaletteOpen, state.isQuickAddOpen, state.isTableQuickAddOpen, state.inlineQuickAddTopicId, state.isFlowMode, state.selectedTaskId, updateState, router]);
-    
+
     // RC65: Listen for external task updates (e.g. from GlobalTaskDialogs)
     useEffect(() => {
         const handleExternalUpdate = () => {
@@ -510,7 +510,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         const prevTask = tasks.find(t => t.id === taskId);
         const prevStatus = prevTask?.status;
         const prevTasks = [...tasks];
-        
+
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
 
         try {
@@ -520,7 +520,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 body: JSON.stringify(updates),
             });
             if (!res.ok) throw new Error("Update failed");
-            
+
             const { task: updatedFromServer } = await res.json();
             setTasks(prev => prev.map(t => t.id === taskId ? updatedFromServer : t));
             // RC52: Undo Support for Status Changes
@@ -573,10 +573,10 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                 const next = nextResult?.task;
 
                 if (next) {
-                    handleFlowNext(false, taskId); 
+                    handleFlowNext(false, taskId);
                 } else {
-                    setToast({ 
-                        isVisible: true, 
+                    setToast({
+                        isVisible: true,
                         message: "🎊 ยอดเยี่ยม! คุณเคลียร์งานทั้งหมดใน Workspace นี้เรียบร้อยแล้ว",
                     });
                     updateState({ isFlowMode: false });
@@ -599,7 +599,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
     const handleFlowNext = useCallback((isSkip = false, currentId?: string) => {
         const activeId = currentId || state.selectedTaskId;
-        
+
         if (isSkip && activeId) {
             handleSkipTask(activeId);
         }
@@ -609,7 +609,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
         if (next) {
             ensureTaskVisible(next.id);
-            updateState({ 
+            updateState({
                 selectedTaskId: next.id,
                 lastActiveTaskId: next.id
             });
@@ -665,7 +665,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
         if (t.topic_id) {
             const pkgTasks = tasks.map(x => x.id === taskId ? { ...x, status: 'done' as const } : x)
                                  .filter(x => x.topic_id === t.topic_id);
-            
+
             const doneCount = pkgTasks.filter(x => x.status === "done").length;
             const totalCount = pkgTasks.length;
 
@@ -694,14 +694,14 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
     // RC65: Batch Cleanup & Undo Logic
     const [deletedTasksBuffer, setDeletedTasksBuffer] = useState<Task[]>([]);
-    
+
     const handleUndo = useCallback(async () => {
         if (deletedTasksBuffer.length === 0) return;
-        
+
         try {
             // Restore tasks one-by-one or in batch if API supports
             // For now, iterate and restore to ensure they go back to the right group
-            const results = await Promise.all(deletedTasksBuffer.map(task => 
+            const results = await Promise.all(deletedTasksBuffer.map(task =>
                 fetch("/api/tasks", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -725,34 +725,34 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
     const handleTasksDelete = useCallback(async (ids: string[]) => {
         if (!ids.length) return;
-        
+
         const tasksToDelete = tasks.filter(t => ids.includes(t.id));
-        
+
         try {
             const res = await fetch("/api/tasks/batch", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ids }),
             });
-            
+
             if (!res.ok) throw new Error("Batch delete failed");
-            
+
             const data = await res.json();
             setTasks(prev => prev.filter(t => !ids.includes(t.id)));
             setDeletedTasksBuffer(tasksToDelete);
-            
-            setToast({ 
-                isVisible: true, 
+
+            setToast({
+                isVisible: true,
                 message: `🗑️ ลบงาน ${data.deletedCount} รายการเรียบร้อยแล้ว`,
                 action: {
                     label: "เลิกทำ (UNDO)",
                     onClick: handleUndo
                 }
             });
-            
+
             // Clear selections if they were deleted
             updateState({ selectedTaskIds: [] });
-            
+
             // RC50: Record event
             recordEvent(workspaceId, 'tasks_deleted_batch', ids[0], { count: ids.length });
 
@@ -811,10 +811,10 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     const listIdFromUrl = searchParams.get('list_id');
 
     const creationDefaults = useMemo(() => {
-        const ctx = buildCreationContext({ 
-            workspaceId, 
-            workspaceType: ws?.type, 
-            mode: state.viewMode, 
+        const ctx = buildCreationContext({
+            workspaceId,
+            workspaceType: ws?.type,
+            mode: state.viewMode,
             launchSource: 'global',
             topicId: topicIdFromUrl || state.inlineQuickAddTopicId,
             packageId: packageIdFromUrl,
@@ -855,7 +855,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
     if (!ws) return null;
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-50/50">
+        <div className="min-h-full flex flex-col bg-gray-50/50">
             <AreasToolbar
                 title={ws.label}
                 state={state}
@@ -929,7 +929,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         </div>
                     </div>
 
-                    <button 
+                    <button
                         onClick={handleRestoreIntelligence}
                         title="คืนค่ารายการที่ซ่อน (Restore Hidden)"
                         className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-400 hover:text-indigo-600 transition-colors shrink-0"
@@ -941,7 +941,7 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         <div className="p-1.5 bg-white rounded-xl shadow-sm border border-neutral-100 text-neutral-400 group-hover:text-black transition-colors shrink-0">
                             <ArrowRight size={14} />
                         </div>
-                        
+
                         <div className="flex flex-col min-w-0 flex-1">
                             {headerTaskResult && (
                                 <div className="flex items-center gap-2 mb-0.5">
@@ -962,14 +962,14 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                                     )}
                                     {microInsight && (
                                         <span className={`text-[9px] font-bold px-1.5 rounded-md border animate-in slide-in-from-left-2 duration-500 ${
-                                            microInsight.type === 'success' ? 'text-green-600 bg-green-50 border-green-100' : 
+                                            microInsight.type === 'success' ? 'text-green-600 bg-green-50 border-green-100' :
                                             microInsight.type === 'nudge' ? 'text-amber-600 bg-amber-50 border-amber-100' :
                                             'text-blue-600 bg-blue-50 border-blue-100'
                                         }`}>
                                             {microInsight.message}
                                         </span>
                                     )}
-                                    <button 
+                                    <button
                                         onClick={() => setIsInsightModalOpen(true)}
                                         className="ml-1 p-1 bg-white text-amber-500 rounded-md border border-neutral-100 shadow-sm hover:scale-110 transition-transform"
                                         title="View Insights"
@@ -1069,38 +1069,38 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                         ) : (
                             <>
                                 {state.isQuickAddOpen && (
-                                    <Modal 
-                                        isOpen={state.isQuickAddOpen} 
-                                        onClose={() => updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null })} 
+                                    <Modal
+                                        isOpen={state.isQuickAddOpen}
+                                        onClose={() => updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null })}
                                         title="Quick Add Task"
                                         hideBackdrop={true}
                                     >
-                                        <QuickAddTask 
-                                            workspaceId={workspaceId} 
-                                            initialStatus={creationDefaults.status} 
-                                            initialListId={creationDefaults.listId} 
-                                            initialPackageId={creationDefaults.packageId} 
-                                            initialTopicId={creationDefaults.topicId} 
+                                        <QuickAddTask
+                                            workspaceId={workspaceId}
+                                            initialStatus={creationDefaults.status}
+                                            initialListId={creationDefaults.listId}
+                                            initialPackageId={creationDefaults.packageId}
+                                            initialTopicId={creationDefaults.topicId}
                                             initialTopicTitle={state.inlineQuickAddTopicTitle ? (state.inlineQuickAddTopicTitle.includes(" — ") ? state.inlineQuickAddTopicTitle.split(" — ")[1] : state.inlineQuickAddTopicTitle) : null}
                                             initialParentTaskId={creationDefaults.parentTaskId}
                                             initialStepKey={creationDefaults.packageStepKey}
-                                            launchSource="global" 
-                                            onCreated={(task) => { 
-                                                setTasks(prev => [task, ...prev]); 
-                                                updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null, selectedTaskId: task.id, lastActiveTaskId: task.id }); 
-                                                fetchTasks(false); 
-                                            }} 
-                                            onCancel={() => updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null })} 
+                                            launchSource="global"
+                                            onCreated={(task) => {
+                                                setTasks(prev => [task, ...prev]);
+                                                updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null, selectedTaskId: task.id, lastActiveTaskId: task.id });
+                                                fetchTasks(false);
+                                            }}
+                                            onCancel={() => updateState({ isQuickAddOpen: false, inlineQuickAddTopicId: null, inlineQuickAddTopicTitle: null })}
                                         />
                                     </Modal>
                                 )}
-                                <AreasTaskList 
-                                    workspaceId={workspaceId} 
-                                    tasks={tasks} 
-                                    state={state} 
-                                    onTaskClick={(t: Task) => router.push(`?taskId=${t.id}`)} 
-                                    onTaskUpdate={handleTaskUpdate} 
-                                    onQuickComplete={handleQuickComplete} 
+                                <AreasTaskList
+                                    workspaceId={workspaceId}
+                                    tasks={tasks}
+                                    state={state}
+                                    onTaskClick={(t: Task) => router.push(`?taskId=${t.id}`)}
+                                    onTaskUpdate={handleTaskUpdate}
+                                    onQuickComplete={handleQuickComplete}
                                     onTaskCreated={() => fetchTasks(false)}
                                     updateState={updateState}
                                     highlightedTaskIds={highlightedTaskIds}
@@ -1108,18 +1108,18 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
                                     onTasksDelete={handleTasksDelete}
                                 />
                                 <Toast isVisible={toast.isVisible} message={toast.message} action={toast.action} onClose={() => setToast({ ...toast, isVisible: false })} />
-                                <CreateContentPackageModal 
-                                    isOpen={isCreatePackageModalOpen} 
+                                <CreateContentPackageModal
+                                    isOpen={isCreatePackageModalOpen}
                                     onClose={() => {
                                         const params = new URLSearchParams(searchParams.toString());
                                         params.delete('createPackage');
                                         router.push(`?${params.toString()}`);
-                                    }} 
-                                    onSuccess={(data) => { 
-                                        fetchTasks(false); 
-                                        setHighlightedTaskIds(data.taskIds); 
-                                        setTimeout(() => setHighlightedTaskIds([]), 5000); 
-                                    }} 
+                                    }}
+                                    onSuccess={(data) => {
+                                        fetchTasks(false);
+                                        setHighlightedTaskIds(data.taskIds);
+                                        setTimeout(() => setHighlightedTaskIds([]), 5000);
+                                    }}
                                 />
                                 <CreateListModal
                                     isOpen={isNewListModalOpen}
@@ -1151,9 +1151,9 @@ export default function WorkspaceDetailClient({ workspaceId }: { workspaceId: st
 
             <WorkspaceSwitcher isOpen={isSwitcherOpen} currentWorkspaceId={workspaceId} onClose={() => setIsSwitcherOpen(false)} onSelect={handleWorkspaceSelect} />
 
-            <InsightSummaryModal 
-                isOpen={isInsightModalOpen} 
-                onClose={() => setIsInsightModalOpen(false)} 
+            <InsightSummaryModal
+                isOpen={isInsightModalOpen}
+                onClose={() => setIsInsightModalOpen(false)}
                 report={report}
                 suggestions={suggestions}
                 onReset={handleResetLearning}

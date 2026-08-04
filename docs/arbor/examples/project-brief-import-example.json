@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "workos-arbor-import-v0.1",
+  "source": "Arbor Project Planner",
+  "importBatchTitle": "AVAONE-SYSTEM — Avaone Content System v1",
+  "items": [
+    {
+      "type": "project",
+      "title": "Avaone Content System v1",
+      "status": "planned"
+    },
+    {
+      "type": "note",
+      "targetProject": "Avaone Content System v1",
+      "title": "Project Brief — Avaone Content System v1",
+      "content": "# Avaone Content System v1 Project Brief\n\nโครงการพัฒนาระบบบริหารจัดการข้อมูลและจัดจำหน่ายเนื้อหาสำหรับ Avaone เพื่อรองรับความต้องการใช้งาน Content Hub และการลิงก์ความสัมพันธ์ระหว่างชิ้นงานต่าง ๆ\n\n## เป้าหมายและขอบเขต\n1. จัดเตรียมโครงสร้างระบบจัดเก็บข้อมูล (Data Schema) ให้มีความทนทาน\n2. ออกแบบ API Endpoints ให้สามารถดึงข้อมูลแบบมีประสิทธิภาพ\n3. จัดระบบประวัติการทำงานให้ง่ายต่อการตรวจสอบย้อนหลัง (Audit Log)"
+    },
+    {
+      "type": "task",
+      "targetProject": "Avaone Content System v1",
+      "title": "System Design: ออกแบบสถาปัตยกรรมระบบ Avaone Content System v1",
+      "status": "planned",
+      "workspace": "other"
+    },
+    {
+      "type": "task",
+      "targetProject": "Avaone Content System v1",
+      "title": "DB Migration: พัฒนาตารางข้อมูลสำหรับเก็บบันทึก Content Metadata",
+      "status": "planned",
+      "workspace": "other"
+    },
+    {
+      "type": "task",
+      "targetProject": "Avaone Content System v1",
+      "title": "API Endpoints: พัฒนา API สำหรับเชื่อมโยงบทความกับ Task การทำงาน",
+      "status": "planned",
+      "workspace": "other"
+    }
+  ]
+}
