@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "workos-writing-lab-update-v0.1",
+  "source": "Arbor",
+  "importBatchTitle": "Analytics Import - GA4 24h",
+  "action": "apply_update",
+  "target": {
+    "type": "writing_lab_project",
+    "projectId": "proj_01gh7v8a34b281",
+    "projectSlug": "golden-pea-amino-acid-guide"
+  },
+  "fields": {
+    "performanceFeedback": {
+      "ga4Snapshots": {
+        "snap24h": {
+          "snapshotDate": "2026-07-01",
+          "window": "24h",
+          "views": 320,
+          "activeUsers": 290,
+          "events": 700,
+          "averageEngagementTime": 140,
+          "bounceRate": "34%",
+          "sourceMedium": "/library/golden-pea-amino-acid-guide",
+          "notes": "สถิตินำเข้าสำหรับการติดตามผลลัพธ์แรกเริ่ม"
+        }
+      },
+      "sourceMetadata": {
+        "sourceFileName": "Pasted Text",
+        "sourceType": "GA4",
+        "snapshotWindow": "24h",
+        "snapshotDate": "2026-07-01",
+        "matchedBy": "exact_url",
+        "matchConfidence": "High",
+        "rawSourceSummary": "Page path and screen class\tViews\tActive users\tAverage engagement time\tEvent count\n/library/golden-pea-amino-acid-guide\t320\t290\t140\t700",
+        "importNote": "สถิติในรอบ 24 ชั่วโมงแรกของการเปิดตัว"
+      }
+    }
+  }
+}

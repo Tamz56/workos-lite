@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "workos-writing-lab-update-v0.1",
+  "source": "Arbor",
+  "importBatchTitle": "Green Fineness Feedback Snapshot - July 2026",
+  "action": "apply_update",
+  "target": {
+    "type": "writing_lab_project",
+    "projectId": "proj_01gh7v8a34b281",
+    "projectSlug": "golden-pea-amino-acid-guide"
+  },
+  "fields": {
+    "performanceFeedback": {
+      "facebookSnapshots": {
+        "snap24h": {
+          "snapshotDate": "2026-07-01",
+          "window": "24h",
+          "platform": "facebook_page",
+          "postUrl": "https://facebook.com/greenfineness/posts/12345",
+          "publishedDate": "2026-06-30",
+          "reach": 1200,
+          "reactions": 85,
+          "comments": 24,
+          "shares": 12,
+          "linkClicks": 110,
+          "saves": 35,
+          "notableComments": "ลูกค้ายืนยันว่าอ่านเข้าใจง่ายและชอบรูป Infographic มาก",
+          "audienceQuestions": "ถามเรื่องปริมาณการทานที่เหมาะสมสำหรับอายุ 50+",
+          "confusion": "สับสนเรื่องความต่างระหว่าง Pea Protein ธรรมดากับอะมิโนสกัดแยก",
+          "audienceLanguage": "เรียกว่า 'โปรตีนช้อนทอง' หรือ 'ถั่วทองคำ'",
+          "notes": "ยอดแชร์และบันทึกค่อนข้างสูงใน 24 ชม. แรก"
+        },
+        "snap7d": {
+          "snapshotDate": "2026-07-07",
+          "window": "7d",
+          "platform": "facebook_page",
+          "postUrl": "https://facebook.com/greenfineness/posts/12345",
+          "publishedDate": "2026-06-30",
+          "reach": 3500,
+          "reactions": 240,
+          "comments": 58,
+          "shares": 45,
+          "linkClicks": 380,
+          "saves": 90,
+          "notableComments": "มีเพจอื่นแชร์ไปชื่นชมต่อเรื่องข้อมูลเชิงลึก",
+          "audienceQuestions": "ถามเรื่องราคา โปรโมชั่น และสถานที่จำหน่าย",
+          "confusion": "",
+          "audienceLanguage": "ถั่วลันเตาสกัดอะมิโน",
+          "notes": "สถิติเติบโตสม่ำเสมอหลังผ่านไป 1 สัปดาห์"
+        }
+      },
+      "ga4Snapshots": {
+        "snap24h": {
+          "snapshotDate": "2026-07-01",
+          "window": "24h",
+          "publishedUrl": "https://greenfineness.com/library/golden-pea-amino-acid-guide",
+          "pageTitle": "คู่มือกรดอะมิโนจากถั่วลันเตาสีทอง",
+          "views": 450,
+          "activeUsers": 380,
+          "events": 900,
+          "averageEngagementTime": 145,
+          "bounceRate": "38%",
+          "sourceMedium": "fb / post",
+          "organicUsers": 20,
+          "referralUsers": 10,
+          "notes": "เฉลี่ยเวลาอ่านค่อนข้างนาน (เกือบ 2.5 นาที) แสดงว่าเนื้อหาตอบโจทย์"
+        },
+        "snap7d": {
+          "snapshotDate": "2026-07-07",
+          "window": "7d",
+          "publishedUrl": "https://greenfineness.com/library/golden-pea-amino-acid-guide",
+          "pageTitle": "คู่มือกรดอะมิโนจากถั่วลันเตาสีทอง",
+          "views": 1800,
+          "activeUsers": 1450,
+          "events": 3200,
+          "averageEngagementTime": 160,
+          "bounceRate": "35%",
+          "sourceMedium": "fb / post",
+          "organicUsers": 120,
+          "referralUsers": 45,
+          "notes": "เริ่มมีทราฟฟิกออแกนิกเข้ามาจาก Google Search"
+        }
+      },
+      "combinedAnalysis": {
+        "performanceSummary": "บทความนี้ประสบความสำเร็จสูงด้านการให้ความรู้ (Knowledge) ทราฟฟิกส่วนใหญ่มาจาก Facebook Page แต่เริ่มมีสัญญาณออแกนิกที่ดีใน 7 วันแรก",
+        "distributionSignal": "Reach ดีมากบน Facebook Page ด้วยภาพ Infographic แต่บน Group ยังเฉยๆ",
+        "websiteSignal": "Average Engagement Time 160s แสดงถึงความสนใจอ่านจนจบสูงมาก",
+        "topicSignal": "High (หัวข้อโปรตีนทางเลือกและกรดอะมิโนพรีเมียมได้รับการตอบรับดี)",
+        "hookSignal": "Strong (ประโยคเปิดหัวเรื่องจุดเด่นของอะมิโนสกัดได้รับความสนใจสูง)",
+        "imageSignal": "Excellent (Infographic ถั่วลันเตาสีทองช่วยเพิ่มยอดแชร์ 3 เท่า)",
+        "ctaSignal": "Medium (คนคลิกลิงก์เข้าเว็บไซต์สูง แต่ยอดแอดไลน์ยังไม่พุ่งมาก)",
+        "seoSignal": "Good (อันดับคีย์เวิร์ด 'อะมิโนถั่วลันเตา' ขยับขึ้นมาหน้า 3 ในสัปดาห์แรก)",
+        "commentSignal": "Inquisitive (คอมเมนต์ถามรายละเอียดสินค้าและการเปรียบเทียบเยอะ)",
+        "whatWorked": "การเปรียบเทียบสารอาหารแบบภาพ Infographic และเนื้อหาลึกกระชับ",
+        "whatDidNotWork": "เนื้อหาช่วงกลางยาวเกินไปเล็กน้อย อาจกระชับได้อีก",
+        "recommendedAction": "นำ Infographic ไปซอยทำเป็น Micro-content โพสต์ลง Facebook Page ซ้ำ พร้อมลิงก์กลับมาบทความหลัก"
+      },
+      "nextDecision": {
+        "decision": "Repost later",
+        "priority": "High",
+        "targetDate": "2026-07-15",
+        "notes": "เตรียมรีโพสต์ซ้ำในช่วงกลางเดือนด้วย Hook ใหม่เน้นเรื่องคุณค่าโภชนาการสำหรับวัย 50+"
+      }
+    }
+  }
+}

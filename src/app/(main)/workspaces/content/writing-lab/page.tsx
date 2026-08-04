@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { 
-    Map, 
-    Library, 
-    PenTool, 
-    RefreshCcw, 
+import {
+    Map,
+    Library,
+    PenTool,
+    RefreshCcw,
     Plus,
     List
 } from "lucide-react";
@@ -34,7 +34,7 @@ function WritingLabContent() {
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [selectedEpisodeId, setSelectedEpisodeId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ isVisible: boolean; message: string }>({ isVisible: false, message: "" });
-    
+
     const [storySets, setStorySets] = useState<any[]>([]);
     const [projects, setProjects] = useState<any[]>([]);
 
@@ -45,7 +45,7 @@ function WritingLabContent() {
                 fetch("/api/content/writing-lab/story-sets", { cache: 'no-store' }),
                 fetch("/api/content/writing-lab/projects", { cache: 'no-store' })
             ]);
-            
+
             if (ssRes.ok) {
                 const ssData = await ssRes.json();
                 setStorySets(ssData);
@@ -56,6 +56,7 @@ function WritingLabContent() {
             }
         } catch (error) {
             console.error("Failed to fetch Lab data", error);
+            setToast({ isVisible: true, message: "⚠️ ไม่สามารถโหลดข้อมูล Writing Lab ได้ กรุณากดปุ่มลองใหม่อีกครั้ง" });
         } finally {
             if (!background) setLoading(false);
         }
@@ -143,9 +144,9 @@ function WritingLabContent() {
                     </div>
                     <p className="text-sm font-medium text-theme-secondary mt-1">Story Map → Writing Studio → Content Library</p>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
-                    <button 
+                    <button
                         onClick={handleSeed}
                         disabled={seeding}
                         className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 border border-neutral-200 dark:border-slate-700/60 rounded-xl text-sm font-bold text-neutral-600 dark:text-theme-secondary hover:bg-neutral-50 dark:hover:bg-slate-700 transition-all shadow-sm disabled:opacity-50"
@@ -153,7 +154,7 @@ function WritingLabContent() {
                         <RefreshCcw className={`w-4 h-4 ${seeding ? 'animate-spin' : ''}`} />
                         {seeding ? 'Seeding...' : 'Seed Data'}
                     </button>
-                    <button 
+                    <button
                         onClick={() => handleOpenCreateProject()}
                         className="flex items-center gap-2 px-6 py-2.5 bg-black dark:bg-slate-800 border border-transparent dark:border-slate-700 text-white dark:text-theme-primary rounded-xl text-sm font-black hover:bg-neutral-800 dark:hover:bg-slate-700 transition-all shadow-sm"
                     >
@@ -165,28 +166,28 @@ function WritingLabContent() {
 
             {/* Tabs */}
             <div className="flex items-center gap-1 bg-neutral-200/50 dark:bg-theme-panel/60 p-1.5 rounded-2xl w-fit mb-8 border border-transparent dark:border-theme-border/40">
-                <button 
+                <button
                     onClick={() => setActiveTab("story-map")}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "story-map" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
                 >
                     <Map className="w-4 h-4" />
                     Story Map
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab("episode-backlog")}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "episode-backlog" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
                 >
                     <List className="w-4 h-4" />
                     Episode Backlog
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab("writing-studio")}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "writing-studio" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
                 >
                     <PenTool className="w-4 h-4" />
                     Writing Studio
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab("content-library")}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "content-library" ? "bg-white dark:bg-theme-card/80 text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-primary dark:hover:text-slate-200"}`}
                 >
@@ -198,36 +199,36 @@ function WritingLabContent() {
             {/* Tab Content */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {activeTab === "story-map" && (
-                    <StoryMapTab 
-                        storySets={storySets} 
+                    <StoryMapTab
+                        storySets={storySets}
                         projects={projects}
-                        loading={loading} 
-                        onRefresh={() => fetchData(true)} 
+                        loading={loading}
+                        onRefresh={() => fetchData(true)}
                         onSelectEpisode={handleSelectEpisode}
                     />
                 )}
                 {activeTab === "episode-backlog" && (
-                    <EpisodeBacklogTab 
-                        storySets={storySets} 
+                    <EpisodeBacklogTab
+                        storySets={storySets}
                         projects={projects}
-                        loading={loading} 
+                        loading={loading}
                         onRefresh={() => fetchData(true)}
                         onSelectEpisode={handleSelectEpisode}
                     />
                 )}
                 {activeTab === "content-library" && (
-                    <ContentLibraryTab 
-                        projects={projects} 
-                        loading={loading} 
-                        onSelectProject={handleSelectProject} 
-                        onRefresh={() => fetchData(true)} 
+                    <ContentLibraryTab
+                        projects={projects}
+                        loading={loading}
+                        onSelectProject={handleSelectProject}
+                        onRefresh={() => fetchData(true)}
                     />
                 )}
                 {activeTab === "writing-studio" && (
-                    <WritingStudioTab 
+                    <WritingStudioTab
                         projectId={selectedProjectId}
-                        episodeId={selectedEpisodeId} 
-                        projects={projects} 
+                        episodeId={selectedEpisodeId}
+                        projects={projects}
                         storySets={storySets}
                         onCreateProject={() => handleOpenCreateProject()}
                         onSelectProject={handleSelectProject}
@@ -237,17 +238,17 @@ function WritingLabContent() {
                 )}
             </div>
 
-            <CreateLabResourceModal 
+            <CreateLabResourceModal
                 isOpen={isCreateProjectOpen}
                 onClose={() => setIsCreateProjectOpen(false)}
                 storySets={storySets}
                 onSuccess={handleProjectCreated}
             />
 
-            <Toast 
-                isVisible={toast.isVisible} 
-                message={toast.message} 
-                onClose={() => setToast({ ...toast, isVisible: false })} 
+            <Toast
+                isVisible={toast.isVisible}
+                message={toast.message}
+                onClose={() => setToast({ ...toast, isVisible: false })}
             />
         </div>
     );

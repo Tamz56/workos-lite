@@ -92,15 +92,73 @@ export interface Project {
     start_date: string | null;
     end_date: string | null;
     owner: string | null;
+    is_seed?: number;
+    category: string | null;
+    registry_status: ProjectRegistryStatus | null;
+    priority: ProjectPriority | null;
+    current_goal: string | null;
+    progress_stage: string | null;
+    next_action: string | null;
+    cadence: string | null;
+    risk_or_blocked_by: string | null;
+    metadata_updated_at: string | null;
     created_at: string;
     updated_at: string;
+}
+
+export type ProjectRegistryStatus =
+    | "idea"
+    | "planning"
+    | "active"
+    | "in_development"
+    | "testing"
+    | "in_use"
+    | "maintenance"
+    | "paused"
+    | "completed";
+
+export type ProjectProgressStage =
+    | "Concept"
+    | "Spec Ready"
+    | "Dev Ready"
+    | "In Dev"
+    | "QA"
+    | "Committed"
+    | "In Use"
+    | "Needs Improvement"
+    | "Paused";
+
+export type ProjectPriority = "high" | "medium" | "low" | "none";
+
+export interface CanonicalProjectRegistryMetadata {
+    category: string | null;
+    registry_status: ProjectRegistryStatus | null;
+    priority: ProjectPriority | null;
+    current_goal: string | null;
+    progress_stage: string | null;
+    next_action: string | null;
+    cadence: string | null;
+    risk_or_blocked_by: string | null;
+    metadata_updated_at: string | null;
+}
+
+export interface ProjectRegistryMetadata {
+    category: string;
+    status: ProjectRegistryStatus;
+    priority: ProjectPriority;
+    currentGoal: string;
+    progressStage: ProjectProgressStage;
+    nextAction: string;
+    cadence: string;
+    riskOrBlockedBy: string;
+    lastUpdated: string;
 }
 
 export interface ProjectItem {
     id: string;
     project_id: string;
     title: string;
-    status: "inbox" | "planned" | "done";
+    status: "inbox" | "planned" | "in_progress" | "drafted" | "ready_for_review" | "done" | "blocked" | "archived";
     priority: number | null;
     schedule_bucket: ScheduleBucket | null;
     start_date: string | null;
@@ -213,3 +271,64 @@ export type ProjectDocBlockEditablePayload = {
     appliedAt?: string;
     orderIndex?: number;
 };
+
+
+export type ProjectContentRoadmapStatus =
+  | "idea"
+  | "planned"
+  | "drafting"
+  | "review"
+  | "ready_to_publish"
+  | "published"
+  | "tracking"
+  | "needs_update"
+  | "paused";
+
+export type ProjectContentType =
+  | "narrative_article"
+  | "knowledge_article"
+  | "group_post"
+  | "page_post"
+  | "personal_post"
+  | "infographic"
+  | "short_video"
+  | "follow_up_post"
+  | "supporting_article"
+  | "legacy_article";
+
+export type ProjectContentLayer =
+  | "core_episode"
+  | "supporting_article"
+  | "social_post"
+  | "performance_followup"
+  | "visual_asset"
+  | "video_asset"
+  | "legacy_shell";
+
+export interface ProjectContentRoadmapItem {
+    id: string;
+    projectSlug: string;
+    episodeCode: string;
+    title: string;
+    contentType: ProjectContentType;
+    contentLayer: ProjectContentLayer;
+    seriesOrTheme?: string;
+    status: ProjectContentRoadmapStatus;
+    priority: "high" | "medium" | "low" | "none";
+    targetChannel?: string;
+    targetPublishDate?: string;
+    relatedMainEpisode?: string;
+    nextAction?: string;
+    notes?: string;
+    linkedWritingProjectId?: string;
+    linkedPublishedUrl?: string;
+    createdAt: string;
+    updatedAt: string;
+
+    // Additional optional fields for WORKOS-OPS-001C
+    orderIndex?: number;
+    contentGoal?: string;
+    reviewNote?: string;
+    sourceText?: string;
+    sourceType?: "manual" | "sheet_paste" | "chat_paste" | "arbor_parse";
+}

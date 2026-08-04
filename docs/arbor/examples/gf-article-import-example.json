@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "workos-arbor-import-v0.1",
+  "source": "Arbor ChatGPT Subagent",
+  "importBatchTitle": "GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+  "items": [
+    {
+      "type": "project",
+      "title": "Green Fineness Content",
+      "status": "planned"
+    },
+    {
+      "type": "article_note",
+      "targetProject": "Green Fineness Content",
+      "title": "GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+      "status": "draft",
+      "content": "# คัมภีร์โปรตีนพืชสำหรับมือใหม่\n\nโปรตีนจากพืช (Plant-based Protein) เป็นทางเลือกที่ดีสำหรับผู้ที่ต้องการรักษาสุขภาพ ลดการบริโภคเนื้อสัตว์ หรือทานมังสวิรัติ บทความนี้จะครอบคลุมถึงแหล่งโปรตีนชั้นดี วิธีการเลือกทานให้ครบถ้วน และประโยชน์ต่อร่างกาย\n\n## ประเด็นสำคัญ\n- แหล่งโปรตีนจากถั่ว, เมล็ดพืช และธัญพืช\n- การจัดคู่กรดอะมิโนให้ครบถ้วน\n- ปริมาณโปรตีนที่ควรได้รับต่อวันสำหรับคนแต่ละกลุ่ม",
+      "nextActions": [
+        "Claim Review: ตรวจสอบความถูกต้องทางการแพทย์เกี่ยวกับกรดอะมิโน",
+        "Image Brief: ออกแบบภาพประกอบและ Infographic แหล่งโปรตีน",
+        "SEO optimization: คำนวณ Keyword และ Meta description",
+        "Social distribution: เผยแพร่ผ่านทาง Facebook Group, Page, และ Personal Profile"
+      ],
+      "metadata": {
+        "author": "Arbor Content Bot",
+        "topic_id": "GF-ARTICLE-001",
+        "content_pillar": "Nutrition",
+        "journey_stage": "Awareness"
+      }
+    },
+    {
+      "type": "task",
+      "targetProject": "Green Fineness Content",
+      "title": "GF Article — Claim Review: GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+      "status": "planned",
+      "workspace": "content"
+    },
+    {
+      "type": "task",
+      "targetProject": "Green Fineness Content",
+      "title": "GF Article — Image Brief: GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+      "status": "planned",
+      "workspace": "content"
+    },
+    {
+      "type": "task",
+      "targetProject": "Green Fineness Content",
+      "title": "GF Article — SEO Fields: GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+      "status": "planned",
+      "workspace": "content"
+    },
+    {
+      "type": "task",
+      "targetProject": "Green Fineness Content",
+      "title": "GF Article — Facebook Group Post: GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+      "status": "planned",
+      "workspace": "content"
+    },
+    {
+      "type": "task",
+      "targetProject": "Green Fineness Content",
+      "title": "GF Article — Facebook Page Post: GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+      "status": "planned",
+      "workspace": "content"
+    },
+    {
+      "type": "task",
+      "targetProject": "Green Fineness Content",
+      "title": "GF Article — Personal Post: GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+      "status": "planned",
+      "workspace": "content"
+    },
+    {
+      "type": "task",
+      "targetProject": "Green Fineness Content",
+      "title": "GF Article — Analytics Tracking: GF-ARTICLE-001 — คัมภีร์โปรตีนพืชสำหรับมือใหม่",
+      "status": "planned",
+      "workspace": "content"
+    }
+  ]
+}
