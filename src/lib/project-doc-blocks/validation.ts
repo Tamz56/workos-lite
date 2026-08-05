@@ -115,7 +115,8 @@ export function checkImmutableFields(payload: Record<string, unknown>): string[]
         "id", "project_id", "projectId", "projectSlug", "created_at", "createdAt", "updated_at", "updatedAt",
         "importSource", "import_source", "importBatchId", "import_batch_id",
         "sourceRecordId", "source_record_id", "sourceRowNumber", "source_row_number",
-        "legacyProjectSlug", "legacy_project_slug"
+        "legacyProjectSlug", "legacy_project_slug",
+        "generatedBy", "generated_by"
     ];
     return Object.keys(payload).filter(k => immutable.includes(k));
 }

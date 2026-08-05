@@ -1166,7 +1166,6 @@ export default function ProjectDetailClient() {
                     relatedFiles: formFiles.split("\n").map(f => f.trim()).filter(Boolean),
                     status: formStatus,
                     nextAction: formNextAction.trim() || undefined,
-                    generatedBy: activeDocBlock.generatedBy,
                     reviewedByUser: activeDocBlock.reviewedByUser
                 };
                 await updateProjectDocBlockOnClient(

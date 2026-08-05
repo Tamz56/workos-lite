@@ -103,7 +103,7 @@ export function mapRowToBlock(row: DbProjectDocBlockRow, projectSlug: string): P
         ...(row.source_text && { sourceText: row.source_text }),
         ...(row.source_excerpt && { sourceExcerpt: row.source_excerpt }),
         ...(row.source_type && { sourceType: row.source_type }),
-        ...(row.generated_by && { generatedBy: (row.import_source === "localstorage_recovery") ? "arbor" as const : "arbor_assistant" as const }),
+        ...(row.generated_by && { generatedBy: row.generated_by as "arbor" | "arbor_assistant" }),
         reviewedByUser: row.reviewed_by_user === 1,
         ...(row.applied_at && { appliedAt: row.applied_at })
     };

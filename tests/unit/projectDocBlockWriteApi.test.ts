@@ -125,7 +125,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             expect(data.evidenceLinks).toEqual(payload.evidenceLinks);
             expect(data.relatedFiles).toEqual(payload.relatedFiles);
             expect(data.reviewedByUser).toBe(true);
-            expect(data.generatedBy).toBe("arbor_assistant");
+            expect(data.generatedBy).toBe("arbor");
             expect(data.createdAt).toBeDefined();
             expect(data.updatedAt).toBeDefined();
 
@@ -224,7 +224,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             );
             expect(response.status).toBe(201);
             const data = await response.json();
-            expect(data.generatedBy).toBe("arbor_assistant");
+            expect(data.generatedBy).toBe("arbor");
 
             // DB stores 'arbor' (column constraint only allows 'arbor' or NULL)
             const row = db.prepare("SELECT generated_by FROM project_doc_blocks WHERE id = ?").get(data.id) as { generated_by: string | null };
