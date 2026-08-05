@@ -418,3 +418,17 @@ export async function oversizedFileBytes(): Promise<Buffer> {
     buffer[3] = 0x04;
     return buffer;
 }
+
+export async function setDocCell(buffer: Buffer, rowNumber: number, columnIndex: number, value: unknown): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    workbook.getWorksheet("01_Project_Documentation").getCell(rowNumber, columnIndex).value = value === undefined ? undefined : value;
+    return toBuffer(workbook);
+}
+
+export async function setBacklogCell(buffer: Buffer, rowNumber: number, columnIndex: number, value: unknown): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    workbook.getWorksheet("02_Backlog").getCell(rowNumber, columnIndex).value = value === undefined ? undefined : value;
+    return toBuffer(workbook);
+}
