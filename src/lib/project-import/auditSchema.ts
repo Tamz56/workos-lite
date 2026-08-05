@@ -1,0 +1,183 @@
+// ---------------------------------------------------------------------------
+// WorkOS Project Field Sheet v1 — Audit schema (source-backed, idempotent)
+// WORKOS-SHEET-GATE-4B
+// ---------------------------------------------------------------------------
+
+import type Database from "better-sqlite3";
+
+export const AUDIT_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS import_batches (
+  id TEXT PRIMARY KEY,
+  dry_run_id TEXT NOT NULL,
+  schema_version TEXT NOT NULL,
+  parser_contract_version TEXT NOT NULL,
+  dry_run_contract_version TEXT NOT NULL,
+  workbook_id TEXT NULL,
+  batch_reference TEXT NULL,
+  source_system TEXT NULL,
+  source_filename TEXT NULL,
+  source_filename_sanitized TEXT NULL,
+  source_file_hash TEXT NOT NULL,
+  source_file_size INTEGER NOT NULL,
+  source_mime_type TEXT NULL,
+  timezone TEXT NULL,
+  prepared_by TEXT NULL,
+  batch_status TEXT NOT NULL DEFAULT 'dry_run_created' CHECK (batch_status IN ('dry_run_created','dry_run_invalid','ready_for_approval','partially_ready','approved','partially_approved','rejected','approval_expired','execution_started','executed','partially_executed','execution_failed','cancelled','retention_eligible','deleted')),
+  project_documentation_status TEXT NULL CHECK (project_documentation_status IN ('ready','ready_with_warnings','blocked','approved','rejected','expired','executed')),
+  backlog_status TEXT NULL CHECK (backlog_status IN ('ready','ready_with_warnings','blocked','approved','rejected','expired','executed')),
+  total_rows INTEGER NOT NULL DEFAULT 0,
+  new_rows INTEGER NOT NULL DEFAULT 0,
+  duplicate_rows INTEGER NOT NULL DEFAULT 0,
+  conflict_rows INTEGER NOT NULL DEFAULT 0,
+  review_required_rows INTEGER NOT NULL DEFAULT 0,
+  invalid_rows INTEGER NOT NULL DEFAULT 0,
+  skipped_rows INTEGER NOT NULL DEFAULT 0,
+  warning_count INTEGER NOT NULL DEFAULT 0,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  retention_eligible_at TEXT NULL,
+  payload_purged_at TEXT NULL,
+  deleted_at TEXT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_import_batches_dry_run_id ON import_batches(dry_run_id);
+CREATE INDEX IF NOT EXISTS idx_import_batches_file_hash ON import_batches(source_file_hash);
+CREATE INDEX IF NOT EXISTS idx_import_batches_status ON import_batches(batch_status);
+CREATE INDEX IF NOT EXISTS idx_import_batches_created_at ON import_batches(created_at);
+CREATE INDEX IF NOT EXISTS idx_import_batches_retention ON import_batches(retention_eligible_at);
+CREATE TRIGGER IF NOT EXISTS trg_import_batches_updated_at
+AFTER UPDATE ON import_batches
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE import_batches SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TABLE IF NOT EXISTS import_batch_rows (
+  id TEXT PRIMARY KEY,
+  batch_id TEXT NOT NULL REFERENCES import_batches(id) ON DELETE RESTRICT,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('project_documentation','backlog')),
+  worksheet_name TEXT NOT NULL,
+  source_row_number INTEGER NOT NULL,
+  external_row_id TEXT NULL,
+  project_slug TEXT NULL,
+  resolved_project_id TEXT NULL,
+  parser_status TEXT NOT NULL CHECK (parser_status IN ('valid','valid_with_warnings','invalid','skipped')),
+  dry_run_status TEXT NOT NULL CHECK (dry_run_status IN ('new','duplicate','conflict','review_required','invalid','skipped')),
+  proposed_operation TEXT NOT NULL CHECK (proposed_operation IN ('insert','none','manual_review')),
+  normalized_payload_json TEXT NULL,
+  validation_issue_codes_json TEXT NOT NULL DEFAULT '[]',
+  warning_count INTEGER NOT NULL DEFAULT 0,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  existing_record_reference TEXT NULL,
+  target_table TEXT NULL,
+  target_record_id TEXT NULL,
+  execution_status TEXT NOT NULL DEFAULT 'not_started' CHECK (execution_status IN ('not_started','attempted','committed','rolled_back','failed_before_write','skipped')),
+  execution_error_code TEXT NULL,
+  executed_at TEXT NULL,
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  last_attempt_reference TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_import_batch_rows_batch_entity ON import_batch_rows(batch_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_import_batch_rows_batch_sheet_row ON import_batch_rows(batch_id, worksheet_name, source_row_number);
+CREATE INDEX IF NOT EXISTS idx_import_batch_rows_project_entity_ext ON import_batch_rows(resolved_project_id, entity_type, external_row_id);
+CREATE INDEX IF NOT EXISTS idx_import_batch_rows_target ON import_batch_rows(target_record_id);
+CREATE TRIGGER IF NOT EXISTS trg_import_batch_rows_updated_at
+AFTER UPDATE ON import_batch_rows
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE import_batch_rows SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TABLE IF NOT EXISTS import_approvals (
+  id TEXT PRIMARY KEY,
+  batch_id TEXT NOT NULL REFERENCES import_batches(id) ON DELETE RESTRICT,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('project_documentation','backlog')),
+  approval_status TEXT NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending','approved','rejected','expired','revoked','consumed')),
+  approved_by TEXT NULL,
+  approved_at TEXT NULL,
+  expires_at TEXT NULL,
+  rejected_by TEXT NULL,
+  rejected_at TEXT NULL,
+  revoked_by TEXT NULL,
+  revoked_at TEXT NULL,
+  consumed_at TEXT NULL,
+  bound_file_hash TEXT NOT NULL,
+  bound_dry_run_id TEXT NOT NULL,
+  bound_schema_version TEXT NOT NULL,
+  bound_parser_contract_version TEXT NOT NULL,
+  bound_dry_run_contract_version TEXT NOT NULL,
+  approval_summary_fingerprint TEXT NOT NULL,
+  reason_or_note TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_import_approvals_batch_entity ON import_approvals(batch_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_import_approvals_expiry ON import_approvals(batch_id, entity_type, expires_at);
+CREATE INDEX IF NOT EXISTS idx_import_approvals_dry_run ON import_approvals(bound_dry_run_id);
+CREATE INDEX IF NOT EXISTS idx_import_approvals_file_hash ON import_approvals(bound_file_hash);
+
+CREATE TABLE IF NOT EXISTS import_approval_events (
+  id TEXT PRIMARY KEY,
+  approval_id TEXT NOT NULL REFERENCES import_approvals(id) ON DELETE RESTRICT,
+  event_type TEXT NOT NULL CHECK (event_type IN ('created','approved','rejected','expired','revoked','consumed')),
+  actor TEXT NULL,
+  occurred_at TEXT NULL,
+  event_code TEXT NULL,
+  safe_reason TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_import_approval_events_approval ON import_approval_events(approval_id);
+CREATE INDEX IF NOT EXISTS idx_import_approval_events_type ON import_approval_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_import_approval_events_created ON import_approval_events(created_at);
+
+CREATE TABLE IF NOT EXISTS import_execution_attempts (
+  id TEXT PRIMARY KEY,
+  batch_id TEXT NOT NULL REFERENCES import_batches(id) ON DELETE RESTRICT,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('project_documentation','backlog')),
+  approval_id TEXT NULL,
+  attempt_number INTEGER NOT NULL,
+  execution_status TEXT NOT NULL CHECK (execution_status IN ('started','committed','rolled_back','failed_before_write','failed','cancelled')),
+  started_at TEXT NULL,
+  finished_at TEXT NULL,
+  eligible_row_count INTEGER NOT NULL DEFAULT 0,
+  attempted_row_count INTEGER NOT NULL DEFAULT 0,
+  committed_row_count INTEGER NOT NULL DEFAULT 0,
+  skipped_row_count INTEGER NOT NULL DEFAULT 0,
+  rolled_back_row_count INTEGER NOT NULL DEFAULT 0,
+  failure_code TEXT NULL,
+  safe_failure_message TEXT NULL,
+  transaction_reference TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_import_attempts_batch_entity ON import_execution_attempts(batch_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_import_attempts_approval ON import_execution_attempts(approval_id);
+CREATE INDEX IF NOT EXISTS idx_import_attempts_created ON import_execution_attempts(created_at);
+
+CREATE TABLE IF NOT EXISTS import_cleanup_log (
+  id TEXT PRIMARY KEY,
+  batch_id TEXT NULL REFERENCES import_batches(id) ON DELETE SET NULL,
+  cleanup_action TEXT NOT NULL,
+  cleanup_scope TEXT NOT NULL,
+  initiated_by TEXT NULL,
+  reason TEXT NULL,
+  rows_affected INTEGER NOT NULL DEFAULT 0,
+  payloads_purged INTEGER NOT NULL DEFAULT 0,
+  records_deleted INTEGER NOT NULL DEFAULT 0,
+  started_at TEXT NULL,
+  completed_at TEXT NULL,
+  status TEXT NOT NULL DEFAULT 'started' CHECK (status IN ('started','completed','failed')),
+  error_code TEXT NULL,
+  safe_error_message TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_import_cleanup_batch ON import_cleanup_log(batch_id);
+CREATE INDEX IF NOT EXISTS idx_import_cleanup_status ON import_cleanup_log(status);
+`;
+
+export function ensureAuditSchema(db: Database.Database, log: (message: string) => void = console.log): void {
+    db.exec(AUDIT_SCHEMA_SQL);
+    log("WorkOS Sheet audit schema ensured");
+}

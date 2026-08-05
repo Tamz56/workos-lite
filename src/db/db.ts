@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { ensureProjectRegistryMetadataColumns } from "@/lib/projects/registryMetadata";
+import { ensureAuditSchema } from "@/lib/project-import/auditSchema";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -845,6 +846,7 @@ ensureProjectRegistryMetadataColumns(db);
 ensureNotes();
 ensureProjectDocBlocks();
 ensureArborWritingLab();
+ensureAuditSchema(db);
 if (!shouldSkipSeed) {
     seedArborWritingLab();
 }
