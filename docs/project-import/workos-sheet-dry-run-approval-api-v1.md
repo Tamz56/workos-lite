@@ -25,7 +25,7 @@ WorkOS-Lite has no full multi-user system. The safest source-backed boundary is 
 
 - header `x-agent-password` must equal `AGENT_UI_PASSWORD` (env)
 - server derives the actor from `AGENT_KEY` → `agent_keys` lookup (hash, `is_enabled=1`)
-- capability scopes from `agent_keys.scopes_json`: `project_import:read`, `project_import:dry_run`, `project_import:approve`, `project_import:reject`, `project_import:revoke` (plus `*` / `project_import:*`)
+- capability scopes from `agent_keys.scopes_json`: `project_import:read`, `project_import:dry_run`, `project_import:approve`, `project_import:reject`, `project_import:revoke`, `project_import:execute` (plus `*` / `project_import:*`)
 - actor identity (`approved_by` etc.) is always server-derived; client body never supplies identity
 - errors: `AUTHENTICATION_REQUIRED` (401), `IMPORT_READ_FORBIDDEN` / `IMPORT_DRY_RUN_FORBIDDEN` / `IMPORT_APPROVAL_FORBIDDEN` (403)
 
@@ -81,7 +81,7 @@ Returns per-entity approval state + append-only event history. **GET is read-onl
 
 - requires an active approved approval; appends `revoked`; revoked approval cannot be consumed
 
-Approval consumption is **not** exposed publicly (reserved for the future Execute Import service).
+Approval consumption is **not** exposed through this Gate; it happens inside the Gate 7A Execute Import API (`POST .../approvals/[entityType]/execute`), which requires the separate `project_import:execute` scope.
 
 ## 7. Approval Expiration
 

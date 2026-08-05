@@ -11,6 +11,7 @@ import type { PersistedDryRunBatch } from "@/lib/project-import/auditTypes";
 import { runWorkOSProjectFieldDryRun } from "@/lib/project-import/dryRunAssembler";
 import type { WorkOSProjectFieldDryRunResult } from "@/lib/project-import/dryRunTypes";
 import { createDryRunTestDatabase, seedProject } from "./dryRunTestDb";
+import { createExecutionTestDatabase } from "./executionTestDb";
 import { validWorkbook } from "./projectFieldSheetFixtures";
 
 export const TEST_PASSWORD = "test-pass";
@@ -54,6 +55,27 @@ export function createApiAuthDatabase(scopes: string[]): Database.Database {
             status TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
+        );
+    `);
+    db.prepare(
+        "INSERT INTO agent_keys (id, name, key_hash, scopes_json, is_enabled) VALUES (?, ?, ?, ?, 1)",
+    ).run("agent-test", "Test Agent", sha256(TEST_KEY), JSON.stringify(scopes));
+    return db;
+}
+
+/**
+ * Gate 7A execution-capable API database: full Gate 6 business schema plus the
+ * agent-key authentication table, so route tests can authenticate and execute.
+ */
+export function createApiExecutionAuthDatabase(scopes: string[]): Database.Database {
+    const db = createExecutionTestDatabase();
+    db.exec(`
+        CREATE TABLE agent_keys (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            key_hash TEXT NOT NULL,
+            scopes_json TEXT NULL,
+            is_enabled INTEGER NOT NULL DEFAULT 1
         );
     `);
     db.prepare(
