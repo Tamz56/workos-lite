@@ -450,7 +450,16 @@ function ensureProjectsAndSprints() {
           owner TEXT NULL,
           is_seed INTEGER DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          category TEXT NULL,
+          registry_status TEXT NULL,
+          priority TEXT NULL,
+          current_goal TEXT NULL,
+          progress_stage TEXT NULL,
+          next_action TEXT NULL,
+          cadence TEXT NULL,
+          risk_or_blocked_by TEXT NULL,
+          metadata_updated_at TEXT NULL
         );
         CREATE TRIGGER IF NOT EXISTS trg_projects_updated_at
         AFTER UPDATE ON projects

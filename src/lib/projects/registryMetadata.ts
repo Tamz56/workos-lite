@@ -89,23 +89,39 @@ interface ProjectSchemaDatabase {
     exec(sql: string): unknown;
 }
 
+function hasRegistryColumn(database: ProjectSchemaDatabase, column: string): boolean {
+    const columns = database.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+    return columns.some((row) => row.name === column);
+}
+
+function isDuplicateColumnError(error: unknown): boolean {
+    return error instanceof Error && /duplicate column name/i.test(error.message);
+}
+
 export function ensureProjectRegistryMetadataColumns(
     database: ProjectSchemaDatabase,
     log: (message: string) => void = console.log,
 ): string[] {
-    const existing = new Set(
-        (database.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>)
-            .map((column) => column.name),
-    );
     const added: string[] = [];
 
     try {
         for (const column of PROJECT_REGISTRY_COLUMNS) {
-            if (existing.has(column)) continue;
-            database.exec(
-                `ALTER TABLE projects ADD COLUMN ${column} ${REGISTRY_COLUMN_DEFINITIONS[column]}`,
-            );
-            added.push(column);
+            if (hasRegistryColumn(database, column)) continue;
+            try {
+                database.exec(
+                    `ALTER TABLE projects ADD COLUMN ${column} ${REGISTRY_COLUMN_DEFINITIONS[column]}`,
+                );
+                added.push(column);
+            } catch (error) {
+                // Concurrent workers (e.g. Next.js page-data workers) may run this ensure
+                // at the same time. If another process created the column between our
+                // check and our ALTER, SQLite reports "duplicate column name". Accept the
+                // race only after re-verifying that the exact expected column now exists.
+                if (isDuplicateColumnError(error) && hasRegistryColumn(database, column)) {
+                    continue;
+                }
+                throw error;
+            }
         }
     } catch (error) {
         log("Project registry metadata migration error");
