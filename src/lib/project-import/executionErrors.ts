@@ -1,0 +1,40 @@
+// ---------------------------------------------------------------------------
+// WorkOS Project Field Sheet v1 — Execute Import typed errors
+// WORKOS-SHEET-GATE-6
+// Messages are safe: never include payloads, SQL, paths, or stack traces.
+// ---------------------------------------------------------------------------
+
+export const EXECUTION_ERROR_CODES = {
+    BATCH_NOT_FOUND: "EXECUTION_BATCH_NOT_FOUND",
+    INVALID_ENTITY: "EXECUTION_INVALID_ENTITY",
+    APPROVAL_NOT_FOUND: "EXECUTION_APPROVAL_NOT_FOUND",
+    APPROVAL_EXPIRED: "EXECUTION_APPROVAL_EXPIRED",
+    APPROVAL_REVOKED: "EXECUTION_APPROVAL_REVOKED",
+    APPROVAL_CONSUMED: "EXECUTION_APPROVAL_CONSUMED",
+    APPROVAL_BINDING_MISMATCH: "EXECUTION_APPROVAL_BINDING_MISMATCH",
+    ENTITY_BLOCKED: "EXECUTION_ENTITY_BLOCKED",
+    NO_ELIGIBLE_ROWS: "EXECUTION_NO_ELIGIBLE_ROWS",
+    ALREADY_COMPLETED: "EXECUTION_ALREADY_COMPLETED",
+    ALREADY_IN_PROGRESS: "EXECUTION_ALREADY_IN_PROGRESS",
+    STALE_PROJECT: "EXECUTION_STALE_PROJECT",
+    STALE_DUPLICATE: "EXECUTION_STALE_DUPLICATE",
+    STALE_CONFLICT: "EXECUTION_STALE_CONFLICT",
+    STALE_REVIEW_REQUIRED: "EXECUTION_STALE_REVIEW_REQUIRED",
+    PROJECT_DOC_INSERT_FAILED: "EXECUTION_PROJECT_DOC_INSERT_FAILED",
+    BACKLOG_INSERT_FAILED: "EXECUTION_BACKLOG_INSERT_FAILED",
+    AUDIT_UPDATE_FAILED: "EXECUTION_AUDIT_UPDATE_FAILED",
+    TRANSACTION_ROLLED_BACK: "EXECUTION_TRANSACTION_ROLLED_BACK",
+    INTERNAL_ERROR: "EXECUTION_INTERNAL_ERROR",
+} as const;
+
+export type ExecutionErrorCode = (typeof EXECUTION_ERROR_CODES)[keyof typeof EXECUTION_ERROR_CODES];
+
+export class ExecutionError extends Error {
+    code: ExecutionErrorCode;
+
+    constructor(code: ExecutionErrorCode, message: string) {
+        super(message);
+        this.name = "ExecutionError";
+        this.code = code;
+    }
+}
