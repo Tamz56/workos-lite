@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { ensureProjectRegistryMetadataColumns } from "@/lib/projects/registryMetadata";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -831,10 +832,10 @@ export function seedArborWritingLab() {
 }
 
 ensureProjectsAndSprints();
+ensureProjectRegistryMetadataColumns(db);
 ensureNotes();
 ensureProjectDocBlocks();
 ensureArborWritingLab();
 if (!shouldSkipSeed) {
     seedArborWritingLab();
 }
-

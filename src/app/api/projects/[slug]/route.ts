@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { z } from "zod";
+import { PROJECT_PRIORITIES, PROJECT_REGISTRY_STATUSES } from "@/lib/projects/registryMetadata";
 
 const UpdateProjectSchema = z.object({
     name: z.string().min(1).optional(),
@@ -8,7 +9,27 @@ const UpdateProjectSchema = z.object({
     start_date: z.string().nullable().optional(),
     end_date: z.string().nullable().optional(),
     owner: z.string().nullable().optional(),
+    // Project Registry fields
+    category: z.string().nullable().optional(),
+    registry_status: z.enum(PROJECT_REGISTRY_STATUSES).optional(),
+    priority: z.enum(PROJECT_PRIORITIES).optional(),
+    current_goal: z.string().nullable().optional(),
+    progress_stage: z.string().nullable().optional(),
+    next_action: z.string().nullable().optional(),
+    cadence: z.string().nullable().optional(),
+    risk_or_blocked_by: z.string().nullable().optional(),
 });
+
+const REGISTRY_FIELDS = [
+    "category",
+    "registry_status",
+    "priority",
+    "current_goal",
+    "progress_stage",
+    "next_action",
+    "cadence",
+    "risk_or_blocked_by",
+] as const;
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
@@ -44,6 +65,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ slug
         if (parsed.start_date !== undefined) { sets.push("start_date = @start_date"); bind.start_date = parsed.start_date; }
         if (parsed.end_date !== undefined) { sets.push("end_date = @end_date"); bind.end_date = parsed.end_date; }
         if (parsed.owner !== undefined) { sets.push("owner = @owner"); bind.owner = parsed.owner; }
+
+        let registryChanged = false;
+        for (const field of REGISTRY_FIELDS) {
+            if (parsed[field] !== undefined) {
+                sets.push(`${field} = @${field}`);
+                bind[field] = parsed[field];
+                registryChanged = true;
+            }
+        }
+        if (registryChanged) {
+            sets.push("metadata_updated_at = datetime('now')");
+        }
 
         if (sets.length === 0) {
             return NextResponse.json(project);
