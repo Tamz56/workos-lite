@@ -26,6 +26,7 @@
     "better-sqlite3": "^12.5.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "form-data": "^4.0.5",
     "lucide-react": "^0.562.0",
     "marked": "^17.0.1",
@@ -54,8 +55,10 @@
     "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "jszip": "^3.10.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.9"
   }
 }
