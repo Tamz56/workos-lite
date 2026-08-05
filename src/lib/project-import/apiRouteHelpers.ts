@@ -57,6 +57,10 @@ export function isValidBatchId(value: string): boolean {
     return /^batch-[A-Za-z0-9-]+$/.test(value);
 }
 
+export function isValidApprovalId(value: string): boolean {
+    return /^apr-[A-Za-z0-9-]+$/.test(value);
+}
+
 export function apiErrorResponse(error: unknown, requestId?: string): Response {
     const body = toProjectImportApiErrorResponse(error, requestId);
     const status = error instanceof ProjectImportApiError ? error.status : 500;

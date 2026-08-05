@@ -16,7 +16,8 @@ export type ImportCapability =
     | "project_import:dry_run"
     | "project_import:approve"
     | "project_import:reject"
-    | "project_import:revoke";
+    | "project_import:revoke"
+    | "project_import:execute";
 
 export type ImportActor = {
     actorId: string;
@@ -39,6 +40,8 @@ function forbiddenCodeForCapability(capability: ImportCapability): string {
             return "IMPORT_READ_FORBIDDEN";
         case "project_import:dry_run":
             return "IMPORT_DRY_RUN_FORBIDDEN";
+        case "project_import:execute":
+            return "IMPORT_EXECUTE_FORBIDDEN";
         default:
             return "IMPORT_APPROVAL_FORBIDDEN";
     }
