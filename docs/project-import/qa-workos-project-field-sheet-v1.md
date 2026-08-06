@@ -80,6 +80,8 @@ File size: `40654` bytes. SHA-256: `9be008e7603cd007c1d5a52141b8993d13b53a3af35d
 
 | Check | Result |
 | --- | --- |
+| No sheet protection (user input never requires a password) | ✅ `sheetProtection` removed from all three sheets |
+| No workbook password / encryption / structure lock | ✅ |
 | No formulas in data range | ✅ (scan rows 5–500, 0 formulas) |
 | No merged cells in canonical data range (rows 5 onward) | ✅ |
 | Display-only merged cells exist only in allowed ranges (rows 1–3, Metadata row 14) | ✅ |
@@ -94,13 +96,15 @@ File size: `40654` bytes. SHA-256: `9be008e7603cd007c1d5a52141b8993d13b53a3af35d
 ## 7. Programmatic Verification Output
 
 ```text
-SHA-256: 9be008e7603cd007c1d5a52141b8993d13b53a3af35d68d582dc8b2e466b8b25
-Size bytes: 40654
+SHA-256: e8e95daab4245c7c6947217b7d486eae9eef53423b6d090d681e286650018171
+Size bytes: 40223
 Opens: OK
 Sheet names: ['00_Metadata', '01_Project_Documentation', '02_Backlog']
 Hidden sheets: []
 Macros (vba_archive): None
 External links: 0
+Sheet protection: none (all sheets editable without password)
+Workbook password/encryption: none
 Defined names: ['backlog_status_list', 'block_type_list', 'boolean_list', 'doc_status_list', 'schedule_bucket_list', 'source_type_list']
 
 [01_Project_Documentation] headers exact: True
@@ -130,7 +134,88 @@ Metadata merged ranges: ['A14:F14', 'A1:F1']
 Metadata merged in rows 5+ (allowed A14 only): ['A14:F14']
 schema_version cell B5: workos-field-sheet-v1
 timezone cell B10: Asia/Bangkok
+Metadata editable value cells B6:B12: OK
 ```
+
+---
+
+## 7b. Editability Fix (Revision)
+
+### User-observed problem
+
+Opening the template in Microsoft Excel and attempting to enter workbook metadata produced:
+
+```text
+The cell or chart you're trying to change is on a protected sheet.
+```
+
+### Root cause
+
+The workbook was generated with `openpyxl`, which by default locks every cell and enables sheet protection without a password:
+
+- All three sheets carried `<sheetProtection sheet="1" ... />`.
+- Only data rows 8–500 in `01_Project_Documentation` / `02_Backlog` had an unlocked style; row 7 (the sample row) and all of `00_Metadata` were locked.
+- The previous QA checked that the workbook "opens successfully" and validated values/structure, but never inspected worksheet protection configuration or cell protection flags, so the defect was not detected.
+
+### Fix applied
+
+Removed the `sheetProtection` element from all three worksheet XML files. No values, styles, validations, named ranges, filters, freeze panes, merges, or the sample row were changed (verified by a byte-level diff of the workbook package: the only difference is the removed `sheetProtection` elements).
+
+### Strategy
+
+User editability takes priority over cosmetic protection (per the approved template contract). Protection is removed entirely so Excel and Google Sheets both allow normal input without a password. Data validation dropdowns remain active and the importer remains the authoritative validator.
+
+### Programmatic editability QA
+
+Added `scripts/qa_workos_field_sheet_template_editability.py`, which verifies:
+
+1. Workbook opens and all three required sheets exist.
+2. No sheet protection, workbook password, encryption, or `fileSharing` attributes.
+3. Metadata value cells `B6:B12` are present and editable.
+4. Project Documentation rows 7–500 × 14 columns and Backlog rows 7–500 × 12 columns are present as editable input rows.
+5. Dropdown validations remain on `C7:C500`, `K7:K500`, `M7:M500`, `N7:N500` (Project Documentation) and `D7:D500`, `F7:F500`, `I7:I500` (Backlog).
+6. Headers, sample row, named ranges, filters, freeze panes, and merges are intact.
+7. An edit round-trip (write → save → reload) succeeds.
+
+Result:
+
+```text
+Template editability QA passed.
+```
+
+### Google Sheets compatibility
+
+With sheet protection removed, Google Sheets imports the workbook without Excel protection metadata; all intended input cells remain editable. Final Google Sheets behavior still requires the manual import check in Browser QA.
+
+### Excel visual/editability QA
+
+Manual Excel verification was completed by the user on the corrected workbook (Browser QA).
+
+Confirmed:
+
+- Metadata cells can be edited without a protection/password dialog.
+- Project Documentation data rows can be edited.
+- Backlog data rows can be edited.
+- The workbook saves successfully.
+- The saved workbook reopens successfully.
+- Entered data persists after reopening.
+- Sheet tabs, formatting, headers, filters, and layout remain present.
+
+Browser QA status:
+
+```text
+Template Editability Browser QA Passed
+```
+
+### Manual dropdown confirmation status
+
+The screenshots confirm editability and persistence, but the visible menus are AutoFilter menus from the header row. Cell-level data-validation dropdowns (`block_type`, `status`, `source_type`, `reviewed_by_user`, `schedule_bucket`, `is_milestone`) are therefore recorded as:
+
+```text
+Programmatically Passed / Manual Cell Dropdown Confirmation Pending
+```
+
+The automated gate (sheet protection removed + validation ranges present in rows 7–500) passes; final confirmation of the in-cell dropdown arrows remains a short manual check.
 
 ---
 
@@ -175,7 +260,7 @@ The template therefore validates `source_type` with the six source-contract valu
 
 ## 10. Final Result
 
-**Template v1 Passed / Ready for Commit**
+**Template v1 Editability Fix Passed / Ready for Commit**
 
 All sections above reflect the current final workbook:
 
@@ -184,6 +269,9 @@ All sections above reflect the current final workbook:
 - Backlog: AutoFilter `A5:L500`, display merges `A1:L1` / `A2:L2` / `A3:L3` only.
 - No merged cells in the canonical data range (rows 5 onward).
 - Headers, validations, named ranges, sample rows, formula/macro/external-link results unchanged from revision QA.
+- Sheet protection removed from all three sheets so every intended input cell is editable without a password.
+- Manual Excel editability, save/reopen persistence, and layout preservation confirmed (Browser QA).
+- Cell-level dropdown validation: programmatically passed; manual in-cell dropdown confirmation pending.
 
 No source code, API, database, or schema was modified. No importer was created.
 
@@ -199,3 +287,11 @@ The following stale statements from the pre-revision QA were corrected so every 
 - Safety QA: now distinguishes "no merges in rows 5 onward" from "display-only merges in allowed ranges".
 - Programmatic Verification Output: replaced with output generated from the current final workbook.
 - Final QA status unified to a single unambiguous value: `Template v1 Passed / Ready for Commit`.
+
+Editability revision additions:
+
+- Safety QA now records "no sheet protection" and "no workbook password/encryption".
+- Programmatic Verification Output updated with the new file hash/size and protection checks.
+- New section 7b documents the user-observed protection defect, root cause, fix, strategy, and the added programmatic editability QA.
+- Excel visual/editability QA completed (Browser QA passed); Google Sheets import verification remains a separate manual check.
+- Cell-level dropdown arrows still await manual confirmation; recorded as pending.

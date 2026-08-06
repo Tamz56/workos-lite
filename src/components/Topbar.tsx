@@ -39,6 +39,7 @@ export default function Topbar() {
         if (pathname.startsWith("/workspaces/travel/rose-trial") || pathname.startsWith("/workspaces/travel/trial-lab")) return "Nutrient Planner App";
         if (pathname.startsWith("/workspaces/astro-strategy")) return "Astro-Strategy Lab";
         if (pathname.startsWith("/workspaces/prompt-studio")) return "Prompt Studio";
+        if (pathname.startsWith("/workspaces/project-import")) return "Project Import";
 
         if (pathname.startsWith("/workspaces")) return "Areas";
         if (pathname.startsWith("/settings")) return "Settings";

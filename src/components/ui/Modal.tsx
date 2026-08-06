@@ -11,6 +11,9 @@ interface ModalProps {
     maxWidth?: string; // e.g. "max-w-2xl" or "max-w-4xl"
     hideBackdrop?: boolean;
     closeOnOutsideClick?: boolean;
+    focusRestoreRef?: React.RefObject<HTMLElement | null>;
+    focusTrap?: boolean;
+    dismissible?: boolean;
 }
 
 // Global list to track open modals in mount order
@@ -21,7 +24,18 @@ export function isAnyModalOpen() {
 }
 
 export function Modal(props: ModalProps) {
-    const { isOpen, title, onClose, children, maxWidth = "max-w-2xl", hideBackdrop = false, closeOnOutsideClick = true } = props;
+    const {
+        isOpen,
+        title,
+        onClose,
+        children,
+        maxWidth = "max-w-2xl",
+        hideBackdrop = false,
+        closeOnOutsideClick = true,
+        focusRestoreRef,
+        focusTrap = false,
+        dismissible = true,
+    } = props;
     const [mounted, setMounted] = React.useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
     const modalId = React.useId();
@@ -29,6 +43,8 @@ export function Modal(props: ModalProps) {
     React.useEffect(() => {
         setMounted(true);
         if (!isOpen) return;
+
+        const restoreTarget = focusRestoreRef?.current;
 
         // Add to stack only if not already present (stable mount order)
         if (!modalList.includes(modalId)) {
@@ -45,7 +61,7 @@ export function Modal(props: ModalProps) {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
                 // Only the topmost modal in the stack handles Escape
-                if (modalList[modalList.length - 1] === modalId) {
+                if (dismissible && modalList[modalList.length - 1] === modalId) {
                     e.preventDefault();
                     e.stopPropagation();
                     onClose();
@@ -53,14 +69,43 @@ export function Modal(props: ModalProps) {
             }
         };
 
+        const focusables = () => {
+            if (!containerRef.current) return [];
+            return Array.from(
+                containerRef.current.querySelectorAll<HTMLElement>(
+                    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                ),
+            );
+        };
+
+        const handleKeydown = (e: KeyboardEvent) => {
+            if (e.key !== "Tab" || !focusTrap || modalList[modalList.length - 1] !== modalId) return;
+            const items = focusables();
+            if (items.length === 0) return;
+            const first = items[0];
+            const last = items[items.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
+
         window.addEventListener("keydown", handleEsc, true);
+        if (focusTrap) window.addEventListener("keydown", handleKeydown, true);
         return () => {
             modalList = modalList.filter(id => id !== modalId);
-            
+
             window.removeEventListener("keydown", handleEsc, true);
+            if (focusTrap) window.removeEventListener("keydown", handleKeydown, true);
             document.body.style.overflow = originalOverflow || "unset";
+            if (restoreTarget && typeof restoreTarget.focus === "function") {
+                restoreTarget.focus();
+            }
         };
-    }, [isOpen, onClose, modalId]);
+    }, [isOpen, onClose, modalId, focusRestoreRef, focusTrap, dismissible]);
 
     if (!isOpen || !mounted) return null;
 
@@ -87,7 +132,8 @@ export function Modal(props: ModalProps) {
                 {/* Header - Compact */}
                 <div className="px-8 pt-8 pb-4 flex items-center justify-between gap-3 shrink-0">
                     <div className="text-2xl font-black text-neutral-900 tracking-tight">{title}</div>
-                    <button 
+                    {dismissible && (
+                        <button
                         className="w-10 h-10 flex items-center justify-center rounded-xl text-neutral-400 hover:bg-neutral-100 hover:text-black transition-all active:scale-90" 
                         onClick={onClose}
                         title="Close (Esc)"
@@ -97,6 +143,7 @@ export function Modal(props: ModalProps) {
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
+                    )}
                 </div>
                 
                 {/* Scrollable Body - Compact */}

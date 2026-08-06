@@ -74,6 +74,12 @@ describe("Import history queries", () => {
         expect(docRows.items.every((row) => row.entityType === "project_documentation")).toBe(true);
         expect(JSON.stringify(docRows)).not.toContain("normalized_payload");
         expect(JSON.stringify(docRows)).not.toContain("Details line 1");
+        const backlogRows = listRowsApi(db, batch.id, { page: 1, pageSize: 25, entityType: "backlog" });
+        expect(backlogRows.totalItems).toBe(2);
+        expect(backlogRows.items.every((row) => row.entityType === "backlog")).toBe(true);
+        const docIds = docRows.items.map((row) => row.externalRowId);
+        const backlogIds = backlogRows.items.map((row) => row.externalRowId);
+        expect(docIds.some((id) => backlogIds.includes(id))).toBe(false);
         db.close();
     });
 });
