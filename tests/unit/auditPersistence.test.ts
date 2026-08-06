@@ -10,7 +10,7 @@ import { listRowsByBatchEntity } from "@/lib/project-import/auditRowRepository";
 import { parseCanonicalJson } from "@/lib/project-import/auditSerialization";
 import { createAuditTestDatabase, tableColumns } from "../fixtures/auditTestDb";
 import { createDryRunTestDatabase, seedProject } from "../fixtures/dryRunTestDb";
-import { validWorkbook, workbookWithBlankRow } from "../fixtures/projectFieldSheetFixtures";
+import { validWorkbook, workbookWithBlankRow, workbookWithWhitespaceRows } from "../fixtures/projectFieldSheetFixtures";
 import type { WorkOSProjectFieldDryRunResult } from "@/lib/project-import/dryRunTypes";
 
 const SOURCE: PersistDryRunSource = {
@@ -66,12 +66,56 @@ describe("Dry-run audit persistence", () => {
     it("does not persist fully blank physical rows", async () => {
         const db = createAuditTestDatabase();
         const result = await buildResultFromWorkbook(await workbookWithBlankRow());
-        expect(result.totals.skippedRows).toBe(1);
+        // Blank capacity rows must be invisible: not counted as skipped, not
+        // counted as candidate rows.
+        expect(result.totals.skippedRows).toBe(0);
+        expect(result.totals.totalCandidateRows).toBe(4);
         const persisted = persistWorkOSProjectFieldDryRun(db, result, SOURCE);
         const batch = getBatch(db, persisted.id);
-        expect(batch.skipped_rows).toBe(1);
+        expect(batch.skipped_rows).toBe(0);
         expect(batch.total_rows).toBe(4);
         expect(persisted.rowIds).toHaveLength(4);
+        db.close();
+    });
+
+    it("ignores whitespace-only rows and 492 blank template rows without skipped counts", async () => {
+        const db = createAuditTestDatabase();
+        const result = await buildResultFromWorkbook(await workbookWithWhitespaceRows());
+        // 492 blank-capacity rows per sheet must not be counted as candidates or skipped.
+        expect(result.totals.totalCandidateRows).toBe(4);
+        expect(result.totals.skippedRows).toBe(0);
+        expect(result.entities.projectDocumentation.totalRows).toBe(2);
+        expect(result.entities.backlog.totalRows).toBe(2);
+        const persisted = persistWorkOSProjectFieldDryRun(db, result, SOURCE);
+        const batch = getBatch(db, persisted.id);
+        expect(batch.total_rows).toBe(4);
+        expect(batch.skipped_rows).toBe(0);
+        expect(persisted.rowIds).toHaveLength(4);
+        db.close();
+    });
+
+    it("keeps entity-specific new counts independent of the other entity", async () => {
+        const db = createAuditTestDatabase();
+        const result = await buildResult();
+        expect(result.entities.projectDocumentation.newRows).toBe(2);
+        expect(result.entities.backlog.newRows).toBe(2);
+        expect(result.totals.newRows).toBe(4);
+        db.close();
+    });
+
+    it("reports one new row per entity when each sheet has a single candidate", async () => {
+        const db = createAuditTestDatabase();
+        const { setDocCell, setBacklogCell } = await import("../fixtures/projectFieldSheetFixtures");
+        let workbook = await validWorkbook();
+        // Clear the second doc row (row 8) and second backlog row (row 8).
+        for (let col = 1; col <= 14; col++) workbook = await setDocCell(workbook, 8, col, undefined);
+        for (let col = 1; col <= 12; col++) workbook = await setBacklogCell(workbook, 8, col, undefined);
+        const result = await buildResultFromWorkbook(workbook);
+        expect(result.totals.totalCandidateRows).toBe(2);
+        expect(result.totals.newRows).toBe(2);
+        expect(result.totals.skippedRows).toBe(0);
+        expect(result.entities.projectDocumentation.newRows).toBe(1);
+        expect(result.entities.backlog.newRows).toBe(1);
         db.close();
     });
 

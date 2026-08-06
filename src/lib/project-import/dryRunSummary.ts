@@ -18,7 +18,7 @@ export function buildDryRunTotals(doc: DryRunEntityResult, backlog: DryRunEntity
         conflictRows: rows.filter((row) => row.dryRunStatus === "conflict").length,
         reviewRequiredRows: rows.filter((row) => row.dryRunStatus === "review_required").length,
         invalidRows: rows.filter((row) => row.dryRunStatus === "invalid").length,
-        skippedRows: (doc.totalRows - doc.rows.length) + (backlog.totalRows - backlog.rows.length),
+        skippedRows: rows.filter((row) => row.dryRunStatus === "skipped").length,
         warningCount: allIssues.filter((issue) => issue.severity === "warning").length,
         errorCount: allIssues.filter((issue) => issue.severity === "error").length,
     };

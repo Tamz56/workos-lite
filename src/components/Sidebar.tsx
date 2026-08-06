@@ -118,6 +118,7 @@ export function Sidebar() {
     const isAstroActive = pathname.startsWith("/workspaces/astro-strategy");
     const isWritingActive = pathname.startsWith("/workspaces/content/writing-lab");
     const isPromptActive = pathname.startsWith("/workspaces/prompt-studio") || pathname.startsWith("/workspaces/prompt-lite");
+    const isProjectImportActive = pathname.startsWith("/workspaces/project-import");
     const isBaActive = pathname.endsWith("/classroom");
     const isGfHubActive = pathname.startsWith("/workspaces/content/gf-hub");
 
@@ -263,6 +264,13 @@ export function Sidebar() {
                         label="Prompt Studio"
                         icon={<SparklesIcon className="w-5 h-5 text-sky-400" />}
                         active={isPromptActive}
+                        isCollapsed={isCollapsed}
+                    />
+                    <NavItem
+                        href="/workspaces/project-import"
+                        label="Project Import"
+                        icon={<TableCellsIcon className="w-5 h-5 text-emerald-400" />}
+                        active={isProjectImportActive}
                         isCollapsed={isCollapsed}
                     />
                 </div>

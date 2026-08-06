@@ -335,6 +335,21 @@ export async function workbookWithBlankRow(): Promise<Buffer> {
     return toBuffer(workbook);
 }
 
+export async function workbookWithWhitespaceRows(): Promise<Buffer> {
+    const workbook = buildBaseWorkbook();
+    const docSheet = documentationSheet(workbook);
+    const backlog = backlogSheet(workbook);
+    for (let row = 9; row <= 500; row++) {
+        for (let col = 1; col <= PROJECT_DOCUMENTATION_HEADERS.length; col++) {
+            docSheet.getCell(row, col).value = " ";
+        }
+        for (let col = 1; col <= BACKLOG_HEADERS.length; col++) {
+            backlog.getCell(row, col).value = " ";
+        }
+    }
+    return toBuffer(workbook);
+}
+
 export async function workbookWithStartDateAfterEndDate(): Promise<Buffer> {
     const workbook = buildBaseWorkbook();
     backlogSheet(workbook).getCell(7, 7).value = "2026-04-01";
