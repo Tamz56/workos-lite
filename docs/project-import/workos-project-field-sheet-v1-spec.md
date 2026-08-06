@@ -71,6 +71,16 @@ Rules:
 - No merged cells in rows 5 onward (the canonical data range).
 - No formulas in data rows.
 
+### Editability contract (v1)
+
+Template v1 ships **without worksheet protection** (no `sheetProtection`, no workbook password, no encryption). The "locked layout" above describes the structural contract, not cell-level protection:
+
+- `00_Metadata`: user-value cells `B6:B12` (`workbook_id`, `batch_reference`, `source_system`, `export_timestamp`, `timezone`, `prepared_by`, `notes`) are editable. `schema_version` (`B5`) is pre-filled and must not be changed.
+- `01_Project_Documentation`: all 14 canonical columns, rows 7–500, are editable.
+- `02_Backlog`: all 12 canonical columns, rows 7–500, are editable.
+
+Because protection is removed, users can type, paste, clear, and use dropdowns without a password prompt in Excel or Google Sheets. Data validation dropdowns and named ranges remain active; the importer remains the authoritative validator. Structural integrity is enforced by the spec and programmatic QA, not by sheet protection.
+
 ---
 
 ## 6. Metadata Contract
@@ -89,6 +99,8 @@ Rules:
 | `notes` | workbook-level notes | Optional |
 
 Values still to be filled by the user use `<...>` placeholders. `schema_version` and `timezone` are pre-filled.
+
+All value cells in column B except `B5` (`schema_version`) are editable input cells.
 
 ---
 
