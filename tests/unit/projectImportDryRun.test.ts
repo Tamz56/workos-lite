@@ -285,3 +285,38 @@ describe("Failure handling", () => {
         expect(result.entities.backlog.status).toBe("blocked");
     });
 });
+
+describe("POST-GATE-8-UX-001C entity status semantics", () => {
+    it("keeps info-only duplicate rows from raising ready_with_warnings (Test 1)", async () => {
+        const db = freshDb();
+        seedDocBlock(db, {
+            id: "doc-dup",
+            project_id: EXAMPLE_PROJECT_ID,
+            source_record_id: "TEST-DOC-001",
+            next_action: "Next step",
+            order_index: 1,
+        });
+        const result = await dryRun(await validWorkbook(), db);
+        const row = docRow(result, "TEST-DOC-001");
+        expect(row?.dryRunStatus).toBe("duplicate");
+        expect(row?.issues.every((issue) => issue.severity !== "warning")).toBe(true);
+        expect(result.entities.projectDocumentation.status).toBe("ready");
+        expect(result.entities.projectDocumentation.status).not.toBe("ready_with_warnings");
+    });
+
+    it("keeps real warning-severity issues at ready_with_warnings (Test 2)", async () => {
+        const db = freshDb();
+        seedDocBlock(db, {
+            id: "doc-sim",
+            project_id: EXAMPLE_PROJECT_ID,
+            source_record_id: "SIM-EXT",
+            title: "Fixture doc one",
+            block_date: "2026-01-05",
+            details_md: "Different content",
+        });
+        const result = await dryRun(await validWorkbook(), db);
+        const row = docRow(result, "TEST-DOC-001");
+        expect(row?.issues.some((issue) => issue.severity === "warning")).toBe(true);
+        expect(result.entities.projectDocumentation.status).toBe("ready_with_warnings");
+    });
+});

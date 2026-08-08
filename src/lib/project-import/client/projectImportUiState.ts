@@ -118,3 +118,137 @@ export function formatDateTime(iso: string | null | undefined): string {
 export function countEligibleNewRows(rows: UiPaginated<UiBatchRowItem> | null): number {
     return rows?.items.filter((row) => row.dryRunStatus === "new" && row.proposedOperation === "insert").length ?? 0;
 }
+
+// ---------------------------------------------------------------------------
+// Derived presentation semantics (POST-GATE-8-UX-001C)
+//
+// These helpers translate persisted audit/lifecycle statuses + counts into
+// user-facing presentation states. They are derived UI state only:
+// - never persisted
+// - never added to audit vocabulary
+// - actionability always comes from eligibleRows, never from a status string
+// ---------------------------------------------------------------------------
+
+export type EntityPresentationState =
+    | "actionable_ready"
+    | "actionable_with_warnings"
+    | "duplicate_only_no_action"
+    | "no_items"
+    | "manual_review"
+    | "blocked"
+    | "historical_fallback";
+
+export type PresentationTone = "ready" | "warning" | "blocked" | "muted" | "info";
+
+export type EntityPresentation = {
+    state: EntityPresentationState;
+    label: string;
+    tone: PresentationTone;
+};
+
+export type EntityPresentationInput = {
+    entityStatus: string | null;
+    eligibleRows: number;
+    duplicateRows: number;
+    warningCount: number;
+    rowStates?: ReadonlyArray<{ dryRunStatus: string }>;
+};
+
+/**
+ * Derive the user-facing presentation for one entity from persisted status +
+ * entity-scoped counts/rows.
+ *
+ * Priority order:
+ *   blocked / executed-like lifecycle statuses (raw fallback)
+ *   > manual review / invalid rows (never hidden behind no-action)
+ *   > actionable (eligibleRows > 0)
+ *   > warning-only no-action
+ *   > duplicate-only benign no-action
+ *   > empty entity
+ *   > historical fallback (raw status, safe rendering)
+ */
+export function deriveEntityPresentation(input: EntityPresentationInput): EntityPresentation {
+    const { entityStatus, eligibleRows, duplicateRows, warningCount, rowStates = [] } = input;
+    const hasInvalid = rowStates.some((row) => row.dryRunStatus === "invalid");
+    const hasManualReview = rowStates.some(
+        (row) => row.dryRunStatus === "conflict" || row.dryRunStatus === "review_required",
+    );
+
+    if (entityStatus === "blocked") {
+        return { state: "blocked", label: "blocked", tone: "blocked" };
+    }
+    if (hasManualReview || hasInvalid) {
+        return {
+            state: "manual_review",
+            label: hasInvalid ? "ไม่ถูกต้อง" : "ต้องตรวจสอบ",
+            tone: hasInvalid ? "blocked" : "warning",
+        };
+    }
+    if (eligibleRows > 0) {
+        return warningCount > 0
+            ? { state: "actionable_with_warnings", label: "พร้อมอนุมัติ — มีคำเตือน", tone: "warning" }
+            : { state: "actionable_ready", label: "พร้อมอนุมัติ", tone: "info" };
+    }
+    if (warningCount > 0) {
+        return { state: "manual_review", label: "มีคำเตือน — ต้องตรวจสอบ", tone: "warning" };
+    }
+    if (duplicateRows > 0 && entityStatus === "ready") {
+        return { state: "duplicate_only_no_action", label: "ซ้ำทั้งหมด — ไม่ต้องดำเนินการ", tone: "muted" };
+    }
+    if (entityStatus === "ready") {
+        return { state: "no_items", label: "ไม่มีรายการต้องนำเข้า", tone: "muted" };
+    }
+    // Historical/lifecycle statuses (e.g. ready_with_warnings + warningCount 0,
+    // approved, executed, expired) render as raw status, never as no-action.
+    return { state: "historical_fallback", label: entityStatus ?? "unknown", tone: "muted" };
+}
+
+export type BatchPresentation = {
+    label: string;
+    tone: PresentationTone;
+};
+
+export type BatchPresentationInput = {
+    batchStatus: string;
+    projectDocumentationStatus: string | null;
+    backlogStatus: string | null;
+    totals: {
+        totalRows: number;
+        newRows: number;
+        duplicateRows: number;
+        conflictRows: number;
+        reviewRequiredRows: number;
+        invalidRows: number;
+        warningCount: number;
+    };
+};
+
+// Batch presentation is derived only during the pre-approval lifecycle phase.
+// Later phases (approved / executed / ...) keep their raw lifecycle display.
+const ACTIONABLE_BATCH_LIFECYCLE = new Set(["dry_run_created", "ready_for_approval", "partially_ready"]);
+
+export function deriveBatchPresentation(input: BatchPresentationInput): BatchPresentation | null {
+    const { batchStatus, projectDocumentationStatus, backlogStatus, totals } = input;
+    if (!ACTIONABLE_BATCH_LIFECYCLE.has(batchStatus)) return null;
+
+    const anyBlocked = projectDocumentationStatus === "blocked" || backlogStatus === "blocked";
+    if (anyBlocked) {
+        return { label: "ต้องตรวจสอบ", tone: "blocked" };
+    }
+    const needsReview =
+        totals.conflictRows > 0 || totals.reviewRequiredRows > 0 || totals.invalidRows > 0;
+    if (needsReview) {
+        return { label: "ต้องตรวจสอบ", tone: "warning" };
+    }
+    if (totals.newRows > 0) {
+        return { label: "พร้อมอนุมัติ", tone: "info" };
+    }
+    const benignNoAction =
+        totals.totalRows > 0 &&
+        totals.duplicateRows === totals.totalRows &&
+        totals.warningCount === 0;
+    if (benignNoAction || totals.totalRows === 0) {
+        return { label: "ไม่มีรายการต้องนำเข้า", tone: "muted" };
+    }
+    return null;
+}

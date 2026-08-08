@@ -4,6 +4,25 @@
 // ---------------------------------------------------------------------------
 
 import type { DryRunEntityResult, DryRunTotals, WorkOSProjectFieldDryRunResult } from "./dryRunTypes";
+import type { ImportValidationIssue } from "./types";
+
+/**
+ * Canonical warning predicate shared by totals and entity status derivation.
+ *
+ * A "warning" is defined exclusively by issue severity === "warning".
+ * Info-severity diagnostics (e.g. EXISTING_IDENTITY_DUPLICATE,
+ * BACKLOG_EXACT_DUPLICATE) are NOT warnings and must not raise an entity to
+ * `ready_with_warnings`.
+ */
+export function hasWarningSeverityIssue(
+    rows: ReadonlyArray<{ issues: ImportValidationIssue[] }>,
+    issues: ReadonlyArray<ImportValidationIssue>,
+): boolean {
+    return (
+        issues.some((issue) => issue.severity === "warning") ||
+        rows.some((row) => row.issues.some((issue) => issue.severity === "warning"))
+    );
+}
 
 export function buildDryRunTotals(doc: DryRunEntityResult, backlog: DryRunEntityResult): DryRunTotals {
     const rows = [...doc.rows, ...backlog.rows];

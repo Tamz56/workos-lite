@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import {
     countEligibleNewRows,
+    deriveEntityPresentation,
     isApprovalValid,
     isEntityExecuted,
 } from "@/lib/project-import/client/projectImportUiState";
@@ -79,6 +80,13 @@ export function EntityReviewPanel({
     const canApprove = Boolean(detail && (detail[entityType === "project_documentation" ? "projectDocumentationStatus" : "backlogStatus"] !== "blocked") && eligibleRowCount > 0);
 
     const entityStatus = detail?.[entityType === "project_documentation" ? "projectDocumentationStatus" : "backlogStatus"];
+    const entityPresentation = deriveEntityPresentation({
+        entityStatus: entityStatus ?? null,
+        eligibleRows: eligibleRowCount,
+        duplicateRows: entityCounts.duplicateRows,
+        warningCount: entityCounts.warningCount,
+        rowStates: entityRows,
+    });
 
     const handleConfirm = async () => {
         try {
@@ -94,7 +102,7 @@ export function EntityReviewPanel({
                 <div>
                     <h2 className="text-lg font-black text-neutral-900">{entityLabel}</h2>
                     <div className="mt-1 flex items-center gap-2">
-                        <ImportStatusBadge label={entityStatus ?? "unknown"} tone={entityStatus === "executed" ? "success" : entityStatus === "blocked" ? "blocked" : entityStatus === "approved" ? "info" : "muted"} />
+                        <ImportStatusBadge label={entityPresentation.label} tone={entityPresentation.tone} />
                         {alreadyExecuted && <ImportStatusBadge label="นำเข้าแล้ว" tone="success" />}
                     </div>
                 </div>

@@ -20,6 +20,8 @@ import {
 import {
     classificationLabel,
     countEligibleNewRows,
+    deriveBatchPresentation,
+    deriveEntityPresentation,
     isApprovalValid,
     remainingTtlMinutes,
 } from "@/lib/project-import/client/projectImportUiState";
@@ -207,6 +209,173 @@ describe("Project Import UI client boundary", () => {
         const ok = new File([""], "good.xlsx");
         expect(validateUploadFile(ok)).toBeNull();
         expect(formatFileSize(2048)).toBe("2.0 KB");
+    });
+});
+
+describe("POST-GATE-8-UX-001C derived presentation helpers", () => {
+    it("duplicate-only entity → no-action, muted (Test 3)", () => {
+        const presentation = deriveEntityPresentation({
+            entityStatus: "ready",
+            eligibleRows: 0,
+            duplicateRows: 2,
+            warningCount: 0,
+        });
+        expect(presentation.state).toBe("duplicate_only_no_action");
+        expect(presentation.label).toBe("ซ้ำทั้งหมด — ไม่ต้องดำเนินการ");
+        expect(presentation.tone).toBe("muted");
+    });
+
+    it("actionable clean entity → พร้อมอนุมัติ (Test 7)", () => {
+        const presentation = deriveEntityPresentation({
+            entityStatus: "ready",
+            eligibleRows: 2,
+            duplicateRows: 0,
+            warningCount: 0,
+        });
+        expect(presentation.state).toBe("actionable_ready");
+        expect(presentation.label).toBe("พร้อมอนุมัติ");
+        expect(presentation.tone).toBe("info");
+    });
+
+    it("actionable with warning → warning presentation (Test 8)", () => {
+        const presentation = deriveEntityPresentation({
+            entityStatus: "ready_with_warnings",
+            eligibleRows: 1,
+            duplicateRows: 0,
+            warningCount: 1,
+        });
+        expect(presentation.state).toBe("actionable_with_warnings");
+        expect(presentation.label).toBe("พร้อมอนุมัติ — มีคำเตือน");
+        expect(presentation.tone).toBe("warning");
+    });
+
+    it("manual review rows override no-action even with zero eligible rows (Test 10)", () => {
+        const presentation = deriveEntityPresentation({
+            entityStatus: "ready",
+            eligibleRows: 0,
+            duplicateRows: 1,
+            warningCount: 0,
+            rowStates: [{ dryRunStatus: "review_required" }],
+        });
+        expect(presentation.state).toBe("manual_review");
+        expect(presentation.label).toBe("ต้องตรวจสอบ");
+    });
+
+    it("invalid rows are never benign no-action (Test 10b)", () => {
+        const presentation = deriveEntityPresentation({
+            entityStatus: "ready",
+            eligibleRows: 0,
+            duplicateRows: 0,
+            warningCount: 0,
+            rowStates: [{ dryRunStatus: "invalid" }],
+        });
+        expect(presentation.state).toBe("manual_review");
+        expect(presentation.label).toBe("ไม่ถูกต้อง");
+    });
+
+    it("blocked entity stays blocked (Test 9)", () => {
+        const presentation = deriveEntityPresentation({
+            entityStatus: "blocked",
+            eligibleRows: 0,
+            duplicateRows: 0,
+            warningCount: 0,
+        });
+        expect(presentation.state).toBe("blocked");
+    });
+
+    it("historical ready_with_warnings + warningCount 0 falls back to raw status (Test 11)", () => {
+        const presentation = deriveEntityPresentation({
+            entityStatus: "ready_with_warnings",
+            eligibleRows: 0,
+            duplicateRows: 2,
+            warningCount: 0,
+        });
+        expect(presentation.state).toBe("historical_fallback");
+        expect(presentation.label).toBe("ready_with_warnings");
+    });
+
+    it("empty entity is not labeled duplicate-only (Test 12)", () => {
+        const presentation = deriveEntityPresentation({
+            entityStatus: "ready",
+            eligibleRows: 0,
+            duplicateRows: 0,
+            warningCount: 0,
+        });
+        expect(presentation.state).toBe("no_items");
+        expect(presentation.label).toBe("ไม่มีรายการต้องนำเข้า");
+        expect(presentation.label).not.toContain("ซ้ำทั้งหมด");
+    });
+
+    it("batch with both entities duplicate-only → ไม่มีรายการต้องนำเข้า (Test 5)", () => {
+        const presentation = deriveBatchPresentation({
+            batchStatus: "ready_for_approval",
+            projectDocumentationStatus: "ready",
+            backlogStatus: "ready",
+            totals: {
+                totalRows: 2,
+                newRows: 0,
+                duplicateRows: 2,
+                conflictRows: 0,
+                reviewRequiredRows: 0,
+                invalidRows: 0,
+                warningCount: 0,
+            },
+        });
+        expect(presentation).toEqual({ label: "ไม่มีรายการต้องนำเข้า", tone: "muted" });
+    });
+
+    it("mixed batch stays actionable (Test 6)", () => {
+        const presentation = deriveBatchPresentation({
+            batchStatus: "ready_for_approval",
+            projectDocumentationStatus: "ready",
+            backlogStatus: "ready",
+            totals: {
+                totalRows: 2,
+                newRows: 1,
+                duplicateRows: 1,
+                conflictRows: 0,
+                reviewRequiredRows: 0,
+                invalidRows: 0,
+                warningCount: 0,
+            },
+        });
+        expect(presentation).toEqual({ label: "พร้อมอนุมัติ", tone: "info" });
+    });
+
+    it("batch with review-required rows is never no-action (Test 10 batch)", () => {
+        const presentation = deriveBatchPresentation({
+            batchStatus: "ready_for_approval",
+            projectDocumentationStatus: "ready",
+            backlogStatus: "ready",
+            totals: {
+                totalRows: 1,
+                newRows: 0,
+                duplicateRows: 0,
+                conflictRows: 1,
+                reviewRequiredRows: 0,
+                invalidRows: 0,
+                warningCount: 1,
+            },
+        });
+        expect(presentation).toEqual({ label: "ต้องตรวจสอบ", tone: "warning" });
+    });
+
+    it("later lifecycle batches are not derived (raw fallback via caller) (Test 11 batch)", () => {
+        const presentation = deriveBatchPresentation({
+            batchStatus: "executed",
+            projectDocumentationStatus: "executed",
+            backlogStatus: "executed",
+            totals: {
+                totalRows: 2,
+                newRows: 2,
+                duplicateRows: 0,
+                conflictRows: 0,
+                reviewRequiredRows: 0,
+                invalidRows: 0,
+                warningCount: 0,
+            },
+        });
+        expect(presentation).toBeNull();
     });
 });
 
