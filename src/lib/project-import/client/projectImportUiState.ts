@@ -119,6 +119,20 @@ export function countEligibleNewRows(rows: UiPaginated<UiBatchRowItem> | null): 
     return rows?.items.filter((row) => row.dryRunStatus === "new" && row.proposedOperation === "insert").length ?? 0;
 }
 
+/**
+ * Unresolved dry-run row states that block entity-wide approval/execution.
+ *
+ * Mirrors the authoritative server predicate (approval repository and
+ * execution service): approval must not be offered when any row is in one of
+ * these states. Duplicates/skipped rows and warning severity alone are NOT
+ * blockers; the decision is based on row state only.
+ */
+const UNRESOLVED_BLOCKING_ROW_STATUSES = new Set(["invalid", "conflict", "review_required"]);
+
+export function hasUnresolvedBlockingRows(rows: ReadonlyArray<{ dryRunStatus: string }> | null | undefined): boolean {
+    return (rows ?? []).some((row) => UNRESOLVED_BLOCKING_ROW_STATUSES.has(row.dryRunStatus));
+}
+
 // ---------------------------------------------------------------------------
 // Derived presentation semantics (POST-GATE-8-UX-001C)
 //

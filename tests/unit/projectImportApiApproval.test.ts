@@ -66,6 +66,44 @@ describe("Approval application service", () => {
         db.close();
     });
 
+    it("blocks approval when the entity has conflict rows", async () => {
+        const db = createApiAuthDatabase(["project_import:*"]);
+        const batch = persistDryRunBatch(
+            db,
+            await resultWith((dryDb) => {
+                seedDocBlock(dryDb, {
+                    id: "doc-conflict",
+                    project_id: "p-example",
+                    source_record_id: "TEST-DOC-001",
+                    details_md: "DIFFERENT details",
+                });
+            }),
+        );
+        expect(() => approveEntityApi(batch.id, "project_documentation", "Test Agent", { db, now: T0 })).toThrowError(
+            expect.objectContaining({ code: "IMPORT_ENTITY_BLOCKED" }),
+        );
+        db.close();
+    });
+
+    it("blocks approval when the entity has review_required rows", async () => {
+        const db = createApiAuthDatabase(["project_import:*"]);
+        const batch = persistDryRunBatch(
+            db,
+            await resultWith((dryDb) => {
+                seedDocBlock(dryDb, {
+                    id: "doc-archived",
+                    project_id: "p-example",
+                    source_record_id: "TEST-DOC-001",
+                    status: "archived",
+                });
+            }),
+        );
+        expect(() => approveEntityApi(batch.id, "project_documentation", "Test Agent", { db, now: T0 })).toThrowError(
+            expect.objectContaining({ code: "IMPORT_ENTITY_BLOCKED" }),
+        );
+        db.close();
+    });
+
     it("rejects approval when the entity has no eligible new rows", async () => {
         const db = createApiAuthDatabase(["project_import:*"]);
         const batch = persistDryRunBatch(db, await resultWith((dryDb) => {

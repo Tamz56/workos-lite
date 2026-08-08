@@ -22,6 +22,7 @@ import {
     countEligibleNewRows,
     deriveBatchPresentation,
     deriveEntityPresentation,
+    hasUnresolvedBlockingRows,
     isApprovalValid,
     remainingTtlMinutes,
 } from "@/lib/project-import/client/projectImportUiState";
@@ -376,6 +377,40 @@ describe("POST-GATE-8-UX-001C derived presentation helpers", () => {
             },
         });
         expect(presentation).toBeNull();
+    });
+});
+
+describe("POST-GATE-8-UX-002C unresolved blocking rows helper", () => {
+    it("treats new, duplicate and skipped as non-blocking", () => {
+        expect(
+            hasUnresolvedBlockingRows([
+                { dryRunStatus: "new" },
+                { dryRunStatus: "duplicate" },
+                { dryRunStatus: "skipped" },
+            ]),
+        ).toBe(false);
+    });
+
+    it("treats conflict, review_required and invalid as blocking", () => {
+        expect(hasUnresolvedBlockingRows([{ dryRunStatus: "conflict" }])).toBe(true);
+        expect(hasUnresolvedBlockingRows([{ dryRunStatus: "review_required" }])).toBe(true);
+        expect(hasUnresolvedBlockingRows([{ dryRunStatus: "invalid" }])).toBe(true);
+    });
+
+    it("mixed new + duplicate stays non-blocking", () => {
+        expect(hasUnresolvedBlockingRows([{ dryRunStatus: "new" }, { dryRunStatus: "duplicate" }])).toBe(false);
+    });
+
+    it("mixed new + blocking rows is blocking", () => {
+        expect(hasUnresolvedBlockingRows([{ dryRunStatus: "new" }, { dryRunStatus: "conflict" }])).toBe(true);
+        expect(hasUnresolvedBlockingRows([{ dryRunStatus: "new" }, { dryRunStatus: "review_required" }])).toBe(true);
+        expect(hasUnresolvedBlockingRows([{ dryRunStatus: "new" }, { dryRunStatus: "invalid" }])).toBe(true);
+    });
+
+    it("empty and null inputs are non-blocking", () => {
+        expect(hasUnresolvedBlockingRows([])).toBe(false);
+        expect(hasUnresolvedBlockingRows(null)).toBe(false);
+        expect(hasUnresolvedBlockingRows(undefined)).toBe(false);
     });
 });
 
