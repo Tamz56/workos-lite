@@ -1,10 +1,16 @@
 "use client";
 
-import { formatDateTime } from "@/lib/project-import/client/projectImportUiState";
+import { deriveBatchPresentation, formatDateTime } from "@/lib/project-import/client/projectImportUiState";
 import type { UiBatchDetail } from "@/lib/project-import/client/projectImportUiTypes";
 import { ImportStatusBadge, batchStatusTone } from "./ImportStatusBadge";
 
 export function ImportBatchDetail({ detail, onBack }: { detail: UiBatchDetail; onBack: () => void }) {
+    const batchPresentation = deriveBatchPresentation({
+        batchStatus: detail.batchStatus,
+        projectDocumentationStatus: detail.projectDocumentationStatus,
+        backlogStatus: detail.backlogStatus,
+        totals: detail.totals,
+    });
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -13,7 +19,10 @@ export function ImportBatchDetail({ detail, onBack }: { detail: UiBatchDetail; o
                     <p className="mt-0.5 text-xs text-neutral-500">Dry Run {detail.dryRunId.slice(0, 24)}... · สร้าง {formatDateTime(detail.createdAt)}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <ImportStatusBadge label={detail.batchStatus} tone={batchStatusTone(detail.batchStatus)} />
+                    <ImportStatusBadge
+                        label={batchPresentation?.label ?? detail.batchStatus}
+                        tone={batchPresentation?.tone ?? batchStatusTone(detail.batchStatus)}
+                    />
                     <button
                         type="button"
                         onClick={onBack}

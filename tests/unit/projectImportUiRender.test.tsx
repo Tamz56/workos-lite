@@ -9,10 +9,11 @@ import { DryRunSummary } from "@/components/project-import/DryRunSummary";
 import { ImportRowsTable } from "@/components/project-import/ImportRowsTable";
 import { ImportHistoryList } from "@/components/project-import/ImportHistoryList";
 import { ApprovalPanel } from "@/components/project-import/ApprovalPanel";
+import { ImportBatchDetail } from "@/components/project-import/ImportBatchDetail";
 import { EntityReviewPanel } from "@/components/project-import/EntityReviewPanel";
 import ProjectImportWorkspace from "@/components/project-import/ProjectImportWorkspace";
 import { ProjectImportUiException } from "@/lib/project-import/client/projectImportUiErrors";
-import type { UiDryRunResponse } from "@/lib/project-import/client/projectImportUiTypes";
+import type { UiBatchDetail, UiDryRunResponse } from "@/lib/project-import/client/projectImportUiTypes";
 
 const { mockCreateDryRun, mockListBatches, mockGetBatchDetail, mockGetApprovals, mockListRows, mockApproveEntity, mockRejectEntity, mockRevokeEntity, mockExecuteEntity } = vi.hoisted(() => ({
     mockCreateDryRun: vi.fn(),
@@ -457,6 +458,156 @@ describe("Project Import workspace auth surface", () => {
         // itself stays interactive so a drop can still be processed.
         expect(html.match(/aria-disabled="true"/g)?.length ?? 0).toBe(1);
         expect(html).not.toContain('label class="mt-4 flex cursor-pointer ... cursor-not-allowed');
+    });
+});
+
+describe("POST-GATE-8-UX-001C duplicate-only presentation", () => {
+    function detailWith(overrides: Partial<UiBatchDetail>): UiBatchDetail {
+        return {
+            id: "batch-1",
+            dryRunId: "dry-1",
+            createdAt: "2026-08-06T00:00:00.000Z",
+            updatedAt: "2026-08-06T00:00:00.000Z",
+            batchStatus: "ready_for_approval",
+            projectDocumentationStatus: "ready",
+            backlogStatus: "ready",
+            sourceFilenameSanitized: "f.xlsx",
+            sourceFileHashExcerpt: "abcd",
+            totals: {
+                totalRows: 2,
+                newRows: 0,
+                duplicateRows: 2,
+                conflictRows: 0,
+                reviewRequiredRows: 0,
+                invalidRows: 0,
+                skippedRows: 0,
+                warningCount: 0,
+                errorCount: 0,
+            },
+            schemaVersion: "v1",
+            parserContractVersion: "p1",
+            dryRunContractVersion: "d1",
+            workbookId: null,
+            batchReference: null,
+            sourceSystem: null,
+            sourceMimeType: null,
+            timezone: null,
+            retention: { retentionEligibleAt: null, payloadPurgedAt: null, deletedAt: null },
+            approvals: [],
+            executionAttempts: { count: 0, byStatus: {} },
+            ...overrides,
+        };
+    }
+
+    function duplicateRows(externalRowId: string) {
+        return {
+            items: [
+                {
+                    id: "r1",
+                    externalRowId,
+                    dryRunStatus: "duplicate",
+                    proposedOperation: "none",
+                    warningCount: 0,
+                    errorCount: 0,
+                    issueCodes: ["EXISTING_IDENTITY_DUPLICATE"],
+                    existingRecordReference: "doc-1",
+                    executionStatus: "not_started",
+                    targetRecordId: null,
+                },
+            ],
+            page: 1,
+            pageSize: 25,
+            totalItems: 1,
+            totalPages: 1,
+        };
+    }
+
+    const panelProps = {
+        approval: null,
+        rowsLoading: false,
+        rowsError: null,
+        rowFilter: {},
+        executing: false,
+        busy: false,
+        onRowFilterChange: () => undefined,
+        onRowPageChange: () => undefined,
+        onRowsRetry: () => undefined,
+        onApprove: () => undefined,
+        onReject: () => undefined,
+        onRevoke: () => undefined,
+        onConfirmExecute: async () => undefined,
+    };
+
+    it("renders duplicate-only entity as no-action with Approve disabled (Tests 3+4)", () => {
+        const html = renderToStaticMarkup(
+            <EntityReviewPanel
+                entityType="project_documentation"
+                entityLabel="Project Documentation"
+                detail={detailWith({})}
+                rows={duplicateRows("ARBOR-QA-G8-DOC-001")}
+                {...panelProps}
+            />,
+        );
+        expect(html).toContain("ซ้ำทั้งหมด — ไม่ต้องดำเนินการ");
+        expect(html).not.toContain("ready_with_warnings");
+        expect(html).toMatch(/<button[^>]*disabled=""[^>]*>\s*อนุมัติ\s*<\/button>/);
+    });
+
+    it("renders historical ready_with_warnings + warningCount 0 safely as raw status (Test 11)", () => {
+        const html = renderToStaticMarkup(
+            <EntityReviewPanel
+                entityType="project_documentation"
+                entityLabel="Project Documentation"
+                detail={detailWith({ projectDocumentationStatus: "ready_with_warnings" })}
+                rows={duplicateRows("ARBOR-QA-G8-DOC-001")}
+                {...panelProps}
+            />,
+        );
+        expect(html).toContain("ready_with_warnings");
+        expect(html).not.toContain("ซ้ำทั้งหมด — ไม่ต้องดำเนินการ");
+    });
+
+    it("renders empty entity as no-items, not duplicate-only (Test 12)", () => {
+        const html = renderToStaticMarkup(
+            <EntityReviewPanel
+                entityType="project_documentation"
+                entityLabel="Project Documentation"
+                detail={detailWith({})}
+                rows={{ items: [], page: 1, pageSize: 25, totalItems: 0, totalPages: 0 }}
+                {...panelProps}
+            />,
+        );
+        expect(html).toContain("ไม่มีรายการต้องนำเข้า");
+        expect(html).not.toContain("ซ้ำทั้งหมด");
+    });
+
+    it("renders entire duplicate-only batch as ไม่มีรายการต้องนำเข้า (Test 5)", () => {
+        const html = renderToStaticMarkup(<ImportBatchDetail detail={detailWith({})} onBack={() => undefined} />);
+        expect(html).toContain("ไม่มีรายการต้องนำเข้า");
+        expect(html).not.toContain("ready_for_approval");
+    });
+
+    it("renders mixed batch as พร้อมอนุมัติ (Test 6)", () => {
+        const html = renderToStaticMarkup(
+            <ImportBatchDetail
+                detail={detailWith({
+                    totals: {
+                        totalRows: 2,
+                        newRows: 1,
+                        duplicateRows: 1,
+                        conflictRows: 0,
+                        reviewRequiredRows: 0,
+                        invalidRows: 0,
+                        skippedRows: 0,
+                        warningCount: 0,
+                        errorCount: 0,
+                    },
+                })}
+                onBack={() => undefined}
+            />,
+        );
+        expect(html).toContain("พร้อมอนุมัติ");
+        expect(html).not.toContain("ไม่มีรายการต้องนำเข้า");
     });
 });
 

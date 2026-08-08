@@ -11,7 +11,7 @@ import { parseWorkOSProjectFieldWorkbook } from "./workbookParser";
 import { createDryRunReadAdapter, openReadOnlyWorkosDatabase } from "./readOnlyAdapter";
 import { classifyProjectDocumentationRows } from "./projectDocumentationClassifier";
 import { classifyBacklogRows } from "./backlogClassifier";
-import { buildDryRunTotals } from "./dryRunSummary";
+import { buildDryRunTotals, hasWarningSeverityIssue } from "./dryRunSummary";
 import { makeIssue } from "./validationIssues";
 import {
     DRY_RUN_CONTRACT_VERSION,
@@ -104,9 +104,11 @@ function assembleEntity(
     const classified = classify(parsedSheet.rows, adapter as DryRunReadAdapter);
     issues.push(...classified.issues);
     const rows = classified.rowResults;
-    const anyRowIssue = rows.some((row) => row.issues.length > 0);
-    const anyEntityWarning = issues.some((issue) => issue.severity === "warning");
-    const status: DryRunEntityResult["status"] = anyRowIssue || anyEntityWarning ? "ready_with_warnings" : "ready";
+    // Entity status follows the same warning predicate as warningCount:
+    // only actual warning-severity issues raise an entity to ready_with_warnings.
+    // Info-only diagnostics (duplicate classification) leave the entity `ready`.
+    const hasActualWarning = hasWarningSeverityIssue(rows, issues);
+    const status: DryRunEntityResult["status"] = hasActualWarning ? "ready_with_warnings" : "ready";
 
     return {
         entityType,
