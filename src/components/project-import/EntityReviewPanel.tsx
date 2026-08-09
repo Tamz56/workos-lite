@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import {
     countEligibleNewRows,
     deriveEntityPresentation,
+    hasUnresolvedBlockingRows,
     isApprovalValid,
     isEntityExecuted,
 } from "@/lib/project-import/client/projectImportUiState";
@@ -77,7 +78,14 @@ export function EntityReviewPanel({
     };
     const eligibleRowCount = countEligibleNewRows(rows);
     const blockedReason = blockedReasonFor(entityType, detail);
-    const canApprove = Boolean(detail && (detail[entityType === "project_documentation" ? "projectDocumentationStatus" : "backlogStatus"] !== "blocked") && eligibleRowCount > 0);
+    const canApprove =
+        Boolean(
+            detail &&
+                detail[entityType === "project_documentation" ? "projectDocumentationStatus" : "backlogStatus"] !==
+                    "blocked",
+        ) &&
+        eligibleRowCount > 0 &&
+        !hasUnresolvedBlockingRows(entityRows);
 
     const entityStatus = detail?.[entityType === "project_documentation" ? "projectDocumentationStatus" : "backlogStatus"];
     const entityPresentation = deriveEntityPresentation({

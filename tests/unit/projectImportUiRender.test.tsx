@@ -611,6 +611,137 @@ describe("POST-GATE-8-UX-001C duplicate-only presentation", () => {
     });
 });
 
+describe("POST-GATE-8-UX-002C approval gating", () => {
+    function row(dryRunStatus: string, proposedOperation: string, warningCount = 0) {
+        return {
+            id: "r1",
+            externalRowId: "X-001",
+            dryRunStatus,
+            proposedOperation,
+            warningCount,
+            errorCount: 0,
+            issueCodes: [],
+            existingRecordReference: null,
+            executionStatus: "not_started",
+            targetRecordId: null,
+        };
+    }
+
+    function detail(status: string): UiBatchDetail {
+        return {
+            id: "batch-1",
+            dryRunId: "dry-1",
+            createdAt: "2026-08-06T00:00:00.000Z",
+            updatedAt: "2026-08-06T00:00:00.000Z",
+            batchStatus: "ready_for_approval",
+            projectDocumentationStatus: status,
+            backlogStatus: "ready",
+            sourceFilenameSanitized: "f.xlsx",
+            sourceFileHashExcerpt: "abcd",
+            totals: {
+                totalRows: 1,
+                newRows: 0,
+                duplicateRows: 0,
+                conflictRows: 0,
+                reviewRequiredRows: 0,
+                invalidRows: 0,
+                skippedRows: 0,
+                warningCount: 0,
+                errorCount: 0,
+            },
+            schemaVersion: "v1",
+            parserContractVersion: "p1",
+            dryRunContractVersion: "d1",
+            workbookId: null,
+            batchReference: null,
+            sourceSystem: null,
+            sourceMimeType: null,
+            timezone: null,
+            retention: { retentionEligibleAt: null, payloadPurgedAt: null, deletedAt: null },
+            approvals: [],
+            executionAttempts: { count: 0, byStatus: {} },
+        };
+    }
+
+    function rowsOf(items: ReturnType<typeof row>[]) {
+        return { items, page: 1, pageSize: 25, totalItems: items.length, totalPages: 1 };
+    }
+
+    function panelHtml(entityStatus: string, items: ReturnType<typeof row>[]) {
+        return renderToStaticMarkup(
+            <EntityReviewPanel
+                entityType="project_documentation"
+                entityLabel="Project Documentation"
+                detail={detail(entityStatus)}
+                approval={null}
+                rows={rowsOf(items)}
+                rowsLoading={false}
+                rowsError={null}
+                rowFilter={{}}
+                executing={false}
+                busy={false}
+                onRowFilterChange={() => undefined}
+                onRowPageChange={() => undefined}
+                onRowsRetry={() => undefined}
+                onApprove={() => undefined}
+                onReject={() => undefined}
+                onRevoke={() => undefined}
+                onConfirmExecute={async () => undefined}
+            />,
+        );
+    }
+
+    const enabled = /<button(?![^>]*disabled="")[^>]*>\s*อนุมัติ\s*<\/button>/;
+    const disabled = /<button[^>]*disabled=""[^>]*>\s*อนุมัติ\s*<\/button>/;
+
+    it("clean new → Approve enabled (Test 1)", () => {
+        const html = panelHtml("ready", [row("new", "insert")]);
+        expect(html).toMatch(enabled);
+        expect(html).not.toMatch(disabled);
+    });
+
+    it("new + duplicate → Approve enabled (Test 2)", () => {
+        const html = panelHtml("ready", [row("new", "insert"), row("duplicate", "none")]);
+        expect(html).toMatch(enabled);
+        expect(html).not.toMatch(disabled);
+    });
+
+    it("duplicate-only → Approve disabled (Test 3)", () => {
+        const html = panelHtml("ready", [row("duplicate", "none")]);
+        expect(html).toMatch(disabled);
+    });
+
+    it("new + conflict → ต้องตรวจสอบ + Approve disabled (Tests 4+9)", () => {
+        const html = panelHtml("ready_with_warnings", [row("new", "insert"), row("conflict", "manual_review")]);
+        expect(html).toContain("ต้องตรวจสอบ");
+        expect(html).toMatch(disabled);
+        expect(html).not.toMatch(enabled);
+    });
+
+    it("new + review_required → ต้องตรวจสอบ + Approve disabled (Tests 5+9)", () => {
+        const html = panelHtml("ready_with_warnings", [row("new", "insert"), row("review_required", "manual_review")]);
+        expect(html).toContain("ต้องตรวจสอบ");
+        expect(html).toMatch(disabled);
+    });
+
+    it("new + invalid → Approve disabled (Test 6)", () => {
+        const html = panelHtml("ready", [row("new", "insert"), row("invalid", "none")]);
+        expect(html).toMatch(disabled);
+    });
+
+    it("blocked entity → Approve disabled (Test 7)", () => {
+        const html = panelHtml("blocked", [row("new", "insert")]);
+        expect(html).toMatch(disabled);
+    });
+
+    it("actionable non-blocking warning → พร้อมอนุมัติ — มีคำเตือน + Approve enabled (Test 8)", () => {
+        const html = panelHtml("ready_with_warnings", [row("new", "insert", 1)]);
+        expect(html).toContain("พร้อมอนุมัติ — มีคำเตือน");
+        expect(html).toMatch(enabled);
+        expect(html).not.toMatch(disabled);
+    });
+});
+
 describe("Project Import client boundary audit", () => {
     const clientDir = join(process.cwd(), "src/lib/project-import/client");
     const componentDir = join(process.cwd(), "src/components/project-import");
