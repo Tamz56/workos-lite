@@ -4,6 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import { ensureProjectRegistryMetadataColumns } from "@/lib/projects/registryMetadata";
 import { ensureAuditSchema } from "@/lib/project-import/auditSchema";
+import { ensureHumanAuthSchema } from "@/lib/human-auth/humanAuthSchema";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -847,6 +848,7 @@ ensureNotes();
 ensureProjectDocBlocks();
 ensureArborWritingLab();
 ensureAuditSchema(db);
+ensureHumanAuthSchema(db);
 if (!shouldSkipSeed) {
     seedArborWritingLab();
 }

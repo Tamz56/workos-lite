@@ -11,7 +11,9 @@
     "smoke:tasks": "node scripts/smoke_tasks.js",
     "smoke:events": "node scripts/smoke_events.js",
     "smoke:backup": "node scripts/smoke_backup.js",
-    "migrate:nutrient": "npx tsx scripts/migrate-nutrient-planner-lists.ts"
+    "migrate:nutrient": "npx tsx scripts/migrate-nutrient-planner-lists.ts",
+    "human:init": "npx tsx scripts/human-init.ts",
+    "human:reset": "npx tsx scripts/human-reset.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
