@@ -6,6 +6,7 @@ import { ensureProjectRegistryMetadataColumns } from "@/lib/projects/registryMet
 import { ensureAuditSchema } from "@/lib/project-import/auditSchema";
 import { ensureHumanAuthSchema } from "@/lib/human-auth/humanAuthSchema";
 import { ensureOperationsSchema } from "@/lib/operations/operationsSchema";
+import { ensureApprovalsSchema } from "@/lib/approvals/approvalsSchema";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -851,6 +852,7 @@ ensureArborWritingLab();
 ensureAuditSchema(db);
 ensureHumanAuthSchema(db);
 ensureOperationsSchema(db);
+ensureApprovalsSchema(db);
 if (!shouldSkipSeed) {
     seedArborWritingLab();
 }
