@@ -72,6 +72,39 @@ export type ReviewDetail = ReviewSummary & {
     previewFingerprint: string;
     contractVersion: string;
     status: string;
+    execution: OperationExecutionPresentation;
+};
+
+export type ExecutionAttemptPresentation = {
+    attemptId: string;
+    approvalId: string;
+    status: "committed" | "failed_before_write" | "rolled_back";
+    startedAt: string;
+    finishedAt: string | null;
+    targetTable: string | null;
+    targetRecordId: string | null;
+    failureCode: string | null;
+    safeFailureMessage: string | null;
+};
+
+export type OperationExecutionPresentation = {
+    committed: ExecutionAttemptPresentation | null;
+    latestFailure: ExecutionAttemptPresentation | null;
+};
+
+export type ExecutionMutationResponse = {
+    ok: true;
+    replay: boolean;
+    execution: {
+        attemptId: string;
+        operationId: string;
+        approvalId: string;
+        status: "committed";
+        targetTable: "project_items";
+        targetRecordId: string;
+        startedAt: string;
+        finishedAt: string;
+    };
 };
 
 export type OperationsListResponse = {
@@ -96,7 +129,7 @@ export type ApprovalMutationResponse = {
 
 export type ApiErrorBody = {
     ok: false;
-    error: { code: string; message: string; status: number };
+    error: { code: string; message: string; status: number; retryable?: boolean };
 };
 
 export type ReviewTokens = {

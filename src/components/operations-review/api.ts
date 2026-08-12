@@ -1,6 +1,7 @@
 import type {
     ApiErrorBody,
     ApprovalMutationResponse,
+    ExecutionMutationResponse,
     OperationDetailResponse,
     OperationsListResponse,
     ReviewTokens,
@@ -9,7 +10,7 @@ import type {
 
 export type ApiResult<T> =
     | { ok: true; data: T }
-    | { ok: false; status: number; code: string; message: string };
+    | { ok: false; status: number; code: string; message: string; retryable?: boolean };
 
 async function request<T>(url: string, init?: RequestInit): Promise<ApiResult<T>> {
     try {
@@ -34,6 +35,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<ApiResult<T>
             status: res.status,
             code: errorBody?.error?.code ?? "UNKNOWN",
             message: errorBody?.error?.message ?? "Unable to complete the request.",
+            retryable: errorBody?.error?.retryable,
         };
     } catch {
         return { ok: false, status: 0, code: "NETWORK_ERROR", message: "Unable to complete the request." };
@@ -99,6 +101,40 @@ export function postRevokeApproval(
         method: "POST",
         body: JSON.stringify({ approvalId }),
     });
+}
+
+export function postExecuteOperation(
+    operationId: string,
+    approvalId: string,
+): Promise<ApiResult<ExecutionMutationResponse>> {
+    return request<ExecutionMutationResponse>(`/api/human/operations/${encodeURIComponent(operationId)}/execute`, {
+        method: "POST",
+        body: JSON.stringify({ approvalId }),
+    });
+}
+
+export function friendlyExecutionError(code: string): string {
+    switch (code) {
+        case "OPS_EXECUTION_APPROVAL_EXPIRED":
+            return "This approval has expired. Review and approve the operation again before executing.";
+        case "OPS_EXECUTION_APPROVAL_REVOKED":
+            return "This approval has been revoked. Review and approve the operation again before executing.";
+        case "OPS_EXECUTION_APPROVAL_CONSUMED":
+            return "This approval has already been consumed. The operation status has been refreshed.";
+        case "OPS_EXECUTION_TARGET_STALE":
+            return "Execution was blocked because the approved target no longer matches the current project.";
+        case "OPS_EXECUTION_APPROVAL_BINDING_MISMATCH":
+        case "OPS_EXECUTION_OPERATION_INTEGRITY_FAILED":
+            return "Execution was blocked because the stored operation no longer matches the approved review snapshot.";
+        case "OPS_EXECUTION_ROLLED_BACK":
+            return "The execution did not commit. The latest operation state has been refreshed.";
+        case "OPS_EXECUTION_INTERNAL_ERROR":
+            return "The execution could not be completed. The latest operation state has been refreshed.";
+        case "OPS_EXECUTION_CONFLICT":
+            return "The execution state changed. Review the refreshed operation before taking another action.";
+        default:
+            return "Unable to complete the request.";
+    }
 }
 
 export function friendlyReviewError(code: string): string {

@@ -116,3 +116,40 @@ describe("Approvals schema", () => {
         db.close();
     });
 });
+
+describe("P1D approval audit hardening", () => {
+    function insertEvent(db: Database.Database, id: string, operationId: string, approvalId: string | null, eventType: string): void {
+        db.prepare(`
+            INSERT INTO operation_approval_events (
+                id, operation_id, approval_id, event_type, actor_type, actor_id,
+                actor_display_name, occurred_at, event_code, safe_reason, created_at
+            ) VALUES (?, ?, ?, ?, 'system', 'system', NULL, 't', 'X', NULL, 't')
+        `).run(id, operationId, approvalId, eventType);
+    }
+
+    it("blocks events whose approval belongs to another operation (F-02)", () => {
+        const db = createDb();
+        seedOperation(db, "op-1");
+        seedOperation(db, "op-2");
+        insertApproval(db, "apr-1", "op-1", "approved");
+        expect(() => insertEvent(db, "ape-x", "op-2", "apr-1", "revoked")).toThrow();
+        expect(() => insertEvent(db, "ape-y", "op-2", "apr-1", "consumed")).toThrow();
+        db.close();
+    });
+
+    it("blocks consumed events without an approval id", () => {
+        const db = createDb();
+        seedOperation(db, "op-1");
+        expect(() => insertEvent(db, "ape-x", "op-1", null, "consumed")).toThrow();
+        db.close();
+    });
+
+    it("allows a valid consumed event and blocks a second one for the same approval", () => {
+        const db = createDb();
+        seedOperation(db, "op-1");
+        insertApproval(db, "apr-1", "op-1", "approved");
+        insertEvent(db, "ape-c1", "op-1", "apr-1", "consumed");
+        expect(() => insertEvent(db, "ape-c2", "op-1", "apr-1", "consumed")).toThrow();
+        db.close();
+    });
+});

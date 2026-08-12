@@ -109,7 +109,7 @@ export function ApproveOperationModal({
                     Approval validity: 30 minutes
                 </p>
                 <p className="text-xs text-neutral-500">
-                    This approval does not execute the operation. Execution is not enabled in this stage.
+                    Approving does not execute the operation. Execution happens only when a human operator explicitly chooses Execute while the approval is valid.
                 </p>
 
                 {error && (
