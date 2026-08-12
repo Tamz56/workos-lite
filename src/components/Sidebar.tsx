@@ -21,6 +21,7 @@ import {
     ChevronDownIcon,
     ChevronUpIcon,
     TableCellsIcon,
+    ShieldCheckIcon,
     XMarkIcon
 } from "@heroicons/react/24/outline";
 
@@ -119,6 +120,7 @@ export function Sidebar() {
     const isWritingActive = pathname.startsWith("/workspaces/content/writing-lab");
     const isPromptActive = pathname.startsWith("/workspaces/prompt-studio") || pathname.startsWith("/workspaces/prompt-lite");
     const isProjectImportActive = pathname.startsWith("/workspaces/project-import");
+    const isOperationsReviewActive = pathname.startsWith("/operations");
     const isBaActive = pathname.endsWith("/classroom");
     const isGfHubActive = pathname.startsWith("/workspaces/content/gf-hub");
 
@@ -332,6 +334,14 @@ export function Sidebar() {
                                 label="Sprints"
                                 icon={<QueueListIcon className="w-4 h-4" />}
                                 active={pathname.startsWith("/sprints")}
+                                isCollapsed={isCollapsed}
+                                isSubItem={true}
+                            />
+                            <NavItem
+                                href="/operations"
+                                label="Operations Review"
+                                icon={<ShieldCheckIcon className="w-4 h-4" />}
+                                active={isOperationsReviewActive}
                                 isCollapsed={isCollapsed}
                                 isSubItem={true}
                             />
