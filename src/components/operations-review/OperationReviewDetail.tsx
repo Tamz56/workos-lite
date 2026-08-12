@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { fetchHumanOperationDetail } from "./api";
 import { useHumanSession } from "./HumanSessionGate";
 import { ApproveOperationModal } from "./ApproveOperationModal";
+import { ExecuteOperationModal } from "./ExecuteOperationModal";
 import { RejectOperationModal } from "./RejectOperationModal";
 import { RevokeApprovalModal } from "./RevokeApprovalModal";
 import { ReviewStateBadge } from "./ReviewStateBadge";
 import { SignOutButton } from "./SignOutButton";
 import {
     approveLabel,
+    canExecute,
     canApprove,
     canReject,
     canRevoke,
@@ -21,7 +23,7 @@ import {
 import type { ReviewDetail } from "./types";
 
 type Notice = { type: "success" | "error"; text: string } | null;
-type ActiveModal = "approve" | "reject" | "revoke" | null;
+type ActiveModal = "approve" | "reject" | "revoke" | "execute" | null;
 
 function HashRow({ label, value }: { label: string; value: string }) {
     const [copied, setCopied] = useState(false);
@@ -117,6 +119,17 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
         router.replace("/human/login");
     }, [router]);
 
+    const handleExecuteSuccess = useCallback((replay: boolean) => {
+        setNotice({
+            type: "success",
+            text: replay
+                ? "This operation was already executed. Showing the committed result."
+                : "Backlog item created successfully.",
+        });
+        setActiveModal(null);
+        load(true);
+    }, [load]);
+
     const handleMutationSuccess = useCallback((text: string) => {
         setNotice({ type: "success", text });
         load(true);
@@ -156,6 +169,10 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
     const showApprove = canApprove(detail.reviewState, detail.status);
     const showReject = canReject(detail.reviewState, detail.status);
     const showRevoke = canRevoke(detail.reviewState, detail.approval, detail.status);
+    const showExecute =
+        mounted &&
+        nowTick > 0 &&
+        canExecute(detail.status, detail.reviewState, detail.approval, nowTick);
     const ttlText =
         mounted && nowTick > 0 && detail.reviewState === "approved" && detail.approval
             ? formatExpiryRemaining(detail.approval.expiresAt, nowTick)
@@ -209,7 +226,7 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
                     )}
                     {detail.status !== "pending" && (
                         <span className="text-xs text-neutral-400">
-                            Operation status: {detail.status} (not reviewable)
+                            Operation status: {detail.status}
                         </span>
                     )}
                 </div>
@@ -343,7 +360,109 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
                     </div>
                 )}
 
+                {detail.execution?.committed && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
+                        <div className="mb-3 flex items-center gap-2">
+                            <h2 className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Execution</h2>
+                            <span
+                                role="status"
+                                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700"
+                            >
+                                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+                                Executed
+                            </span>
+                        </div>
+                        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                                    Execution attempt ID
+                                </dt>
+                                <dd className="mt-0.5 font-mono text-xs break-all">{detail.execution.committed.attemptId}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Approval ID</dt>
+                                <dd className="mt-0.5 font-mono text-xs break-all">{detail.execution.committed.approvalId}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Target table</dt>
+                                <dd className="mt-0.5 font-mono text-xs">{detail.execution.committed.targetTable}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Target record ID</dt>
+                                <dd className="mt-0.5 font-mono text-xs break-all">{detail.execution.committed.targetRecordId}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Started at</dt>
+                                <dd className="mt-0.5 text-xs">
+                                    {mounted && detail.execution.committed.startedAt
+                                        ? formatDateTime(detail.execution.committed.startedAt)
+                                        : "—"}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Finished at</dt>
+                                <dd className="mt-0.5 text-xs">
+                                    {mounted && detail.execution.committed.finishedAt
+                                        ? formatDateTime(detail.execution.committed.finishedAt)
+                                        : "—"}
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+                )}
+
+                {!detail.execution?.committed && detail.execution?.latestFailure && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
+                        <div className="mb-3 flex items-center gap-2">
+                            <h2 className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Execution</h2>
+                            <span
+                                role={detail.status === "failed" ? "alert" : "status"}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700"
+                            >
+                                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+                                {detail.status === "failed" ? "Execution blocked" : "Not committed"}
+                            </span>
+                        </div>
+                        <p className="text-xs font-medium text-neutral-700">
+                            {detail.status === "failed"
+                                ? "Execution was blocked and the operation can no longer be safely executed."
+                                : "Last execution attempt did not commit."}
+                        </p>
+                        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Attempt ID</dt>
+                                <dd className="mt-0.5 font-mono text-xs break-all">{detail.execution.latestFailure.attemptId}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Failure</dt>
+                                <dd className="mt-0.5 text-xs">{detail.execution.latestFailure.failureCode}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Detail</dt>
+                                <dd className="mt-0.5 text-xs">{detail.execution.latestFailure.safeFailureMessage}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Finished at</dt>
+                                <dd className="mt-0.5 text-xs">
+                                    {mounted && detail.execution.latestFailure.finishedAt
+                                        ? formatDateTime(detail.execution.latestFailure.finishedAt)
+                                        : "—"}
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+                )}
+
                 <div className="flex flex-wrap gap-2 pt-1">
+                    {showExecute && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveModal("execute")}
+                            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                        >
+                            Execute operation
+                        </button>
+                    )}
                     {showApprove && (
                         <button
                             type="button"
@@ -401,6 +520,16 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
                     approval={detail.approval}
                     onClose={() => setActiveModal(null)}
                     onSuccess={handleMutationSuccess}
+                    onRefetch={handleStaleOrConflict}
+                    onSessionExpired={handleSessionExpired}
+                />
+            )}
+            {activeModal === "execute" && detail.approval && (
+                <ExecuteOperationModal
+                    open
+                    operation={detail}
+                    onClose={() => setActiveModal(null)}
+                    onSuccess={handleExecuteSuccess}
                     onRefetch={handleStaleOrConflict}
                     onSessionExpired={handleSessionExpired}
                 />

@@ -33,6 +33,21 @@ export function canRevoke(
     return Boolean(approval?.id);
 }
 
+export function canExecute(
+    operationStatus: string,
+    reviewState: ReviewState,
+    approval: ApprovalView | null | undefined,
+    clientNow: number,
+): boolean {
+    if (!isReviewableOperationStatus(operationStatus)) return false;
+    if (reviewState !== "approved") return false;
+    if (!approval) return false;
+    if (approval.status !== "approved") return false;
+    // Client clock is advisory only; the server remains authoritative.
+    if (new Date(approval.expiresAt).getTime() <= clientNow) return false;
+    return true;
+}
+
 export function approveLabel(state: ReviewState): string {
     return state === "awaiting_review" ? "Approve" : "Approve again";
 }

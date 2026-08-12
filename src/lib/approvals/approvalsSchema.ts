@@ -84,6 +84,32 @@ CREATE INDEX IF NOT EXISTS idx_operation_approval_events_operation
   ON operation_approval_events(operation_id);
 CREATE INDEX IF NOT EXISTS idx_operation_approval_events_approval
   ON operation_approval_events(approval_id);
+-- P1D hardening: one consumed event maximum per approval.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_operation_approval_events_consumed
+  ON operation_approval_events(approval_id)
+  WHERE event_type = 'consumed';
+-- P1D hardening: consumed events always carry the consumed approval id.
+CREATE TRIGGER IF NOT EXISTS trg_operation_approval_events_consumed_approval_id
+BEFORE INSERT ON operation_approval_events
+FOR EACH ROW
+WHEN NEW.event_type = 'consumed' AND NEW.approval_id IS NULL
+BEGIN
+  SELECT RAISE(ABORT, 'consumed events require an approval id');
+END;
+-- P1D hardening (F-02): an event's approval must belong to the same operation.
+CREATE TRIGGER IF NOT EXISTS trg_operation_approval_events_pair_integrity
+BEFORE INSERT ON operation_approval_events
+FOR EACH ROW
+WHEN NEW.approval_id IS NOT NULL
+BEGIN
+  SELECT CASE
+    WHEN NOT EXISTS (
+      SELECT 1 FROM operation_approvals a
+      WHERE a.id = NEW.approval_id AND a.operation_id = NEW.operation_id
+    )
+    THEN RAISE(ABORT, 'approval/operation pair mismatch')
+  END;
+END;
 `;
 
 export function ensureApprovalsSchema(db: Database.Database, log: (message: string) => void = console.log): void {

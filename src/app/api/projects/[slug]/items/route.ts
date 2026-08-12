@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
-import { nanoid } from "nanoid";
 import { CreateProjectItemSchema } from "@/lib/projects/backlogCreateSchema";
+import { insertProjectItem } from "@/lib/projects/backlogWrite";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
@@ -46,31 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         const body = await req.json();
         const parsed = CreateProjectItemSchema.parse(body);
 
-        const stmt = db.prepare(`
-            INSERT INTO project_items (
-                id, project_id, title, status, priority, schedule_bucket,
-                start_date, end_date, is_milestone, workstream, dod_text, notes
-            ) VALUES (
-                @id, @project_id, @title, @status, @priority, @schedule_bucket,
-                @start_date, @end_date, @is_milestone, @workstream, @dod_text, @notes
-            )
-        `);
-
-        const id = nanoid();
-        stmt.run({
-            id,
-            project_id: project.id,
-            title: parsed.title,
-            status: parsed.status,
-            priority: parsed.priority ?? null,
-            schedule_bucket: parsed.schedule_bucket ?? null,
-            start_date: parsed.start_date ?? null,
-            end_date: parsed.end_date ?? null,
-            is_milestone: parsed.is_milestone ?? 0,
-            workstream: parsed.workstream ?? null,
-            dod_text: parsed.dod_text ?? null,
-            notes: parsed.notes ?? null,
-        });
+        const id = insertProjectItem(db, project.id, parsed);
 
         const item = db.prepare("SELECT * FROM project_items WHERE id = ?").get(id);
         return NextResponse.json(item);

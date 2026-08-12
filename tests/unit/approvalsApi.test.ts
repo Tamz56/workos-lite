@@ -6,6 +6,7 @@ import { OPERATIONS_SCHEMA_SQL } from "@/lib/operations/operationsSchema";
 import { createOperation } from "@/lib/operations/service";
 import { createHumanSession, SESSION_COOKIE_NAME } from "@/lib/human-auth/session";
 import { HUMAN_AUTH_SCHEMA_SQL } from "@/lib/human-auth/humanAuthSchema";
+import { EXECUTION_SCHEMA_SQL } from "@/lib/execution/executionSchema";
 import type { AgentPrincipal } from "@/lib/agent-auth/agentAuthentication";
 import type { OperationRecord } from "@/lib/operations/types";
 
@@ -31,6 +32,7 @@ function createDb(): Database.Database {
     db.exec(HUMAN_AUTH_SCHEMA_SQL);
     db.exec(OPERATIONS_SCHEMA_SQL);
     db.exec(APPROVALS_SCHEMA_SQL);
+    db.exec(EXECUTION_SCHEMA_SQL);
     db.exec(`
         CREATE TABLE projects (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT, updated_at TEXT);
     `);
