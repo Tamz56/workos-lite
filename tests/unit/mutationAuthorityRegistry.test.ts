@@ -3,40 +3,21 @@
 // fails this test. The scan is test-time filesystem only; production runtime
 // never depends on filesystem scanning.
 
-import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { MUTATION_AUTHORITY_REGISTRY } from "@/lib/authority/mutationAuthorityRegistry";
+import { findServerActionFiles, scanRouteFiles } from "../helpers/routeScanner";
 
 const API_ROOT = path.resolve(__dirname, "../../src/app/api");
-const MUTATION_RE = /export\s+(?:async\s+)?function\s+(POST|PUT|PATCH|DELETE)\s*\(/g;
-
-function routeFiles(dir: string): string[] {
-    const out: string[] = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-            out.push(...routeFiles(full));
-        } else if (entry.name === "route.ts") {
-            out.push(full);
-        }
-    }
-    return out;
-}
+const SRC_ROOT = path.resolve(__dirname, "../../src");
 
 describe("mutation authority registry coverage", () => {
     it("classifies every mutation handler in src/app/api", () => {
         const scannedKeys = new Set<string>();
 
-        for (const file of routeFiles(API_ROOT)) {
-            const relDir = path.relative(API_ROOT, path.dirname(file)).split(path.sep).join("/");
-            const source = fs.readFileSync(file, "utf8");
-            let match: RegExpExecArray | null;
-            MUTATION_RE.lastIndex = 0;
-            while ((match = MUTATION_RE.exec(source)) !== null) {
-                const method = match[1];
-                const key = `${method} api/${relDir}`;
-                scannedKeys.add(key);
+        for (const [relDir, methods] of scanRouteFiles(API_ROOT)) {
+            for (const method of methods) {
+                scannedKeys.add(`${method} api/${relDir}`);
             }
         }
 
@@ -63,5 +44,13 @@ describe("mutation authority registry coverage", () => {
         }
         const sum = Object.values(counts).reduce((a, b) => a + b, 0);
         expect(sum).toBe(registryKeys.length);
+    });
+
+    it("fails if any Server Action appears in application source (explicit authority review required)", () => {
+        const serverActions = findServerActionFiles(SRC_ROOT);
+        expect(
+            serverActions,
+            `Server Actions found outside the route-method registry — explicit authority review required before adoption:\n${serverActions.join("\n")}`,
+        ).toEqual([]);
     });
 });

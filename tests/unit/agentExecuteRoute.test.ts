@@ -116,6 +116,50 @@ describe("legacy agent execute shutdown", () => {
         expect((db.prepare("SELECT COUNT(*) AS c FROM agent_idempotency").get() as { c: number }).c).toBe(0);
     });
 
+    it("records a denial audit event for dry_run:false without exposing payload secrets", async () => {
+        const res = await agentExecute(
+            request({
+                actions: [
+                    {
+                        type: "task.create",
+                        data: { title: "SECRET_TITLE_SHOULD_NOT_LEAK" },
+                    },
+                ],
+                dry_run: false,
+            }),
+        );
+        expect(res.status).toBe(403);
+        const row = db.prepare(
+            "SELECT action_type, payload_json, result_json FROM agent_audit_log ORDER BY created_at DESC LIMIT 1",
+        ).get() as { action_type: string; payload_json: string; result_json: string } | undefined;
+        expect(row).toBeDefined();
+        expect(row?.action_type).toBe("legacy.live_write_denied");
+        expect(row?.result_json).toContain("AGENT_DIRECT_WRITE_DISABLED");
+        expect(row?.payload_json).toContain("task.create");
+        expect(row?.payload_json).not.toContain("SECRET_TITLE_SHOULD_NOT_LEAK");
+    });
+
+    it("records one denial audit entry covering all six legacy action types", async () => {
+        const actions = [
+            { type: "task.create", data: { title: "t" } },
+            { type: "task.update", data: { id: "t1", title: "u" } },
+            { type: "doc.create", data: { title: "d" } },
+            { type: "doc.update", data: { id: "d1", title: "u" } },
+            { type: "event.create", data: { title: "e", start_time: "2026-01-01T00:00:00.000Z" } },
+            { type: "attachment.create", data: { task_id: "t1", file_name: "a.txt", storage_path: "x.txt" } },
+        ];
+        const res = await agentExecute(request({ actions, dry_run: false }));
+        expect(res.status).toBe(403);
+        const rows = db.prepare(
+            "SELECT payload_json FROM agent_audit_log WHERE action_type = 'legacy.live_write_denied'",
+        ).all() as Array<{ payload_json: string }>;
+        expect(rows).toHaveLength(1);
+        expect(rows[0].payload_json).toContain('"actions_count":6');
+        for (const action of actions) {
+            expect(rows[0].payload_json).toContain(action.type);
+        }
+    });
+
     it("dry_run:false returns 403 AGENT_DIRECT_WRITE_DISABLED with zero domain writes", async () => {
         const before = (db.prepare("SELECT COUNT(*) AS c FROM tasks").get() as { c: number }).c;
         const res = await agentExecute(
@@ -128,7 +172,8 @@ describe("legacy agent execute shutdown", () => {
         expect(body.error).toContain("Direct agent writes are disabled");
         const after = (db.prepare("SELECT COUNT(*) AS c FROM tasks").get() as { c: number }).c;
         expect(after).toBe(before);
-        expect((db.prepare("SELECT COUNT(*) AS c FROM agent_audit_log").get() as { c: number }).c).toBe(0);
+        // A denial audit event is the intended behavior for live attempts.
+        expect((db.prepare("SELECT COUNT(*) AS c FROM agent_audit_log").get() as { c: number }).c).toBe(1);
         expect((db.prepare("SELECT COUNT(*) AS c FROM agent_idempotency").get() as { c: number }).c).toBe(0);
     });
 

@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { toErrorMessage } from "@/lib/error";
 import { WORKSPACES } from "@/lib/workspaces";
 import {
+    AGENT_DIRECT_WRITE_DISABLED_CODE,
     AGENT_GATEWAY_PATH,
     assertLegacyAgentExecutionAllowed,
     LegacyAgentDirectWriteDisabledError,
@@ -183,6 +184,33 @@ export async function POST(req: NextRequest) {
             assertLegacyAgentExecutionAllowed(parsed.data.dry_run);
         } catch (error) {
             if (error instanceof LegacyAgentDirectWriteDisabledError) {
+                // R1-L1: record a denial/security audit event (control-plane
+                // evidence only). The live write remains forbidden regardless of
+                // audit persistence outcome — an audit failure must never fall
+                // through to historical live execution.
+                try {
+                    db.prepare(`
+                        INSERT INTO agent_audit_log (
+                            id, agent_key_id, action_type, payload_json, result_json, created_at
+                        ) VALUES (@id, @agent_key_id, @action_type, @payload_json, @result_json, @created_at)
+                    `).run({
+                        id: nanoid(),
+                        agent_key_id: agent.id,
+                        action_type: "legacy.live_write_denied",
+                        payload_json: JSON.stringify({
+                            dry_run: false,
+                            actions_count: parsed.data.actions.length,
+                            action_types: parsed.data.actions.map((a: { type: string }) => a.type),
+                        }),
+                        result_json: JSON.stringify({
+                            ok: false,
+                            code: AGENT_DIRECT_WRITE_DISABLED_CODE,
+                        }),
+                        created_at: nowIso(),
+                    });
+                } catch {
+                    // Audit persistence failure must never authorize live execution.
+                }
                 return NextResponse.json(
                     {
                         error: error.message,
