@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
 import crypto from "crypto";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export async function GET(
   req: Request,
@@ -31,9 +32,11 @@ export async function GET(
 }
 
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authGuard = humanMutationGuard(req);
+  if (authGuard instanceof NextResponse) return authGuard;
   const { id } = await params;
   try {
     // Deriving writing_mode from the project itself instead of relying on body
@@ -188,9 +191,11 @@ export async function POST(
 }
 
 export async function PUT(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authGuard = humanMutationGuard(req);
+  if (authGuard instanceof NextResponse) return authGuard;
   const { id } = await params;
   try {
     const { blocks } = await req.json();

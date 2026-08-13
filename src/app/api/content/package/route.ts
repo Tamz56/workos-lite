@@ -5,8 +5,11 @@ import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 import { AGENT_TEMPLATES } from "@/lib/agent/templates";
 import { toErrorMessage } from "@/lib/error";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export async function POST(req: NextRequest) {
+  const authGuard = humanMutationGuard(req);
+  if (authGuard instanceof NextResponse) return authGuard;
   try {
     const { topicId, topicTitle, templateKey, publishDate } = await req.json();
 

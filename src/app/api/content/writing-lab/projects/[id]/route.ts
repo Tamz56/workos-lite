@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export async function PATCH(
-  req: Request,
+  req: NextRequest,
   props: { params: Promise<{ id: string }> }
 ) {
+  const authGuard = humanMutationGuard(req);
+  if (authGuard instanceof NextResponse) return authGuard;
   const { id } = await props.params;
   try {
     const body = await req.json();
@@ -88,9 +91,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  req: Request,
+  req: NextRequest,
   props: { params: Promise<{ id: string }> }
 ) {
+  const authGuard = humanMutationGuard(req);
+  if (authGuard instanceof NextResponse) return authGuard;
   const { id } = await props.params;
   try {
     // Delete projects (cascade will handle blocks because of FK ON DELETE CASCADE)

@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export async function PATCH(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authGuard = humanMutationGuard(req);
+  if (authGuard instanceof NextResponse) return authGuard;
   const { id } = await params;
   try {
     const body = await req.json();
@@ -56,9 +59,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authGuard = humanMutationGuard(req);
+  if (authGuard instanceof NextResponse) return authGuard;
   const { id } = await params;
   try {
     // Transactional delete: Projects (which will cascade to blocks) then Episode

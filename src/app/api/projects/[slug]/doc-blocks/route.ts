@@ -1,5 +1,6 @@
 import type { DocBlockSourceType } from "@/lib/types";
 import { NextRequest, NextResponse } from "next/server";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import {
     listProjectDocBlocks,
     resolveProjectId,
@@ -57,6 +58,8 @@ export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ slug: string }> }
 ) {
+    const authGuard = humanMutationGuard(request);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { slug } = await params;
         if (!isValidRouteIdentifier(slug)) {

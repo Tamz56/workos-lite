@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
 import { nanoid } from "nanoid";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export async function GET(req: NextRequest) {
     try {
@@ -41,6 +42,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const body = await req.json();
         const { title, content_json, content_html, plain_text, project_id, linked_task_id } = body;

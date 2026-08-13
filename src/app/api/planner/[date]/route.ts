@@ -8,6 +8,7 @@ import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { PlannerDay, PlannerDayTemplate } from "@/lib/planner/types";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,8 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ date: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { date } = await params;
 
@@ -140,6 +143,8 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ date: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { date } = await params;
 

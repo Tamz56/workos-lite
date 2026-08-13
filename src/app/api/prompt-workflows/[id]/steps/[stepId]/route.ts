@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import { db } from "@/db/db";
 
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string; stepId: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { id: workflowId, stepId } = await params;
         const body = await req.json();
@@ -115,6 +118,8 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string; stepId: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { id: workflowId, stepId } = await params;
 

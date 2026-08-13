@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import { toErrorMessage } from "@/lib/error";
 
 // --- HEURISTICS START ---
@@ -91,6 +92,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const body = await req.json();
         const parsed = ReviewRequestSchema.safeParse(body);

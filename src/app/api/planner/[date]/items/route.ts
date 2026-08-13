@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { PlannerDay, EnrichedPlannerItem } from "@/lib/planner/types";
 import { calculateTimeRangeMinutes, getTimeRangeError } from "@/lib/planner/time";
 import { aiProviderExists } from "@/lib/planner/provider";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,8 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ date: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { date } = await params;
 

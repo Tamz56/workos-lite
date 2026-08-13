@@ -8,6 +8,7 @@ import {
     parseSchedule
 } from "@/lib/planner-import/parser";
 import { ImportExecutePayload, ImportExecutionResult, ImportMetadataResult } from "@/lib/planner-import/types";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import {
     PLANNER_SCHEDULED_BLOCKS,
     PLANNER_WORK_MODES,
@@ -36,6 +37,8 @@ function getWorkModeDefaultBlock(workMode: PlannerWorkMode): PlannerScheduledBlo
 }
 
 export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const body: ImportExecutePayload = await req.json();
 

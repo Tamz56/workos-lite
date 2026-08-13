@@ -7,6 +7,11 @@ import { nanoid } from "nanoid";
 import crypto from "crypto";
 import { toErrorMessage } from "@/lib/error";
 import { WORKSPACES } from "@/lib/workspaces";
+import {
+    AGENT_GATEWAY_PATH,
+    assertLegacyAgentExecutionAllowed,
+    LegacyAgentDirectWriteDisabledError,
+} from "@/lib/agent/executePolicy";
 
 const Workspace = z.enum(WORKSPACES);
 const Status = z.enum(["inbox", "planned", "done"]);
@@ -170,6 +175,25 @@ export async function POST(req: NextRequest) {
             phase: "validation"
         };
         isDryRun = parsed.data.dry_run;
+
+        // P1E.1C Strategy A: live legacy writes are forbidden. Only dry-run
+        // previews may proceed; every live write returns 403 before any
+        // business/domain write or idempotency persistence.
+        try {
+            assertLegacyAgentExecutionAllowed(parsed.data.dry_run);
+        } catch (error) {
+            if (error instanceof LegacyAgentDirectWriteDisabledError) {
+                return NextResponse.json(
+                    {
+                        error: error.message,
+                        code: error.code,
+                        gateway: AGENT_GATEWAY_PATH,
+                    },
+                    { status: error.status },
+                );
+            }
+            throw error;
+        }
 
         const idempotencyKey = req.headers.get("x-idempotency-key")?.trim() || null;
         const reqHash = sha256(JSON.stringify(parsed.data));

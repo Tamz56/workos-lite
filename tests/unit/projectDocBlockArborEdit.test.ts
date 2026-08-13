@@ -2,6 +2,12 @@ import Database from "better-sqlite3";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mapRowToBlock } from "@/lib/project-doc-blocks/mappers";
+import { HUMAN_AUTH_SCHEMA_SQL } from "@/lib/human-auth/humanAuthSchema";
+import {
+    createTestH2Session,
+    seedHumanOperator,
+    TRUSTED_ORIGIN,
+} from "../helpers/humanSession";
 
 const { mockGetDb } = vi.hoisted(() => ({ mockGetDb: vi.fn() }));
 vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
@@ -13,6 +19,7 @@ const BLOCK_ID = "blk-arbor-001";
 const ARBOR_UPDATED_AT = "2026-08-05T09:16:29.963Z";
 
 let db: Database.Database;
+let sessionCookie: string;
 
 function createSchema() {
     db.exec(`
@@ -69,19 +76,28 @@ function seedArborBlock() {
 function patchRequest(body: unknown) {
     return new NextRequest(`http://localhost/api/projects/arbor-project/doc-blocks/${BLOCK_ID}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            cookie: sessionCookie,
+            origin: TRUSTED_ORIGIN,
+        },
         body: JSON.stringify(body),
     });
 }
 
 beforeEach(() => {
     db = new Database(":memory:");
+    db.exec(HUMAN_AUTH_SCHEMA_SQL);
     createSchema();
     seedArborBlock();
+    const operatorId = seedHumanOperator(db);
+    sessionCookie = createTestH2Session(db, operatorId).cookieHeader;
+    vi.stubEnv("WORKOS_TRUSTED_ORIGINS", TRUSTED_ORIGIN);
     mockGetDb.mockReturnValue(db);
 });
 
 afterEach(() => {
+    vi.unstubAllEnvs();
     db.close();
 });
 
