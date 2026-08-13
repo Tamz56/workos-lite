@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchHumanSession, postHumanLogin } from "./api";
+import { loginRedirectTarget } from "@/lib/human-auth/clientSession";
 
 type LoginState = "idle" | "submitting";
 type LoginError = "invalid" | "network" | "internal" | null;
 
-export function HumanLoginForm() {
+export function HumanLoginForm({ next }: { next?: string | null }) {
     const router = useRouter();
     const [password, setPassword] = useState("");
     const [state, setState] = useState<LoginState>("idle");
@@ -20,7 +21,7 @@ export function HumanLoginForm() {
             const result = await fetchHumanSession();
             if (cancelled) return;
             if (result.ok && result.data.authenticated === true) {
-                router.replace("/operations");
+                router.replace(loginRedirectTarget(next));
             } else {
                 setChecking(false);
             }
@@ -28,7 +29,7 @@ export function HumanLoginForm() {
         return () => {
             cancelled = true;
         };
-    }, [router]);
+    }, [router, next]);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -42,7 +43,7 @@ export function HumanLoginForm() {
 
         const result = await postHumanLogin(password);
         if (result.ok) {
-            router.replace("/operations");
+            router.replace(loginRedirectTarget(next));
             router.refresh();
             return;
         }
