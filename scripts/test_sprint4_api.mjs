@@ -7,7 +7,10 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { loginHuman, logoutHuman, h2Headers } = require('./h2-smoke-client.cjs');
 
-const BASE_URL = 'http://localhost:3000/api';
+// Configurable runtime target (same model as h2-smoke-client):
+// WORKOS_SMOKE_BASE_URL, defaulting to the documented local dev base.
+const BASE_URL = (process.env.WORKOS_SMOKE_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '') + '/api';
+const APP_BASE_URL = BASE_URL.replace(/\/api$/, '');
 
 async function requestJson(url, options) {
     const res = await fetch(url, options);
@@ -32,7 +35,7 @@ async function runTest() {
     let ctx = null;
 
     try {
-        ctx = await loginHuman({ baseUrl: BASE_URL.replace(/\/api$/, '') });
+        ctx = await loginHuman({ baseUrl: APP_BASE_URL });
         const h2 = h2Headers(ctx);
 
         // 0. Setup: Create a test task
@@ -75,7 +78,9 @@ async function runTest() {
 
         // 3. Upload Attachment
         console.log('\n--- 3. Uploading Attachment ---');
-        const dummyPath = path.join(process.cwd(), 'test_upload.txt');
+        // Fixture extension must be accepted by src/lib/uploadRules.ts
+        // ALLOWED_EXTENSIONS (png is permitted). Content stays tiny text.
+        const dummyPath = path.join(process.cwd(), 'test_upload.png');
         fs.writeFileSync(dummyPath, 'Hello Sprint 4');
 
         const form = new FormData();

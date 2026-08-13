@@ -1,5 +1,5 @@
-// scripts/smoke_backup.js
-const { request, logPass, logFail } = require('./smoke_base');
+// scripts/smoke_backup.cjs
+const { request, logPass, logFail } = require('./smoke_base.cjs');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');

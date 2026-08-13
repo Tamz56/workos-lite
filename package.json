@@ -8,9 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "smoke:tasks": "node scripts/smoke_tasks.js",
-    "smoke:events": "node scripts/smoke_events.js",
-    "smoke:backup": "node scripts/smoke_backup.js",
+    "smoke:tasks": "node scripts/smoke_tasks.cjs",
+    "smoke:events": "node scripts/smoke_events.cjs",
+    "smoke:backup": "node scripts/smoke_backup.cjs",
     "migrate:nutrient": "npx tsx scripts/migrate-nutrient-planner-lists.ts",
     "human:init": "npx tsx scripts/human-init.ts",
     "human:reset": "npx tsx scripts/human-reset.ts"

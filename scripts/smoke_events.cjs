@@ -1,6 +1,6 @@
-// scripts/smoke_events.js
-const { request, logPass, logFail } = require('./smoke_base');
-const { loginHuman, logoutHuman, h2Headers } = require('./h2-smoke-client');
+// scripts/smoke_events.cjs
+const { request, logPass, logFail } = require('./smoke_base.cjs');
+const { loginHuman, logoutHuman, h2Headers } = require('./h2-smoke-client.cjs');
 
 async function main() {
     let ctx = null;
