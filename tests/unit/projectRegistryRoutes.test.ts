@@ -2,6 +2,12 @@ import Database from "better-sqlite3";
 import { NextRequest } from "next/server";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ensureProjectRegistryMetadataColumns } from "@/lib/projects/registryMetadata";
+import { HUMAN_AUTH_SCHEMA_SQL } from "@/lib/human-auth/humanAuthSchema";
+import {
+    createTestH2Session,
+    seedHumanOperator,
+    TRUSTED_ORIGIN,
+} from "../helpers/humanSession";
 
 const { mockGetDb } = vi.hoisted(() => ({ mockGetDb: vi.fn() }));
 vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
@@ -9,10 +15,12 @@ vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
 import { PUT as updateProject } from "@/app/api/projects/[slug]/route";
 
 let db: Database.Database;
+let sessionCookie: string;
 
 function createSchema() {
+    db.exec("PRAGMA foreign_keys = ON;");
+    db.exec(HUMAN_AUTH_SCHEMA_SQL);
     db.exec(`
-        PRAGMA foreign_keys = ON;
         CREATE TABLE projects (
             id TEXT PRIMARY KEY,
             slug TEXT NOT NULL UNIQUE,
@@ -44,7 +52,11 @@ function insertProject(id: string, slug: string, name: string, status = "planned
 function putRequest(slug: string, body: unknown) {
     return new NextRequest(`http://localhost/api/projects/${slug}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            cookie: sessionCookie,
+            origin: TRUSTED_ORIGIN,
+        },
         body: JSON.stringify(body),
     });
 }
@@ -66,10 +78,14 @@ beforeEach(() => {
     db = new Database(":memory:");
     createSchema();
     insertProject("p1", "existing-project", "Existing Project");
+    const operatorId = seedHumanOperator(db);
+    sessionCookie = createTestH2Session(db, operatorId).cookieHeader;
+    vi.stubEnv("WORKOS_TRUSTED_ORIGINS", TRUSTED_ORIGIN);
     mockGetDb.mockReturnValue(db);
 });
 
 afterEach(() => {
+    vi.unstubAllEnvs();
     db.close();
 });
 

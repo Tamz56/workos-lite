@@ -1,9 +1,12 @@
 import { db } from "@/db/db";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import { TEMPLATES } from "@/lib/templates";
 import crypto from "crypto";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { projectName, templateId } = await req.json();
         const template = TEMPLATES.find(t => t.id === templateId);

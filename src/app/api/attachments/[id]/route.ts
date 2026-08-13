@@ -5,6 +5,7 @@ import { db } from "@/db/db";
 import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 function resolvePath(storedPath: string) {
     if (path.isAbsolute(storedPath)) return storedPath;
@@ -50,7 +51,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     const { id } = await params;
 
     const att = db.prepare("SELECT * FROM attachments WHERE id = ?").get(id) as { storage_path: string };

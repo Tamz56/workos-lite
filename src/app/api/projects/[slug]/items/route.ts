@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { CreateProjectItemSchema } from "@/lib/projects/backlogCreateSchema";
 import { insertProjectItem } from "@/lib/projects/backlogWrite";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
@@ -37,6 +38,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { slug } = await params;
         const db = getDb();

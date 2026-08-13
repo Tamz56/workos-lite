@@ -68,14 +68,19 @@ export function createTestH2Session(
 
 export function humanMutationRequest(
     url: string,
-    opts: { cookieHeader?: string | null; origin?: string | null } = {},
+    opts: {
+        cookieHeader?: string | null;
+        origin?: string | null;
+        method?: string;
+        body?: string;
+    } = {},
 ): NextRequest {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (opts.cookieHeader) headers.cookie = opts.cookieHeader;
     if (opts.origin !== undefined && opts.origin !== null) headers.origin = opts.origin;
     return new NextRequest(url, {
-        method: "POST",
+        method: opts.method ?? "POST",
         headers,
-        body: JSON.stringify({}),
+        body: opts.body ?? JSON.stringify({}),
     });
 }

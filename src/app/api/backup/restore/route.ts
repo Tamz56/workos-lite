@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import { parseBackupJson } from "@/lib/backup/schema";
 import { validateZipStructure, ZIP_LIMITS } from "@/lib/backup/zipUtils";
 import { readAllDocs, writeAllDocs, withDocsLock, type DocRow } from "@/lib/docsStore";
@@ -224,7 +225,9 @@ function safeCopyFile(src: string, dest: string): boolean {
 // ============================================================
 // Main Route
 // ============================================================
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     // ---- Lock check ----
     if (restoreInProgress) {
         return errorResponse("validate", ["Restore already in progress. Please wait."]);

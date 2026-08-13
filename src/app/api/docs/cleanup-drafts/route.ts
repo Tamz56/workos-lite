@@ -1,6 +1,7 @@
 // src/app/api/docs/cleanup-drafts/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { readAllDocs, writeAllDocs, withDocsLock, type DocRow } from "@/lib/docsStore";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,9 @@ function isDraft(d: Pick<DocRow, "title" | "content_md">) {
     return (t === "" || t === "Untitled") && c === "";
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     const result = await withDocsLock(async () => {
         const docs = await readAllDocs();
         const removed = docs.filter(isDraft).map((d) => d.id);

@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import path from "path";
 import fs from "fs/promises";
 import { ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, getFileExtLower } from "@/lib/uploadRules";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 function uploadDir(taskId: string) {
     return path.join(process.cwd(), "data", "uploads", "tasks", taskId);
@@ -33,6 +34,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     const { id: taskId } = await params;
 
     const task = db.prepare("SELECT id FROM tasks WHERE id = ?").get(taskId);
