@@ -5,7 +5,6 @@ import type { NextRequest } from 'next/server'
 const PROTECTED_ROUTES = [
     '/agent',
     '/agent/logs',
-    '/api/agent/proxy',
     '/api/agent/logs'
 ]
 

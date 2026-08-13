@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import { getDb } from "@/db/db";
 import { nanoid } from "nanoid";
 
@@ -41,6 +42,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { slug } = await params;
         const db = getDb();
@@ -115,6 +118,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { slug } = await params;
         const db = getDb();

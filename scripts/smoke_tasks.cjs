@@ -1,9 +1,13 @@
-// scripts/smoke_tasks.js
-const { request, logPass, logFail } = require('./smoke_base');
+// scripts/smoke_tasks.cjs
+const { request, logPass, logFail } = require('./smoke_base.cjs');
+const { loginHuman, logoutHuman, h2Headers } = require('./h2-smoke-client.cjs');
 
 async function main() {
+    let ctx = null;
     try {
         console.log('Running Smoke Test: Tasks API');
+        ctx = await loginHuman();
+        const headers = h2Headers(ctx);
 
         // 1. Create Task
         const newTask = {
@@ -14,7 +18,8 @@ async function main() {
 
         const createRes = await request('/api/tasks', {
             method: 'POST',
-            body: newTask
+            body: newTask,
+            headers
         });
 
         if (!createRes.ok) throw new Error(`Create task failed: ${JSON.stringify(createRes.body)}`);
@@ -24,13 +29,14 @@ async function main() {
         logPass('Create Task');
 
         // 2. Read Task (List)
-        const listRes = await request('/api/tasks?limit=1');
+        const listRes = await request('/api/tasks?limit=1', { headers });
         if (!listRes.ok) throw new Error(`List tasks failed: ${JSON.stringify(listRes.body)}`);
         logPass('List Tasks');
 
         // 3. Delete Task (Cleanup)
         const deleteRes = await request(`/api/tasks/${taskId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers
         });
 
         if (!deleteRes.ok) throw new Error(`Delete task failed: ${JSON.stringify(deleteRes.body)}`);
@@ -38,6 +44,8 @@ async function main() {
 
     } catch (e) {
         logFail('Tasks Smoke Test', e);
+    } finally {
+        if (ctx) await logoutHuman(ctx);
     }
 }
 

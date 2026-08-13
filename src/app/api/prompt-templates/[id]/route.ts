@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import { db } from "@/db/db";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { id } = await params;
         const body = await req.json();
@@ -90,6 +93,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 // DELETE: Archive-first behavior (set status to 'archived' instead of hard delete)
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { id } = await params;
 

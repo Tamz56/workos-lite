@@ -5,6 +5,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { getDb } from "@/db/db";
 import { toErrorMessage } from "@/lib/error";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 import { WORKSPACES } from "@/lib/workspaces";
 
@@ -111,6 +112,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 

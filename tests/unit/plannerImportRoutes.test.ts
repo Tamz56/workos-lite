@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Database from "better-sqlite3";
 import { NextRequest } from "next/server";
+import { HUMAN_AUTH_SCHEMA_SQL } from "@/lib/human-auth/humanAuthSchema";
+import {
+    createTestH2Session,
+    seedHumanOperator,
+    TRUSTED_ORIGIN,
+} from "../helpers/humanSession";
 
 const { mockGetDb } = vi.hoisted(() => ({ mockGetDb: vi.fn() }));
 vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
@@ -13,6 +19,7 @@ import type { EnrichedPlannerItem } from "@/lib/planner/types";
 import { CANONICAL_ROSE_TRIAL_SCHEDULE } from "../fixtures/plannerImportCanonical";
 
 let db: Database.Database;
+let sessionCookie: string;
 
 function createSchema() {
     db.exec(`
@@ -82,10 +89,15 @@ function createSchema() {
 beforeEach(() => {
     db = new Database(":memory:");
     createSchema();
+    db.exec(HUMAN_AUTH_SCHEMA_SQL);
+    const operatorId = seedHumanOperator(db);
+    sessionCookie = createTestH2Session(db, operatorId).cookieHeader;
+    vi.stubEnv("WORKOS_TRUSTED_ORIGINS", TRUSTED_ORIGIN);
     mockGetDb.mockReturnValue(db);
 });
 
 afterEach(() => {
+    vi.unstubAllEnvs();
     db.close();
 });
 
@@ -124,7 +136,11 @@ ${status}
 function request(url: string, body: object) {
     return new NextRequest(`http://localhost${url}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            cookie: sessionCookie,
+            origin: TRUSTED_ORIGIN,
+        },
         body: JSON.stringify(body)
     });
 }

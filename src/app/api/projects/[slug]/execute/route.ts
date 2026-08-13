@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { slug } = await params;
         const db = getDb();

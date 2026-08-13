@@ -1,4 +1,4 @@
-// scripts/smoke_base.js
+// scripts/smoke_base.cjs
 // Base helper for smoke tests
 
 const http = require('http');

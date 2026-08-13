@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { PlannerDay } from "@/lib/planner/types";
 import { calculateTimeRangeMinutes, getTimeRangeError } from "@/lib/planner/time";
 import { aiProviderExists } from "@/lib/planner/provider";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,8 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ date: string; id: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const ctx = await resolveContext(params);
         if ("error" in ctx) return ctx.error;
@@ -148,9 +151,11 @@ export async function PATCH(
 // --- DELETE: Remove planner item (does NOT delete source task/project_item) ---
 
 export async function DELETE(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ date: string; id: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const ctx = await resolveContext(params);
         if ("error" in ctx) return ctx.error;

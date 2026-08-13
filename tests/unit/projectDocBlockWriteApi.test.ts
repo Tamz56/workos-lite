@@ -1,6 +1,12 @@
 import Database from "better-sqlite3";
 import { NextRequest } from "next/server";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HUMAN_AUTH_SCHEMA_SQL } from "@/lib/human-auth/humanAuthSchema";
+import {
+    createTestH2Session,
+    seedHumanOperator,
+    TRUSTED_ORIGIN,
+} from "../helpers/humanSession";
 
 const { mockGetDb } = vi.hoisted(() => ({ mockGetDb: vi.fn() }));
 vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
@@ -14,6 +20,18 @@ const WORKOS_PROJECT_ID = "WniiRWTaGeEY7gt3XAsm7";
 const OTHER_PROJECT_ID = "RciepxjtyZYQSA6pmKZ0f";
 
 let db: Database.Database;
+let sessionCookie: string;
+
+function authedRequest(url: string, init: RequestInit = {}) {
+    return new NextRequest(url, {
+        ...init,
+        headers: {
+            cookie: sessionCookie,
+            origin: TRUSTED_ORIGIN,
+            ...(init.headers ?? {}),
+        },
+    });
+}
 
 function createSchema() {
     db.exec(`
@@ -79,11 +97,16 @@ function insertMockBlock(id: string, projectId: string, updatedAt: string, statu
 
 beforeEach(() => {
     db = new Database(":memory:");
+    db.exec(HUMAN_AUTH_SCHEMA_SQL);
     createSchema();
+    const operatorId = seedHumanOperator(db);
+    sessionCookie = createTestH2Session(db, operatorId).cookieHeader;
+    vi.stubEnv("WORKOS_TRUSTED_ORIGINS", TRUSTED_ORIGIN);
     mockGetDb.mockReturnValue(db);
 });
 
 afterEach(() => {
+    vi.unstubAllEnvs();
     db.close();
     vi.clearAllMocks();
 });
@@ -110,7 +133,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             };
 
             const response = await createBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify(payload)
                 }),
@@ -136,7 +159,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
         it("returns 404 for unknown project", async () => {
             const response = await createBlock(
-                new NextRequest(`http://localhost/api/projects/unknown-proj/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/unknown-proj/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify({
                         type: "process_note",
@@ -152,7 +175,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
         it("returns 400 for invalid payload (missing title)", async () => {
             const response = await createBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify({
                         type: "process_note",
@@ -167,7 +190,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
         it("returns 400 for malformed arrays", async () => {
             await createBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify({
                         type: "process_note",
@@ -185,7 +208,7 @@ describe("Project Doc Blocks Write API Tests", () => {
     describe("generatedBy Contract", () => {
         it("creates block without generatedBy (manual Add Block) → 201", async () => {
             const response = await createBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify({
                         type: "process_note",
@@ -209,7 +232,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
         it("creates block with generatedBy: 'arbor_assistant' → 201", async () => {
             const response = await createBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify({
                         type: "process_note",
@@ -233,7 +256,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
         it("creates block with generatedBy: 'arbor' → 201", async () => {
             const response = await createBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify({
                         type: "process_note",
@@ -254,7 +277,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
         it("rejects invalid generatedBy value → 400", async () => {
             const response = await createBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify({
                         type: "process_note",
@@ -273,7 +296,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
         it("rejects another invalid generatedBy value → 400", async () => {
             const response = await createBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks`, {
                     method: "POST",
                     body: JSON.stringify({
                         type: "process_note",
@@ -304,7 +327,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
             // List and verify generatedBy is not set on the response
             const response = await listBlocks(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks?status=active`),
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks?status=active`),
                 { params: Promise.resolve({ slug: WORKOS_PROJECT_ID }) }
             );
             expect(response.status).toBe(200);
@@ -331,7 +354,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             };
 
             const response = await updateBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
                     method: "PATCH",
                     body: JSON.stringify(payload)
                 }),
@@ -360,7 +383,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             };
 
             const response = await updateBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
                     method: "PATCH",
                     body: JSON.stringify(payload)
                 }),
@@ -379,7 +402,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             };
 
             const response = await updateBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
                     method: "PATCH",
                     body: JSON.stringify(payload)
                 }),
@@ -399,7 +422,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             };
 
             const response = await updateBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
                     method: "PATCH",
                     body: JSON.stringify(payload)
                 }),
@@ -419,7 +442,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             };
 
             const response = await updateBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
                     method: "PATCH",
                     body: JSON.stringify(payload)
                 }),
@@ -438,7 +461,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             };
 
             const response = await updateBlock(
-                new NextRequest(`http://localhost/api/projects/${OTHER_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
+                authedRequest(`http://localhost/api/projects/${OTHER_PROJECT_ID}/doc-blocks/${BLOCK_ID}`, {
                     method: "PATCH",
                     body: JSON.stringify(payload)
                 }),
@@ -458,7 +481,7 @@ describe("Project Doc Blocks Write API Tests", () => {
 
         it("archives an active block successfully", async () => {
             const response = await archiveBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}/archive`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}/archive`, {
                     method: "POST",
                     body: JSON.stringify({ expectedUpdatedAt: "2026-08-01T12:00:00.000Z" })
                 }),
@@ -471,14 +494,14 @@ describe("Project Doc Blocks Write API Tests", () => {
 
             // Verify active list excludes it, archived filter includes it
             const activeRes = await listBlocks(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks?status=active`),
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks?status=active`),
                 { params: Promise.resolve({ slug: WORKOS_PROJECT_ID }) }
             );
             const activeList = await activeRes.json();
             expect(activeList.some((b: { id: string }) => b.id === BLOCK_ID)).toBe(false);
 
             const archivedRes = await listBlocks(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks?status=archived`),
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks?status=archived`),
                 { params: Promise.resolve({ slug: WORKOS_PROJECT_ID }) }
             );
             const archivedList = await archivedRes.json();
@@ -491,7 +514,7 @@ describe("Project Doc Blocks Write API Tests", () => {
             const current = db.prepare("SELECT updated_at FROM project_doc_blocks WHERE id = ?").get(BLOCK_ID) as { updated_at: string };
 
             const response = await restoreBlock(
-                new NextRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}/restore`, {
+                authedRequest(`http://localhost/api/projects/${WORKOS_PROJECT_ID}/doc-blocks/${BLOCK_ID}/restore`, {
                     method: "POST",
                     body: JSON.stringify({ expectedUpdatedAt: current.updated_at })
                 }),
@@ -515,7 +538,7 @@ describe("Project identifier resolver write operations (slug support)", () => {
 
     it("POST creates a block by slug → 201", async () => {
         const response = await createBlock(
-            new NextRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks`, {
+            authedRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks`, {
                 method: "POST",
                 body: JSON.stringify({
                     type: "process_note",
@@ -535,7 +558,7 @@ describe("Project identifier resolver write operations (slug support)", () => {
 
     it("PATCH updates a block by slug → 200", async () => {
         const response = await updateBlock(
-            new NextRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks/${BLOCK_ID}`, {
+            authedRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks/${BLOCK_ID}`, {
                 method: "PATCH",
                 body: JSON.stringify({
                     expectedUpdatedAt: "2026-08-01T12:00:00.000Z",
@@ -552,7 +575,7 @@ describe("Project identifier resolver write operations (slug support)", () => {
 
     it("Archive by slug → 200", async () => {
         const response = await archiveBlock(
-            new NextRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks/${BLOCK_ID}/archive`, {
+            authedRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks/${BLOCK_ID}/archive`, {
                 method: "POST",
                 body: JSON.stringify({ expectedUpdatedAt: "2026-08-01T12:00:00.000Z" })
             }),
@@ -569,7 +592,7 @@ describe("Project identifier resolver write operations (slug support)", () => {
         const current = db.prepare("SELECT updated_at FROM project_doc_blocks WHERE id = ?").get(BLOCK_ID) as { updated_at: string };
 
         const response = await restoreBlock(
-            new NextRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks/${BLOCK_ID}/restore`, {
+            authedRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks/${BLOCK_ID}/restore`, {
                 method: "POST",
                 body: JSON.stringify({ expectedUpdatedAt: current.updated_at })
             }),
@@ -583,7 +606,7 @@ describe("Project identifier resolver write operations (slug support)", () => {
 
     it("returns 404 for POST with unknown slug", async () => {
         const response = await createBlock(
-            new NextRequest(`http://localhost/api/projects/unknown-slug/doc-blocks`, {
+            authedRequest(`http://localhost/api/projects/unknown-slug/doc-blocks`, {
                 method: "POST",
                 body: JSON.stringify({
                     type: "process_note",
@@ -600,7 +623,7 @@ describe("Project identifier resolver write operations (slug support)", () => {
 
     it("returns 404 for PATCH with unknown slug", async () => {
         const response = await updateBlock(
-            new NextRequest(`http://localhost/api/projects/unknown-slug/doc-blocks/${BLOCK_ID}`, {
+            authedRequest(`http://localhost/api/projects/unknown-slug/doc-blocks/${BLOCK_ID}`, {
                 method: "PATCH",
                 body: JSON.stringify({
                     expectedUpdatedAt: "2026-08-01T12:00:00.000Z",
@@ -618,7 +641,7 @@ describe("Project identifier resolver write operations (slug support)", () => {
         insertMockBlock(otherBlockId, OTHER_PROJECT_ID, "2026-08-01T12:00:00.000Z");
 
         const response = await updateBlock(
-            new NextRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks/${otherBlockId}`, {
+            authedRequest(`http://localhost/api/projects/${WORKOS_SLUG}/doc-blocks/${otherBlockId}`, {
                 method: "PATCH",
                 body: JSON.stringify({
                     expectedUpdatedAt: "2026-08-01T12:00:00.000Z",

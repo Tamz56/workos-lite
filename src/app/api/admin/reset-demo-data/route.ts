@@ -1,9 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { mode, dry_run } = await req.json();
         const isDev = process.env.NODE_ENV === "development";

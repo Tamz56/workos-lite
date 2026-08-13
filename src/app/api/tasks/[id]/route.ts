@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import { db } from "@/db/db";
 import { z } from "zod";
 import { defaultBucketForWorkspace } from "@/lib/planning";
@@ -59,6 +60,8 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     const { id } = await params;
 
     const body = (await req.json().catch(() => ({}))) as unknown;
@@ -211,9 +214,11 @@ async function safeUnlink(
 }
 
 export async function DELETE(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     const { id } = await params;
 
     // Cleanup files before DB cascade deletes the rows

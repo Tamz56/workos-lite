@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { toErrorMessage } from "@/lib/error";
 import { WORKSPACES, normalizeWorkspace } from "@/lib/workspaces";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 const Workspace = z.enum(WORKSPACES);
 
@@ -41,6 +42,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 

@@ -24,6 +24,7 @@ import {
     ShieldCheckIcon,
     XMarkIcon
 } from "@heroicons/react/24/outline";
+import { LogoutButton } from "@/components/human-auth/LogoutButton";
 
 const STORAGE_KEY = "workos.sidebar.collapsed";
 const ADVANCED_KEY = "workos.sidebar.advanced.open";
@@ -375,6 +376,8 @@ export function Sidebar() {
                     active={pathname.startsWith("/settings")}
                     isCollapsed={isCollapsed}
                 />
+
+                <LogoutButton collapsed={isCollapsed} />
 
                 {/* Collapse Toggle */}
                 <button

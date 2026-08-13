@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { seedArborWritingLab } from "@/db/db";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const authGuard = humanMutationGuard(req);
+  if (authGuard instanceof NextResponse) return authGuard;
   try {
     seedArborWritingLab();
     return NextResponse.json({ success: true, message: "Arbor Writing Lab seeded successfully" });

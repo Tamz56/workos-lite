@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 function now() {
     return new Date().toISOString();
@@ -24,6 +25,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     const { id } = await params;
     const existing = db.prepare("SELECT * FROM docs WHERE id = ?").get(id) as { 
         title: string; 
@@ -74,7 +77,9 @@ async function safeUnlink(
     }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     const { id } = await params;
 
     // Cleanup files before DB cascade deletes the rows

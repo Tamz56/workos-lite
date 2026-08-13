@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { readAllDocs, writeAllDocs, withDocsLock, type DocRow } from "@/lib/docsStore";
 import { toErrorMessage } from "@/lib/error";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 type Mode = "merge" | "replace";
 
@@ -42,6 +43,8 @@ function pick<T extends object>(obj: unknown, keys: (keyof T)[]) {
 }
 
 export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     const url = new URL(req.url);
     const mode = (url.searchParams.get("mode") || "merge") as Mode;
 

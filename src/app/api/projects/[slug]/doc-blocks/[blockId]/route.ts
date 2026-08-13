@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import {
     getProjectDocBlockByProjectAndId,
     resolveProjectId,
@@ -53,6 +54,8 @@ export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ slug: string; blockId: string }> }
 ) {
+    const authGuard = humanMutationGuard(request);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { slug, blockId } = await params;
         if (!isValidRouteIdentifier(slug)) {

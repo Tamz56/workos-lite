@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Database from "better-sqlite3";
 import { NextRequest } from "next/server";
+import { HUMAN_AUTH_SCHEMA_SQL } from "@/lib/human-auth/humanAuthSchema";
+import {
+    createTestH2Session,
+    seedHumanOperator,
+    TRUSTED_ORIGIN,
+} from "../helpers/humanSession";
 
 const { mockGetDb } = vi.hoisted(() => ({ mockGetDb: vi.fn() }));
 vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
@@ -8,9 +14,11 @@ vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
 import { PATCH } from "@/app/api/planner/[date]/items/[id]/route";
 
 let db: Database.Database;
+let sessionCookie: string;
 
 beforeEach(() => {
     db = new Database(":memory:");
+    db.exec(HUMAN_AUTH_SCHEMA_SQL);
     db.exec(`
         CREATE TABLE planner_days (
             id TEXT PRIMARY KEY,
@@ -39,17 +47,27 @@ beforeEach(() => {
             NULL, NULL, NULL, NULL, 'morning_focus', 0, 'planned', 0
         );
     `);
+    const operatorId = seedHumanOperator(db);
+    sessionCookie = createTestH2Session(db, operatorId).cookieHeader;
+    vi.stubEnv("WORKOS_TRUSTED_ORIGINS", TRUSTED_ORIGIN);
     mockGetDb.mockReturnValue(db);
 });
 
-afterEach(() => { db.close(); });
+afterEach(() => {
+    vi.unstubAllEnvs();
+    db.close();
+});
 afterAll(() => { vi.restoreAllMocks(); });
 
 async function patch(body: object) {
     const response = await PATCH(
         new NextRequest("http://localhost/api/planner/2026-07-13/items/PI-1", {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                cookie: sessionCookie,
+                origin: TRUSTED_ORIGIN,
+            },
             body: JSON.stringify(body),
         }),
         { params: Promise.resolve({ date: "2026-07-13", id: "PI-1" }) }

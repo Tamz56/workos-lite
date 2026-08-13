@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { z } from "zod";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 const UpdateProjectItemSchema = z.object({
     title: z.string().min(1).optional(),
@@ -16,6 +17,8 @@ const UpdateProjectItemSchema = z.object({
 });
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { id } = await params;
         const db = getDb();
@@ -56,6 +59,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { id } = await params;
         const db = getDb();

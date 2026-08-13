@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
 import { nanoid } from "nanoid";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 export async function GET(req: NextRequest) {
     try {
@@ -25,6 +26,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const body = await req.json();
         const { note_id, linked_entity_type, linked_entity_id } = body;
@@ -50,6 +53,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { searchParams } = new URL(req.url);
         const id = searchParams.get("id");

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { randomUUID } from "crypto";
 import { toErrorMessage } from "@/lib/error";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 
 function now() {
     return new Date().toISOString();
@@ -74,6 +75,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
         const title = body.title !== undefined ? String(body.title).trim() : "";
@@ -97,6 +100,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { searchParams } = new URL(req.url);
         const mode = searchParams.get("mode");

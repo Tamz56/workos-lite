@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { toErrorMessage } from "@/lib/error";
+import { humanMutationGuard } from "@/lib/human-auth/mutationGuard";
 import fs from "fs/promises";
 import path from "path";
 
 export const runtime = "nodejs";
 
 export async function PATCH(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { topicId, newPublishDate, newReviewStatus, isPublishing, distributionChannels, performanceMetrics } = await req.json();
 
@@ -155,6 +158,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const authGuard = humanMutationGuard(req);
+    if (authGuard instanceof NextResponse) return authGuard;
     try {
         const { ids } = await req.json();
 

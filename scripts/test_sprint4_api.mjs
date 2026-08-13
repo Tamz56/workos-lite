@@ -2,8 +2,15 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
 
-const BASE_URL = 'http://localhost:3000/api';
+const require = createRequire(import.meta.url);
+const { loginHuman, logoutHuman, h2Headers } = require('./h2-smoke-client.cjs');
+
+// Configurable runtime target (same model as h2-smoke-client):
+// WORKOS_SMOKE_BASE_URL, defaulting to the documented local dev base.
+const BASE_URL = (process.env.WORKOS_SMOKE_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '') + '/api';
+const APP_BASE_URL = BASE_URL.replace(/\/api$/, '');
 
 async function requestJson(url, options) {
     const res = await fetch(url, options);
@@ -25,13 +32,17 @@ async function requestJson(url, options) {
 
 async function runTest() {
     console.log('🚀 Starting Sprint 4 API Test...');
+    let ctx = null;
 
     try {
+        ctx = await loginHuman({ baseUrl: APP_BASE_URL });
+        const h2 = h2Headers(ctx);
+
         // 0. Setup: Create a test task
         console.log('\n--- 0. Creating Test Task ---');
         const taskData = await requestJson(`${BASE_URL}/tasks`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...h2 },
             body: JSON.stringify({ title: 'API Test Task', workspace: 'avacrm' })
         });
         const taskId = taskData.task.id;
@@ -41,7 +52,7 @@ async function runTest() {
         console.log('\n--- 1. Creating Doc ---');
         const docJson = await requestJson(`${BASE_URL}/docs`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...h2 },
             body: JSON.stringify({ title: 'Sprint 4 Test Doc', content_md: '# Hello World' })
         });
 
@@ -55,7 +66,7 @@ async function runTest() {
         console.log('\n--- 2. Linking Doc to Task ---');
         const patchData = await requestJson(`${BASE_URL}/tasks/${taskId}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...h2 },
             body: JSON.stringify({ doc_id: docId })
         });
 
@@ -67,7 +78,9 @@ async function runTest() {
 
         // 3. Upload Attachment
         console.log('\n--- 3. Uploading Attachment ---');
-        const dummyPath = path.join(process.cwd(), 'test_upload.txt');
+        // Fixture extension must be accepted by src/lib/uploadRules.ts
+        // ALLOWED_EXTENSIONS (png is permitted). Content stays tiny text.
+        const dummyPath = path.join(process.cwd(), 'test_upload.png');
         fs.writeFileSync(dummyPath, 'Hello Sprint 4');
 
         const form = new FormData();
@@ -75,6 +88,7 @@ async function runTest() {
 
         const uploadRes = await fetch(`${BASE_URL}/tasks/${taskId}/attachments`, {
             method: 'POST',
+            headers: h2,
             body: form
         });
         const uploadText = await uploadRes.text();
@@ -95,7 +109,7 @@ async function runTest() {
 
         // 4. List Attachments
         console.log('\n--- 4. Listing Attachments ---');
-        const listData = await requestJson(`${BASE_URL}/tasks/${taskId}/attachments`);
+        const listData = await requestJson(`${BASE_URL}/tasks/${taskId}/attachments`, { headers: h2 });
         if (listData.attachments.length > 0) {
             console.log(`✅ Found ${listData.attachments.length} attachments`);
         } else {
@@ -104,7 +118,7 @@ async function runTest() {
 
         // 5. Download Attachment
         console.log('\n--- 5. Downloading Attachment ---');
-        const dlRes = await fetch(`${BASE_URL}/attachments/${attachmentId}`);
+        const dlRes = await fetch(`${BASE_URL}/attachments/${attachmentId}`, { headers: h2 });
         if (!dlRes.ok) {
             throw new Error(`Download failed (${dlRes.status})`);
         }
@@ -117,12 +131,12 @@ async function runTest() {
 
         // 6. Delete Attachment
         console.log('\n--- 6. Deleting Attachment ---');
-        await requestJson(`${BASE_URL}/attachments/${attachmentId}`, { method: 'DELETE' });
+        await requestJson(`${BASE_URL}/attachments/${attachmentId}`, { method: 'DELETE', headers: h2 });
         console.log('✅ Attachment deleted');
 
         // Cleanup
         console.log('\n--- Cleanup ---');
-        await requestJson(`${BASE_URL}/tasks/${taskId}`, { method: 'DELETE' });
+        await requestJson(`${BASE_URL}/tasks/${taskId}`, { method: 'DELETE', headers: h2 });
         fs.unlinkSync(dummyPath);
 
         console.log('\n✨ ALL TESTS PASSED!');
@@ -130,6 +144,8 @@ async function runTest() {
     } catch (error) {
         console.error('\n❌ Test Failed:', error.message);
         process.exit(1);
+    } finally {
+        if (ctx) await logoutHuman(ctx);
     }
 }
 

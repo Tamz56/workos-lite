@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Home, RefreshCw, Layers } from "lucide-react";
 
 import { AGENT_TEMPLATES, getTemplatePayload } from "@/lib/agent/templates";
+import { AgentExecuteActions } from "@/components/agent/AgentExecuteActions";
 
 const DEFAULT_PAYLOAD_RAW = `{
   "actions": [
@@ -244,26 +245,8 @@ export default function AgentDebuggerPage() {
                             </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                            <div className="flex items-center gap-2">
-                                <button onClick={formatJson} className="text-[10px] text-neutral-500 hover:text-neutral-800 transition-colors uppercase font-bold tracking-wider mr-2">Format JSON</button>
-                                <button
-                                    onClick={() => handleRun(true)}
-                                    disabled={loading}
-                                    className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
-                                >
-                                    {loading ? '...' : 'Preview Build (Dry Run)'}
-                                </button>
-                                <button
-                                    onClick={() => handleRun(false)}
-                                    disabled={loading}
-                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
-                                >
-                                    {loading ? '...' : 'Execute Now'}
-                                </button>
-                            </div>
-                            <div className="text-[10px] text-neutral-400">
-                                <span>Preview only (<code className="bg-neutral-100 px-0.5 rounded text-neutral-500">dry_run:true</code>) or Will write + idempotency enabled (<code className="text-blue-500 px-0.5 rounded bg-blue-50">dry_run:false</code>)</span>
-                            </div>
+                            <button onClick={formatJson} className="text-[10px] text-neutral-500 hover:text-neutral-800 transition-colors uppercase font-bold tracking-wider mr-2">Format JSON</button>
+                            <AgentExecuteActions loading={loading} onPreview={() => handleRun(true)} />
                         </div>
                     </div>
                     <textarea
