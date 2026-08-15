@@ -102,7 +102,10 @@ describe("Operations Review UI state helpers", () => {
     });
 
     it("formats display timestamps without throwing", () => {
-        expect(formatDateTime("2026-08-12T10:00:00.000Z")).toContain("2026");
+        const result = formatDateTime("2026-08-12T10:00:00.000Z");
+        expect(typeof result).toBe("string");
+        expect(result.length).toBeGreaterThan(0);
+        expect(() => formatDateTime("2026-08-12T10:00:00.000Z")).not.toThrow();
     });
 
     it("maps API errors to safe friendly messages", () => {

@@ -10,6 +10,7 @@ vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
 
 import { runRecoveryImporter } from "../../scripts/import-recovery-blocks.js";
 import { computeContentDuplicateHash, computeRecordIntegrityHash } from "../../src/lib/project-doc-blocks/hashing.js";
+import { RECOVERY_FIXTURE_RECORDS } from "../fixtures/projectDocBlocksRecoveryFixtures";
 
 type RecoveryRecord = {
   id: string;
@@ -27,14 +28,10 @@ type RecoveryRecord = {
   [key: string]: unknown;
 };
 
-const ACTIVE_RECOVERY_PATH = path.resolve(
-  process.cwd(),
-  "backup/workos_projects_docs_v1-recovery-2026-08-01-actual.json"
-);
-const VALID_RECOVERY_HASH = "538ce39753174a2395d8e5c077e6c5ee8067a047b53c3639af34e8237425e452";
-
 let db: Database.Database;
 let tempDir: string;
+let syntheticRecoveryPath = "";
+let syntheticRecoveryHash = "";
 
 function createTestSchema() {
   db.exec(`
@@ -96,7 +93,7 @@ function createTestSchema() {
 }
 
 function recoveryRecords(): RecoveryRecord[] {
-  return JSON.parse(fs.readFileSync(ACTIVE_RECOVERY_PATH, "utf8")) as RecoveryRecord[];
+  return structuredClone(RECOVERY_FIXTURE_RECORDS) as RecoveryRecord[];
 }
 
 function rowCount(): number {
@@ -114,6 +111,14 @@ function writeRecoveryText(contents: string) {
 
 function writeRecoveryFixture(records: unknown) {
   return writeRecoveryText(JSON.stringify(records));
+}
+
+function runFixtureImporter(options: Parameters<typeof runRecoveryImporter>[0] = {}) {
+  return runRecoveryImporter({
+    recoveryFilePath: syntheticRecoveryPath,
+    overrideExpectedHash: syntheticRecoveryHash,
+    ...options,
+  });
 }
 
 function projectIdForSlug(slug: string): string {
@@ -160,6 +165,9 @@ beforeEach(() => {
   createTestSchema();
   mockGetDb.mockReturnValue(db);
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "workos-recovery-importer-"));
+  const fixtureWrite = writeRecoveryText(JSON.stringify(recoveryRecords()));
+  syntheticRecoveryPath = fixtureWrite.recoveryFilePath;
+  syntheticRecoveryHash = fixtureWrite.overrideExpectedHash;
 });
 
 afterEach(() => {
@@ -195,13 +203,13 @@ describe("Project Doc Blocks Recovery Importer", () => {
   });
 
   it("defaults to dry-run, resolves projects, writes zero rows, and leaves the recovery file unchanged", async () => {
-    const sourceHashBefore = crypto.createHash("sha256").update(fs.readFileSync(ACTIVE_RECOVERY_PATH)).digest("hex");
+    const sourceHashBefore = crypto.createHash("sha256").update(fs.readFileSync(syntheticRecoveryPath)).digest("hex");
 
-    const report = await runRecoveryImporter();
+    const report = await runFixtureImporter();
 
-    const sourceHashAfter = crypto.createHash("sha256").update(fs.readFileSync(ACTIVE_RECOVERY_PATH)).digest("hex");
+    const sourceHashAfter = crypto.createHash("sha256").update(fs.readFileSync(syntheticRecoveryPath)).digest("hex");
     expect(report.mode).toBe("Dry Run");
-    expect(report.recoveryHash).toBe(VALID_RECOVERY_HASH);
+    expect(report.recoveryHash).toBe(syntheticRecoveryHash);
     expect(report.inputRecordCount).toBe(2);
     expect(report.validRecords).toBe(2);
     expect(report.readyToInsert).toBe(2);
@@ -216,7 +224,7 @@ describe("Project Doc Blocks Recovery Importer", () => {
   });
 
   it("blocks a recovery hash mismatch before processing records", async () => {
-    const report = await runRecoveryImporter({
+    const report = await runFixtureImporter({
       overrideExpectedHash: "0000000000000000000000000000000000000000000000000000000000000000"
     });
 
@@ -352,7 +360,7 @@ describe("Project Doc Blocks Recovery Importer", () => {
     const records = recoveryRecords();
     records.forEach(record => insertExistingRecord(record));
 
-    const report = await runRecoveryImporter();
+    const report = await runFixtureImporter();
 
     expect(report.status).toBe("Dry Run Passed — No Changes Required");
     expect(report.readyToInsert).toBe(0);
@@ -398,7 +406,7 @@ describe("Project Doc Blocks Recovery Importer", () => {
   it("atomically inserts all recovery records with metadata and matching integrity hashes", async () => {
     const sourceRecords = recoveryRecords();
 
-    const report = await runRecoveryImporter({ write: true });
+    const report = await runFixtureImporter({ write: true });
 
     expect(report.status).toBe("Write Execution Passed");
     expect(report.databaseWritesPerformed).toBe(true);
@@ -506,7 +514,7 @@ describe("Project Doc Blocks Recovery Importer", () => {
       END;
     `);
 
-    const report = await runRecoveryImporter({ write: true });
+    const report = await runFixtureImporter({ write: true });
 
     expect(report.status).toBe("Write Execution Failed");
     expect(report.databaseWritesPerformed).toBe(false);
@@ -515,10 +523,10 @@ describe("Project Doc Blocks Recovery Importer", () => {
   });
 
   it("treats a write rerun of an already imported batch as an idempotent no-op", async () => {
-    const firstReport = await runRecoveryImporter({ write: true });
+    const firstReport = await runFixtureImporter({ write: true });
     const rowsBeforeRerun = db.prepare("SELECT * FROM project_doc_blocks ORDER BY id").all();
 
-    const report = await runRecoveryImporter({ write: true });
+    const report = await runFixtureImporter({ write: true });
     const rowsAfterRerun = db.prepare("SELECT * FROM project_doc_blocks ORDER BY id").all();
 
     expect(firstReport.status).toBe("Write Execution Passed");
@@ -534,7 +542,7 @@ describe("Project Doc Blocks Recovery Importer", () => {
     const records = recoveryRecords();
     insertExistingRecord(records[0]);
 
-    const report = await runRecoveryImporter({ write: true });
+    const report = await runFixtureImporter({ write: true });
 
     expect(report.status).toBe("Write Execution Passed");
     expect(report.exactIdDuplicates).toBe(1);
@@ -549,7 +557,7 @@ describe("Project Doc Blocks Recovery Importer", () => {
     insertExistingRecord(records[1], { details: `${records[1].details}\nExisting conflict` });
     const rowsBefore = db.prepare("SELECT * FROM project_doc_blocks ORDER BY id").all();
 
-    const report = await runRecoveryImporter({ write: true });
+    const report = await runFixtureImporter({ write: true });
 
     expect(report.status).toBe("Write Execution Failed");
     expect(report.exactIdDuplicates).toBe(1);
