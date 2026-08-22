@@ -35,6 +35,7 @@ function countByKind(
         doc_block: 0,
         doc: 0,
         decision: 0,
+        project_context: 0,
         loop: 0,
     };
     for (const entry of entries) {

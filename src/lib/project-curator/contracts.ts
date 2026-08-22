@@ -29,6 +29,7 @@ export type ProjectContextSourceKind =
     | "doc_block"
     | "doc"
     | "decision"
+    | "project_context"
     | "loop";
 
 /** Explicit source reference supplied by the caller / CTX3. */
@@ -43,6 +44,13 @@ export interface ProjectContextSourceRef {
  * used as authoritative source material for a new curation generation.
  */
 export const DERIVED_CONTEXT_TITLE = "PROJECT-CONTEXT-CURRENT";
+
+/**
+ * Deterministic display title for the `project_context` source kind.
+ * `project_contexts` has no stable title field, so the title is never derived
+ * from mutable content; identity remains `sourceKind + sourceId`.
+ */
+export const PROJECT_CONTEXT_DISPLAY_TITLE = "Project Context";
 
 // ---------------------------------------------------------------------------
 // Stage A — metadata-only index
@@ -164,7 +172,9 @@ export type ProjectContextCuratorErrorCode =
     | "CROSS_PROJECT_SOURCE"
     | "DERIVED_CONTEXT_REJECTED"
     | "MAX_SELECTED_SOURCES_EXCEEDED"
-    | "MAX_TOTAL_CHARS_EXCEEDED";
+    | "MAX_TOTAL_CHARS_EXCEEDED"
+    | "INVALID_OFFSET"
+    | "INVALID_CHUNK_LIMIT";
 
 /** Deterministic, fail-closed curator error. */
 export class ProjectContextCuratorError extends Error {

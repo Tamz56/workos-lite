@@ -9,6 +9,7 @@
 import type Database from "better-sqlite3";
 import {
     DERIVED_CONTEXT_TITLE,
+    PROJECT_CONTEXT_DISPLAY_TITLE,
     PROJECT_CONTEXT_SOURCE_INDEX_SCHEMA_VERSION,
     ProjectContextCuratorError,
     type ProjectContextSourceIndex,
@@ -24,6 +25,7 @@ export const PROJECT_CONTEXT_KIND_ORDER: ProjectContextSourceKind[] = [
     "doc_block",
     "doc",
     "decision",
+    "project_context",
     "loop",
 ];
 
@@ -150,6 +152,7 @@ function collectProjectMetadataEntry(
 function collectDocBlockEntries(
     db: Database.Database,
     projectId: string,
+    maxEntries: number = MAX_INDEX_ENTRIES_PER_KIND,
 ): ProjectContextSourceIndexEntry[] {
     const rows = db
         .prepare(
@@ -161,7 +164,7 @@ function collectDocBlockEntries(
         )
         .all(projectId) as DocBlockMetaRow[];
 
-    return rows.slice(0, MAX_INDEX_ENTRIES_PER_KIND).map((row) => ({
+    return rows.slice(0, maxEntries).map((row) => ({
         sourceKind: "doc_block",
         sourceId: row.id,
         title: row.title,
@@ -180,6 +183,7 @@ function collectDocBlockEntries(
 function collectDocEntries(
     db: Database.Database,
     projectId: string,
+    maxEntries: number = MAX_INDEX_ENTRIES_PER_KIND,
 ): ProjectContextSourceIndexEntry[] {
     const rows = db
         .prepare(
@@ -190,7 +194,7 @@ function collectDocEntries(
         )
         .all(projectId) as DocMetaRow[];
 
-    return rows.slice(0, MAX_INDEX_ENTRIES_PER_KIND).map((row) => ({
+    return rows.slice(0, maxEntries).map((row) => ({
         sourceKind: "doc",
         sourceId: row.id,
         title: row.title,
@@ -204,6 +208,7 @@ function collectDocEntries(
 function collectDecisionEntries(
     db: Database.Database,
     projectId: string,
+    maxEntries: number = MAX_INDEX_ENTRIES_PER_KIND,
 ): ProjectContextSourceIndexEntry[] {
     const rows = db
         .prepare(
@@ -214,7 +219,7 @@ function collectDecisionEntries(
         )
         .all(projectId) as DecisionMetaRow[];
 
-    return rows.slice(0, MAX_INDEX_ENTRIES_PER_KIND).map((row) => ({
+    return rows.slice(0, maxEntries).map((row) => ({
         sourceKind: "decision",
         sourceId: row.id,
         title: row.title,
@@ -225,10 +230,41 @@ function collectDecisionEntries(
     }));
 }
 
+function collectProjectContextEntries(
+    db: Database.Database,
+    projectId: string,
+    maxEntries: number = MAX_INDEX_ENTRIES_PER_KIND,
+): ProjectContextSourceIndexEntry[] {
+    const tableExists = db
+        .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get("project_contexts");
+    if (!tableExists) return [];
+
+    const rows = db
+        .prepare(
+            `SELECT id, created_at, updated_at
+             FROM project_contexts
+             WHERE project_id = ?
+             ORDER BY updated_at DESC, created_at DESC, id ASC`,
+        )
+        .all(projectId) as Array<{ id: string; created_at: string; updated_at: string }>;
+
+    return rows.slice(0, maxEntries).map((row) => ({
+        sourceKind: "project_context",
+        sourceId: row.id,
+        title: PROJECT_CONTEXT_DISPLAY_TITLE,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        hasFullContent: true,
+        isDerivedContext: false,
+    }));
+}
+
 function collectLoopEntries(
     db: Database.Database,
     projectId: string,
     includeArchived: boolean,
+    maxEntries: number = MAX_INDEX_ENTRIES_PER_KIND,
 ): ProjectContextSourceIndexEntry[] {
     let query =
         `SELECT id, loop_name, loop_type, status, current_step, created_at, updated_at
@@ -239,7 +275,7 @@ function collectLoopEntries(
 
     const rows = db.prepare(query).all(projectId) as LoopMetaRow[];
 
-    return rows.slice(0, MAX_INDEX_ENTRIES_PER_KIND).map((row) => ({
+    return rows.slice(0, maxEntries).map((row) => ({
         sourceKind: "loop",
         sourceId: row.id,
         title: row.loop_name,
@@ -251,7 +287,7 @@ function collectLoopEntries(
     }));
 }
 
-function entryRecency(entry: ProjectContextSourceIndexEntry): string {
+export function entryRecency(entry: ProjectContextSourceIndexEntry): string {
     return entry.updatedAt ?? entry.date ?? entry.createdAt ?? "";
 }
 
@@ -264,7 +300,7 @@ function entryRecency(entry: ProjectContextSourceIndexEntry): string {
  * Recency is the PRIMARY key so chronology is not dominated by source-kind
  * grouping; a newer doc is listed before an older doc_block.
  */
-function sortIndexEntries(entries: ProjectContextSourceIndexEntry[]): ProjectContextSourceIndexEntry[] {
+export function sortIndexEntries(entries: ProjectContextSourceIndexEntry[]): ProjectContextSourceIndexEntry[] {
     return [...entries].sort((a, b) => {
         const recencyA = entryRecency(a);
         const recencyB = entryRecency(b);
@@ -324,4 +360,36 @@ export function collectProjectContextSourceIndex(
         sources,
         generatedAt: now,
     };
+}
+
+/**
+ * READ1 — COMPLETE metadata enumerator.
+ * Collects EVERY supported text source for the project across all kinds
+ * (including `project_context` and archived loops) with NO per-kind cap and
+ * NO hidden truncation, then applies the canonical global ordering
+ * (effective recency DESC → source-kind order → sourceId ASC).
+ *
+ * This is distinct from CTX2's bounded curation-oriented index, which keeps
+ * its own `MAX_INDEX_ENTRIES_PER_KIND` safety cap.
+ */
+export function collectCompleteProjectSourceEntries(
+    db: Database.Database,
+    projectIdentifier: string,
+    options: CollectSourceIndexOptions = {},
+): { project: ProjectContextSourceIndexProject; entries: ProjectContextSourceIndexEntry[] } {
+    const projectId = resolveProjectId(db, projectIdentifier);
+    const project = loadProjectProfile(db, projectId);
+
+    const entries = markPossibleDuplicateTitles(
+        sortIndexEntries([
+            collectProjectMetadataEntry(project),
+            ...collectDocBlockEntries(db, projectId, Infinity),
+            ...collectDocEntries(db, projectId, Infinity),
+            ...collectDecisionEntries(db, projectId, Infinity),
+            ...collectProjectContextEntries(db, projectId, Infinity),
+            ...collectLoopEntries(db, projectId, options.includeArchivedLoops ?? true, Infinity),
+        ]),
+    );
+
+    return { project, entries };
 }

@@ -44,7 +44,7 @@ export class AgentAuthError extends Error {
     }
 }
 
-function sha256(value: string): string {
+export function sha256(value: string): string {
     return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
@@ -52,7 +52,7 @@ function sha256(value: string): string {
  * Fail-closed scope parsing: only a JSON array of strings is accepted;
  * malformed JSON or invalid shapes produce an empty scope list.
  */
-function parseAgentScopes(raw: string | null): string[] {
+export function parseAgentScopes(raw: string | null): string[] {
     try {
         const parsed = JSON.parse(raw ?? "[]") as unknown;
         if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {

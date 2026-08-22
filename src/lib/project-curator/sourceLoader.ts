@@ -10,6 +10,7 @@ import type Database from "better-sqlite3";
 import { mapRowToBlock, type DbProjectDocBlockRow } from "@/lib/project-doc-blocks/mappers";
 import {
     DERIVED_CONTEXT_TITLE,
+    PROJECT_CONTEXT_DISPLAY_TITLE,
     ProjectContextCuratorError,
     type ProjectContextLoadedSource,
     type ProjectContextSourceIndexProject,
@@ -29,6 +30,7 @@ const SUPPORTED_KINDS = new Set<ProjectContextSourceKind>([
     "doc_block",
     "doc",
     "decision",
+    "project_context",
     "loop",
 ]);
 
@@ -36,6 +38,7 @@ const KIND_TABLE: Record<Exclude<ProjectContextSourceKind, "project_metadata">, 
     doc_block: "project_doc_blocks",
     doc: "docs",
     decision: "project_decisions",
+    project_context: "project_contexts",
     loop: "project_loops",
 };
 
@@ -152,6 +155,19 @@ function renderLoop(row: ContentRow): string {
     ].join("\n");
 }
 
+function renderProjectContext(row: ContentRow): string {
+    return [
+        `overview: ${String(row.overview ?? "")}`,
+        `purpose: ${String(row.purpose ?? "")}`,
+        `standing_instructions: ${String(row.standing_instructions ?? "")}`,
+        `tone_voice: ${String(row.tone_voice ?? "")}`,
+        `guardrails: ${String(row.guardrails ?? "")}`,
+        `output_standards: ${String(row.output_standards ?? "")}`,
+        `decision_rules: ${String(row.decision_rules ?? "")}`,
+        `source_of_truth: ${String(row.source_of_truth ?? "")}`,
+    ].join("\n");
+}
+
 function buildLoaded(
     ref: ProjectContextSourceRef,
     title: string,
@@ -263,6 +279,23 @@ function loadOne(
                 limits,
             );
         }
+        case "project_context": {
+            const row = findOwnedRow(db, "project_context", project.id, ref.sourceId);
+            if (!row) {
+                throw new ProjectContextCuratorError(
+                    "UNKNOWN_SOURCE",
+                    `Unknown source ${ref.sourceKind}:${ref.sourceId}`,
+                );
+            }
+            return buildLoaded(
+                ref,
+                PROJECT_CONTEXT_DISPLAY_TITLE,
+                null,
+                null,
+                renderProjectContext(row),
+                limits,
+            );
+        }
     }
 }
 
@@ -309,4 +342,186 @@ export function loadProjectContextSources(
     }
 
     return loaded;
+}
+
+// ---------------------------------------------------------------------------
+// Stage B+ — Range-aware complete-source chunk reader (READ1)
+// ---------------------------------------------------------------------------
+
+export interface LoadProjectContextSourceChunkOptions {
+    offset: number;
+    limit: number;
+    /** READ1 evidence layer may read derived context for transparency. */
+    allowDerivedContext?: boolean;
+}
+
+export interface ProjectContextSourceChunk {
+    ref: ProjectContextSourceRef;
+    title: string;
+    sourceType: string | null;
+    status: string | null;
+    isDerivedContext: boolean;
+    content: string;
+    chunk: {
+        offset: number;
+        includedChars: number;
+        totalCharacterCount: number;
+        nextOffset: number;
+        hasMore: boolean;
+    };
+}
+
+/**
+ * Resolves the deterministic full body + provenance for an exact ref.
+ * Ownership/identity validation fails closed; derived context is rejected
+ * unless `allowDerivedContext` opts in (READ1 evidence layer).
+ */
+function resolveFullBody(
+    db: Database.Database,
+    project: ProjectContextSourceIndexProject,
+    ref: ProjectContextSourceRef,
+    allowDerivedContext: boolean,
+): {
+    body: string;
+    title: string;
+    sourceType: string | null;
+    status: string | null;
+    isDerivedContext: boolean;
+} {
+    if (!SUPPORTED_KINDS.has(ref.sourceKind)) {
+        throw new ProjectContextCuratorError(
+            "UNSUPPORTED_SOURCE_KIND",
+            `Unsupported source kind: ${ref.sourceKind}`,
+        );
+    }
+    if (ref.sourceKind === "project_metadata") {
+        if (ref.sourceId !== project.id) {
+            throw new ProjectContextCuratorError(
+                "CROSS_PROJECT_SOURCE",
+                `project_metadata ${ref.sourceId} does not match project ${project.id}`,
+            );
+        }
+        return {
+            body: renderProjectMetadata(project),
+            title: project.name,
+            sourceType: null,
+            status: project.status ?? null,
+            isDerivedContext: false,
+        };
+    }
+    const row = findOwnedRow(db, ref.sourceKind, project.id, ref.sourceId);
+    if (!row) {
+        if (existsAnywhere(db, ref.sourceKind, ref.sourceId)) {
+            throw new ProjectContextCuratorError(
+                "CROSS_PROJECT_SOURCE",
+                `Source ${ref.sourceKind}:${ref.sourceId} belongs to a different project`,
+            );
+        }
+        throw new ProjectContextCuratorError(
+            "UNKNOWN_SOURCE",
+            `Unknown source ${ref.sourceKind}:${ref.sourceId}`,
+        );
+    }
+    const derived = isDerivedTitle(titleOf(ref.sourceKind, row));
+    if (derived && !allowDerivedContext) {
+        throw new ProjectContextCuratorError(
+            "DERIVED_CONTEXT_REJECTED",
+            `Derived context source ${ref.sourceKind}:${ref.sourceId} is not authoritative`,
+        );
+    }
+    switch (ref.sourceKind) {
+        case "doc_block": {
+            const block = mapRowToBlock(row as DbProjectDocBlockRow, project.slug);
+            return {
+                body: block.details,
+                title: block.title,
+                sourceType: block.sourceType ?? null,
+                status: block.status,
+                isDerivedContext: derived,
+            };
+        }
+        case "doc":
+            return {
+                body: String(row.content_md ?? ""),
+                title: String(row.title ?? ""),
+                sourceType: null,
+                status: null,
+                isDerivedContext: derived,
+            };
+        case "decision":
+            return {
+                body: renderDecision(row),
+                title: String(row.title ?? ""),
+                sourceType: null,
+                status: null,
+                isDerivedContext: derived,
+            };
+        case "project_context":
+            return {
+                body: renderProjectContext(row),
+                title: PROJECT_CONTEXT_DISPLAY_TITLE,
+                sourceType: null,
+                status: null,
+                isDerivedContext: derived,
+            };
+        case "loop":
+            return {
+                body: renderLoop(row),
+                title: String(row.loop_name ?? ""),
+                sourceType: null,
+                status: (row.status as string | null) ?? null,
+                isDerivedContext: false,
+            };
+    }
+    throw new ProjectContextCuratorError(
+        "UNSUPPORTED_SOURCE_KIND",
+        `Unsupported source kind: ${ref.sourceKind}`,
+    );
+}
+
+/**
+ * Reads a deterministic range of a source's complete content. The full
+ * representation is resolved first (never pre-truncated), then the requested
+ * range is applied. Chunk offsets are stable across calls (no gaps/overlap).
+ */
+export function loadProjectContextSourceChunk(
+    db: Database.Database,
+    projectIdentifier: string,
+    sourceRef: ProjectContextSourceRef,
+    options: LoadProjectContextSourceChunkOptions,
+): ProjectContextSourceChunk {
+    if (!Number.isInteger(options.offset) || options.offset < 0) {
+        throw new ProjectContextCuratorError("INVALID_OFFSET", `Invalid offset: ${options.offset}`);
+    }
+    if (!Number.isInteger(options.limit) || options.limit <= 0) {
+        throw new ProjectContextCuratorError("INVALID_CHUNK_LIMIT", `Invalid chunk limit: ${options.limit}`);
+    }
+    const projectId = resolveProjectId(db, projectIdentifier);
+    const project = loadProjectProfile(db, projectId);
+    const { body, title, sourceType, status, isDerivedContext } = resolveFullBody(
+        db,
+        project,
+        sourceRef,
+        options.allowDerivedContext ?? false,
+    );
+    const total = body.length;
+    const start = options.offset;
+    const end = Math.min(start + options.limit, total);
+    const content = start >= total ? "" : body.slice(start, end);
+    const nextOffset = start + content.length;
+    return {
+        ref: sourceRef,
+        title,
+        sourceType,
+        status,
+        isDerivedContext,
+        content,
+        chunk: {
+            offset: start,
+            includedChars: content.length,
+            totalCharacterCount: total,
+            nextOffset,
+            hasMore: nextOffset < total,
+        },
+    };
 }
