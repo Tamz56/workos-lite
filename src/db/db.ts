@@ -9,6 +9,7 @@ import { ensureOperationsSchema } from "@/lib/operations/operationsSchema";
 import { ensureApprovalsSchema } from "@/lib/approvals/approvalsSchema";
 import { ensureExecutionSchema } from "@/lib/execution/executionSchema";
 import { ensurePlannerSchema } from "@/lib/planner/schema";
+import { seedStorySetsWithoutDuplicates } from "@/db/storySetSeed";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -715,74 +716,6 @@ function ensureArborWritingLab() {
     `);
 }
 
-type ArborStorySetSeed = {
-    id: string;
-    slug?: string;
-    title: string;
-    description: string;
-};
-
-function normalizeStorySetName(name: string) {
-    return name
-        .normalize("NFKC")
-        .replace(/\s+/g, "")
-        .trim()
-        .toLocaleLowerCase("th-TH");
-}
-
-function seedStorySetsWithoutDuplicates(storySets: ArborStorySetSeed[]) {
-    const existingRows = db.prepare("SELECT id, slug, title FROM gf_story_sets").all() as {
-        id: string;
-        slug: string | null;
-        title: string;
-    }[];
-
-    const bySlug = new Map<string, string>();
-    const byNormalizedTitle = new Map<string, string>();
-
-    for (const row of existingRows) {
-        if (row.slug) bySlug.set(row.slug, row.id);
-        byNormalizedTitle.set(normalizeStorySetName(row.title), row.id);
-    }
-
-    const insertStmt = db.prepare(`
-        INSERT INTO gf_story_sets (id, slug, title, description, status, created_at, updated_at)
-        VALUES (@id, @slug, @title, @description, 'active', datetime('now'), datetime('now'))
-    `);
-
-    const updateStmt = db.prepare(`
-        UPDATE gf_story_sets
-        SET
-            slug = COALESCE(NULLIF(slug, ''), @slug),
-            description = CASE
-                WHEN description IS NULL OR TRIM(description) = '' THEN @description
-                ELSE description
-            END,
-            status = 'active',
-            updated_at = datetime('now')
-        WHERE id = @id
-    `);
-
-    const tx = db.transaction(() => {
-        for (const storySet of storySets) {
-            const slug = storySet.slug ?? null;
-            const matchId = (slug ? bySlug.get(slug) : undefined)
-                ?? byNormalizedTitle.get(normalizeStorySetName(storySet.title));
-
-            if (matchId) {
-                updateStmt.run({ ...storySet, id: matchId, slug });
-                continue;
-            }
-
-            insertStmt.run({ ...storySet, slug });
-            if (slug) bySlug.set(slug, storySet.id);
-            byNormalizedTitle.set(normalizeStorySetName(storySet.title), storySet.id);
-        }
-    });
-
-    tx();
-}
-
 export function seedArborWritingLab() {
     const storySets = [
         { id: "STORY-SET-01", title: "ชีวิตของพืชหนึ่งต้น", description: "The core journey of a single plant from seed to seed." },
@@ -837,7 +770,7 @@ export function seedArborWritingLab() {
         }
     ];
 
-    seedStorySetsWithoutDuplicates([...storySets, ...greenFinenessTopicStorySets]);
+    seedStorySetsWithoutDuplicates(db, [...storySets, ...greenFinenessTopicStorySets]);
 
     db.prepare(`
         INSERT INTO gf_episodes (id, story_set_id, title, role, status, created_at, updated_at)
