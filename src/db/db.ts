@@ -10,6 +10,7 @@ import { ensureApprovalsSchema } from "@/lib/approvals/approvalsSchema";
 import { ensureExecutionSchema } from "@/lib/execution/executionSchema";
 import { ensurePlannerSchema } from "@/lib/planner/schema";
 import { seedStorySetsWithoutDuplicates } from "@/db/storySetSeed";
+import { ensureProjectContextSnapshotSchema } from "@/lib/project-context-snapshots/schema";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -786,6 +787,7 @@ ensureProjectDocBlocks();
 ensureArborWritingLab();
 ensureAuditSchema(db);
 ensureHumanAuthSchema(db);
+ensureProjectContextSnapshotSchema(db);
 ensureOperationsSchema(db);
 ensureApprovalsSchema(db);
 ensureExecutionSchema(db);
