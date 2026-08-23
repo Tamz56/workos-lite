@@ -25,7 +25,168 @@
 
 import { z } from "zod";
 
-export const ASTRO_CORE_SCHEMA_VERSION = "astro-core-contracts-v0.1";
+export const ASTRO_CORE_SCHEMA_VERSION = "astro-core-contracts-v0.2";
+
+// ============================================================================
+// 0. Provenance Data Boundary (ASTRO-SCHEMA-002)
+// ============================================================================
+
+/**
+ * Executable Astro provenance is DATA-ONLY JSON-compatible recursive data.
+ * Runtime/executable objects are prohibited.
+ */
+export type ProvenanceValue =
+  | null
+  | boolean
+  | number
+  | string
+  | ProvenanceValue[]
+  | { [key: string]: ProvenanceValue };
+
+export type ProvenanceRecord = Record<string, ProvenanceValue>;
+
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  if (typeof val !== "object" || val === null) {
+    return false;
+  }
+  return Object.getPrototypeOf(val) === Object.prototype;
+}
+
+function validateProvenanceValue(val: unknown, ancestors: Set<object>): boolean {
+  if (val === null) {
+    return true;
+  }
+  if (typeof val === "boolean") {
+    return true;
+  }
+  if (typeof val === "string") {
+    return true;
+  }
+  if (typeof val === "number") {
+    return Number.isFinite(val);
+  }
+  if (typeof val !== "object") {
+    // Reject undefined, function, symbol, bigint
+    return false;
+  }
+
+  // At this point, typeof val === "object" and val !== null
+  // Recursion-path-aware cycle detection:
+  // Repeated-but-acyclic shared input references are allowed,
+  // but any reference that appears in the active ancestor stack is a cycle.
+  if (ancestors.has(val)) {
+    return false;
+  }
+
+  if (Array.isArray(val)) {
+    // Array prototype check: must be direct Array.prototype
+    if (Object.getPrototypeOf(val) !== Array.prototype) {
+      return false;
+    }
+    // No symbol keys/properties
+    if (Object.getOwnPropertySymbols(val).length > 0) {
+      return false;
+    }
+    // No extra semantic array properties; only integer indices and "length"
+    const propNames = Object.getOwnPropertyNames(val);
+    const len = val.length;
+    if (propNames.length !== len + 1) {
+      return false;
+    }
+
+    ancestors.add(val);
+    try {
+      for (let i = 0; i < len; i++) {
+        const desc = Object.getOwnPropertyDescriptor(val, String(i));
+        if (!desc) {
+          // Sparse array hole
+          return false;
+        }
+        // Accessor rejection without invoking getters/setters
+        if (desc.get !== undefined || desc.set !== undefined) {
+          return false;
+        }
+        if (!desc.enumerable) {
+          return false;
+        }
+        if (desc.value === undefined) {
+          return false;
+        }
+        if (!validateProvenanceValue(desc.value, ancestors)) {
+          return false;
+        }
+      }
+    } finally {
+      ancestors.delete(val);
+    }
+    return true;
+  }
+
+  if (isPlainObject(val)) {
+    // No symbol keys
+    if (Object.getOwnPropertySymbols(val).length > 0) {
+      return false;
+    }
+
+    const descriptors = Object.getOwnPropertyDescriptors(val);
+    const keys = Object.keys(descriptors);
+    const allPropNames = Object.getOwnPropertyNames(val);
+    // Ensure all own property names are enumerable (no non-enumerable semantic payload)
+    if (allPropNames.length !== keys.length) {
+      return false;
+    }
+
+    ancestors.add(val);
+    try {
+      for (const key of keys) {
+        const desc = descriptors[key];
+        // Accessor rejection without invoking getters/setters
+        if (desc.get !== undefined || desc.set !== undefined) {
+          return false;
+        }
+        if (!desc.enumerable) {
+          return false;
+        }
+        if (desc.value === undefined) {
+          return false;
+        }
+        if (!validateProvenanceValue(desc.value, ancestors)) {
+          return false;
+        }
+      }
+    } finally {
+      ancestors.delete(val);
+    }
+    return true;
+  }
+
+  // Custom prototypes, class instances, boxed primitives, Date, Map, Set, RegExp, Error, Promise, ArrayBuffer, etc.
+  return false;
+}
+
+function validateProvenanceRecord(val: unknown, ancestors: Set<object>): boolean {
+  if (typeof val !== "object" || val === null || Array.isArray(val)) {
+    return false;
+  }
+  if (!isPlainObject(val)) {
+    return false;
+  }
+  return validateProvenanceValue(val, ancestors);
+}
+
+export const ProvenanceValueSchema: z.ZodType<ProvenanceValue> = z.custom<ProvenanceValue>(
+  (val) => validateProvenanceValue(val, new Set()),
+  {
+    message: "Invalid ProvenanceValue: must be JSON-compatible recursive data without runtime/executable objects",
+  }
+);
+
+export const ProvenanceRecordSchema: z.ZodType<ProvenanceRecord> = z.custom<ProvenanceRecord>(
+  (val) => validateProvenanceRecord(val, new Set()),
+  {
+    message: "Invalid ProvenanceRecord: must be a plain string-keyed object containing only ProvenanceValue values",
+  }
+);
 
 /**
  * Non-empty, non-whitespace-only string validator.
@@ -94,7 +255,7 @@ export const CalculationRequestSchema = z
     requestedScope: z.array(NonEmptyString).min(1),
     callerIdentity: NonEmptyString.optional(),
     requestVersion: NonEmptyString.optional(),
-    provenance: z.record(z.string(), z.unknown()).optional(),
+    provenance: ProvenanceRecordSchema.optional(),
   })
   .strict();
 
@@ -214,7 +375,7 @@ export const SourceRecordRefSchema = z
     locator: NonEmptyString.optional(),
     accessDate: z.string().datetime({ offset: true }).optional(),
     traditionScope: NonEmptyString.optional(),
-    provenance: z.record(z.string(), z.unknown()).optional(),
+    provenance: ProvenanceRecordSchema.optional(),
   })
   .strict();
 
@@ -240,7 +401,7 @@ export const CalculatedFactSchema = z
     ]),
     units: NonEmptyString.optional(),
     referenceFrame: NonEmptyString.optional(),
-    provenance: z.record(z.string(), z.unknown()).optional(),
+    provenance: ProvenanceRecordSchema.optional(),
   })
   .strict();
 
@@ -270,7 +431,7 @@ export const CalculationSnapshotSchema = z
     incompleteness: z.array(NonEmptyString).optional(),
     ambiguity: z.array(NonEmptyString).optional(),
     isPartial: z.boolean().optional(),
-    provenance: z.record(z.string(), z.unknown()).optional(),
+    provenance: ProvenanceRecordSchema.optional(),
   })
   .strict();
 
@@ -333,7 +494,7 @@ export const CalculationValidationRecordSchema = z
     evidenceReferences: z.array(SourceRecordRefSchema).optional(),
     discrepancies: z.array(z.record(z.string(), z.unknown())).optional(),
     warnings: z.array(NonEmptyString).optional(),
-    provenance: z.record(z.string(), z.unknown()).optional(),
+    provenance: ProvenanceRecordSchema.optional(),
   })
   .strict();
 
