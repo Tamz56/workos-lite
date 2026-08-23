@@ -1,0 +1,206 @@
+import { describe, expect, it, vi } from "vitest";
+import { McpBridgeError } from "@/lib/mcp/errors";
+import type { CompleteProjectIndex, CompleteSource, Read1SourceEntry } from "@/lib/mcp/read1Client";
+import {
+    ProjectMemoryService,
+    SEARCH_RESULT_LIMIT,
+    type ProjectMemoryReadClient,
+} from "@/lib/mcp/projectMemoryService";
+import { decodeResultId, encodeSourceId } from "@/lib/mcp/resultIds";
+
+const FINGERPRINT = "a".repeat(64);
+const OTHER_FINGERPRINT = "b".repeat(64);
+
+function source(
+    sourceId: string,
+    title: string,
+    overrides: Partial<Read1SourceEntry> = {},
+): Read1SourceEntry {
+    return {
+        sourceKind: "doc",
+        sourceId,
+        title,
+        sourceType: "document",
+        status: "active",
+        summary: null,
+        nextAction: null,
+        hasFullContent: true,
+        isDerivedContext: false,
+        ...overrides,
+    };
+}
+
+function index(sources: Read1SourceEntry[] = [
+    source("doc-1", "Architecture Notes"),
+    source("doc-2", "Duplicate title"),
+    source("doc-3", "Duplicate title"),
+    source("context-1", "Project Context", {
+        sourceKind: "project_context",
+        isDerivedContext: true,
+    }),
+]): CompleteProjectIndex {
+    const counts = {
+        project_metadata: 0,
+        doc_block: 0,
+        doc: sources.filter((entry) => entry.sourceKind === "doc").length,
+        decision: 0,
+        project_context: sources.filter((entry) => entry.sourceKind === "project_context").length,
+        loop: 0,
+    };
+    return {
+        project: { id: "project-1", slug: "allowed-project", name: "Allowed Project", status: "active" },
+        counts,
+        sources,
+        corpusFingerprint: FINGERPRINT,
+        attachmentReadingSupported: false,
+    };
+}
+
+function client(projectIndex = index(), fullText = "canonical source text"): ProjectMemoryReadClient {
+    return {
+        enumerateProject: vi.fn(async (slug: string, expected?: string) => {
+            if (slug !== projectIndex.project.slug) {
+                throw new McpBridgeError("READ1_REQUEST_FAILED", "The read-only source request failed");
+            }
+            if (expected && expected !== projectIndex.corpusFingerprint) {
+                throw new McpBridgeError("STALE_CORPUS", "The Project corpus changed; search again");
+            }
+            return projectIndex;
+        }),
+        readCompleteSource: vi.fn(async (_slug, ref): Promise<CompleteSource> => ({
+            title: projectIndex.sources.find(
+                (entry) => entry.sourceKind === ref.sourceKind && entry.sourceId === ref.sourceId,
+            )?.title ?? "Unknown",
+            text: fullText,
+            status: "active",
+            sourceType: "document",
+            isDerivedContext: ref.sourceKind === "project_context",
+            totalCharacterCount: fullText.length,
+            chunkCount: fullText.length > 30_000 ? 2 : 1,
+        })),
+    };
+}
+
+describe("READ1B Project Memory search", () => {
+    it("fails closed to zero Project exposure when the allowlist is missing", async () => {
+        const read1 = client();
+        const service = new ProjectMemoryService(read1, []);
+        expect(await service.search("Allowed Project")).toEqual({ results: [] });
+        expect(read1.enumerateProject).not.toHaveBeenCalled();
+    });
+
+    it.each(["Allowed Project", "allowed-project"])(
+        "returns the manifest first for exact Project query %s",
+        async (query) => {
+            const service = new ProjectMemoryService(client(), ["allowed-project"]);
+            const output = await service.search(query);
+            expect(decodeResultId(output.results[0].id)).toMatchObject({
+                type: "manifest",
+                projectSlug: "allowed-project",
+                corpusFingerprint: FINGERPRINT,
+            });
+            expect(output.results[0].url).toMatch(/^https:\/\/workos\.greenfineness\.com\/projects\//);
+        },
+    );
+
+    it("finds source titles deterministically and preserves duplicate titles as distinct IDs", async () => {
+        const service = new ProjectMemoryService(client(), ["allowed-project"]);
+        const first = await service.search("Duplicate title");
+        const second = await service.search("Duplicate title");
+        expect(second).toEqual(first);
+        const duplicates = first.results.filter((result) => result.title === "Duplicate title");
+        expect(duplicates).toHaveLength(2);
+        expect(new Set(duplicates.map((result) => result.id)).size).toBe(2);
+    });
+
+    it("bounds results and has deterministic empty-query behavior", async () => {
+        const manySources = Array.from({ length: 30 }, (_, i) => source(`doc-${i}`, `Planning note ${i}`));
+        const service = new ProjectMemoryService(client(index(manySources)), ["allowed-project"]);
+        expect((await service.search("planning")).results).toHaveLength(SEARCH_RESULT_LIMIT);
+        const empty = await service.search("   ");
+        expect(empty.results).toHaveLength(1);
+        expect(decodeResultId(empty.results[0].id).type).toBe("manifest");
+    });
+});
+
+describe("READ1B Project Memory fetch", () => {
+    it("returns a complete metadata-only manifest with exact unique source inventory", async () => {
+        const projectIndex = index();
+        const service = new ProjectMemoryService(client(projectIndex), ["allowed-project"]);
+        const manifestId = (await service.search("allowed-project")).results[0].id;
+        const output = await service.fetch(manifestId);
+        expect(output.metadata).toMatchObject({
+            isProjectManifest: true,
+            isCanonicalSource: false,
+            projectSlug: "allowed-project",
+            corpusFingerprint: FINGERPRINT,
+            totalSources: projectIndex.sources.length,
+            counts: projectIndex.counts,
+            complete: true,
+            attachmentReadingSupported: false,
+        });
+        const inventory = output.metadata.sources as Array<{ id: string }>;
+        expect(inventory).toHaveLength(projectIndex.sources.length);
+        expect(new Set(inventory.map((entry) => entry.id)).size).toBe(projectIndex.sources.length);
+        expect(output.text).not.toContain("canonical source text");
+    });
+
+    it("returns one complete canonical multi-chunk source with provenance preserved", async () => {
+        const fullText = "x".repeat(43_618);
+        const read1 = client(index(), fullText);
+        const service = new ProjectMemoryService(read1, ["allowed-project"]);
+        const sourceId = encodeSourceId("allowed-project", FINGERPRINT, {
+            sourceKind: "doc",
+            sourceId: "doc-1",
+        });
+        const output = await service.fetch(sourceId);
+        expect(output.text).toBe(fullText);
+        expect(output.metadata).toMatchObject({
+            isProjectManifest: false,
+            isCanonicalSource: true,
+            sourceKind: "doc",
+            sourceId: "doc-1",
+            corpusFingerprint: FINGERPRINT,
+            totalCharacterCount: 43_618,
+            chunkCount: 2,
+            complete: true,
+            attachmentReadingSupported: false,
+        });
+        expect(read1.readCompleteSource).toHaveBeenCalledWith(
+            "allowed-project",
+            { sourceKind: "doc", sourceId: "doc-1" },
+            FINGERPRINT,
+        );
+    });
+
+    it("preserves the derived-context flag", async () => {
+        const service = new ProjectMemoryService(client(), ["allowed-project"]);
+        const id = encodeSourceId("allowed-project", FINGERPRINT, {
+            sourceKind: "project_context",
+            sourceId: "context-1",
+        });
+        expect((await service.fetch(id)).metadata.isDerivedContext).toBe(true);
+    });
+
+    it("rejects stale, fabricated, unknown and non-allowlisted identities", async () => {
+        const service = new ProjectMemoryService(client(), ["allowed-project"]);
+        const stale = encodeSourceId("allowed-project", OTHER_FINGERPRINT, {
+            sourceKind: "doc",
+            sourceId: "doc-1",
+        });
+        await expect(service.fetch(stale)).rejects.toMatchObject({ code: "STALE_CORPUS" });
+        await expect(service.fetch("fabricated-id")).rejects.toMatchObject({ code: "INVALID_RESULT_ID" });
+
+        const unknown = encodeSourceId("allowed-project", FINGERPRINT, {
+            sourceKind: "doc",
+            sourceId: "missing-doc",
+        });
+        await expect(service.fetch(unknown)).rejects.toMatchObject({ code: "SOURCE_NOT_FOUND" });
+
+        const other = encodeSourceId("other-project", FINGERPRINT, {
+            sourceKind: "doc",
+            sourceId: "doc-1",
+        });
+        await expect(service.fetch(other)).rejects.toMatchObject({ code: "PROJECT_NOT_ALLOWED" });
+    });
+});
