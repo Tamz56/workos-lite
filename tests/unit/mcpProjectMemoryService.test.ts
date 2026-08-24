@@ -3,13 +3,22 @@ import { McpBridgeError } from "@/lib/mcp/errors";
 import type { CompleteProjectIndex, CompleteSource, Read1SourceEntry } from "@/lib/mcp/read1Client";
 import {
     ProjectMemoryService,
+    REGISTRY_INDEX_MAX_SERIALIZED_BYTES,
+    REGISTRY_PAGE_MAX_SERIALIZED_BYTES,
+    REGISTRY_PAGE_SIZE,
     SEARCH_RESULT_LIMIT,
     type ProjectMemoryReadClient,
 } from "@/lib/mcp/projectMemoryService";
-import { decodeResultId, encodeSourceId } from "@/lib/mcp/resultIds";
+import {
+    decodeResultId,
+    encodeRegistryIndexId,
+    encodeRegistryPageId,
+    encodeSourceId,
+} from "@/lib/mcp/resultIds";
 
 const FINGERPRINT = "a".repeat(64);
 const OTHER_FINGERPRINT = "b".repeat(64);
+const PILOT_FINGERPRINT = "b0a516c2714c18586468a306816a2a62f11d6df69aacbaeb567252237c595394";
 
 function source(
     sourceId: string,
@@ -61,23 +70,42 @@ function index(sources: Read1SourceEntry[] = [
         sourceKind: "project_context",
         isDerivedContext: true,
     }),
-]): CompleteProjectIndex {
+], fingerprint = FINGERPRINT): CompleteProjectIndex {
     const counts = {
-        project_metadata: 0,
-        doc_block: 0,
+        project_metadata: sources.filter((entry) => entry.sourceKind === "project_metadata").length,
+        doc_block: sources.filter((entry) => entry.sourceKind === "doc_block").length,
         doc: sources.filter((entry) => entry.sourceKind === "doc").length,
-        decision: 0,
+        decision: sources.filter((entry) => entry.sourceKind === "decision").length,
         project_context: sources.filter((entry) => entry.sourceKind === "project_context").length,
-        loop: 0,
+        loop: sources.filter((entry) => entry.sourceKind === "loop").length,
         project_context_snapshot: sources.filter((entry) => entry.sourceKind === "project_context_snapshot").length,
     };
     return {
         project: { id: "project-1", slug: "allowed-project", name: "Allowed Project", status: "active" },
         counts,
         sources,
-        corpusFingerprint: FINGERPRINT,
+        corpusFingerprint: fingerprint,
         attachmentReadingSupported: false,
     };
+}
+
+function pilotIndex(): CompleteProjectIndex {
+    const sources: Read1SourceEntry[] = [];
+    const add = (kind: Read1SourceEntry["sourceKind"], count: number): void => {
+        for (let position = 1; position <= count; position += 1) {
+            sources.push(source(`${kind}-${position}`, `${kind} source ${position}`, { sourceKind: kind }));
+        }
+    };
+    add("project_metadata", 1);
+    add("doc_block", 13);
+    add("doc", 24);
+    add("decision", 7);
+    add("project_context", 1);
+    return index(sources, PILOT_FINGERPRINT);
+}
+
+function serializedBytes(value: unknown): number {
+    return Buffer.byteLength(JSON.stringify(value), "utf8");
 }
 
 function client(projectIndex = index(), fullText = "canonical source text"): ProjectMemoryReadClient {
@@ -125,6 +153,21 @@ describe("READ1B Project Memory search", () => {
                 corpusFingerprint: FINGERPRINT,
             });
             expect(output.results[0].url).toMatch(/^https:\/\/workos\.greenfineness\.com\/projects\//);
+        },
+    );
+
+    it.each(["allowed-project", "Project Source Registry"])(
+        "makes the bounded registry index discoverable through search query %s",
+        async (query) => {
+            const service = new ProjectMemoryService(client(), ["allowed-project"]);
+            const output = await service.search(query);
+            const registry = output.results.find((result) => decodeResultId(result.id).type === "registry_index");
+            expect(registry?.title).toBe("Allowed Project — Project Source Registry");
+            expect(decodeResultId(registry!.id)).toMatchObject({
+                type: "registry_index",
+                projectSlug: "allowed-project",
+                corpusFingerprint: FINGERPRINT,
+            });
         },
     );
 
@@ -196,6 +239,183 @@ describe("READ1B Project Memory fetch", () => {
             { sourceKind: "doc", sourceId: "doc-1" },
             FINGERPRINT,
         );
+    });
+
+    it("fetches a compact fingerprint-bound registry index without repeating source entries", async () => {
+        const projectIndex = pilotIndex();
+        const service = new ProjectMemoryService(client(projectIndex), ["allowed-project"]);
+        const output = await service.fetch(encodeRegistryIndexId("allowed-project", PILOT_FINGERPRINT));
+        expect(output.metadata).toMatchObject({
+            isProjectManifest: false,
+            isProjectSourceRegistry: true,
+            isCanonicalSource: false,
+            controlArtifactType: "project_source_registry_index",
+            projectSlug: "allowed-project",
+            corpusFingerprint: PILOT_FINGERPRINT,
+            totalSources: 46,
+            pageSize: REGISTRY_PAGE_SIZE,
+            pageCount: 5,
+            complete: true,
+        });
+        const pages = output.metadata.pages as Array<{ pageNumber: number; id: string }>;
+        expect(pages).toHaveLength(5);
+        expect(pages.map((page) => decodeResultId(page.id))).toEqual(
+            pages.map((page) => expect.objectContaining({
+                type: "registry_page",
+                projectSlug: "allowed-project",
+                corpusFingerprint: PILOT_FINGERPRINT,
+                pageNumber: page.pageNumber,
+            })),
+        );
+        expect(JSON.parse(output.text)).not.toHaveProperty("sources");
+        expect(serializedBytes(output)).toBeLessThanOrEqual(REGISTRY_INDEX_MAX_SERIALIZED_BYTES);
+    });
+
+    it("enumerates all 46 sources exactly once in existing READ1 order through bounded pages", async () => {
+        const projectIndex = pilotIndex();
+        const service = new ProjectMemoryService(client(projectIndex), ["allowed-project"]);
+        const registryIndex = await service.fetch(encodeRegistryIndexId("allowed-project", PILOT_FINGERPRINT));
+        const pages = registryIndex.metadata.pages as Array<{ pageNumber: number; id: string }>;
+        const union: Array<{ sourceKind: string; sourceId: string; id: string }> = [];
+        const pageSizes: number[] = [];
+
+        for (const pageRef of pages) {
+            const page = await service.fetch(pageRef.id);
+            expect(page.metadata).toMatchObject({
+                isProjectSourceRegistry: true,
+                isCanonicalSource: false,
+                controlArtifactType: "project_source_registry_page",
+                corpusFingerprint: PILOT_FINGERPRINT,
+                pageNumber: pageRef.pageNumber,
+                totalSources: 46,
+            });
+            const pageSources = page.metadata.sources as typeof union;
+            pageSizes.push(pageSources.length);
+            expect(pageSources.length).toBeLessThanOrEqual(REGISTRY_PAGE_SIZE);
+            expect(serializedBytes(page)).toBeLessThanOrEqual(REGISTRY_PAGE_MAX_SERIALIZED_BYTES);
+            expect(page.text).not.toContain("canonical source text");
+            union.push(...pageSources);
+        }
+
+        expect(pageSizes).toEqual([10, 10, 10, 10, 6]);
+        expect(union.map(({ sourceKind, sourceId }) => ({ sourceKind, sourceId }))).toEqual(
+            projectIndex.sources.map(({ sourceKind, sourceId }) => ({ sourceKind, sourceId })),
+        );
+        expect(union).toHaveLength(46);
+        expect(new Set(union.map((entry) => `${entry.sourceKind}\u0000${entry.sourceId}`)).size).toBe(46);
+        expect(union.every((entry) => decodeResultId(entry.id).type === "source")).toBe(true);
+    });
+
+    it("binds opaque registry IDs to project, fingerprint and page and rejects tampering", async () => {
+        const service = new ProjectMemoryService(client(pilotIndex()), ["allowed-project"]);
+        const indexId = encodeRegistryIndexId("allowed-project", PILOT_FINGERPRINT);
+        const pageId = encodeRegistryPageId("allowed-project", PILOT_FINGERPRINT, 3);
+        expect(indexId).not.toContain("allowed-project");
+        expect(pageId).not.toContain("allowed-project");
+        expect(decodeResultId(pageId)).toEqual({
+            version: 1,
+            type: "registry_page",
+            projectSlug: "allowed-project",
+            corpusFingerprint: PILOT_FINGERPRINT,
+            pageNumber: 3,
+        });
+        expect(() => decodeResultId(`${pageId}A`)).toThrowError(expect.objectContaining({ code: "INVALID_RESULT_ID" }));
+        expect(() => decodeResultId(encodeRegistryPageId("allowed-project", PILOT_FINGERPRINT, 0)))
+            .toThrowError(expect.objectContaining({ code: "INVALID_RESULT_ID" }));
+        await expect(service.fetch(encodeRegistryPageId("allowed-project", PILOT_FINGERPRINT, 6)))
+            .rejects.toMatchObject({ code: "INVALID_RESULT_ID" });
+        await expect(service.fetch(encodeRegistryPageId("other-project", PILOT_FINGERPRINT, 1)))
+            .rejects.toMatchObject({ code: "PROJECT_NOT_ALLOWED" });
+    });
+
+    it("rejects negative and type-confused registry page identities", () => {
+        expect(() => decodeResultId(encodeRegistryPageId("allowed-project", PILOT_FINGERPRINT, -1)))
+            .toThrowError(expect.objectContaining({ code: "INVALID_RESULT_ID" }));
+        const stringPage = Buffer.from(
+            JSON.stringify([1, "registry_page", "allowed-project", PILOT_FINGERPRINT, "1"]),
+            "utf8",
+        ).toString("base64url");
+        expect(() => decodeResultId(stringPage))
+            .toThrowError(expect.objectContaining({ code: "INVALID_RESULT_ID" }));
+        const confusedIndex = Buffer.from(
+            JSON.stringify([1, "registry_index", "allowed-project", PILOT_FINGERPRINT, 1]),
+            "utf8",
+        ).toString("base64url");
+        expect(() => decodeResultId(confusedIndex))
+            .toThrowError(expect.objectContaining({ code: "INVALID_RESULT_ID" }));
+    });
+
+    it("fails closed when an index or page result fingerprint becomes stale", async () => {
+        let current = pilotIndex();
+        const read1: ProjectMemoryReadClient = {
+            enumerateProject: vi.fn(async (_slug, expected) => {
+                if (expected && expected !== current.corpusFingerprint) {
+                    throw new McpBridgeError("STALE_CORPUS", "The Project corpus changed; search again");
+                }
+                return current;
+            }),
+            readCompleteSource: vi.fn(),
+        };
+        const service = new ProjectMemoryService(read1, ["allowed-project"]);
+        const oldIndexId = encodeRegistryIndexId("allowed-project", PILOT_FINGERPRINT);
+        const oldPageId = encodeRegistryPageId("allowed-project", PILOT_FINGERPRINT, 1);
+        current = { ...current, corpusFingerprint: OTHER_FINGERPRINT };
+        await expect(service.fetch(oldIndexId)).rejects.toMatchObject({ code: "STALE_CORPUS" });
+        await expect(service.fetch(oldPageId)).rejects.toMatchObject({ code: "STALE_CORPUS" });
+    });
+
+    it("fails closed instead of emitting an oversized registry page", async () => {
+        const oversized = index(Array.from({ length: REGISTRY_PAGE_SIZE }, (_, position) =>
+            source(`doc-${position}`, "x".repeat(REGISTRY_PAGE_MAX_SERIALIZED_BYTES)),
+        ));
+        const service = new ProjectMemoryService(client(oversized), ["allowed-project"]);
+        await expect(service.fetch(encodeRegistryPageId("allowed-project", FINGERPRINT, 1)))
+            .rejects.toMatchObject({ code: "READ1_PROTOCOL_ERROR" });
+    });
+
+    it("preserves the exact no-snapshot 46-source pilot corpus semantics", async () => {
+        const projectIndex = pilotIndex();
+        const service = new ProjectMemoryService(client(projectIndex), ["allowed-project"]);
+        const manifestId = (await service.search("allowed-project")).results[0].id;
+        const manifest = await service.fetch(manifestId);
+        expect(manifest.metadata).toMatchObject({
+            totalSources: 46,
+            corpusFingerprint: PILOT_FINGERPRINT,
+            counts: {
+                project_metadata: 1,
+                doc_block: 13,
+                doc: 24,
+                decision: 7,
+                project_context: 1,
+                loop: 0,
+                project_context_snapshot: 0,
+            },
+        });
+        expect(projectIndex.sources).toHaveLength(46);
+        expect(projectIndex.sources.some((entry) => entry.sourceKind === "project_context_snapshot")).toBe(false);
+        const registry = await service.fetch(encodeRegistryIndexId("allowed-project", PILOT_FINGERPRINT));
+        expect(registry.metadata.isCanonicalSource).toBe(false);
+        expect(registry.metadata.totalSources).toBe(46);
+    });
+
+    it("preserves canonical Project Metadata fetch compatibility", async () => {
+        const projectIndex = pilotIndex();
+        const read1 = client(projectIndex, "canonical project metadata text");
+        const service = new ProjectMemoryService(read1, ["allowed-project"]);
+        const id = encodeSourceId("allowed-project", PILOT_FINGERPRINT, {
+            sourceKind: "project_metadata",
+            sourceId: "project_metadata-1",
+        });
+        const output = await service.fetch(id);
+        expect(output.text).toBe("canonical project metadata text");
+        expect(output.metadata).toMatchObject({
+            isProjectManifest: false,
+            isCanonicalSource: true,
+            sourceKind: "project_metadata",
+            sourceId: "project_metadata-1",
+            corpusFingerprint: PILOT_FINGERPRINT,
+            complete: true,
+        });
     });
 
     it("preserves the derived-context flag", async () => {

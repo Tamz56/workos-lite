@@ -17,7 +17,9 @@ export const PROJECT_MEMORY_SERVER_VERSION = "1.0.0";
 
 const SERVER_INSTRUCTIONS = [
     "This server is read-only.",
-    "Use search to discover WorkOS Projects and sources, then fetch to retrieve a Project manifest or one canonical source.",
+    "Use search to discover WorkOS Projects, bounded Project Source Registry controls, and sources.",
+    "Fetch the registry index and every fingerprint-bound registry page to enumerate a complete Project source inventory.",
+    "Fetch canonical source result IDs separately to read source bodies.",
     "Never claim complete Project coverage unless every manifest source was fetched completely and the manifest fingerprint is unchanged.",
     "Attachments are unsupported in v1.",
 ].join(" ");
@@ -70,7 +72,7 @@ export const PROJECT_MEMORY_TOOLS: readonly OpenAiTool[] = [
         name: "search",
         title: "Search WorkOS project memory",
         description:
-            "Search allowlisted WorkOS Projects and canonical source metadata. Use an exact Project name or slug to obtain its coverage manifest.",
+            "Search allowlisted WorkOS Projects and canonical source metadata. Use an exact Project name or slug to obtain its manifest and bounded Project Source Registry index.",
         inputSchema: {
             type: "object",
             properties: { query: { type: "string", maxLength: 500 } },
@@ -86,7 +88,7 @@ export const PROJECT_MEMORY_TOOLS: readonly OpenAiTool[] = [
         name: "fetch",
         title: "Fetch WorkOS project memory",
         description:
-            "Fetch one fingerprint-bound Project manifest or one complete canonical source returned by search. Stale or fabricated IDs fail closed.",
+            "Fetch one fingerprint-bound Project manifest, registry index/page control artifact, or complete canonical source returned by search. Stale or fabricated IDs fail closed.",
         inputSchema: {
             type: "object",
             properties: { id: { type: "string", minLength: 1, maxLength: 4_096 } },

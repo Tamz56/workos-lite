@@ -15,6 +15,14 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export type ProjectMemoryResultId =
     | { version: 1; type: "manifest"; projectSlug: string; corpusFingerprint: string }
+    | { version: 1; type: "registry_index"; projectSlug: string; corpusFingerprint: string }
+    | {
+        version: 1;
+        type: "registry_page";
+        projectSlug: string;
+        corpusFingerprint: string;
+        pageNumber: number;
+    }
     | {
         version: 1;
         type: "source";
@@ -29,6 +37,18 @@ function encode(value: unknown[]): string {
 
 export function encodeManifestId(projectSlug: string, corpusFingerprint: string): string {
     return encode([1, "manifest", projectSlug, corpusFingerprint]);
+}
+
+export function encodeRegistryIndexId(projectSlug: string, corpusFingerprint: string): string {
+    return encode([1, "registry_index", projectSlug, corpusFingerprint]);
+}
+
+export function encodeRegistryPageId(
+    projectSlug: string,
+    corpusFingerprint: string,
+    pageNumber: number,
+): string {
+    return encode([1, "registry_page", projectSlug, corpusFingerprint, pageNumber]);
 }
 
 export function encodeSourceId(
@@ -54,6 +74,29 @@ export function decodeResultId(id: string): ProjectMemoryResultId {
                 type: "manifest",
                 projectSlug: parsed[2] as string,
                 corpusFingerprint: parsed[3] as string,
+            };
+        }
+        if (parsed.length === 4 && parsed[1] === "registry_index") {
+            return {
+                version: 1,
+                type: "registry_index",
+                projectSlug: parsed[2] as string,
+                corpusFingerprint: parsed[3] as string,
+            };
+        }
+        if (
+            parsed.length === 5
+            && parsed[1] === "registry_page"
+            && Number.isSafeInteger(parsed[4])
+            && (parsed[4] as number) >= 1
+            && (parsed[4] as number) <= 1_000_000
+        ) {
+            return {
+                version: 1,
+                type: "registry_page",
+                projectSlug: parsed[2] as string,
+                corpusFingerprint: parsed[3] as string,
+                pageNumber: parsed[4] as number,
             };
         }
         if (

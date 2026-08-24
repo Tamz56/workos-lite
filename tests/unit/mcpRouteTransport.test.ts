@@ -147,6 +147,10 @@ describe("READ1B Next.js Streamable HTTP route", () => {
             expect(tool.securitySchemes).toEqual([{ type: "oauth2", scopes: [MCP_REQUIRED_SCOPE] }]);
             expect(tool._meta.securitySchemes).toEqual(tool.securitySchemes);
         }
+        expect(body.result.tools.find((tool: { name: string }) => tool.name === "search").description)
+            .toContain("Project Source Registry");
+        expect(body.result.tools.find((tool: { name: string }) => tool.name === "fetch").description)
+            .toContain("registry index/page");
     });
 
     it("invokes search and returns matching structuredContent and JSON content", async () => {
@@ -161,6 +165,7 @@ describe("READ1B Next.js Streamable HTTP route", () => {
         expect(body.result.isError).not.toBe(true);
         expect(JSON.parse(body.result.content[0].text)).toEqual(body.result.structuredContent);
         expect(body.result.structuredContent.results[0].title).toContain("Project manifest");
+        expect(body.result.structuredContent.results[1].title).toContain("Project Source Registry");
     });
 
     it("invokes fetch for a valid manifest", async () => {
