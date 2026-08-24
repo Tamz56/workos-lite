@@ -30,6 +30,29 @@ function source(
     };
 }
 
+/** CTX3-I2E snapshot fixture — derived working memory, never canonical. */
+function snapshotSource(sourceId: string, overrides: Partial<Read1SourceEntry> = {}): Read1SourceEntry {
+    return {
+        sourceKind: "project_context_snapshot",
+        sourceId,
+        title: "Project Context Snapshot",
+        sourceType: null,
+        status: "PUBLISHED",
+        summary: null,
+        nextAction: null,
+        hasFullContent: true,
+        isDerivedContext: true,
+        snapshotMetadata: {
+            schemaVersion: "project-context.v1",
+            generatedFromFingerprint: "b".repeat(64),
+            publishedCorpusFingerprint: FINGERPRINT,
+            generatedAt: "2026-08-20T00:00:00.000Z",
+            approvedAt: "2026-08-20T00:00:00.000Z",
+        },
+        ...overrides,
+    };
+}
+
 function index(sources: Read1SourceEntry[] = [
     source("doc-1", "Architecture Notes"),
     source("doc-2", "Duplicate title"),
@@ -46,6 +69,7 @@ function index(sources: Read1SourceEntry[] = [
         decision: 0,
         project_context: sources.filter((entry) => entry.sourceKind === "project_context").length,
         loop: 0,
+        project_context_snapshot: sources.filter((entry) => entry.sourceKind === "project_context_snapshot").length,
     };
     return {
         project: { id: "project-1", slug: "allowed-project", name: "Allowed Project", status: "active" },
@@ -72,9 +96,10 @@ function client(projectIndex = index(), fullText = "canonical source text"): Pro
                 (entry) => entry.sourceKind === ref.sourceKind && entry.sourceId === ref.sourceId,
             )?.title ?? "Unknown",
             text: fullText,
-            status: "active",
-            sourceType: "document",
-            isDerivedContext: ref.sourceKind === "project_context",
+            status: ref.sourceKind === "project_context_snapshot" ? "PUBLISHED" : "active",
+            sourceType: ref.sourceKind === "project_context_snapshot" ? null : "document",
+            isDerivedContext:
+                ref.sourceKind === "project_context" || ref.sourceKind === "project_context_snapshot",
             totalCharacterCount: fullText.length,
             chunkCount: fullText.length > 30_000 ? 2 : 1,
         })),
@@ -202,5 +227,127 @@ describe("READ1B Project Memory fetch", () => {
             sourceId: "doc-1",
         });
         await expect(service.fetch(other)).rejects.toMatchObject({ code: "PROJECT_NOT_ALLOWED" });
+    });
+});
+
+describe("READ1B — project_context_snapshot (CTX3-I2E)", () => {
+    it("no-snapshot regression: zero count, no synthetic snapshot, existing search/fetch work (I2E 6-10)", async () => {
+        const service = new ProjectMemoryService(client(), ["allowed-project"]);
+        const manifestId = (await service.search("allowed-project")).results[0].id;
+        const manifest = await service.fetch(manifestId);
+        expect(manifest.metadata.counts).toMatchObject({ project_context_snapshot: 0 });
+        expect(
+            (manifest.metadata.sources as Array<{ sourceKind: string }>)
+                .some((s) => s.sourceKind === "project_context_snapshot"),
+        ).toBe(false);
+        const search = await service.search("Architecture Notes");
+        expect(search.results.length).toBeGreaterThan(0);
+        const docId = encodeSourceId("allowed-project", FINGERPRINT, { sourceKind: "doc", sourceId: "doc-1" });
+        expect((await service.fetch(docId)).text).toBe("canonical source text");
+    });
+
+    it("surfaces the current published snapshot as a standard search result (I2E 11-15)", async () => {
+        const idx = index([snapshotSource("snap-v1")]);
+        const service = new ProjectMemoryService(client(idx), ["allowed-project"]);
+        const output = await service.search("Project Context Snapshot");
+        const snapResult = output.results.find((r) => {
+            const d = decodeResultId(r.id);
+            return d.type === "source" && d.source.sourceKind === "project_context_snapshot";
+        });
+        expect(snapResult).toBeDefined();
+        expect(decodeResultId(snapResult!.id)).toMatchObject({
+            type: "source",
+            projectSlug: "allowed-project",
+            source: { sourceKind: "project_context_snapshot", sourceId: "snap-v1" },
+        });
+        const manifestId = (await service.search("allowed-project")).results[0].id;
+        expect((await service.fetch(manifestId)).metadata.counts)
+            .toMatchObject({ project_context_snapshot: 1 });
+    });
+
+    it("fetches the snapshot via READ1 with exact body, derived semantics, and currentness metadata (I2E 12-14, 21-25)", async () => {
+        const snapshotText = "line one\nline two\nline three";
+        const idx = index([snapshotSource("snap-v1")]);
+        const read1 = client(idx, snapshotText);
+        const service = new ProjectMemoryService(read1, ["allowed-project"]);
+        const id = encodeSourceId("allowed-project", FINGERPRINT, {
+            sourceKind: "project_context_snapshot",
+            sourceId: "snap-v1",
+        });
+        const output = await service.fetch(id);
+        expect(output.text).toBe(snapshotText);
+        expect(output.metadata).toMatchObject({
+            sourceKind: "project_context_snapshot",
+            sourceId: "snap-v1",
+            isDerivedContext: true,
+            isCanonicalSource: false,
+        });
+        expect(output.metadata.snapshot).toMatchObject({
+            schemaVersion: "project-context.v1",
+            generatedFromFingerprint: "b".repeat(64),
+            publishedCorpusFingerprint: FINGERPRINT,
+            generatedAt: "2026-08-20T00:00:00.000Z",
+            approvedAt: "2026-08-20T00:00:00.000Z",
+        });
+        expect(output.text).not.toContain(FINGERPRINT);
+        expect(read1.readCompleteSource).toHaveBeenCalledWith(
+            "allowed-project",
+            { sourceKind: "project_context_snapshot", sourceId: "snap-v1" },
+            FINGERPRINT,
+        );
+    });
+
+    it("round-trips snapshot result IDs, keeps old kinds, and fails closed (I2E 16-20, 26)", async () => {
+        const service = new ProjectMemoryService(client(), ["allowed-project"]);
+        const snapId = encodeSourceId("allowed-project", FINGERPRINT, {
+            sourceKind: "project_context_snapshot",
+            sourceId: "snap-v1",
+        });
+        expect(decodeResultId(snapId)).toMatchObject({
+            source: { sourceKind: "project_context_snapshot", sourceId: "snap-v1" },
+        });
+        const oldId = encodeSourceId("allowed-project", FINGERPRINT, { sourceKind: "doc", sourceId: "doc-1" });
+        expect(decodeResultId(oldId).source.sourceKind).toBe("doc");
+        await expect(service.fetch("fabricated-id")).rejects.toMatchObject({ code: "INVALID_RESULT_ID" });
+        const unknownKind = Buffer.from(
+            JSON.stringify([1, "source", "allowed-project", FINGERPRINT, "note", "n1"]),
+            "utf8",
+        ).toString("base64url");
+        await expect(service.fetch(unknownKind)).rejects.toMatchObject({ code: "INVALID_RESULT_ID" });
+        const stale = encodeSourceId("allowed-project", OTHER_FINGERPRINT, {
+            sourceKind: "project_context_snapshot",
+            sourceId: "snap-v1",
+        });
+        await expect(service.fetch(stale)).rejects.toMatchObject({ code: "STALE_CORPUS" });
+        const other = encodeSourceId("other-project", FINGERPRINT, {
+            sourceKind: "project_context_snapshot",
+            sourceId: "snap-v1",
+        });
+        await expect(service.fetch(other)).rejects.toMatchObject({ code: "PROJECT_NOT_ALLOWED" });
+    });
+
+    it("preserves legacy isCanonicalSource=true for a derived-titled existing source (I2E-R1 C)", async () => {
+        // Legacy DERIVED_CONTEXT_TITLE behavior: an existing doc marked
+        // isDerivedContext=true must keep the pre-I2E isCanonicalSource=true
+        // MCP contract. I2E does not reconcile legacy authority.
+        const idx = index([source("doc-derived", "PROJECT-CONTEXT-CURRENT")]);
+        const read1 = client(idx);
+        read1.readCompleteSource = vi.fn(async (): Promise<CompleteSource> => ({
+            title: "PROJECT-CONTEXT-CURRENT",
+            text: "legacy derived body",
+            status: "active",
+            sourceType: "document",
+            isDerivedContext: true,
+            totalCharacterCount: "legacy derived body".length,
+            chunkCount: 1,
+        }));
+        const service = new ProjectMemoryService(read1, ["allowed-project"]);
+        const id = encodeSourceId("allowed-project", FINGERPRINT, {
+            sourceKind: "doc",
+            sourceId: "doc-derived",
+        });
+        const output = await service.fetch(id);
+        expect(output.metadata.isDerivedContext).toBe(true);
+        expect(output.metadata.isCanonicalSource).toBe(true);
     });
 });

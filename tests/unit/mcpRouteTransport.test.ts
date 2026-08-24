@@ -32,6 +32,7 @@ function indexPage() {
             decision: 0,
             project_context: 0,
             loop: 0,
+            project_context_snapshot: 0,
         },
         sources: [{
             sourceKind: "doc",

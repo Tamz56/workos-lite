@@ -10,7 +10,15 @@ const sourceKindSchema = z.enum([
     "decision",
     "project_context",
     "loop",
+    "project_context_snapshot",
 ]);
+const snapshotMetadataSchema = z.object({
+    schemaVersion: z.string(),
+    generatedFromFingerprint: z.string(),
+    publishedCorpusFingerprint: z.string().nullable(),
+    generatedAt: z.string(),
+    approvedAt: z.string().nullable(),
+});
 const sourceSchema = z.object({
     sourceKind: sourceKindSchema,
     sourceId: z.string().min(1),
@@ -25,6 +33,9 @@ const sourceSchema = z.object({
     hasFullContent: z.boolean(),
     isDerivedContext: z.boolean(),
     possibleDuplicateTitle: z.boolean().optional(),
+    // Optional snapshot-specific currentness metadata (I2C). Only
+    // project_context_snapshot entries carry it; the six prior kinds never do.
+    snapshotMetadata: snapshotMetadataSchema.optional(),
 });
 const projectSchema = z.object({
     id: z.string().min(1),
@@ -45,6 +56,7 @@ const countsSchema = z.object({
     decision: z.number().int().nonnegative(),
     project_context: z.number().int().nonnegative(),
     loop: z.number().int().nonnegative(),
+    project_context_snapshot: z.number().int().nonnegative(),
 });
 const indexPageSchema = z.object({
     schemaVersion: z.literal("ai-read-source-index.v1"),

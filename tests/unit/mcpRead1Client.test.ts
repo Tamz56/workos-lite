@@ -16,6 +16,7 @@ function indexPage() {
             decision: 0,
             project_context: 0,
             loop: 0,
+            project_context_snapshot: 0,
         },
         sources: [{
             sourceKind: "doc",
@@ -167,5 +168,111 @@ describe("READ1B internal READ1 client", () => {
             FINGERPRINT,
         )).rejects.toMatchObject({ code: "STALE_CORPUS" });
         expect(indexRequestCount).toBe(2);
+    });
+
+    it("accepts a project_context_snapshot source kind, count, and optional snapshot metadata (I2E 1-4)", async () => {
+        const page = indexPage();
+        page.counts.project_context_snapshot = 1;
+        page.counts.doc = 0;
+        page.sources = [{
+            sourceKind: "project_context_snapshot",
+            sourceId: "snap-v1",
+            title: "Project Context Snapshot",
+            status: "PUBLISHED",
+            sourceType: null,
+            hasFullContent: true,
+            isDerivedContext: true,
+            snapshotMetadata: {
+                schemaVersion: "project-context.v1",
+                generatedFromFingerprint: "b".repeat(64),
+                publishedCorpusFingerprint: FINGERPRINT,
+                generatedAt: "2026-08-20T00:00:00.000Z",
+                approvedAt: "2026-08-20T00:00:00.000Z",
+            },
+        }];
+        const fetchFn = vi.fn(async () => Response.json(page));
+        const client = new Read1Client(
+            { internalOrigin: "http://127.0.0.1:3100", readPassword: PASSWORD },
+            fetchFn as typeof fetch,
+        );
+        const index = await client.enumerateProject("allowed-project");
+        expect(index.counts.project_context_snapshot).toBe(1);
+        expect(index.sources[0].sourceKind).toBe("project_context_snapshot");
+        expect(index.sources[0].sourceId).toBe("snap-v1");
+        expect(index.sources[0].isDerivedContext).toBe(true);
+        expect(index.sources[0].snapshotMetadata).toMatchObject({
+            schemaVersion: "project-context.v1",
+            generatedFromFingerprint: "b".repeat(64),
+            publishedCorpusFingerprint: FINGERPRINT,
+        });
+    });
+
+    it("fetches a snapshot through READ1 with exact multi-chunk reconstruction (I2E 21-23)", async () => {
+        const snapshotText = ("# Snapshot\n\n- deterministic line\n").repeat(2500);
+        const page = indexPage();
+        page.counts.project_context_snapshot = 1;
+        page.counts.doc = 0;
+        page.sources = [{
+            sourceKind: "project_context_snapshot",
+            sourceId: "snap-v1",
+            title: "Project Context Snapshot",
+            status: "PUBLISHED",
+            sourceType: null,
+            hasFullContent: true,
+            isDerivedContext: true,
+        }];
+        const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            if (input.toString().endsWith("/sources/read")) {
+                const body = JSON.parse(String(init?.body)) as { offset: number };
+                const content = snapshotText.slice(body.offset, body.offset + 30_000);
+                return Response.json({
+                    schemaVersion: "ai-read-source-read.v1",
+                    project: { id: "project-1", slug: "allowed-project", name: "Allowed Project" },
+                    ref: { sourceKind: "project_context_snapshot", sourceId: "snap-v1" },
+                    title: "Project Context Snapshot",
+                    metadata: {
+                        sourceKind: "project_context_snapshot",
+                        sourceId: "snap-v1",
+                        status: "PUBLISHED",
+                        sourceType: null,
+                        isDerivedContext: true,
+                    },
+                    content,
+                    chunk: {
+                        offset: body.offset,
+                        includedChars: content.length,
+                        totalCharacterCount: snapshotText.length,
+                        nextOffset: body.offset + content.length,
+                        hasMore: body.offset + content.length < snapshotText.length,
+                    },
+                });
+            }
+            return Response.json(page);
+        });
+        const client = new Read1Client(
+            { internalOrigin: "http://127.0.0.1:3100", readPassword: PASSWORD },
+            fetchFn as typeof fetch,
+        );
+        const output = await client.readCompleteSource(
+            "allowed-project",
+            { sourceKind: "project_context_snapshot", sourceId: "snap-v1" },
+            FINGERPRINT,
+        );
+        expect(output.text).toBe(snapshotText);
+        expect(output.isDerivedContext).toBe(true);
+        expect(output.chunkCount).toBeGreaterThan(1);
+        expect(output.text).not.toContain(FINGERPRINT);
+    });
+
+    it("rejects an unknown source kind in READ1 payloads (I2E 5)", async () => {
+        const page = indexPage();
+        page.sources = [{ ...page.sources[0], sourceKind: "note" }];
+        const fetchFn = vi.fn(async () => Response.json(page));
+        const client = new Read1Client(
+            { internalOrigin: "http://127.0.0.1:3100", readPassword: PASSWORD },
+            fetchFn as typeof fetch,
+        );
+        await expect(client.enumerateProject("allowed-project"))
+            .rejects.toMatchObject({ code: "READ1_PROTOCOL_ERROR" });
     });
 });

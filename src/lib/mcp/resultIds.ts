@@ -8,6 +8,7 @@ const SOURCE_KINDS = new Set<ProjectContextSourceKind>([
     "decision",
     "project_context",
     "loop",
+    "project_context_snapshot",
 ]);
 const FINGERPRINT = /^[a-f0-9]{64}$/;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

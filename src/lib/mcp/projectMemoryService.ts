@@ -219,7 +219,12 @@ export class ProjectMemoryService {
             url: canonicalSourceUrl(index.project.slug, ref.sourceKind, ref.sourceId),
             metadata: {
                 isProjectManifest: false,
-                isCanonicalSource: true,
+                // I2E scope: only the new project_context_snapshot kind is
+                // reported non-canonical. The six pre-I2E source kinds preserve
+                // their exact pre-I2E isCanonicalSource=true contract even when
+                // an entry carries the legacy DERIVED_CONTEXT_TITLE identity
+                // (authority reconciliation is out of scope for I2E).
+                isCanonicalSource: ref.sourceKind !== "project_context_snapshot",
                 projectSlug: index.project.slug,
                 sourceKind: ref.sourceKind,
                 sourceId: ref.sourceId,
@@ -231,6 +236,10 @@ export class ProjectMemoryService {
                 chunkCount: complete.chunkCount,
                 complete: true,
                 attachmentReadingSupported: false,
+                // Snapshot currentness metadata (I2C): distinguishes the corpus
+                // the snapshot was generated from vs the corpus it was
+                // published into. Never injected into the Markdown body.
+                ...(indexed.snapshotMetadata ? { snapshot: indexed.snapshotMetadata } : {}),
             },
         };
     }
