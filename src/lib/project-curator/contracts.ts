@@ -30,7 +30,8 @@ export type ProjectContextSourceKind =
     | "doc"
     | "decision"
     | "project_context"
-    | "loop";
+    | "loop"
+    | "project_context_snapshot";
 
 /** Explicit source reference supplied by the caller / CTX3. */
 export interface ProjectContextSourceRef {
@@ -51,6 +52,27 @@ export const DERIVED_CONTEXT_TITLE = "PROJECT-CONTEXT-CURRENT";
  * from mutable content; identity remains `sourceKind + sourceId`.
  */
 export const PROJECT_CONTEXT_DISPLAY_TITLE = "Project Context";
+
+/**
+ * Deterministic display title for the `project_context_snapshot` source kind.
+ * Display metadata only — NEVER an identity. Identity is the immutable
+ * snapshot version id (`sourceKind + sourceId`).
+ */
+export const PROJECT_CONTEXT_SNAPSHOT_DISPLAY_TITLE = "Project Context Snapshot";
+
+/**
+ * Snapshot-specific non-digest metadata surfaced by READ1 for a future
+ * READ1B resume to determine snapshot currentness. `publishedCorpusFingerprint`
+ * is publication/currentness metadata and MUST NOT participate in the corpus
+ * content digest (no fingerprint recursion).
+ */
+export interface ProjectContextSnapshotMetadata {
+    schemaVersion: string;
+    generatedFromFingerprint: string;
+    publishedCorpusFingerprint: string | null;
+    generatedAt: string;
+    approvedAt: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Stage A — metadata-only index
@@ -81,6 +103,18 @@ export interface ProjectContextSourceIndexEntry {
     isDerivedContext: boolean;
     /** Deterministic flag when another source id shares the same title. */
     possibleDuplicateTitle?: boolean;
+
+    /**
+     * SHA-256 over the exact deterministic READ1 body bytes for a
+     * `project_context_snapshot` source. Digest-bearing fingerprint material
+     * only; absent for every non-snapshot source kind.
+     */
+    contentDigest?: string;
+    /**
+     * Snapshot-specific non-digest metadata (currentness/publication).
+     * Absent for every non-snapshot source kind.
+     */
+    snapshotMetadata?: ProjectContextSnapshotMetadata;
 }
 
 /** Bounded project identity/profile carried by the index (metadata only). */

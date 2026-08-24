@@ -55,11 +55,17 @@ export interface BuildIndexPageInput {
  * Deterministic full-corpus fingerprint over source metadata only:
  * sourceKind, sourceId, title, status, createdAt, updatedAt, isDerivedContext.
  * Nulls use a sentinel; material is canonically sorted independent of page.
+ *
+ * Snapshot entries additionally bind `contentDigest` (SHA-256 over the exact
+ * deterministic READ1 snapshot body bytes) as snapshot-only digest material.
+ * Non-snapshot entries carry no extra field, so a Project without a snapshot
+ * keeps its exact pre-I2C fingerprint. `publishedCorpusFingerprint` is never
+ * part of this material (no fingerprint recursion).
  */
 export function buildCorpusFingerprint(entries: ProjectContextSourceIndexEntry[]): string {
     const material = entries
-        .map((e) =>
-            [
+        .map((e) => {
+            const parts = [
                 e.sourceKind,
                 e.sourceId,
                 e.title ?? NULL_SENTINEL,
@@ -67,8 +73,12 @@ export function buildCorpusFingerprint(entries: ProjectContextSourceIndexEntry[]
                 e.createdAt ?? NULL_SENTINEL,
                 e.updatedAt ?? NULL_SENTINEL,
                 String(e.isDerivedContext),
-            ].join(FIELD_SEP),
-        )
+            ];
+            if (e.contentDigest != null) {
+                parts.push(`contentDigest=${e.contentDigest}`);
+            }
+            return parts.join(FIELD_SEP);
+        })
         .sort()
         .join("\n");
     return createHash("sha256").update(material, "utf8").digest("hex");
@@ -82,6 +92,7 @@ function countByKind(entries: ProjectContextSourceIndexEntry[]): Record<ProjectC
         decision: 0,
         project_context: 0,
         loop: 0,
+        project_context_snapshot: 0,
     };
     for (const entry of entries) {
         counts[entry.sourceKind] += 1;

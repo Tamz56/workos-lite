@@ -7,11 +7,14 @@
 // No semantic relevance decisions are made here.
 // ---------------------------------------------------------------------------
 import type Database from "better-sqlite3";
+import { createHash } from "crypto";
 import {
     DERIVED_CONTEXT_TITLE,
     PROJECT_CONTEXT_DISPLAY_TITLE,
+    PROJECT_CONTEXT_SNAPSHOT_DISPLAY_TITLE,
     PROJECT_CONTEXT_SOURCE_INDEX_SCHEMA_VERSION,
     ProjectContextCuratorError,
+    type ProjectContextSnapshotMetadata,
     type ProjectContextSourceIndex,
     type ProjectContextSourceIndexEntry,
     type ProjectContextSourceIndexProject,
@@ -27,6 +30,7 @@ export const PROJECT_CONTEXT_KIND_ORDER: ProjectContextSourceKind[] = [
     "decision",
     "project_context",
     "loop",
+    "project_context_snapshot",
 ];
 
 export interface CollectSourceIndexOptions {
@@ -287,6 +291,79 @@ function collectLoopEntries(
     }));
 }
 
+type SnapshotVersionMetaRow = {
+    id: string;
+    schema_version: string;
+    generated_from_fingerprint: string;
+    published_corpus_fingerprint: string | null;
+    rendered_markdown: string;
+    generated_at: string;
+    approved_at: string | null;
+};
+
+/**
+ * READ1 — zero-or-one `project_context_snapshot` enumerator.
+ *
+ * Eligible ONLY when: the container belongs to the exact Project, its
+ * `current_version_id` is non-null, the referenced version belongs to the same
+ * container, its publication state is PUBLISHED, and it is the current version.
+ * Everything else (historical PUBLISHED, PUBLISHING, orphan/fabricated,
+ * cross-Project) is excluded fail-closed (returns null → zero sources).
+ *
+ * `sourceId` is the immutable snapshot version id. The deterministic display
+ * title is metadata only and never an identity. `isDerivedContext=true` is
+ * based on the semantic source kind, never title inference.
+ */
+function collectProjectContextSnapshotEntry(
+    db: Database.Database,
+    projectId: string,
+): ProjectContextSourceIndexEntry | null {
+    const containerTable = db
+        .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get("project_context_snapshots");
+    if (!containerTable) return null;
+
+    const container = db
+        .prepare("SELECT id, current_version_id FROM project_context_snapshots WHERE project_id = ?")
+        .get(projectId) as { id: string; current_version_id: string | null } | undefined;
+    if (!container || !container.current_version_id) return null;
+
+    const version = db
+        .prepare(
+            `SELECT id, schema_version, generated_from_fingerprint,
+                    published_corpus_fingerprint, rendered_markdown, generated_at, approved_at
+             FROM project_context_snapshot_versions
+             WHERE id = ? AND snapshot_id = ? AND publication_state = 'PUBLISHED'`,
+        )
+        .get(container.current_version_id, container.id) as SnapshotVersionMetaRow | undefined;
+    if (!version) return null;
+
+    // Snapshot-only digest material: SHA-256 over the exact deterministic
+    // READ1 body bytes. `publishedCorpusFingerprint` is deliberately excluded.
+    const contentDigest = createHash("sha256").update(version.rendered_markdown, "utf8").digest("hex");
+
+    const snapshotMetadata: ProjectContextSnapshotMetadata = {
+        schemaVersion: version.schema_version,
+        generatedFromFingerprint: version.generated_from_fingerprint,
+        publishedCorpusFingerprint: version.published_corpus_fingerprint,
+        generatedAt: version.generated_at,
+        approvedAt: version.approved_at,
+    };
+
+    return {
+        sourceKind: "project_context_snapshot",
+        sourceId: version.id,
+        title: PROJECT_CONTEXT_SNAPSHOT_DISPLAY_TITLE,
+        status: "PUBLISHED",
+        createdAt: version.generated_at,
+        updatedAt: version.generated_at,
+        hasFullContent: true,
+        isDerivedContext: true,
+        contentDigest,
+        snapshotMetadata,
+    };
+}
+
 export function entryRecency(entry: ProjectContextSourceIndexEntry): string {
     return entry.updatedAt ?? entry.date ?? entry.createdAt ?? "";
 }
@@ -380,6 +457,7 @@ export function collectCompleteProjectSourceEntries(
     const projectId = resolveProjectId(db, projectIdentifier);
     const project = loadProjectProfile(db, projectId);
 
+    const snapshotEntry = collectProjectContextSnapshotEntry(db, projectId);
     const entries = markPossibleDuplicateTitles(
         sortIndexEntries([
             collectProjectMetadataEntry(project),
@@ -388,6 +466,7 @@ export function collectCompleteProjectSourceEntries(
             ...collectDecisionEntries(db, projectId, Infinity),
             ...collectProjectContextEntries(db, projectId, Infinity),
             ...collectLoopEntries(db, projectId, options.includeArchivedLoops ?? true, Infinity),
+            ...(snapshotEntry ? [snapshotEntry] : []),
         ]),
     );
 

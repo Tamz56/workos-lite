@@ -37,6 +37,7 @@ function countByKind(
         decision: 0,
         project_context: 0,
         loop: 0,
+        project_context_snapshot: 0,
     };
     for (const entry of entries) {
         counts[entry.sourceKind] += 1;

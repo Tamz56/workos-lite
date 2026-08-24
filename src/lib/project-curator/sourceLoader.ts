@@ -11,6 +11,7 @@ import { mapRowToBlock, type DbProjectDocBlockRow } from "@/lib/project-doc-bloc
 import {
     DERIVED_CONTEXT_TITLE,
     PROJECT_CONTEXT_DISPLAY_TITLE,
+    PROJECT_CONTEXT_SNAPSHOT_DISPLAY_TITLE,
     ProjectContextCuratorError,
     type ProjectContextLoadedSource,
     type ProjectContextSourceIndexProject,
@@ -32,6 +33,7 @@ const SUPPORTED_KINDS = new Set<ProjectContextSourceKind>([
     "decision",
     "project_context",
     "loop",
+    "project_context_snapshot",
 ]);
 
 const KIND_TABLE: Record<Exclude<ProjectContextSourceKind, "project_metadata">, string> = {
@@ -40,6 +42,11 @@ const KIND_TABLE: Record<Exclude<ProjectContextSourceKind, "project_metadata">, 
     decision: "project_decisions",
     project_context: "project_contexts",
     loop: "project_loops",
+    // project_context_snapshot is resolved directly against the snapshot
+    // container + version tables (see validateRef / resolveSnapshotBody) and is
+    // never reached through findOwnedRow; this key only keeps the exhaustive
+    // Record type well-formed.
+    project_context_snapshot: "project_context_snapshot_versions",
 };
 
 type ContentRow = Record<string, unknown> & { id: string };
@@ -97,6 +104,14 @@ function validateRef(
             );
         }
         return;
+    }
+    if (ref.sourceKind === "project_context_snapshot") {
+        // Snapshot is derived working memory; Stage B selected-source loading is
+        // for authoritative material only. READ1 reads it via the chunk path.
+        throw new ProjectContextCuratorError(
+            "UNSUPPORTED_SOURCE_KIND",
+            `project_context_snapshot is not a supported Stage B selected source: ${ref.sourceId}`,
+        );
     }
     const row = findOwnedRow(db, ref.sourceKind, projectId, ref.sourceId);
     if (!row) {
@@ -296,6 +311,12 @@ function loadOne(
                 limits,
             );
         }
+        case "project_context_snapshot":
+            // Unreachable: validateRef rejects snapshot refs in Stage B.
+            throw new ProjectContextCuratorError(
+                "UNSUPPORTED_SOURCE_KIND",
+                `Unsupported source kind in Stage B: ${ref.sourceKind}`,
+            );
     }
 }
 
@@ -371,6 +392,82 @@ export interface ProjectContextSourceChunk {
     };
 }
 
+type SnapshotBodyRow = {
+    id: string;
+    rendered_markdown: string;
+};
+
+/** Resolves the current PUBLISHED snapshot version owned by the project. */
+function findCurrentSnapshotVersion(
+    db: Database.Database,
+    projectId: string,
+    sourceId: string,
+): SnapshotBodyRow | undefined {
+    return db
+        .prepare(
+            `SELECT v.id, v.rendered_markdown
+             FROM project_context_snapshots s
+             JOIN project_context_snapshot_versions v ON v.snapshot_id = s.id
+             WHERE s.project_id = ? AND s.current_version_id = ? AND v.id = ?
+               AND v.publication_state = 'PUBLISHED'`,
+        )
+        .get(projectId, sourceId, sourceId) as SnapshotBodyRow | undefined;
+}
+
+/** True when sourceId is the current PUBLISHED version of another project. */
+function snapshotIsCurrentOfOtherProject(
+    db: Database.Database,
+    projectId: string,
+    sourceId: string,
+): boolean {
+    return (
+        db
+            .prepare(
+                `SELECT 1 FROM project_context_snapshots s
+                 JOIN project_context_snapshot_versions v ON v.snapshot_id = s.id
+                 WHERE v.id = ? AND s.project_id != ? AND s.current_version_id = v.id
+                   AND v.publication_state = 'PUBLISHED'`,
+            )
+            .get(sourceId, projectId) !== undefined
+    );
+}
+
+/**
+ * READ1 full-body resolution for a snapshot. The stored deterministic Markdown
+ * (produced by the approved I2B renderer) is returned byte-identical; no
+ * reconstruction, no DB-generated current timestamp, no secrets, no body
+ * mutation during fetch. `publishedCorpusFingerprint` is never injected into
+ * the body. `isDerivedContext=true` is from the semantic source kind.
+ * Historical / PUBLISHING / fabricated / cross-Project ids fail closed and are
+ * never silently redirected to the current version.
+ */
+function resolveSnapshotBody(
+    db: Database.Database,
+    project: ProjectContextSourceIndexProject,
+    sourceId: string,
+): { body: string; title: string; sourceType: null; status: string; isDerivedContext: true } {
+    const row = findCurrentSnapshotVersion(db, project.id, sourceId);
+    if (!row) {
+        if (snapshotIsCurrentOfOtherProject(db, project.id, sourceId)) {
+            throw new ProjectContextCuratorError(
+                "CROSS_PROJECT_SOURCE",
+                `Snapshot version ${sourceId} belongs to a different project`,
+            );
+        }
+        throw new ProjectContextCuratorError(
+            "UNKNOWN_SOURCE",
+            `Unknown snapshot version ${sourceId}`,
+        );
+    }
+    return {
+        body: row.rendered_markdown,
+        title: PROJECT_CONTEXT_SNAPSHOT_DISPLAY_TITLE,
+        sourceType: null,
+        status: "PUBLISHED",
+        isDerivedContext: true,
+    };
+}
+
 /**
  * Resolves the deterministic full body + provenance for an exact ref.
  * Ownership/identity validation fails closed; derived context is rejected
@@ -408,6 +505,9 @@ function resolveFullBody(
             status: project.status ?? null,
             isDerivedContext: false,
         };
+    }
+    if (ref.sourceKind === "project_context_snapshot") {
+        return resolveSnapshotBody(db, project, ref.sourceId);
     }
     const row = findOwnedRow(db, ref.sourceKind, project.id, ref.sourceId);
     if (!row) {
