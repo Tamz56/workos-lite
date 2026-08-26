@@ -1,4 +1,5 @@
 import type { ProjectContextSourceRef } from "@/lib/project-curator/contracts";
+import type { ProjectContextAuthorityClass } from "@/lib/project-context-snapshots/contracts";
 import { canonicalSourceUrl } from "./config";
 import { McpBridgeError } from "./errors";
 import type { CompleteProjectIndex, CompleteSource, Read1SourceEntry } from "./read1Client";
@@ -356,35 +357,57 @@ export class ProjectMemoryService {
             throw new McpBridgeError("SOURCE_NOT_FOUND", "Source is not present in the current Project corpus");
         }
         const complete = await this.read1.readCompleteSource(index.project.slug, ref, index.corpusFingerprint);
+        const metadata: Record<string, unknown> = {
+            isProjectManifest: false,
+            // I2E scope: only the new project_context_snapshot kind is
+            // reported non-canonical. The six pre-I2E source kinds preserve
+            // their exact pre-I2E isCanonicalSource=true contract even when
+            // an entry carries the legacy DERIVED_CONTEXT_TITLE identity
+            // (authority reconciliation is out of scope for I2E).
+            isCanonicalSource: ref.sourceKind !== "project_context_snapshot",
+            projectSlug: index.project.slug,
+            sourceKind: ref.sourceKind,
+            sourceId: ref.sourceId,
+            status: complete.status,
+            sourceType: complete.sourceType,
+            isDerivedContext: complete.isDerivedContext,
+            corpusFingerprint: index.corpusFingerprint,
+            totalCharacterCount: complete.totalCharacterCount,
+            chunkCount: complete.chunkCount,
+            complete: true,
+            attachmentReadingSupported: false,
+        };
+
+        if (ref.sourceKind === "project_context_snapshot") {
+            if (!indexed.snapshotMetadata) {
+                throw new McpBridgeError("READ1_PROTOCOL_ERROR", "READ1 snapshot provenance metadata is missing");
+            }
+            const authorityClass: ProjectContextAuthorityClass = "DERIVED_WORKING_MEMORY";
+            const snapshot = indexed.snapshotMetadata;
+            const snapshotMetadata: Record<string, unknown> = {
+                ...metadata,
+                generatedFromFingerprint: snapshot.generatedFromFingerprint,
+                publishedCorpusFingerprint: snapshot.publishedCorpusFingerprint,
+                authorityClass,
+                // Preserve the committed nested metadata contract for existing
+                // consumers while exposing provenance directly before text.
+                snapshot,
+            };
+            return {
+                id,
+                title: complete.title,
+                url: canonicalSourceUrl(index.project.slug, ref.sourceKind, ref.sourceId),
+                metadata: snapshotMetadata,
+                text: complete.text,
+            };
+        }
+
         return {
             id,
             title: complete.title,
             text: complete.text,
             url: canonicalSourceUrl(index.project.slug, ref.sourceKind, ref.sourceId),
-            metadata: {
-                isProjectManifest: false,
-                // I2E scope: only the new project_context_snapshot kind is
-                // reported non-canonical. The six pre-I2E source kinds preserve
-                // their exact pre-I2E isCanonicalSource=true contract even when
-                // an entry carries the legacy DERIVED_CONTEXT_TITLE identity
-                // (authority reconciliation is out of scope for I2E).
-                isCanonicalSource: ref.sourceKind !== "project_context_snapshot",
-                projectSlug: index.project.slug,
-                sourceKind: ref.sourceKind,
-                sourceId: ref.sourceId,
-                status: complete.status,
-                sourceType: complete.sourceType,
-                isDerivedContext: complete.isDerivedContext,
-                corpusFingerprint: index.corpusFingerprint,
-                totalCharacterCount: complete.totalCharacterCount,
-                chunkCount: complete.chunkCount,
-                complete: true,
-                attachmentReadingSupported: false,
-                // Snapshot currentness metadata (I2C): distinguishes the corpus
-                // the snapshot was generated from vs the corpus it was
-                // published into. Never injected into the Markdown body.
-                ...(indexed.snapshotMetadata ? { snapshot: indexed.snapshotMetadata } : {}),
-            },
+            metadata,
         };
     }
 }

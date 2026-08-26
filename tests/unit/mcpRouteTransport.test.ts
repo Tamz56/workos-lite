@@ -2,7 +2,7 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWK } from
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { handleMcpRequest } from "@/app/mcp/route";
 import { MCP_REQUIRED_SCOPE, MCP_RESOURCE_URL } from "@/lib/mcp/config";
-import { encodeManifestId } from "@/lib/mcp/resultIds";
+import { encodeManifestId, encodeSourceId } from "@/lib/mcp/resultIds";
 
 const ISSUER = "https://issuer.example.com";
 const FINGERPRINT = "d".repeat(64);
@@ -186,6 +186,115 @@ describe("READ1B Next.js Streamable HTTP route", () => {
             totalSources: 1,
             complete: true,
         });
+    });
+
+    it("serializes exact snapshot provenance before long snapshot source text", async () => {
+        const generatedFromFingerprint = "b".repeat(64);
+        const snapshotText = `snapshot-start\n${"long snapshot line\n".repeat(2_000)}snapshot-end`;
+        const snapshotSourceId = "snapshot-version-1";
+        const snapshotPage = {
+            ...indexPage(),
+            counts: {
+                project_metadata: 0,
+                doc_block: 0,
+                doc: 0,
+                decision: 0,
+                project_context: 0,
+                loop: 0,
+                project_context_snapshot: 1,
+            },
+            sources: [{
+                sourceKind: "project_context_snapshot",
+                sourceId: snapshotSourceId,
+                title: "Project Context Snapshot",
+                sourceType: null,
+                status: "PUBLISHED",
+                hasFullContent: true,
+                isDerivedContext: true,
+                snapshotMetadata: {
+                    schemaVersion: "project-context.v1",
+                    generatedFromFingerprint,
+                    publishedCorpusFingerprint: FINGERPRINT,
+                    generatedAt: "2026-08-25T21:06:00+07:00",
+                    approvedAt: "2026-08-25T15:07:25.664Z",
+                },
+            }],
+        };
+        const snapshotFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = new URL(
+                typeof input === "string"
+                    ? input
+                    : input instanceof URL
+                        ? input.href
+                        : input.url,
+            );
+            if (url.pathname.endsWith("/sources/read")) {
+                const request = JSON.parse(String(init?.body)) as { offset: number; limit: number };
+                const content = snapshotText.slice(request.offset, request.offset + request.limit);
+                return Response.json({
+                    schemaVersion: "ai-read-source-read.v1",
+                    project: snapshotPage.project,
+                    ref: { sourceKind: "project_context_snapshot", sourceId: snapshotSourceId },
+                    title: "Project Context Snapshot",
+                    metadata: {
+                        sourceKind: "project_context_snapshot",
+                        sourceId: snapshotSourceId,
+                        status: "PUBLISHED",
+                        sourceType: null,
+                        isDerivedContext: true,
+                    },
+                    content,
+                    chunk: {
+                        offset: request.offset,
+                        includedChars: content.length,
+                        totalCharacterCount: snapshotText.length,
+                        nextOffset: request.offset + content.length,
+                        hasMore: request.offset + content.length < snapshotText.length,
+                    },
+                });
+            }
+            return Response.json(snapshotPage);
+        }) as unknown as typeof fetch;
+
+        const response = await handleMcpRequest(mcpRequest({
+            jsonrpc: "2.0",
+            id: 41,
+            method: "tools/call",
+            params: {
+                name: "fetch",
+                arguments: {
+                    id: encodeSourceId("allowed-project", FINGERPRINT, {
+                        sourceKind: "project_context_snapshot",
+                        sourceId: snapshotSourceId,
+                    }),
+                },
+            },
+        }), { env, getKey, fetchFn: snapshotFetch });
+
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        const serialized = body.result.content[0].text as string;
+        const textIndex = serialized.indexOf('"text":');
+        expect(textIndex).toBeGreaterThan(-1);
+        expect(serialized.indexOf('"generatedFromFingerprint":')).toBeLessThan(textIndex);
+        expect(serialized.indexOf('"publishedCorpusFingerprint":')).toBeLessThan(textIndex);
+        expect(serialized.indexOf('"authorityClass":')).toBeLessThan(textIndex);
+        expect(JSON.parse(serialized)).toEqual(body.result.structuredContent);
+        expect(body.result.structuredContent).toMatchObject({
+            text: snapshotText,
+            metadata: {
+                isProjectManifest: false,
+                isCanonicalSource: false,
+                sourceKind: "project_context_snapshot",
+                sourceId: snapshotSourceId,
+                isDerivedContext: true,
+                generatedFromFingerprint,
+                publishedCorpusFingerprint: FINGERPRINT,
+                authorityClass: "DERIVED_WORKING_MEMORY",
+                snapshot: snapshotPage.sources[0].snapshotMetadata,
+            },
+        });
+        expect(body.result.structuredContent.metadata.controlArtifactType).toBeUndefined();
     });
 
     it("rejects malformed MCP JSON and remains stateless/retry-safe", async () => {

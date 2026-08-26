@@ -486,7 +486,7 @@ describe("READ1B — project_context_snapshot (CTX3-I2E)", () => {
     });
 
     it("fetches the snapshot via READ1 with exact body, derived semantics, and currentness metadata (I2E 12-14, 21-25)", async () => {
-        const snapshotText = "line one\nline two\nline three";
+        const snapshotText = `snapshot-start\n${"long snapshot line\n".repeat(2_000)}snapshot-end`;
         const idx = index([snapshotSource("snap-v1")]);
         const read1 = client(idx, snapshotText);
         const service = new ProjectMemoryService(read1, ["allowed-project"]);
@@ -501,6 +501,9 @@ describe("READ1B — project_context_snapshot (CTX3-I2E)", () => {
             sourceId: "snap-v1",
             isDerivedContext: true,
             isCanonicalSource: false,
+            generatedFromFingerprint: "b".repeat(64),
+            publishedCorpusFingerprint: FINGERPRINT,
+            authorityClass: "DERIVED_WORKING_MEMORY",
         });
         expect(output.metadata.snapshot).toMatchObject({
             schemaVersion: "project-context.v1",
@@ -509,6 +512,11 @@ describe("READ1B — project_context_snapshot (CTX3-I2E)", () => {
             generatedAt: "2026-08-20T00:00:00.000Z",
             approvedAt: "2026-08-20T00:00:00.000Z",
         });
+        const serialized = JSON.stringify(output);
+        const textIndex = serialized.indexOf('"text":');
+        expect(serialized.indexOf('"generatedFromFingerprint":')).toBeLessThan(textIndex);
+        expect(serialized.indexOf('"publishedCorpusFingerprint":')).toBeLessThan(textIndex);
+        expect(serialized.indexOf('"authorityClass":')).toBeLessThan(textIndex);
         expect(output.text).not.toContain(FINGERPRINT);
         expect(read1.readCompleteSource).toHaveBeenCalledWith(
             "allowed-project",
