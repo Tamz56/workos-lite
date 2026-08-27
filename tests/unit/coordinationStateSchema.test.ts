@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ensureCoordinationSchema } from "@/lib/coordination/schema";
 import {
     CoordinationLaneStateSchemaError,
+    ensureCoordinationLaneStateBindingColumns,
     ensureCoordinationLaneStateSchema,
     LANE_LIFECYCLE_SEMANTICS_STATUS,
 } from "@/lib/coordination/stateSchema";
@@ -58,9 +59,10 @@ describe("P1-G2A canonical Lane state history schema", () => {
         expect(LANE_LIFECYCLE_SEMANTICS_STATUS).toBe("UNKNOWN/NOT_PROVEN");
     });
 
-    it("provisions only the canonical durable history fields", () => {
+    it("provisions the canonical durable history fields plus approved binding columns", () => {
         const db = createTestDb();
         ensureCoordinationLaneStateSchema(db, () => undefined);
+        ensureCoordinationLaneStateBindingColumns(db, () => undefined);
 
         const columns = db.prepare("PRAGMA table_info(coordination_lane_state_history)").all() as Array<{ name: string }>;
         expect(columns.map((column) => column.name)).toEqual([
@@ -69,6 +71,13 @@ describe("P1-G2A canonical Lane state history schema", () => {
             "state",
             "recorded_at",
             "provenance",
+            "source_ref_kind",
+            "source_ref_id",
+            "evaluated_state_lane_id",
+            "evaluated_state_seq",
+            "evaluated_baseline_kind",
+            "evaluated_baseline_id",
+            "evaluated_baseline_fingerprint",
         ]);
     });
 
@@ -142,6 +151,54 @@ describe("P1-G2A canonical Lane state history schema", () => {
             "created_at",
             "updated_at",
         ]);
+    });
+
+    it("additive binding-column ensure is idempotent on a fresh schema", () => {
+        const db = createTestDb();
+        ensureCoordinationLaneStateSchema(db, () => undefined);
+        expect(ensureCoordinationLaneStateBindingColumns(db, () => undefined)).toHaveLength(0);
+        const columns = db.prepare("PRAGMA table_info(coordination_lane_state_history)").all() as Array<{ name: string }>;
+        expect(columns).toHaveLength(12);
+    });
+
+    it("T11 keeps an existing pre-G2B row valid when binding columns are added (no rewrite/backfill)", () => {
+        const db = createTestDb();
+        // createTestDb does not provision the history table; build the pre-G2B
+        // (core-columns-only) shape directly.
+        db.exec(`CREATE TABLE coordination_lane_state_history (
+            lane_id TEXT NOT NULL, seq INTEGER NOT NULL CHECK(seq > 0),
+            state TEXT NOT NULL CHECK(length(trim(state)) > 0),
+            recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+            provenance TEXT NOT NULL CHECK(length(trim(provenance)) > 0),
+            PRIMARY KEY (lane_id, seq),
+            FOREIGN KEY(lane_id) REFERENCES coordination_lanes(id) ON DELETE RESTRICT
+        );
+        CREATE TRIGGER trg_coordination_lane_state_history_append_only_update
+        BEFORE UPDATE ON coordination_lane_state_history
+        FOR EACH ROW BEGIN SELECT RAISE(ABORT, 'coordination Lane state history is append-only'); END;
+        CREATE TRIGGER trg_coordination_lane_state_history_append_only_delete
+        BEFORE DELETE ON coordination_lane_state_history
+        FOR EACH ROW BEGIN SELECT RAISE(ABORT, 'coordination Lane state history is append-only'); END;`);
+        seedProject(db, "project-1", "project-one");
+        insertLane(db, "lane-1", "project-1", "delivery", "Delivery");
+        db.prepare(`INSERT INTO coordination_lane_state_history (lane_id, seq, state, provenance) VALUES ('lane-1', 1, 'alpha', 'workos:human-1')`).run();
+
+        ensureCoordinationLaneStateSchema(db, () => undefined);
+        const added = ensureCoordinationLaneStateBindingColumns(db, () => undefined);
+        expect(added).toHaveLength(7);
+
+        const columns = db.prepare("PRAGMA table_info(coordination_lane_state_history)").all() as Array<{ name: string }>;
+        expect(columns).toHaveLength(12);
+        const row = db.prepare(
+            "SELECT lane_id, seq, state, provenance, source_ref_kind FROM coordination_lane_state_history WHERE lane_id = 'lane-1'",
+        ).get() as Record<string, unknown>;
+        expect(row).toEqual({
+            lane_id: "lane-1",
+            seq: 1,
+            state: "alpha",
+            provenance: "workos:human-1",
+            source_ref_kind: null,
+        });
     });
 
     it("keeps schema.sql aligned with the source-backed ensure path", () => {

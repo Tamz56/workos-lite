@@ -19,6 +19,7 @@ import {
     type ProjectContextSourceIndexEntry,
     type ProjectContextSourceIndexProject,
     type ProjectContextSourceKind,
+    type ProjectContextSourceRef,
 } from "./contracts";
 import { MAX_INDEX_ENTRIES_PER_KIND } from "./bounds";
 
@@ -471,4 +472,38 @@ export function collectCompleteProjectSourceEntries(
     );
 
     return { project, entries };
+}
+
+/**
+ * P1-G2B ownership seam — asserts the Project owns an existing source
+ * identified exactly by `ref`, WITHOUT Stage-B authority/admissibility
+ * semantics (does not reject derived sources; does not classify authority).
+ *
+ * Membership is decided against the complete Project Context enumeration, so
+ * every established `ProjectContextSourceKind` follows its existing identity
+ * semantics (e.g. `project_metadata` → project id; `project_context_snapshot` →
+ * current published version id). Unknown kinds and sources not owned by the
+ * Project fail visibly.
+ */
+export function assertProjectOwnsSource(
+    db: Database.Database,
+    projectId: string,
+    ref: ProjectContextSourceRef,
+): void {
+    if (!PROJECT_CONTEXT_KIND_ORDER.includes(ref.sourceKind)) {
+        throw new ProjectContextCuratorError(
+            "UNSUPPORTED_SOURCE_KIND",
+            `Unsupported source kind: ${ref.sourceKind}`,
+        );
+    }
+    const { entries } = collectCompleteProjectSourceEntries(db, projectId);
+    const owned = entries.some(
+        (entry) => entry.sourceKind === ref.sourceKind && entry.sourceId === ref.sourceId,
+    );
+    if (!owned) {
+        throw new ProjectContextCuratorError(
+            "UNKNOWN_SOURCE",
+            `Source ${ref.sourceKind}:${ref.sourceId} is not owned by project ${projectId}`,
+        );
+    }
 }

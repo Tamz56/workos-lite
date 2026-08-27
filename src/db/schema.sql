@@ -200,6 +200,13 @@ CREATE TABLE IF NOT EXISTS coordination_lane_state_history (
   state TEXT NOT NULL CHECK(length(trim(state)) > 0),
   recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
   provenance TEXT NOT NULL CHECK(length(trim(provenance)) > 0),
+  source_ref_kind TEXT NULL,
+  source_ref_id TEXT NULL,
+  evaluated_state_lane_id TEXT NULL,
+  evaluated_state_seq INTEGER NULL,
+  evaluated_baseline_kind TEXT NULL,
+  evaluated_baseline_id TEXT NULL,
+  evaluated_baseline_fingerprint TEXT NULL,
   PRIMARY KEY (lane_id, seq),
   FOREIGN KEY(lane_id) REFERENCES coordination_lanes(id) ON DELETE RESTRICT
 );

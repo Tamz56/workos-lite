@@ -13,6 +13,15 @@
 // ---------------------------------------------------------------------------
 
 import type Database from "better-sqlite3";
+import { assertProjectOwnsSource } from "@/lib/project-curator/knowledgeIndex";
+import {
+    CoordinationBindingError,
+    reconstructCoordinationLaneStateBinding,
+    toPersistedBindingRow,
+    validateCoordinationLaneStateBinding,
+    type CoordinationLaneStateBinding,
+    type PersistedBindingRow,
+} from "./binding";
 
 export type LaneStateRecord = {
     laneId: string;
@@ -26,6 +35,7 @@ export type NewLaneState = {
     laneId: string;
     state: string;
     provenance: string;
+    binding?: CoordinationLaneStateBinding;
 };
 
 export const COORDINATION_LANE_NOT_FOUND = "COORDINATION_LANE_NOT_FOUND" as const;
@@ -50,11 +60,44 @@ export function appendLaneState(
     db: Database.Database,
     input: NewLaneState,
 ): LaneStateRecord {
-    const { laneId, state, provenance } = input;
+    const { laneId, state, provenance, binding } = input;
 
     const run = db.transaction((): LaneStateRecord => {
         if (!laneStateExists(db, laneId)) {
             throw new CoordinationLaneNotFoundError(laneId);
+        }
+
+        if (binding !== undefined) {
+            validateCoordinationLaneStateBinding(binding);
+        }
+
+        if (binding?.evaluatedStateRef) {
+            const ref = binding.evaluatedStateRef;
+            if (ref.laneId !== laneId) {
+                throw new CoordinationBindingError(
+                    `evaluatedStateRef.laneId ${ref.laneId} does not match lane ${laneId}`,
+                );
+            }
+            const exists = db
+                .prepare(
+                    `SELECT 1 FROM coordination_lane_state_history WHERE lane_id = ? AND seq = ?`,
+                )
+                .get(ref.laneId, ref.seq);
+            if (exists === undefined) {
+                throw new CoordinationBindingError(
+                    `evaluated state record (${ref.laneId}, ${ref.seq}) does not exist`,
+                );
+            }
+        }
+
+        if (binding?.sourceRef) {
+            const laneRow = db
+                .prepare("SELECT project_id FROM coordination_lanes WHERE id = ?")
+                .get(laneId) as { project_id: string } | undefined;
+            if (!laneRow) {
+                throw new CoordinationLaneNotFoundError(laneId);
+            }
+            assertProjectOwnsSource(db, laneRow.project_id, binding.sourceRef);
         }
 
         const { next } = db
@@ -65,10 +108,27 @@ export function appendLaneState(
             )
             .get(laneId) as { next: number };
 
+        const persisted = toPersistedBindingRow(binding);
         db.prepare(
-            `INSERT INTO coordination_lane_state_history (lane_id, seq, state, provenance)
-             VALUES (?, ?, ?, ?)`,
-        ).run(laneId, next, state, provenance);
+            `INSERT INTO coordination_lane_state_history (
+                 lane_id, seq, state, provenance,
+                 source_ref_kind, source_ref_id,
+                 evaluated_state_lane_id, evaluated_state_seq,
+                 evaluated_baseline_kind, evaluated_baseline_id, evaluated_baseline_fingerprint
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+            laneId,
+            next,
+            state,
+            provenance,
+            persisted.source_ref_kind,
+            persisted.source_ref_id,
+            persisted.evaluated_state_lane_id,
+            persisted.evaluated_state_seq,
+            persisted.evaluated_baseline_kind,
+            persisted.evaluated_baseline_id,
+            persisted.evaluated_baseline_fingerprint,
+        );
 
         const row = db
             .prepare(
@@ -112,4 +172,27 @@ export function resolveLaneStateHistory(
              ORDER BY seq ASC`,
         )
         .all(laneId) as LaneStateRecord[];
+}
+
+/**
+ * P1-G2B — deterministic binding read for round-trip/recovery. Applies the
+ * approved persisted reconstruction rules and fails visibly on malformed
+ * partial data. Returns null when the record or its binding is absent.
+ */
+export function resolveLaneStateBinding(
+    db: Database.Database,
+    laneId: string,
+    seq: number,
+): CoordinationLaneStateBinding | null {
+    const row = db
+        .prepare(
+            `SELECT source_ref_kind, source_ref_id,
+                    evaluated_state_lane_id, evaluated_state_seq,
+                    evaluated_baseline_kind, evaluated_baseline_id, evaluated_baseline_fingerprint
+             FROM coordination_lane_state_history
+             WHERE lane_id = ? AND seq = ?`,
+        )
+        .get(laneId, seq) as PersistedBindingRow | undefined;
+    if (!row) return null;
+    return reconstructCoordinationLaneStateBinding(row);
 }

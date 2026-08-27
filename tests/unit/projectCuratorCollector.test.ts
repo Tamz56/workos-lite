@@ -11,6 +11,7 @@ import {
     DEFAULT_CURATOR_LIMITS,
     TRUNCATION_SUFFIX,
 } from "@/lib/project-curator";
+import { assertProjectOwnsSource } from "@/lib/project-curator/knowledgeIndex";
 
 const NOW = "2026-08-22T00:00:00.000Z";
 
@@ -486,6 +487,96 @@ describe("Project Context Curator (CTX2-R1) — bundle + safety", () => {
             loop: 1,
             project_metadata: 1,
         });
+        db.close();
+    });
+});
+
+describe("P1-G2B assertProjectOwnsSource ownership seam", () => {
+    it("T8 fails visibly for an unknown sourceKind", () => {
+        const db = createCuratorTestDb();
+        seedFixture(db);
+        expect(() =>
+            assertProjectOwnsSource(db, "proj-1", { sourceKind: "bogus" as never, sourceId: "x" }),
+        ).toThrowError(
+            expect.objectContaining<ProjectContextCuratorError>({ code: "UNSUPPORTED_SOURCE_KIND" }),
+        );
+        db.close();
+    });
+
+    it("T15 accepts sources owned by the Project (doc, project_metadata)", () => {
+        const db = createCuratorTestDb();
+        seedFixture(db);
+        expect(() =>
+            assertProjectOwnsSource(db, "proj-1", { sourceKind: "doc", sourceId: "doc-1" }),
+        ).not.toThrow();
+        expect(() =>
+            assertProjectOwnsSource(db, "proj-1", { sourceKind: "project_metadata", sourceId: "proj-1" }),
+        ).not.toThrow();
+        db.close();
+    });
+
+    it("T16 fails visibly when the source belongs to another Project", () => {
+        const db = createCuratorTestDb();
+        seedFixture(db);
+        expect(() =>
+            assertProjectOwnsSource(db, "proj-1", { sourceKind: "doc", sourceId: "doc-x" }),
+        ).toThrowError(
+            expect.objectContaining<ProjectContextCuratorError>({ code: "UNKNOWN_SOURCE" }),
+        );
+        db.close();
+    });
+
+    it("T17 fails visibly for a known kind with a nonexistent sourceId", () => {
+        const db = createCuratorTestDb();
+        seedFixture(db);
+        expect(() =>
+            assertProjectOwnsSource(db, "proj-1", { sourceKind: "doc", sourceId: "doc-missing" }),
+        ).toThrowError(
+            expect.objectContaining<ProjectContextCuratorError>({ code: "UNKNOWN_SOURCE" }),
+        );
+        db.close();
+    });
+
+    it("T19 does not import Stage-B admissibility (derived-title doc_block accepted)", () => {
+        const db = createCuratorTestDb();
+        seedFixture(db);
+        // db-3 carries DERIVED_CONTEXT_TITLE; Stage-B validateRef would reject it,
+        // the ownership seam must NOT.
+        expect(() =>
+            assertProjectOwnsSource(db, "proj-1", { sourceKind: "doc_block", sourceId: "db-3" }),
+        ).not.toThrow();
+        db.close();
+    });
+
+    it("T18 accepts a valid enumerated project_context_snapshot even though derived", () => {
+        const db = createCuratorTestDb();
+        seedFixture(db);
+        db.exec(`
+            CREATE TABLE project_context_snapshots (
+              id TEXT PRIMARY KEY, project_id TEXT NOT NULL UNIQUE, current_version_id TEXT NULL, created_at TEXT
+            );
+            CREATE TABLE project_context_snapshot_versions (
+              id TEXT PRIMARY KEY, snapshot_id TEXT NOT NULL, schema_version TEXT NOT NULL,
+              project_slug TEXT NOT NULL, generated_from_fingerprint TEXT NOT NULL,
+              published_corpus_fingerprint TEXT NULL, coverage_json TEXT NOT NULL,
+              synthesis_json TEXT NOT NULL, rendered_markdown TEXT NOT NULL,
+              generated_at TEXT NOT NULL, approved_at TEXT NULL, approved_by TEXT NULL,
+              publication_state TEXT NOT NULL
+            );
+        `);
+        db.prepare(
+            `INSERT INTO project_context_snapshots (id, project_id, current_version_id) VALUES ('snap-1', 'proj-1', 'ver-1')`,
+        ).run();
+        db.prepare(
+            `INSERT INTO project_context_snapshot_versions (
+              id, snapshot_id, schema_version, project_slug, generated_from_fingerprint,
+              published_corpus_fingerprint, coverage_json, synthesis_json, rendered_markdown,
+              generated_at, approved_at, approved_by, publication_state
+            ) VALUES ('ver-1', 'snap-1', 'project-context.v1', 'proj-1', ?, NULL, '{}', '{}', 'markdown body', '2026-07-01T00:00:00.000Z', '2026-07-02T00:00:00.000Z', 'human-1', 'PUBLISHED')`,
+        ).run("a".repeat(64));
+        expect(() =>
+            assertProjectOwnsSource(db, "proj-1", { sourceKind: "project_context_snapshot", sourceId: "ver-1" }),
+        ).not.toThrow();
         db.close();
     });
 });
