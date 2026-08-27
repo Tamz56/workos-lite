@@ -154,6 +154,70 @@ END;
 
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 
+-- Canonical Coordination Lanes (P1-G1A identity/persistence only)
+CREATE TABLE IF NOT EXISTS coordination_lanes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  lane_key TEXT NOT NULL CHECK(
+    length(trim(lane_key)) > 0
+    AND lane_key = lower(lane_key)
+    AND lane_key NOT GLOB '*[^a-z0-9-]*'
+    AND lane_key NOT LIKE '-%'
+    AND lane_key NOT LIKE '%-'
+    AND lane_key NOT LIKE '%--%'
+  ),
+  name TEXT NOT NULL CHECK(length(trim(name)) > 0),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(project_id, lane_key),
+  FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_coordination_lanes_project
+ON coordination_lanes(project_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_lanes_identity_immutable
+BEFORE UPDATE OF id, project_id, lane_key ON coordination_lanes
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination Lane identity is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_lanes_updated_at
+AFTER UPDATE ON coordination_lanes
+FOR EACH ROW
+WHEN NEW.updated_at = OLD.updated_at OR NEW.updated_at IS OLD.updated_at
+BEGIN
+  UPDATE coordination_lanes SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+-- Canonical Coordination Lane state history (P1-G2A current-state lifecycle foundation)
+-- Durable, append-only. Current Lane state is DERIVED (highest seq); never materialized.
+-- Approved Lane lifecycle state vocabulary/transitions = UNKNOWN/NOT_PROVEN (not invented).
+CREATE TABLE IF NOT EXISTS coordination_lane_state_history (
+  lane_id TEXT NOT NULL,
+  seq INTEGER NOT NULL CHECK(seq > 0),
+  state TEXT NOT NULL CHECK(length(trim(state)) > 0),
+  recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+  provenance TEXT NOT NULL CHECK(length(trim(provenance)) > 0),
+  PRIMARY KEY (lane_id, seq),
+  FOREIGN KEY(lane_id) REFERENCES coordination_lanes(id) ON DELETE RESTRICT
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_lane_state_history_append_only_update
+BEFORE UPDATE ON coordination_lane_state_history
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination Lane state history is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_lane_state_history_append_only_delete
+BEFORE DELETE ON coordination_lane_state_history
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination Lane state history is append-only');
+END;
+
 -- Human-authored Project Context Configuration
 CREATE TABLE IF NOT EXISTS project_contexts (
   id TEXT PRIMARY KEY,
