@@ -14,6 +14,7 @@ import { ensureProjectContextSnapshotSchema } from "@/lib/project-context-snapsh
 import { ensureCoordinationSchema } from "@/lib/coordination/schema";
 import { ensureCoordinationLaneStateSchema, ensureCoordinationLaneStateBindingColumns } from "@/lib/coordination/stateSchema";
 import { ensureCoordinationDependencySchema } from "@/lib/coordination/dependencySchema";
+import { ensureCoordinationConditionSchema } from "@/lib/coordination/conditionSchema";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -795,6 +796,7 @@ ensureCoordinationSchema(db);
 ensureCoordinationLaneStateSchema(db);
 ensureCoordinationLaneStateBindingColumns(db);
 ensureCoordinationDependencySchema(db);
+ensureCoordinationConditionSchema(db);
 ensureOperationsSchema(db);
 ensureApprovalsSchema(db);
 ensureExecutionSchema(db);

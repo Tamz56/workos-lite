@@ -282,6 +282,70 @@ BEGIN
   SELECT RAISE(ABORT, 'coordination dependency history is append-only');
 END;
 
+-- Canonical Coordination conditions (P2-G4B identity + lifecycle history foundation)
+-- First-class coordination signals (blocker | waiting | attention). Identity is
+-- immutable; authoritative lifecycle state is append-only history (active | cleared).
+-- When dependency_id is present the condition Lane MUST be the source Lane of the
+-- referenced Directional Dependency (endpoint rule; same Project follows from the
+-- Dependency's own F1 invariant).
+CREATE TABLE IF NOT EXISTS coordination_conditions (
+  id TEXT PRIMARY KEY CHECK(length(trim(id)) > 0),
+  lane_id TEXT NOT NULL CHECK(length(trim(lane_id)) > 0),
+  signal_kind TEXT NOT NULL CHECK(
+    length(trim(signal_kind)) > 0
+    AND signal_kind IN ('blocker','waiting','attention')
+  ),
+  dependency_id TEXT NULL,
+  reason TEXT NOT NULL CHECK(length(trim(reason)) > 0),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(lane_id) REFERENCES coordination_lanes(id) ON DELETE RESTRICT,
+  FOREIGN KEY(dependency_id) REFERENCES coordination_dependencies(id) ON DELETE RESTRICT
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_conditions_identity_immutable
+BEFORE UPDATE OF id, lane_id, signal_kind, dependency_id, reason ON coordination_conditions
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination condition identity is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_conditions_dependency_endpoint
+BEFORE INSERT ON coordination_conditions
+FOR EACH ROW
+WHEN NEW.dependency_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1
+  FROM coordination_dependencies
+  WHERE id = NEW.dependency_id
+    AND source_lane_id = NEW.lane_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'coordination condition Lane must be the source Lane of the referenced Dependency');
+END;
+
+CREATE TABLE IF NOT EXISTS coordination_condition_history (
+  condition_id TEXT NOT NULL,
+  seq INTEGER NOT NULL CHECK(seq > 0),
+  state TEXT NOT NULL CHECK(length(trim(state)) > 0 AND state IN ('active','cleared')),
+  recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+  provenance TEXT NOT NULL CHECK(length(trim(provenance)) > 0),
+  PRIMARY KEY (condition_id, seq),
+  FOREIGN KEY(condition_id) REFERENCES coordination_conditions(id) ON DELETE RESTRICT
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_condition_history_append_only_update
+BEFORE UPDATE ON coordination_condition_history
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination condition history is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_condition_history_append_only_delete
+BEFORE DELETE ON coordination_condition_history
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination condition history is append-only');
+END;
+
 -- Human-authored Project Context Configuration
 CREATE TABLE IF NOT EXISTS project_contexts (
   id TEXT PRIMARY KEY,
