@@ -225,6 +225,63 @@ BEGIN
   SELECT RAISE(ABORT, 'coordination Lane state history is append-only');
 END;
 
+-- Canonical Coordination Lane dependencies (P2-G3B identity + history foundation)
+-- Directional Lane-only identity; authoritative state is append-only history.
+CREATE TABLE IF NOT EXISTS coordination_dependencies (
+  id TEXT PRIMARY KEY CHECK(length(trim(id)) > 0),
+  source_lane_id TEXT NOT NULL CHECK(length(trim(source_lane_id)) > 0),
+  target_lane_id TEXT NOT NULL CHECK(length(trim(target_lane_id)) > 0),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(source_lane_id) REFERENCES coordination_lanes(id) ON DELETE RESTRICT,
+  FOREIGN KEY(target_lane_id) REFERENCES coordination_lanes(id) ON DELETE RESTRICT
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_dependencies_identity_immutable
+BEFORE UPDATE OF id, source_lane_id, target_lane_id ON coordination_dependencies
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination dependency identity is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_dependencies_same_project
+BEFORE INSERT ON coordination_dependencies
+FOR EACH ROW
+WHEN NOT EXISTS (
+  SELECT 1
+  FROM coordination_lanes AS source_lane
+  JOIN coordination_lanes AS target_lane
+    ON target_lane.project_id = source_lane.project_id
+  WHERE source_lane.id = NEW.source_lane_id
+    AND target_lane.id = NEW.target_lane_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'coordination dependency endpoints must be existing Lanes in the same Project');
+END;
+
+CREATE TABLE IF NOT EXISTS coordination_dependency_history (
+  dependency_id TEXT NOT NULL,
+  seq INTEGER NOT NULL CHECK(seq > 0),
+  state TEXT NOT NULL CHECK(length(trim(state)) > 0),
+  recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+  provenance TEXT NOT NULL CHECK(length(trim(provenance)) > 0),
+  PRIMARY KEY (dependency_id, seq),
+  FOREIGN KEY(dependency_id) REFERENCES coordination_dependencies(id) ON DELETE RESTRICT
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_dependency_history_append_only_update
+BEFORE UPDATE ON coordination_dependency_history
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination dependency history is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_coordination_dependency_history_append_only_delete
+BEFORE DELETE ON coordination_dependency_history
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'coordination dependency history is append-only');
+END;
+
 -- Human-authored Project Context Configuration
 CREATE TABLE IF NOT EXISTS project_contexts (
   id TEXT PRIMARY KEY,

@@ -13,6 +13,7 @@ import { seedStorySetsWithoutDuplicates } from "@/db/storySetSeed";
 import { ensureProjectContextSnapshotSchema } from "@/lib/project-context-snapshots/schema";
 import { ensureCoordinationSchema } from "@/lib/coordination/schema";
 import { ensureCoordinationLaneStateSchema, ensureCoordinationLaneStateBindingColumns } from "@/lib/coordination/stateSchema";
+import { ensureCoordinationDependencySchema } from "@/lib/coordination/dependencySchema";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -793,6 +794,7 @@ ensureProjectContextSnapshotSchema(db);
 ensureCoordinationSchema(db);
 ensureCoordinationLaneStateSchema(db);
 ensureCoordinationLaneStateBindingColumns(db);
+ensureCoordinationDependencySchema(db);
 ensureOperationsSchema(db);
 ensureApprovalsSchema(db);
 ensureExecutionSchema(db);
