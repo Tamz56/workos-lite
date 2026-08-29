@@ -1,6 +1,10 @@
+import Database from "better-sqlite3";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { handleMcpRequest } from "@/app/mcp/route";
+import { createInitialLaneCheckpoint } from "@/lib/coordination/checkpoint";
+import { ensureCoordinationCheckpointSchema } from "@/lib/coordination/checkpointSchema";
+import { ensureCoordinationSchema } from "@/lib/coordination/schema";
 import { MCP_REQUIRED_SCOPE, MCP_RESOURCE_URL } from "@/lib/mcp/config";
 import { encodeManifestId, encodeSourceId } from "@/lib/mcp/resultIds";
 
@@ -9,6 +13,7 @@ const FINGERPRINT = "d".repeat(64);
 let privateKey: CryptoKey;
 let getKey: ReturnType<typeof createLocalJWKSet>;
 let bearer: string;
+let routeDb: Database.Database;
 
 const env: NodeJS.ProcessEnv = {
     NODE_ENV: "test",
@@ -92,7 +97,7 @@ async function invoke(
         origin?: string;
     },
 ) {
-    return handleMcpRequest(mcpRequest(body, options), { env, getKey, fetchFn });
+    return handleMcpRequest(mcpRequest(body, options), { env, getKey, fetchFn, db: routeDb });
 }
 
 beforeAll(async () => {
@@ -111,6 +116,33 @@ beforeAll(async () => {
         .setIssuedAt(now)
         .setExpirationTime(now + 300)
         .sign(privateKey);
+
+    routeDb = new Database(":memory:");
+    routeDb.pragma("foreign_keys = ON");
+    routeDb.exec("CREATE TABLE projects (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE)");
+    ensureCoordinationSchema(routeDb, () => undefined);
+    ensureCoordinationCheckpointSchema(routeDb, () => undefined);
+    routeDb.exec(`
+        INSERT INTO projects (id, slug) VALUES ('project-1', 'allowed-project');
+        INSERT INTO coordination_lanes (id, project_id, lane_key, name)
+        VALUES ('lane-a', 'project-1', 'main', 'Main');
+    `);
+    createInitialLaneCheckpoint(routeDb, {
+        id: "cp-1",
+        laneId: "lane-a",
+        continuity: {
+            blocker: null,
+            cross_lane_pending: [],
+            do_not_reopen: ["P2-G6B"],
+            next_exact_action: "continue",
+        },
+        openItems: [],
+        provenance: "route-test",
+    });
+});
+
+afterAll(() => {
+    routeDb.close();
 });
 
 describe("READ1B Next.js Streamable HTTP route", () => {
@@ -131,11 +163,18 @@ describe("READ1B Next.js Streamable HTTP route", () => {
         expect(body.result.instructions).toContain("read-only");
     });
 
-    it("advertises exactly search/fetch with schemas, annotations and OAuth security schemes", async () => {
+    it("advertises Project Memory plus four Coordination read tools with OAuth security schemes", async () => {
         const response = await invoke({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
         expect(response.status).toBe(200);
         const body = await response.json();
-        expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(["search", "fetch"]);
+        expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+            "search",
+            "fetch",
+            "coordination_checkpoint_lookup",
+            "coordination_checkpoint_history",
+            "coordination_checkpoint_current",
+            "coordination_checkpoint_resume",
+        ]);
         for (const tool of body.result.tools) {
             expect(tool.inputSchema.type).toBe("object");
             expect(tool.outputSchema.type).toBe("object");
@@ -295,6 +334,109 @@ describe("READ1B Next.js Streamable HTTP route", () => {
             },
         });
         expect(body.result.structuredContent.metadata.controlArtifactType).toBeUndefined();
+    });
+
+
+    it("invokes all four Coordination operations through the real MCP transport", async () => {
+        const calls = [
+            {
+                name: "coordination_checkpoint_lookup",
+                arguments: {
+                    projectSlug: "allowed-project",
+                    laneKey: "main",
+                    selector: { by: "seq", seq: 1 },
+                },
+                status: "FOUND",
+                authorityClass: "HISTORICAL_ONLY",
+            },
+            {
+                name: "coordination_checkpoint_history",
+                arguments: { projectSlug: "allowed-project", laneKey: "main" },
+                status: "HISTORY",
+                authorityClass: "HISTORICAL_ONLY",
+            },
+            {
+                name: "coordination_checkpoint_current",
+                arguments: { projectSlug: "allowed-project", laneKey: "main" },
+                status: "CURRENT",
+                authorityClass: "CURRENT",
+            },
+            {
+                name: "coordination_checkpoint_resume",
+                arguments: { projectSlug: "allowed-project", laneKey: "main" },
+                status: "RESUMED",
+                authorityClass: "AUTHORITATIVE_RESUME",
+            },
+        ];
+
+        for (const [offset, call] of calls.entries()) {
+            const response = await invoke({
+                jsonrpc: "2.0",
+                id: 50 + offset,
+                method: "tools/call",
+                params: { name: call.name, arguments: call.arguments },
+            });
+            expect(response.status).toBe(200);
+            const body = await response.json();
+            expect(body.result.isError).not.toBe(true);
+            expect(body.result.structuredContent).toMatchObject({
+                status: call.status,
+                authorityClass: call.authorityClass,
+                identity: {
+                    projectSlug: "allowed-project",
+                    laneKey: "main",
+                    laneId: "lane-a",
+                },
+            });
+            expect(JSON.parse(body.result.content[0].text)).toEqual(body.result.structuredContent);
+        }
+    });
+
+    it("enforces the MCP project allowlist before Coordination project resolution", async () => {
+        const response = await invoke({
+            jsonrpc: "2.0",
+            id: 60,
+            method: "tools/call",
+            params: {
+                name: "coordination_checkpoint_current",
+                arguments: { projectSlug: "blocked-project", laneKey: "main" },
+            },
+        });
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.result.isError).toBe(true);
+        expect(body.result.structuredContent).toEqual({
+            error: expect.objectContaining({ code: "PROJECT_NOT_ALLOWED" }),
+        });
+    });
+
+    it("proves Project Memory and Coordination reads coexist in one stateless MCP runtime", async () => {
+        const sequence = [
+            { name: "search", arguments: { query: "allowed-project" } },
+            { name: "coordination_checkpoint_current", arguments: { projectSlug: "allowed-project", laneKey: "main" } },
+            { name: "fetch", arguments: { id: encodeManifestId("allowed-project", FINGERPRINT) } },
+            { name: "coordination_checkpoint_resume", arguments: { projectSlug: "allowed-project", laneKey: "main" } },
+        ];
+        const checkpointCountBefore = (routeDb.prepare(
+            "SELECT COUNT(*) AS count FROM coordination_lane_checkpoints",
+        ).get() as { count: number }).count;
+
+        for (const [offset, call] of sequence.entries()) {
+            const response = await invoke({
+                jsonrpc: "2.0",
+                id: 70 + offset,
+                method: "tools/call",
+                params: call,
+            });
+            expect(response.status).toBe(200);
+            const body = await response.json();
+            expect(body.result.isError).not.toBe(true);
+        }
+
+        const checkpointCountAfter = (routeDb.prepare(
+            "SELECT COUNT(*) AS count FROM coordination_lane_checkpoints",
+        ).get() as { count: number }).count;
+        expect(checkpointCountAfter).toBe(checkpointCountBefore);
     });
 
     it("rejects malformed MCP JSON and remains stateless/retry-safe", async () => {

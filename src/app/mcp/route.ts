@@ -1,6 +1,9 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import type Database from "better-sqlite3";
 import type { JWTVerifyGetKey } from "jose";
+import { CoordinationReadAdapter } from "@/lib/coordination/readAdapter";
 import { getAllowedProjectSlugs } from "@/lib/mcp/config";
+import { createCoordinationReadToolset } from "@/lib/mcp/coordinationReadTools";
 import { oauthErrorResponse, verifyBearerRequest } from "@/lib/mcp/oauthResourceServer";
 import { createProjectMemoryServer } from "@/lib/mcp/projectMemoryServer";
 import { ProjectMemoryService } from "@/lib/mcp/projectMemoryService";
@@ -13,6 +16,7 @@ interface McpRouteDependencies {
     env?: NodeJS.ProcessEnv;
     fetchFn?: typeof fetch;
     getKey?: JWTVerifyGetKey;
+    db?: Database.Database;
 }
 
 export async function handleMcpRequest(
@@ -28,9 +32,15 @@ export async function handleMcpRequest(
     }
 
     try {
+        const allowedProjectSlugs = getAllowedProjectSlugs(env);
         const read1 = createRead1Client(env, dependencies.fetchFn ?? fetch);
-        const service = new ProjectMemoryService(read1, getAllowedProjectSlugs(env));
-        const server = createProjectMemoryServer(service);
+        const service = new ProjectMemoryService(read1, allowedProjectSlugs);
+        const coordinationDb = dependencies.db ?? (await import("@/db/db")).getDb();
+        const coordinationTools = createCoordinationReadToolset(
+            new CoordinationReadAdapter(coordinationDb),
+            allowedProjectSlugs,
+        );
+        const server = createProjectMemoryServer(service, coordinationTools);
         const transport = new WebStandardStreamableHTTPServerTransport({
             sessionIdGenerator: undefined,
             enableJsonResponse: true,

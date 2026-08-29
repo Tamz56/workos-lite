@@ -9,6 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { MCP_REQUIRED_SCOPE, MCP_RESOURCE_METADATA_URL } from "./config";
+import type { CoordinationReadToolset } from "./coordinationReadTools";
 import { safeMcpError } from "./errors";
 import type { FetchOutput, ProjectMemoryService, SearchOutput } from "./projectMemoryService";
 
@@ -22,6 +23,8 @@ const SERVER_INSTRUCTIONS = [
     "Fetch canonical source result IDs separately to read source bodies.",
     "Never claim complete Project coverage unless every manifest source was fetched completely and the manifest fingerprint is unchanged.",
     "Attachments are unsupported in v1.",
+    "Coordination checkpoint lookup/history are historical-only and never assert CURRENT.",
+    "Only Coordination current resolution may assert CURRENT, and Coordination resume is validated-current-only.",
 ].join(" ");
 
 const searchInput = z.object({ query: z.string().max(500) }).strict();
@@ -131,14 +134,17 @@ function errorResult(error: unknown): CallToolResult {
     };
 }
 
-export function createProjectMemoryServer(service: ProjectMemoryService): Server {
+export function createProjectMemoryServer(
+    service: ProjectMemoryService,
+    coordinationTools?: CoordinationReadToolset,
+): Server {
     const server = new Server(
         { name: PROJECT_MEMORY_SERVER_NAME, version: PROJECT_MEMORY_SERVER_VERSION },
         { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS },
     );
 
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-        tools: PROJECT_MEMORY_TOOLS,
+        tools: [...PROJECT_MEMORY_TOOLS, ...(coordinationTools?.tools ?? [])],
     } as unknown as ListToolsResult));
 
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
@@ -152,6 +158,9 @@ export function createProjectMemoryServer(service: ProjectMemoryService): Server
             if (request.params.name === "fetch") {
                 const input = fetchInput.parse(request.params.arguments ?? {});
                 return successResult(await service.fetch(input.id));
+            }
+            if (coordinationTools?.handles(request.params.name)) {
+                return coordinationTools.call(request.params.name, request.params.arguments ?? {});
             }
             return errorResult(new Error("Unknown tool"));
         } catch (error) {
