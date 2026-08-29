@@ -16,6 +16,7 @@ import { ensureCoordinationLaneStateSchema, ensureCoordinationLaneStateBindingCo
 import { ensureCoordinationDependencySchema } from "@/lib/coordination/dependencySchema";
 import { ensureCoordinationConditionSchema } from "@/lib/coordination/conditionSchema";
 import { ensureCoordinationCrossLaneSchema } from "@/lib/coordination/crossLaneSchema";
+import { ensureCoordinationCheckpointSchema } from "@/lib/coordination/checkpointSchema";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -799,6 +800,7 @@ ensureCoordinationLaneStateBindingColumns(db);
 ensureCoordinationDependencySchema(db);
 ensureCoordinationConditionSchema(db);
 ensureCoordinationCrossLaneSchema(db);
+ensureCoordinationCheckpointSchema(db);
 ensureOperationsSchema(db);
 ensureApprovalsSchema(db);
 ensureExecutionSchema(db);
