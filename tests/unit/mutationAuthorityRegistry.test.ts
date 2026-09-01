@@ -12,6 +12,11 @@ const API_ROOT = path.resolve(__dirname, "../../src/app/api");
 const SRC_ROOT = path.resolve(__dirname, "../../src");
 
 describe("mutation authority registry coverage", () => {
+    it("classifies the CP-P2-C initial checkpoint writer as an H1 Human mutation", () => {
+        expect(MUTATION_AUTHORITY_REGISTRY["POST api/human/coordination/checkpoints/initial"])
+            .toBe("H1_HUMAN");
+    });
+
     it("classifies every mutation handler in src/app/api", () => {
         const scannedKeys = new Set<string>();
 

@@ -7,6 +7,12 @@ import {
     resumeLaneFromValidatedCurrentCheckpoint,
     type CheckpointLookupSelector,
 } from "./checkpointService";
+import {
+    COORDINATION_LANE_KEY,
+    COORDINATION_PROJECT_SLUG,
+    CoordinationLaneResolutionError,
+    resolveCoordinationProjectLane,
+} from "./laneResolver";
 
 export const COORDINATION_READ_SCHEMA_VERSION = "coordination-read.v1" as const;
 
@@ -67,19 +73,11 @@ export interface CoordinationReadResult {
     detail?: string;
 }
 
-type ResolvedLane = {
-    projectId: string;
-    projectSlug: string;
-    laneId: string;
-    laneKey: string;
-};
+type ResolvedLane = ReturnType<typeof resolveCoordinationProjectLane>;
 
 type LaneResolution =
     | { lane: ResolvedLane }
     | { result: CoordinationReadResult };
-
-const PROJECT_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const LANE_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function detailFromError(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
@@ -372,7 +370,7 @@ export class CoordinationReadAdapter {
         projectSlug: string,
         laneKey: string,
     ): CoordinationReadResult | undefined {
-        if (!PROJECT_SLUG.test(projectSlug)) {
+        if (!COORDINATION_PROJECT_SLUG.test(projectSlug)) {
             return this.result(
                 operation,
                 "INVALID_ARGUMENT",
@@ -384,7 +382,7 @@ export class CoordinationReadAdapter {
                 "projectSlug must be a canonical lowercase slug",
             );
         }
-        if (!LANE_KEY.test(laneKey)) {
+        if (!COORDINATION_LANE_KEY.test(laneKey)) {
             return this.result(
                 operation,
                 "INVALID_ARGUMENT",
@@ -452,47 +450,27 @@ export class CoordinationReadAdapter {
         laneKey: string,
     ): LaneResolution {
         try {
-            const project = this.db.prepare(
-                "SELECT id, slug FROM projects WHERE slug = ?",
-            ).get(projectSlug) as { id: string; slug: string } | undefined;
-            if (!project) {
-                return {
-                    result: this.result(
-                        operation,
-                        "PROJECT_NOT_FOUND",
-                        "NONE",
-                        projectSlug,
-                        laneKey,
-                        null,
-                    ),
-                };
-            }
-            const lane = this.db.prepare(
-                `SELECT id, lane_key
-                 FROM coordination_lanes
-                 WHERE project_id = ? AND lane_key = ?`,
-            ).get(project.id, laneKey) as { id: string; lane_key: string } | undefined;
-            if (!lane) {
-                return {
-                    result: this.result(
-                        operation,
-                        "LANE_NOT_FOUND",
-                        "NONE",
-                        projectSlug,
-                        laneKey,
-                        null,
-                    ),
-                };
-            }
-            return {
-                lane: {
-                    projectId: project.id,
-                    projectSlug: project.slug,
-                    laneId: lane.id,
-                    laneKey: lane.lane_key,
-                },
-            };
+            return { lane: resolveCoordinationProjectLane(this.db, projectSlug, laneKey) };
         } catch (error) {
+            if (error instanceof CoordinationLaneResolutionError) {
+                const status = error.code === "COORDINATION_PROJECT_NOT_FOUND"
+                    ? "PROJECT_NOT_FOUND"
+                    : error.code === "COORDINATION_LANE_NOT_FOUND"
+                        ? "LANE_NOT_FOUND"
+                        : "EVIDENCE_UNAVAILABLE";
+                return {
+                    result: this.result(
+                        operation,
+                        status,
+                        "NONE",
+                        projectSlug,
+                        laneKey,
+                        null,
+                        undefined,
+                        status === "EVIDENCE_UNAVAILABLE" ? detailFromError(error) : undefined,
+                    ),
+                };
+            }
             return {
                 result: this.result(
                     operation,
