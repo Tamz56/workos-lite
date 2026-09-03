@@ -17,6 +17,11 @@ describe("mutation authority registry coverage", () => {
             .toBe("H1_HUMAN");
     });
 
+    it("classifies the CP-P2-F governed Lane creator as an H1 Human mutation", () => {
+        expect(MUTATION_AUTHORITY_REGISTRY["POST api/human/coordination/lanes"])
+            .toBe("H1_HUMAN");
+    });
+
     it("classifies every mutation handler in src/app/api", () => {
         const scannedKeys = new Set<string>();
 
