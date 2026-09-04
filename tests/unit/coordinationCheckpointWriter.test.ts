@@ -4,7 +4,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
     CoordinationCheckpointWriterError,
     createGovernedInitialLaneCheckpoint,
+    createGovernedSuccessorLaneCheckpoint,
 } from "@/lib/coordination/checkpointWriter";
+import { CoordinationCheckpointStaleSuccessorError } from "@/lib/coordination/checkpoint";
 import { CoordinationLaneResolutionError } from "@/lib/coordination/laneResolver";
 import { ensureCoordinationCheckpointSchema } from "@/lib/coordination/checkpointSchema";
 import { ensureCoordinationSchema } from "@/lib/coordination/schema";
@@ -93,5 +95,86 @@ describe("CP-P2-C governed initial checkpoint writer", () => {
         }
         expect(db.prepare("SELECT COUNT(*) AS count FROM coordination_lane_checkpoints").get())
             .toEqual({ count: 0 });
+    });
+});
+
+describe("SCW-P1 governed successor checkpoint writer", () => {
+    function successorRequest(overrides: Record<string, unknown> = {}) {
+        return {
+            projectSlug: "project-a",
+            laneKey: "main",
+            id: "cp-successor",
+            expectedPredecessorCheckpointId: "cp-initial",
+            continuity: {
+                blocker: null,
+                cross_lane_pending: [],
+                do_not_reopen: ["P2-G6B"],
+                next_exact_action: "continue after successor",
+            },
+            openItems: [],
+            openItemExits: [],
+            provenance: "human:successor-test",
+            ...overrides,
+        };
+    }
+
+    it("resolves Project/Lane server-side and creates the successor only for the expected predecessor", () => {
+        const db = createTestDb();
+
+        createGovernedInitialLaneCheckpoint(db, request({ openItems: [] }));
+
+        const created = createGovernedSuccessorLaneCheckpoint(
+            db,
+            successorRequest(),
+        );
+
+        expect(created).toMatchObject({
+            checkpoint: {
+                id: "cp-successor",
+                laneId: "lane-a",
+                seq: 2,
+                supersedesCheckpointId: "cp-initial",
+            },
+        });
+    });
+
+    it("rejects a stale or incorrect expected predecessor without creating another checkpoint", () => {
+        const db = createTestDb();
+
+        createGovernedInitialLaneCheckpoint(db, request({ openItems: [] }));
+
+        expect(() =>
+            createGovernedSuccessorLaneCheckpoint(
+                db,
+                successorRequest({
+                    expectedPredecessorCheckpointId: "cp-stale",
+                }),
+            ),
+        ).toThrow(CoordinationCheckpointStaleSuccessorError);
+
+        expect(
+            db.prepare(
+                "SELECT COUNT(*) AS count FROM coordination_lane_checkpoints",
+            ).get(),
+        ).toEqual({ count: 1 });
+    });
+
+    it("rejects caller-supplied laneId as unsupported mutation authority", () => {
+        const db = createTestDb();
+
+        createGovernedInitialLaneCheckpoint(db, request({ openItems: [] }));
+
+        expect(() =>
+            createGovernedSuccessorLaneCheckpoint(
+                db,
+                successorRequest({ laneId: "lane-b" }),
+            ),
+        ).toThrow(CoordinationCheckpointWriterError);
+
+        expect(
+            db.prepare(
+                "SELECT COUNT(*) AS count FROM coordination_lane_checkpoints",
+            ).get(),
+        ).toEqual({ count: 1 });
     });
 });

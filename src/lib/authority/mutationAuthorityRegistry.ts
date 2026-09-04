@@ -31,6 +31,7 @@ export const MUTATION_AUTHORITY_REGISTRY: Record<string, MutationAuthority> = {
     "POST api/human/operations/[id]/revoke": "G1_HUMAN",
     "POST api/human/operations/[id]/execute": "G1_HUMAN",
     "POST api/human/coordination/checkpoints/initial": "H1_HUMAN",
+    "POST api/human/coordination/checkpoints/successor": "H1_HUMAN",
     "POST api/human/coordination/lanes": "H1_HUMAN",
 
     // ---- G2 — Project Import (separately governed) ----
