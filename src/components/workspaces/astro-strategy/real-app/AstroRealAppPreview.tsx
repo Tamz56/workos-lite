@@ -794,7 +794,7 @@ export function AstroRealAppPreview({ variant = "preview" }: { variant?: "produc
 
   return (
     <AstroStrategyAppShell>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* ---------------------------------------------------------------- */}
         {/* Preview Header Banner                                           */}
         {/* ---------------------------------------------------------------- */}

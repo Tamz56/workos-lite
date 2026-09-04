@@ -95,7 +95,7 @@ export default function WorkspacesClient() {
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <div className="max-w-6xl mx-auto px-8 py-10">
+                <div className="px-8 py-10">
 
                     {/* RC42A: Resume CTA - Prominent Placement */}
                     {resumeData && (

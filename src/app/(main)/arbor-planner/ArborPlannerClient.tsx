@@ -108,7 +108,7 @@ export default function ArborPlannerClient() {
     if (loading && !day) return <PageShell><div className="rounded-2xl border border-theme-border bg-theme-card-bg p-10 text-center text-theme-secondary">กำลังโหลด Planner...</div></PageShell>;
 
     return (
-        <PageShell className="max-w-[1500px] mx-auto">
+        <PageShell>
             <header className="mb-6 flex flex-col gap-4 rounded-2xl border border-theme-border bg-theme-card-bg p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <div className="text-xs font-bold uppercase tracking-[0.18em] text-blue-500">Arbor Planner</div>

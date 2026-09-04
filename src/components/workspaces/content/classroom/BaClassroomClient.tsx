@@ -667,7 +667,7 @@ export default function BaClassroomClient({ workspaceId }: { workspaceId: string
 
             {/* Main scrollable body */}
             <main className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                <div className="max-w-5xl mx-auto space-y-6">
+                <div className="space-y-6">
 
                     {/* Day Tabs / Lesson Day Selector */}
                     <div className="bg-theme-card border border-theme-border rounded-3xl p-2.5 shadow-sm transition-theme flex flex-wrap gap-1.5">

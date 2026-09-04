@@ -211,7 +211,7 @@ export default function TimelinePage() {
 
     return (
         <div className="min-h-screen bg-white">
-            <div className="p-4 sm:p-6 max-w-[1600px] mx-auto w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-6 w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Timeline Planner</h1>

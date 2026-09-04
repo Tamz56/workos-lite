@@ -388,7 +388,7 @@ export default function ProjectsClient() {
                 }
             />
 
-            <div className="max-w-7xl mx-auto space-y-8 pb-12">
+            <div className="space-y-8 pb-12">
 
                 {/* Seed Preview Panel */}
                 {missingSeeds.length > 0 && (

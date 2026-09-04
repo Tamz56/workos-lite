@@ -493,7 +493,7 @@ export default function RoseTrialLabClient() {
   }
 
   return (
-    <div className="w-full max-w-[1280px] mx-auto px-4 py-6 md:px-6 md:py-8 xl:px-8 space-y-6 pb-24">
+    <div className="w-full px-4 py-6 md:px-6 md:py-8 xl:px-8 space-y-6 pb-24">
       {/* Header Banner */}
       <div className="rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/10 border border-rose-100 dark:border-rose-900/40 p-5 md:p-6 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

@@ -278,7 +278,7 @@ export default function SprintsClient() {
 
     return (
         <div className="min-h-screen bg-white">
-            <div className="p-4 sm:p-6 max-w-[1600px] mx-auto w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-6 w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold tracking-tight">Active Sprints Board</h1>
                     <button

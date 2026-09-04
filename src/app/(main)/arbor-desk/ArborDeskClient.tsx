@@ -203,7 +203,7 @@ export default function ArborDeskClient() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-6 py-8 min-h-[calc(100vh-64px)] flex flex-col gap-8">
+        <div className="px-6 py-8 min-h-[calc(100vh-64px)] flex flex-col gap-8">
             {/* Header Greeting */}
             <div className="flex items-center justify-between">
                 <div>

@@ -2559,7 +2559,7 @@ ${suggestedNextStr}
 
             {/* Main content grid */}
             {activeTab === "deliverables" && (
-                <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
+                <div className="w-full grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
 
                 {/* Main Deliverables & Milestones (Left side) */}
                 <div className="xl:col-span-9 space-y-10">
@@ -3203,7 +3203,7 @@ ${suggestedNextStr}
             )}
 
             {activeTab === "context" && (
-                <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
+                <div className="w-full grid grid-cols-1 xl:grid-cols-12 gap-8 mt-8 pb-12">
                     {/* Left Column: Context Form */}
                     <div className="xl:col-span-8 space-y-6">
                         <div className="bg-theme-card border border-neutral-200 dark:border-neutral-800 rounded-[32px] p-6 shadow-sm">
@@ -3415,7 +3415,7 @@ ${suggestedNextStr}
             )}
 
             {activeTab === "loops" && (
-                <div className="w-full max-w-[1600px] mx-auto mt-8 pb-12">
+                <div className="w-full mt-8 pb-12">
                     <ProjectLoopsTab
                         slug={slug}
                         loops={loops}

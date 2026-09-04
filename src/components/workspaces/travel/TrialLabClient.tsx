@@ -56,7 +56,7 @@ export default function TrialLabClient() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 pb-20">
+    <div className="w-full p-4 md:p-6 space-y-6 pb-20">
 
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-2xl p-6 shadow-sm">
