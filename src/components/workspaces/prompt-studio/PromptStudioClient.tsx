@@ -5082,7 +5082,7 @@ ${templateStructurePrompt || "Not available"}
                                                 {draftEditFields.constraints && (
                                                     <div>
                                                         <strong className="text-slate-500 block uppercase tracking-wider text-[9px] mb-0.5">Constraints (ข้อจำกัด)</strong>
-                                                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200 font-mono whitespace-pre-wrap text-red-700 bg-red-50/20 border-red-100">{draftEditFields.constraints}</p>
+                                                        <p className="text-red-700 bg-red-50/20 p-2 rounded-lg border border-red-100 font-mono whitespace-pre-wrap">{draftEditFields.constraints}</p>
                                                     </div>
                                                 )}
                                                 {draftEditFields.output_format && (
@@ -5618,7 +5618,7 @@ ${templateStructurePrompt || "Not available"}
                                                 if (tag === "[USER INPUT]" && !applyUserInput) return null;
                                                 return (
                                                     <div key={tag} className="p-3 space-y-1 bg-white">
-                                                        <span className="font-bold text-slate-700 text-[10px] tracking-wide text-blue-600 uppercase">{tag}</span>
+                                                        <span className="font-bold text-[10px] tracking-wide text-blue-600 uppercase">{tag}</span>
                                                         <pre className="text-[11px] font-mono text-slate-800 leading-relaxed whitespace-pre-wrap p-2 bg-slate-50 rounded-lg border border-slate-100 max-h-[120px] overflow-y-auto">
                                                             {val || "(ไม่มีเนื้อหา)"}
                                                         </pre>
