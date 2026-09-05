@@ -90,3 +90,43 @@ export function resolveCoordinationProjectLane(
         laneKey: lane.lane_key,
     };
 }
+
+export interface ResolvedCoordinationProject {
+    projectId: string;
+    projectSlug: string;
+}
+
+export interface CoordinationProjectLaneReference {
+    laneId: string;
+    laneKey: string;
+}
+
+/** Resolves the exact owning Project for a slug, or null when it does not exist. */
+export function resolveCoordinationProject(
+    db: Database.Database,
+    projectSlug: string,
+): ResolvedCoordinationProject | null {
+    const projects = db.prepare("SELECT id, slug FROM projects WHERE slug = ?").all(projectSlug) as Array<{
+        id: string;
+        slug: string;
+    }>;
+    if (projects.length !== 1) return null;
+    return { projectId: projects[0].id, projectSlug: projects[0].slug };
+}
+
+/**
+ * Lists every Lane owned by a Project ordered by lane_key ASC only.
+ * Deterministic by design; never ordered by recency, seq, created_at, or name.
+ */
+export function listCoordinationProjectLanes(
+    db: Database.Database,
+    projectId: string,
+): CoordinationProjectLaneReference[] {
+    const lanes = db.prepare(
+        `SELECT id AS laneId, lane_key AS laneKey
+         FROM coordination_lanes
+         WHERE project_id = ?
+         ORDER BY lane_key ASC`,
+    ).all(projectId) as Array<{ laneId: string; laneKey: string }>;
+    return lanes.map((lane) => ({ laneId: lane.laneId, laneKey: lane.laneKey }));
+}

@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type Database from "better-sqlite3";
 import type { JWTVerifyGetKey } from "jose";
 import { CoordinationReadAdapter } from "@/lib/coordination/readAdapter";
+import { ProjectRecoveryAdapter } from "@/lib/coordination/projectRecoveryAdapter";
 import { getAllowedProjectSlugs } from "@/lib/mcp/config";
 import { createCoordinationReadToolset } from "@/lib/mcp/coordinationReadTools";
 import { oauthErrorResponse, verifyBearerRequest } from "@/lib/mcp/oauthResourceServer";
@@ -39,6 +40,7 @@ export async function handleMcpRequest(
         const coordinationTools = createCoordinationReadToolset(
             new CoordinationReadAdapter(coordinationDb),
             allowedProjectSlugs,
+            new ProjectRecoveryAdapter(coordinationDb),
         );
         const server = createProjectMemoryServer(service, coordinationTools);
         const transport = new WebStandardStreamableHTTPServerTransport({

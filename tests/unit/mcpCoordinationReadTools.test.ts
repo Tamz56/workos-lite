@@ -2,12 +2,15 @@ import Database from "better-sqlite3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialLaneCheckpoint } from "@/lib/coordination/checkpoint";
 import { ensureCoordinationCheckpointSchema } from "@/lib/coordination/checkpointSchema";
+import { ProjectRecoveryAdapter } from "@/lib/coordination/projectRecoveryAdapter";
 import { CoordinationReadAdapter } from "@/lib/coordination/readAdapter";
 import { ensureCoordinationSchema } from "@/lib/coordination/schema";
 import {
     COORDINATION_READ_TOOLS,
     COORDINATION_TOOL_NAMES,
     createCoordinationReadToolset,
+    PROJECT_RECOVERY_TOOLS,
+    PROJECT_RECOVERY_TOOL_NAMES,
 } from "@/lib/mcp/coordinationReadTools";
 import { MCP_REQUIRED_SCOPE } from "@/lib/mcp/config";
 
@@ -17,11 +20,11 @@ function createTestDb(): Database.Database {
     const db = new Database(":memory:");
     openDatabases.push(db);
     db.pragma("foreign_keys = ON");
-    db.exec("CREATE TABLE projects (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE)");
+    db.exec("CREATE TABLE projects (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL)");
     ensureCoordinationSchema(db, () => undefined);
     ensureCoordinationCheckpointSchema(db, () => undefined);
     db.exec(`
-        INSERT INTO projects (id, slug) VALUES ('project-1', 'allowed-project');
+        INSERT INTO projects (id, slug, name) VALUES ('project-1', 'allowed-project', 'Allowed Project');
         INSERT INTO coordination_lanes (id, project_id, lane_key, name)
         VALUES ('lane-a', 'project-1', 'main', 'Main');
     `);
@@ -150,5 +153,78 @@ describe("Coordination MCP read tools", () => {
         expect(result.structuredContent).toEqual({
             error: expect.objectContaining({ code: "UNSUPPORTED_OPERATION" }),
         });
+    });
+
+    it("registers project_recovery as an additional read-only, non-write action", () => {
+        expect(PROJECT_RECOVERY_TOOLS.map((tool) => tool.name)).toEqual(PROJECT_RECOVERY_TOOL_NAMES);
+        for (const tool of PROJECT_RECOVERY_TOOLS) {
+            expect(tool.inputSchema.type).toBe("object");
+            expect(tool.outputSchema?.type).toBe("object");
+            expect(tool.annotations).toMatchObject({
+                readOnlyHint: true,
+                destructiveHint: false,
+                openWorldHint: false,
+            });
+            expect(tool.securitySchemes).toEqual([{ type: "oauth2", scopes: [MCP_REQUIRED_SCOPE] }]);
+            expect(tool._meta?.securitySchemes).toEqual(tool.securitySchemes);
+            expect(tool.name).not.toMatch(/create|write|mutate|approve/i);
+        }
+    });
+
+    it("enforces the project allowlist before project_recovery executes", () => {
+        const db = createTestDb();
+        const tools = createCoordinationReadToolset(
+            new CoordinationReadAdapter(db),
+            ["allowed-project"],
+            new ProjectRecoveryAdapter(db),
+        );
+        const result = tools.call("project_recovery", { projectSlug: "blocked-project" });
+        expect(result.isError).toBe(true);
+        expect(result.structuredContent).toEqual({
+            error: expect.objectContaining({ code: "PROJECT_NOT_ALLOWED" }),
+        });
+    });
+
+    it("resolves project_recovery to RECOVERED with exact provenance and NOT_PROVEN Project State", () => {
+        const db = createTestDb();
+        const tools = createCoordinationReadToolset(
+            new CoordinationReadAdapter(db),
+            ["allowed-project"],
+            new ProjectRecoveryAdapter(db),
+        );
+        const result = tools.call("project_recovery", { projectSlug: "allowed-project" });
+        expect(result.isError).not.toBe(true);
+        expect(result.structuredContent).toMatchObject({
+            schemaVersion: "project-recovery.v1",
+            operation: "PROJECT_RECOVERY",
+            status: "RECOVERED",
+            project: {
+                value: { projectId: "project-1", projectSlug: "allowed-project", projectName: "Allowed Project" },
+                source: "projects",
+                authorityClass: "PROJECT_IDENTITY",
+                currentness: "RESOLVED_AT_REQUEST",
+            },
+            lane: {
+                value: { laneId: "lane-a", laneKey: "main", laneName: "Main" },
+                source: "coordination_lanes",
+                authorityClass: "COORDINATION_BINDING",
+                currentness: "RESOLVED_AT_REQUEST",
+            },
+            projectState: {
+                value: null,
+                source: null,
+                authorityClass: "NONE",
+                currentness: "NOT_PROVEN",
+            },
+            coordinationResume: {
+                source: "CoordinationReadAdapter.resume",
+                authorityClass: "AUTHORITATIVE_RESUME",
+                currentness: "VALIDATED_CURRENT_ONLY",
+                value: { status: "RESUMED", authorityClass: "AUTHORITATIVE_RESUME" },
+            },
+        });
+        expect(JSON.parse(result.content[0].type === "text" ? result.content[0].text : "{}")).toEqual(
+            result.structuredContent,
+        );
     });
 });

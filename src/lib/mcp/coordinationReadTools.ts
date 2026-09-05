@@ -6,6 +6,11 @@ import {
     type CoordinationReadResult,
     type CoordinationReadSelector,
 } from "@/lib/coordination/readAdapter";
+import {
+    PROJECT_RECOVERY_SCHEMA_VERSION,
+    type ProjectRecoveryAdapter,
+    type ProjectRecoveryResult,
+} from "@/lib/coordination/projectRecoveryAdapter";
 import { MCP_REQUIRED_SCOPE } from "./config";
 
 export const COORDINATION_TOOL_NAMES = [
@@ -167,13 +172,79 @@ export const COORDINATION_READ_TOOLS: readonly OpenAiTool[] = [
     ),
 ];
 
+export const PROJECT_RECOVERY_TOOL_NAME = "project_recovery" as const;
+
+export const PROJECT_RECOVERY_TOOL_NAMES = [PROJECT_RECOVERY_TOOL_NAME] as const;
+
+export type ProjectRecoveryToolName = (typeof PROJECT_RECOVERY_TOOL_NAMES)[number];
+
+const projectRecoveryInput = z.object({ projectSlug: z.string().min(1).max(200) }).strict();
+
+const PROJECT_RECOVERY_OUTPUT_SCHEMA = {
+    type: "object" as const,
+    properties: {
+        schemaVersion: { type: "string", const: PROJECT_RECOVERY_SCHEMA_VERSION },
+        operation: { type: "string", const: "PROJECT_RECOVERY" },
+        status: { type: "string" },
+        projectId: { anyOf: [{ type: "string" }, { type: "null" }] },
+        projectSlug: { type: "string" },
+        projectState: {
+            type: "object",
+            properties: {
+                value: { type: "null" },
+                source: { type: "null" },
+                authorityClass: { type: "string", const: "NONE" },
+                currentness: { type: "string", const: "NOT_PROVEN" },
+            },
+            required: ["value", "source", "authorityClass", "currentness"],
+            additionalProperties: false,
+        },
+        candidates: {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    projectSlug: { type: "string" },
+                    laneId: { type: "string" },
+                    laneKey: { type: "string" },
+                },
+                required: ["projectSlug", "laneId", "laneKey"],
+                additionalProperties: false,
+            },
+        },
+        coordinationResume: { anyOf: [{ type: "object" }, { type: "null" }] },
+        detail: { anyOf: [{ type: "string" }, { type: "null" }] },
+    },
+    required: ["schemaVersion", "operation", "status", "projectId", "projectSlug", "projectState"],
+    additionalProperties: false,
+};
+
+export const PROJECT_RECOVERY_TOOLS: readonly OpenAiTool[] = [
+    {
+        name: PROJECT_RECOVERY_TOOL_NAME,
+        title: "Resolve WorkOS Project recovery resume",
+        description:
+            "Resolve Project recovery through the single owned Coordination Lane. Rejects Projects without a Lane or with multiple Lanes and never asserts CANONICAL_PROJECT_STATE.",
+        inputSchema: {
+            type: "object",
+            properties: { projectSlug: { type: "string", minLength: 1, maxLength: 200 } },
+            required: ["projectSlug"],
+            additionalProperties: false,
+        },
+        outputSchema: PROJECT_RECOVERY_OUTPUT_SCHEMA,
+        annotations: READ_ONLY_ANNOTATIONS,
+        securitySchemes: OAUTH_SCHEMES,
+        _meta: { securitySchemes: OAUTH_SCHEMES },
+    },
+];
+
 export interface CoordinationReadToolset {
     readonly tools: readonly OpenAiTool[];
     handles(name: string): boolean;
     call(name: string, args: unknown): CallToolResult;
 }
 
-function successResult(output: CoordinationReadResult): CallToolResult {
+function successResult(output: CoordinationReadResult | ProjectRecoveryResult): CallToolResult {
     return {
         structuredContent: output as unknown as Record<string, unknown>,
         content: [{ type: "text", text: JSON.stringify(output) }],
@@ -196,13 +267,25 @@ function projectAllowed(projectSlug: string, allowedProjectSlugs: readonly strin
 export function createCoordinationReadToolset(
     adapter: CoordinationReadAdapter,
     allowedProjectSlugs: readonly string[],
+    recovery?: ProjectRecoveryAdapter,
 ): CoordinationReadToolset {
     const names = new Set<string>(COORDINATION_TOOL_NAMES);
+    names.add(PROJECT_RECOVERY_TOOL_NAME);
     return {
-        tools: COORDINATION_READ_TOOLS,
+        tools: [...COORDINATION_READ_TOOLS, ...PROJECT_RECOVERY_TOOLS],
         handles: (name) => names.has(name) || name.startsWith("coordination_checkpoint_"),
         call(name, args) {
             try {
+                if (name === PROJECT_RECOVERY_TOOL_NAME) {
+                    const input = projectRecoveryInput.parse(args ?? {});
+                    if (!projectAllowed(input.projectSlug, allowedProjectSlugs)) {
+                        return toolError("PROJECT_NOT_ALLOWED", "Project is not available through this MCP resource");
+                    }
+                    if (!recovery) {
+                        return toolError("EVIDENCE_UNAVAILABLE", "Project recovery is not configured on this server");
+                    }
+                    return successResult(recovery.recover(input.projectSlug));
+                }
                 if (name === "coordination_checkpoint_lookup") {
                     const input = lookupInput.parse(args ?? {});
                     if (!projectAllowed(input.projectSlug, allowedProjectSlugs)) {

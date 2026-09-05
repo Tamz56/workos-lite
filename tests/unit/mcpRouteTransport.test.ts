@@ -119,11 +119,11 @@ beforeAll(async () => {
 
     routeDb = new Database(":memory:");
     routeDb.pragma("foreign_keys = ON");
-    routeDb.exec("CREATE TABLE projects (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE)");
+    routeDb.exec("CREATE TABLE projects (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL)");
     ensureCoordinationSchema(routeDb, () => undefined);
     ensureCoordinationCheckpointSchema(routeDb, () => undefined);
     routeDb.exec(`
-        INSERT INTO projects (id, slug) VALUES ('project-1', 'allowed-project');
+        INSERT INTO projects (id, slug, name) VALUES ('project-1', 'allowed-project', 'Allowed Project');
         INSERT INTO coordination_lanes (id, project_id, lane_key, name)
         VALUES ('lane-a', 'project-1', 'main', 'Main');
     `);
@@ -163,7 +163,7 @@ describe("READ1B Next.js Streamable HTTP route", () => {
         expect(body.result.instructions).toContain("read-only");
     });
 
-    it("advertises Project Memory plus four Coordination read tools with OAuth security schemes", async () => {
+    it("advertises Project Memory, four Coordination reads, and project_recovery with OAuth security schemes", async () => {
         const response = await invoke({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
         expect(response.status).toBe(200);
         const body = await response.json();
@@ -174,6 +174,7 @@ describe("READ1B Next.js Streamable HTTP route", () => {
             "coordination_checkpoint_history",
             "coordination_checkpoint_current",
             "coordination_checkpoint_resume",
+            "project_recovery",
         ]);
         for (const tool of body.result.tools) {
             expect(tool.inputSchema.type).toBe("object");
@@ -502,6 +503,70 @@ describe("READ1B Next.js Streamable HTTP route", () => {
             params: {},
         });
         expect(response.status).toBe(200);
+    });
+
+    it("resolves project_recovery over the canonical single Lane through the real transport", async () => {
+        const response = await invoke({
+            jsonrpc: "2.0",
+            id: 12,
+            method: "tools/call",
+            params: { name: "project_recovery", arguments: { projectSlug: "allowed-project" } },
+        });
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.result.isError).not.toBe(true);
+        expect(body.result.structuredContent).toMatchObject({
+            schemaVersion: "project-recovery.v1",
+            operation: "PROJECT_RECOVERY",
+            status: "RECOVERED",
+            projectSlug: "allowed-project",
+            projectId: "project-1",
+            project: {
+                value: { projectId: "project-1", projectSlug: "allowed-project", projectName: "Allowed Project" },
+                source: "projects",
+                authorityClass: "PROJECT_IDENTITY",
+                currentness: "RESOLVED_AT_REQUEST",
+            },
+            lane: {
+                value: { laneId: "lane-a", laneKey: "main", laneName: "Main" },
+                source: "coordination_lanes",
+                authorityClass: "COORDINATION_BINDING",
+                currentness: "RESOLVED_AT_REQUEST",
+            },
+            projectState: {
+                value: null,
+                source: null,
+                authorityClass: "NONE",
+                currentness: "NOT_PROVEN",
+            },
+            coordinationResume: {
+                source: "CoordinationReadAdapter.resume",
+                authorityClass: "AUTHORITATIVE_RESUME",
+                currentness: "VALIDATED_CURRENT_ONLY",
+                value: {
+                    operation: "RESUME",
+                    status: "RESUMED",
+                    authorityClass: "AUTHORITATIVE_RESUME",
+                    identity: { projectSlug: "allowed-project", laneKey: "main", laneId: "lane-a" },
+                },
+            },
+        });
+        expect(JSON.parse(body.result.content[0].text)).toEqual(body.result.structuredContent);
+    });
+
+    it("enforces the MCP project allowlist before project_recovery executes", async () => {
+        const response = await invoke({
+            jsonrpc: "2.0",
+            id: 13,
+            method: "tools/call",
+            params: { name: "project_recovery", arguments: { projectSlug: "blocked-project" } },
+        });
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.result.isError).toBe(true);
+        expect(body.result.structuredContent).toEqual({
+            error: expect.objectContaining({ code: "PROJECT_NOT_ALLOWED" }),
+        });
     });
 
 });
