@@ -1,7 +1,7 @@
 import type { AIResourceAvailability, AIResourceProfile, AssignmentCandidate, AssignmentContext, AssignmentFactor, AssignmentOwner, AssignmentRecommendation, AssignmentResult } from "./types";
 
-const statusScores = { doing: 25, ready: 22, planned: 15, review: 18, waiting: 5, blocked: -40, carried_forward: 18, completed: 0 } as const;
-const readinessScores = { doing: 18, ready: 20, planned: 10, review: 16, waiting: 4, blocked: -30, carried_forward: 10, completed: 0 } as const;
+const statusScores = { doing: 25, ready: 22, planned: 15, review: 18, waiting: 5, blocked: -40, carried_forward: 18, completed: 0, dropped: 0 } as const;
+const readinessScores = { doing: 18, ready: 20, planned: 10, review: 16, waiting: 4, blocked: -30, carried_forward: 10, completed: 0, dropped: 0 } as const;
 const priorityScores = { critical: 20, high: 15, normal: 10, low: 4 } as const;
 function factor(key: string, label: string, score: number, reason: string): AssignmentFactor { return { key, label, score, reason }; }
 function contextOf(item: AssignmentCandidate) { return item.source_project_id || item.source_workspace || null; }
@@ -79,7 +79,7 @@ function scoreCandidate(item: AssignmentCandidate, context: AssignmentContext): 
 
 export function recommendAssignments(context: AssignmentContext): AssignmentResult {
     const recommendations = context.candidates
-        .filter(item => item.planner_status !== "completed" && !item.source_missing)
+        .filter(item => item.planner_status !== "completed" && item.planner_status !== "dropped" && !item.source_missing)
         .map(item => scoreCandidate(item, context))
         .sort((a, b) => b.total_score - a.total_score || a.item.planned_order - b.item.planned_order || a.item.id.localeCompare(b.item.id));
     return { recommendations, top_recommendation: recommendations[0] ?? null, message: recommendations.length ? null : "ยังไม่มีงานที่เหมาะสำหรับแนะนำในขณะนี้" };
