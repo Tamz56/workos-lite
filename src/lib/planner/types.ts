@@ -49,6 +49,7 @@ export const PLANNER_ITEM_STATUSES = [
     "completed",
     "carried_forward",
     "blocked",
+    "dropped",
 ] as const;
 export type PlannerItemStatus = (typeof PLANNER_ITEM_STATUSES)[number];
 

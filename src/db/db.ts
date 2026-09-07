@@ -8,6 +8,7 @@ import { ensureHumanAuthSchema } from "@/lib/human-auth/humanAuthSchema";
 import { ensureOperationsSchema } from "@/lib/operations/operationsSchema";
 import { ensureApprovalsSchema } from "@/lib/approvals/approvalsSchema";
 import { ensureExecutionSchema } from "@/lib/execution/executionSchema";
+import { ensurePlannerSchema } from "@/lib/planner/schema";
 
 const dbPath = path.resolve(process.cwd(), "data/workos.db");
 const dbDir = path.dirname(dbPath);
@@ -855,6 +856,7 @@ ensureHumanAuthSchema(db);
 ensureOperationsSchema(db);
 ensureApprovalsSchema(db);
 ensureExecutionSchema(db);
+ensurePlannerSchema(db);
 if (!shouldSkipSeed) {
     seedArborWritingLab();
 }

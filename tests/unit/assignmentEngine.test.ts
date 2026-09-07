@@ -12,6 +12,21 @@ describe("deterministic assignment engine", () => {
     it("ranks a critical ready item above a normal planned item", () => { const result = recommendAssignments(context([candidate("normal"), candidate("critical", { priority: "critical", planner_status: "ready" })])); expect(result.top_recommendation?.item.id).toBe("critical"); });
     it("strongly penalizes a blocked item", () => { const result = recommendAssignments(context([candidate("ready", { planner_status: "ready" }), candidate("blocked", { priority: "critical", planner_status: "blocked" })])); expect(result.recommendations.find(entry => entry.item.id === "blocked")!.total_score).toBeLessThan(result.top_recommendation!.total_score); });
     it("excludes completed items", () => { expect(recommendAssignments(context([candidate("done", { planner_status: "completed" })])).recommendations).toHaveLength(0); });
+    it("excludes dropped items (non-destructive, never recommended as active work)", () => {
+        const result = recommendAssignments(context([candidate("drop", { planner_status: "dropped" })]));
+        expect(result.recommendations).toHaveLength(0);
+        expect(result.top_recommendation).toBeNull();
+    });
+    it("keeps carried_forward and blocked behavior unchanged (only completed/dropped are excluded)", () => {
+        const result = recommendAssignments(context([
+            candidate("carry", { planner_status: "carried_forward" }),
+            candidate("blocked", { priority: "critical", planner_status: "blocked" }),
+        ]));
+        expect(result.recommendations.find(entry => entry.item.id === "carry")).toBeDefined();
+        const blocked = result.recommendations.find(entry => entry.item.id === "blocked");
+        expect(blocked).toBeDefined();
+        expect(blocked!.total_score).toBeLessThan(result.top_recommendation!.total_score);
+    });
     it("excludes missing-source items", () => { expect(recommendAssignments(context([candidate("missing", { source_missing: true })])).recommendations).toHaveLength(0); });
     it("ranks a fitting task above an oversized task", () => { const result = recommendAssignments(context([candidate("large", { estimated_minutes: 180 }), candidate("fit", { estimated_minutes: 60 })])); expect(result.top_recommendation?.item.id).toBe("fit"); });
     it("penalizes high-energy work on a low-energy day", () => { const result = recommendAssignments(context([candidate("high", { energy_level: "high" }), candidate("low", { energy_level: "low" })], { day_energy_level: "low" })); expect(result.top_recommendation?.item.id).toBe("low"); });
