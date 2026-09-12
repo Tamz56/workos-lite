@@ -20,6 +20,7 @@ import {
     CheckCircle
 } from "lucide-react";
 import Link from "next/link";
+import GovernedControlCenterView from "@/components/arbor-desk/GovernedControlCenterView";
 
 export default function CommandCenterPanel() {
     const [tasks, setTasks] = useState<any[]>([]);
@@ -206,6 +207,8 @@ export default function CommandCenterPanel() {
                 </h2>
                 <p className="text-[10px] font-bold text-theme-muted mt-0.5">บอร์ดควบคุมและสนับสนุนการตัดสินใจแผนงานรายสัปดาห์</p>
             </div>
+
+            <GovernedControlCenterView />
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
