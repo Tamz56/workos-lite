@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // WorkOS-Lite Operations control-plane service
-// AUTOMATION-001-P1B.1
+// AUTOMATION-001-P1B.1 + ACC-P5-001
 // request -> validate -> resolve target -> normalize -> hash -> preview
 // -> fingerprint -> idempotency reconciliation -> persist (status=pending)
 // ---------------------------------------------------------------------------
@@ -9,6 +9,12 @@ import { randomUUID } from "crypto";
 import type Database from "better-sqlite3";
 import type { AgentPrincipal } from "@/lib/agent-auth/agentAuthentication";
 import {
+    AI_READ_ANALYZE_CONTRACT_VERSION,
+    AI_READ_ANALYZE_OPERATION_TYPE,
+    buildAiReadAnalyzePreview,
+    normalizeAiReadAnalyzePayload,
+} from "./adapters/aiReadAnalyze";
+import {
     BACKLOG_CREATE_CONTRACT_VERSION,
     OPERATIONS_SOURCE,
     buildBacklogCreatePreview,
@@ -16,7 +22,11 @@ import {
 } from "./adapters/backlogCreate";
 import { canonicalJson, computeDomainHash } from "./canonicalization";
 import { OpsError } from "./errors";
-import type { NormalizedBacklogCreatePayload, OperationRecord } from "./types";
+import type {
+    NormalizedAiReadAnalyzePayload,
+    NormalizedBacklogCreatePayload,
+    OperationRecord,
+} from "./types";
 
 export const PAYLOAD_HASH_PREFIX = "ops-payload-v1:";
 export const PREVIEW_HASH_PREFIX = "ops-preview-v1:";
@@ -141,9 +151,6 @@ export function createOperation(
 ): OperationRecord {
     const envelope = parseEnvelope(body);
 
-    if (envelope.operationType !== "backlog.create") {
-        throw new OpsError("OPS_INVALID_OPERATION_TYPE", "Unsupported operation type", 400);
-    }
     if (envelope.targetType !== "project") {
         throw new OpsError("OPS_INVALID_ENVELOPE", "Invalid target type", 400);
     }
@@ -155,7 +162,17 @@ export function createOperation(
         throw new OpsError("OPS_INVALID_ENVELOPE", "Invalid targetRef", 400);
     }
 
-    const normalized: NormalizedBacklogCreatePayload = normalizeBacklogCreatePayload(envelope.payload);
+    let normalized: NormalizedBacklogCreatePayload | NormalizedAiReadAnalyzePayload;
+    let contractVersion: string;
+    if (envelope.operationType === "backlog.create") {
+        normalized = normalizeBacklogCreatePayload(envelope.payload);
+        contractVersion = BACKLOG_CREATE_CONTRACT_VERSION;
+    } else if (envelope.operationType === AI_READ_ANALYZE_OPERATION_TYPE) {
+        normalized = normalizeAiReadAnalyzePayload(envelope.payload);
+        contractVersion = AI_READ_ANALYZE_CONTRACT_VERSION;
+    } else {
+        throw new OpsError("OPS_INVALID_OPERATION_TYPE", "Unsupported operation type", 400);
+    }
 
     const project = db.prepare("SELECT id, slug FROM projects WHERE slug = ?").get(envelope.targetRef) as
         | { id: string; slug: string }
@@ -176,11 +193,17 @@ export function createOperation(
         if (existing) return reconcile(existing, payloadHash);
     }
 
-    const preview = buildBacklogCreatePreview({
-        targetRef: envelope.targetRef,
-        resolvedTargetId: project.id,
-        payload: normalized,
-    });
+    const preview = envelope.operationType === "backlog.create"
+        ? buildBacklogCreatePreview({
+              targetRef: envelope.targetRef,
+              resolvedTargetId: project.id,
+              payload: normalized as NormalizedBacklogCreatePayload,
+          })
+        : buildAiReadAnalyzePreview({
+              targetRef: envelope.targetRef,
+              resolvedTargetId: project.id,
+              payload: normalized as NormalizedAiReadAnalyzePayload,
+          });
     const previewFingerprint = computeDomainHash(PREVIEW_HASH_PREFIX, preview);
     const now = new Date().toISOString();
     const id = `op-${randomUUID()}`;
@@ -201,7 +224,7 @@ export function createOperation(
         validation_result_json: canonicalJson({ valid: true, issues: [] }),
         preview_json: canonicalJson(preview),
         preview_fingerprint: previewFingerprint,
-        contract_version: BACKLOG_CREATE_CONTRACT_VERSION,
+        contract_version: contractVersion,
         requested_at: now,
         created_at: now,
         updated_at: now,

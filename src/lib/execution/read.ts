@@ -1,17 +1,17 @@
 // ---------------------------------------------------------------------------
 // WorkOS-Lite execution read surface (READ ONLY)
-// AUTOMATION-001-P1D.2
-// Builds a safe presentation DTO from persisted execution attempts. Never
-// executes, never writes, never repairs state. The committed attempt row is
-// the authoritative duplicate-write fact.
+// AUTOMATION-001-P1D.2 + ACC-P5-001
+// Builds safe typed presentation DTOs. Raw result_json is never exposed.
 // ---------------------------------------------------------------------------
 
 import type Database from "better-sqlite3";
-import type { ExecutionAttemptRow } from "./types";
+import { validateAiReadAnalyzeResult } from "@/lib/ai/openaiReadAnalyze";
+import type { ExecutionAttemptRow, PersistedAiReadAnalyzeResult } from "./types";
 
 export type ExecutionAttemptPresentation = {
     attemptId: string;
     approvalId: string;
+    executionKind: "backlog_create" | "ai_read_analyze";
     status: "committed" | "failed_before_write" | "rolled_back";
     startedAt: string;
     finishedAt: string | null;
@@ -19,6 +19,7 @@ export type ExecutionAttemptPresentation = {
     targetRecordId: string | null;
     failureCode: string | null;
     safeFailureMessage: string | null;
+    aiResult: PersistedAiReadAnalyzeResult | null;
 };
 
 export type OperationExecutionPresentation = {
@@ -26,10 +27,36 @@ export type OperationExecutionPresentation = {
     latestFailure: ExecutionAttemptPresentation | null;
 };
 
+function safeAiResult(row: ExecutionAttemptRow): PersistedAiReadAnalyzeResult | null {
+    if (row.execution_kind !== "ai_read_analyze" || row.execution_status !== "committed" || !row.result_json) return null;
+    try {
+        const raw = JSON.parse(row.result_json) as Record<string, unknown>;
+        if (raw.kind !== "ai_read_analyze" || !raw.executionMetadata || typeof raw.executionMetadata !== "object") return null;
+        const metadata = raw.executionMetadata as Record<string, unknown>;
+        const required = ["operationId", "approvalId", "executionAttemptId", "contractVersion", "provider", "model", "startedAt", "finishedAt"];
+        if (required.some((key) => typeof metadata[key] !== "string")) return null;
+        if (
+            metadata.operationId !== row.operation_id ||
+            metadata.approvalId !== row.approval_id ||
+            metadata.executionAttemptId !== row.id ||
+            metadata.provider !== "openai" ||
+            metadata.model !== "gpt-5.6-terra"
+        ) return null;
+        return {
+            kind: "ai_read_analyze",
+            result: validateAiReadAnalyzeResult(raw.result),
+            executionMetadata: metadata as PersistedAiReadAnalyzeResult["executionMetadata"],
+        };
+    } catch {
+        return null;
+    }
+}
+
 function project(row: ExecutionAttemptRow): ExecutionAttemptPresentation {
     return {
         attemptId: row.id,
         approvalId: row.approval_id,
+        executionKind: row.execution_kind,
         status: row.execution_status as ExecutionAttemptPresentation["status"],
         startedAt: row.started_at,
         finishedAt: row.finished_at,
@@ -37,6 +64,7 @@ function project(row: ExecutionAttemptRow): ExecutionAttemptPresentation {
         targetRecordId: row.target_record_id,
         failureCode: row.failure_code,
         safeFailureMessage: row.safe_failure_message,
+        aiResult: safeAiResult(row),
     };
 }
 

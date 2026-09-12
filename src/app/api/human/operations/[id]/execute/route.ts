@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/db";
 import { assertTrustedHumanOrigin, getAuthenticatedHuman } from "@/lib/human-auth/authorization";
 import { ExecutionError, toExecutionErrorResponse } from "@/lib/execution/errors";
-import { executeOperation } from "@/lib/execution/service";
+import { dispatchExecuteOperation } from "@/lib/execution/dispatcher";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         assertTrustedHumanOrigin(req);
         const { id } = await params;
         const body = (await req.json().catch(() => ({}))) as unknown;
-        const outcome = executeOperation(
+        const outcome = await dispatchExecuteOperation(
             getDb(),
             { actorId: human.operatorId, displayName: human.displayName },
             id,

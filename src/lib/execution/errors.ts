@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // WorkOS-Lite execution typed errors + safe HTTP mapping
-// AUTOMATION-001-P1D.1
-// Messages are safe: no SQL, stacks, payloads, or internal state.
+// AUTOMATION-001-P1D.1 + ACC-P5-001
+// Messages are safe: no SQL, stacks, payloads, provider bodies, or secrets.
 // ---------------------------------------------------------------------------
 
 import { HumanAuthError } from "@/lib/human-auth/errors";
@@ -21,6 +21,11 @@ export type ExecutionErrorCode =
     | "OPS_EXECUTION_APPROVAL_BINDING_MISMATCH"
     | "OPS_EXECUTION_TARGET_STALE"
     | "OPS_EXECUTION_CONFLICT"
+    | "OPS_EXECUTION_IN_PROGRESS"
+    | "OPS_EXECUTION_AI_NOT_CONFIGURED"
+    | "OPS_EXECUTION_AI_TIMEOUT"
+    | "OPS_EXECUTION_AI_PROVIDER_FAILED"
+    | "OPS_EXECUTION_AI_RESULT_INVALID"
     | "OPS_EXECUTION_ROLLED_BACK"
     | "OPS_EXECUTION_INTERNAL_ERROR";
 
@@ -98,6 +103,16 @@ export function executionSafeMessage(code: ExecutionErrorCode): string {
             return "Target project could not be verified";
         case "OPS_EXECUTION_CONFLICT":
             return "Execution request conflicts with committed state";
+        case "OPS_EXECUTION_IN_PROGRESS":
+            return "Execution is already in progress";
+        case "OPS_EXECUTION_AI_NOT_CONFIGURED":
+            return "AI runtime is not configured";
+        case "OPS_EXECUTION_AI_TIMEOUT":
+            return "AI runtime timed out";
+        case "OPS_EXECUTION_AI_PROVIDER_FAILED":
+            return "AI provider request failed";
+        case "OPS_EXECUTION_AI_RESULT_INVALID":
+            return "AI result failed structured validation";
         case "OPS_EXECUTION_ROLLED_BACK":
             return "Execution transaction rolled back";
         default:

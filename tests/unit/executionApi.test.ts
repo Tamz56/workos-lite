@@ -11,8 +11,12 @@ import { approveOperation } from "@/lib/approvals/service";
 import type { AgentPrincipal } from "@/lib/agent-auth/agentAuthentication";
 import type { OperationRecord } from "@/lib/operations/types";
 
-const { mockGetDb } = vi.hoisted(() => ({ mockGetDb: vi.fn() }));
+const { mockGetDb, mockAiRuntime } = vi.hoisted(() => ({ mockGetDb: vi.fn(), mockAiRuntime: vi.fn() }));
 vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
+vi.mock("@/lib/ai/openaiReadAnalyze", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/ai/openaiReadAnalyze")>();
+    return { ...actual, runOpenAiReadAnalyze: mockAiRuntime };
+});
 
 import { POST as executeRoute } from "@/app/api/human/operations/[id]/execute/route";
 
@@ -20,6 +24,7 @@ const ORIGIN = "http://localhost:3000";
 const NOW = new Date().toISOString();
 
 afterEach(() => {
+    mockAiRuntime.mockReset();
     vi.restoreAllMocks();
 });
 
@@ -155,6 +160,38 @@ describe("Human execute API", () => {
         expect(JSON.stringify(body)).not.toContain("sqlite");
         expect(JSON.stringify(body)).not.toContain("workos.db");
         expect(JSON.stringify(body)).not.toContain(token);
+        db.close();
+    });
+});
+
+describe("ACC-P5-001 Human execute API", () => {
+    it("executes and replays ai.read_analyze through the same Human route without project_items mutation", async () => {
+        const db = createDb();
+        const token = seedHumanSession(db);
+        const principal: AgentPrincipal = { actorId: "agent-test", actorName: "Test Agent", scopes: ["operations:request"] };
+        const op = createOperation(db, principal, {
+            operationType: "ai.read_analyze",
+            targetType: "project",
+            targetRef: "project-a",
+            payload: { analysisMode: "summary_findings_evidence", sourceLabel: "API Source", sourceText: "Alpha" },
+        });
+        const approvalId = approveOperation(db, { actorId: "human-1", displayName: "Owner" }, op.id, {
+            expectedPreviewFingerprint: op.previewFingerprint,
+            expectedPayloadHash: op.payloadHash,
+            expectedContractVersion: op.contractVersion,
+        }, { now: NOW }).review.approval!.id;
+        mockAiRuntime.mockResolvedValue({ summary: "S", findings: [], evidence: [], limitations: [] });
+        const path = `/api/human/operations/${op.id}/execute`;
+        const first = await callExecute(db, path, { approvalId }, { cookie: token, origin: ORIGIN });
+        expect(first.status).toBe(200);
+        const firstBody = await first.json();
+        expect(firstBody.execution.executionKind).toBe("ai_read_analyze");
+        expect(firstBody.execution.targetRecordId).toBeNull();
+        const second = await callExecute(db, path, { approvalId }, { cookie: token, origin: ORIGIN });
+        expect(second.status).toBe(200);
+        expect((await second.json()).replay).toBe(true);
+        expect(mockAiRuntime).toHaveBeenCalledTimes(1);
+        expect((db.prepare("SELECT COUNT(*) c FROM project_items").get() as { c: number }).c).toBe(0);
         db.close();
     });
 });

@@ -614,3 +614,26 @@ describe("No-business-write boundary", () => {
         db.close();
     });
 });
+
+describe("ACC-P5-001 operation admission", () => {
+    it("admits exactly ai.read_analyze through the existing Operations control plane", () => {
+        const db = createControlPlaneDb();
+        seedProject(db, "p1", "project-a");
+        const operation = createOperation(db, principal(["operations:request"]), {
+            operationType: "ai.read_analyze",
+            targetType: "project",
+            targetRef: "project-a",
+            payload: {
+                analysisMode: "summary_findings_evidence",
+                sourceLabel: "Source A",
+                sourceText: "Alpha",
+            },
+        });
+        expect(operation.contractVersion).toBe("ai.read_analyze.v1");
+        expect(operation.status).toBe("pending");
+        expect((operation.preview as { runtime: { provider: string; model: string } }).runtime)
+            .toEqual(expect.objectContaining({ provider: "openai", model: "gpt-5.6-terra" }));
+        expectBusinessUnchanged(db, { projects: 1, items: 0, docBlocks: 0, tasks: 0 });
+        db.close();
+    });
+});

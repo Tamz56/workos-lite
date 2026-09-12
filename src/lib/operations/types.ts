@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // WorkOS-Lite Operations control-plane types
-// AUTOMATION-001-P1B.1
+// AUTOMATION-001-P1B.1 + ACC-P5-001
 // ---------------------------------------------------------------------------
 
 export type OperationsCapability = "operations:request" | "operations:read";
@@ -16,6 +16,12 @@ export type NormalizedBacklogCreatePayload = {
     workstream: string | null;
     dod_text: string | null;
     notes: string | null;
+};
+
+export type NormalizedAiReadAnalyzePayload = {
+    analysisMode: "summary_findings_evidence";
+    sourceLabel: string;
+    sourceText: string;
 };
 
 export type OperationRecord = {

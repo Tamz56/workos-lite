@@ -1,5 +1,5 @@
 // UI-local DTO types for the Human Operations Review surface.
-// Mirrors the P1C.1 API response contracts only; no server-only imports.
+// Mirrors safe API response contracts only; no server-only imports.
 
 export type ReviewState =
     | "awaiting_review"
@@ -65,6 +65,28 @@ export type ReviewSummary = {
     rejection: RejectionView | null;
 };
 
+export type AiReadAnalyzeSemanticResult = {
+    summary: string;
+    findings: string[];
+    evidence: string[];
+    limitations: string[];
+};
+
+export type PersistedAiReadAnalyzeResult = {
+    kind: "ai_read_analyze";
+    result: AiReadAnalyzeSemanticResult;
+    executionMetadata: {
+        operationId: string;
+        approvalId: string;
+        executionAttemptId: string;
+        contractVersion: string;
+        provider: "openai";
+        model: "gpt-5.6-terra";
+        startedAt: string;
+        finishedAt: string;
+    };
+};
+
 export type ReviewDetail = ReviewSummary & {
     payload: unknown;
     payloadHash: string;
@@ -78,6 +100,7 @@ export type ReviewDetail = ReviewSummary & {
 export type ExecutionAttemptPresentation = {
     attemptId: string;
     approvalId: string;
+    executionKind: "backlog_create" | "ai_read_analyze";
     status: "committed" | "failed_before_write" | "rolled_back";
     startedAt: string;
     finishedAt: string | null;
@@ -85,6 +108,7 @@ export type ExecutionAttemptPresentation = {
     targetRecordId: string | null;
     failureCode: string | null;
     safeFailureMessage: string | null;
+    aiResult: PersistedAiReadAnalyzeResult | null;
 };
 
 export type OperationExecutionPresentation = {
@@ -100,10 +124,12 @@ export type ExecutionMutationResponse = {
         operationId: string;
         approvalId: string;
         status: "committed";
-        targetTable: "project_items";
-        targetRecordId: string;
+        executionKind?: "backlog_create" | "ai_read_analyze";
+        targetTable: "project_items" | null;
+        targetRecordId: string | null;
         startedAt: string;
         finishedAt: string;
+        aiResult?: PersistedAiReadAnalyzeResult;
     };
 };
 
