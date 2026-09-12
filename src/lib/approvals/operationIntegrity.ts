@@ -1,11 +1,16 @@
 // ---------------------------------------------------------------------------
 // WorkOS-Lite operation-integrity verification
-// AUTOMATION-001-P1C.1
+// AUTOMATION-001-P1C.1 + ACC-P5-001
 // Recomputes payload hash, preview, and preview fingerprint from the persisted
-// operation snapshot using P1B primitives. Manual DB/admin mutation is part
-// of the threat model.
+// operation snapshot using only admitted operation adapters.
 // ---------------------------------------------------------------------------
 
+import {
+    AI_READ_ANALYZE_CONTRACT_VERSION,
+    AI_READ_ANALYZE_OPERATION_TYPE,
+    buildAiReadAnalyzePreview,
+    normalizeAiReadAnalyzePayload,
+} from "@/lib/operations/adapters/aiReadAnalyze";
 import {
     BACKLOG_CREATE_CONTRACT_VERSION,
     buildBacklogCreatePreview,
@@ -18,11 +23,36 @@ import type { OperationRow } from "./types";
 
 export function verifyOperationIntegrity(op: OperationRow): void {
     try {
-        if (op.contract_version !== BACKLOG_CREATE_CONTRACT_VERSION) {
+        const rawPayload = JSON.parse(op.payload_json) as unknown;
+        let normalized: unknown;
+        let preview: unknown;
+        let contractVersion: string;
+
+        if (op.operation_type === "backlog.create") {
+            contractVersion = BACKLOG_CREATE_CONTRACT_VERSION;
+            const payload = normalizeBacklogCreatePayload(rawPayload);
+            normalized = payload;
+            preview = buildBacklogCreatePreview({
+                targetRef: op.target_ref,
+                resolvedTargetId: op.resolved_target_id,
+                payload,
+            });
+        } else if (op.operation_type === AI_READ_ANALYZE_OPERATION_TYPE) {
+            contractVersion = AI_READ_ANALYZE_CONTRACT_VERSION;
+            const payload = normalizeAiReadAnalyzePayload(rawPayload);
+            normalized = payload;
+            preview = buildAiReadAnalyzePreview({
+                targetRef: op.target_ref,
+                resolvedTargetId: op.resolved_target_id,
+                payload,
+            });
+        } else {
+            throw new Error("unsupported operation type");
+        }
+
+        if (op.contract_version !== contractVersion) {
             throw new Error("contract version mismatch");
         }
-        const rawPayload = JSON.parse(op.payload_json) as unknown;
-        const normalized = normalizeBacklogCreatePayload(rawPayload);
 
         const recomputedHash = computeDomainHash(PAYLOAD_HASH_PREFIX, {
             operationType: op.operation_type,
@@ -34,11 +64,6 @@ export function verifyOperationIntegrity(op: OperationRow): void {
             throw new Error("payload hash mismatch");
         }
 
-        const preview = buildBacklogCreatePreview({
-            targetRef: op.target_ref,
-            resolvedTargetId: op.resolved_target_id,
-            payload: normalized,
-        });
         if (canonicalJson(preview) !== canonicalJson(JSON.parse(op.preview_json) as unknown)) {
             throw new Error("preview mismatch");
         }

@@ -185,3 +185,42 @@ describe("Human detail API execution read", () => {
         db.close();
     });
 });
+
+describe("ACC-P5-001 safe AI result read", () => {
+    it("projects validated AI result/evidence without exposing raw result_json", () => {
+        const db = createDb();
+        const principal: AgentPrincipal = { actorId: "agent-test", actorName: "Test Agent", scopes: ["operations:request"] };
+        const op = createOperation(db, principal, {
+            operationType: "ai.read_analyze",
+            targetType: "project",
+            targetRef: "project-a",
+            payload: { analysisMode: "summary_findings_evidence", sourceLabel: "Read Source", sourceText: "Alpha" },
+        });
+        const approvalId = approveOperation(db, HUMAN, op.id, {
+            expectedPreviewFingerprint: op.previewFingerprint,
+            expectedPayloadHash: op.payloadHash,
+            expectedContractVersion: op.contractVersion,
+        }, { now: NOW }).review.approval!.id;
+        const persisted = {
+            kind: "ai_read_analyze",
+            result: { summary: "Summary", findings: ["F"], evidence: ["E"], limitations: [] },
+            executionMetadata: {
+                operationId: op.id, approvalId, executionAttemptId: "opexec-ai", contractVersion: "ai.read_analyze.v1",
+                provider: "openai", model: "gpt-5.6-terra", startedAt: T0, finishedAt: T0,
+            },
+        };
+        db.prepare(`INSERT INTO operation_execution_attempts (
+            id, operation_id, approval_id, execution_kind, execution_status,
+            trigger_actor_type, trigger_actor_id, trigger_display_name,
+            executor_actor_type, executor_actor_id, started_at, finished_at,
+            result_json, created_at, updated_at
+        ) VALUES ('opexec-ai', ?, ?, 'ai_read_analyze', 'committed', 'human', 'h1', 'Owner', 'system', 'system', ?, ?, ?, ?, ?)`)
+            .run(op.id, approvalId, T0, T0, JSON.stringify(persisted), T0, T0);
+        const presentation = getOperationExecutionPresentation(db, op.id);
+        expect(presentation.committed?.executionKind).toBe("ai_read_analyze");
+        expect(presentation.committed?.targetRecordId).toBeNull();
+        expect(presentation.committed?.aiResult?.result.summary).toBe("Summary");
+        expect(JSON.stringify(presentation)).not.toContain("result_json");
+        db.close();
+    });
+});

@@ -17,6 +17,19 @@ function proposedFields(operation: ReviewDetail): Array<[string, unknown]> {
     return Object.entries(payload);
 }
 
+function runtimeDisclosure(operation: ReviewDetail): { provider: string; model: string; mutation: string } | null {
+    if (operation.operationType !== "ai.read_analyze") return null;
+    const preview = (operation.preview ?? {}) as {
+        runtime?: { provider?: string; model?: string };
+        effects?: { workosDomainMutation?: string };
+    };
+    return {
+        provider: preview.runtime?.provider ?? "NOT_AVAILABLE",
+        model: preview.runtime?.model ?? "NOT_AVAILABLE",
+        mutation: preview.effects?.workosDomainMutation ?? "NOT_AVAILABLE",
+    };
+}
+
 export function ExecuteOperationModalContent({
     operation,
     submitting = false,
@@ -30,6 +43,7 @@ export function ExecuteOperationModalContent({
     onExecute?: () => void;
     onCancel?: () => void;
 }) {
+    const runtime = runtimeDisclosure(operation);
     return (
         <div className="space-y-4">
             <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm">
@@ -56,21 +70,30 @@ export function ExecuteOperationModalContent({
                     </div>
                 </dl>
                 <div className="mt-3">
-                    <dt className="text-[10px] uppercase font-bold tracking-wider text-neutral-500">Proposed change</dt>
+                    <dt className="text-[10px] uppercase font-bold tracking-wider text-neutral-500">Approved Work Package</dt>
                     <dd className="mt-1 text-xs">
                         {proposedFields(operation).map(([key, value]) => (
                             <div key={key} className="flex gap-2 py-0.5">
                                 <span className="w-32 shrink-0 font-semibold text-neutral-600">{key}</span>
-                                <span className="break-all text-neutral-800">{String(value ?? "—")}</span>
+                                <span className="break-all whitespace-pre-wrap text-neutral-800">{String(value ?? "—")}</span>
                             </div>
                         ))}
                     </dd>
                 </div>
             </div>
 
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-900">
-                This action will create the backlog item in WorkOS.
-            </div>
+            {runtime ? (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    <p className="font-medium">This action runs one bounded read-only AI analysis.</p>
+                    <p className="mt-1 text-xs">Provider: {runtime.provider} · Model: {runtime.model}</p>
+                    <p className="mt-1 text-xs">WorkOS domain mutation: {runtime.mutation}</p>
+                    <p className="mt-1 text-xs">The result is evidence for Human review, not canonical Project state.</p>
+                </div>
+            ) : (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-900">
+                    This action will create the backlog item in WorkOS.
+                </div>
+            )}
             <p className="text-xs text-neutral-600">
                 The operation will be executed exactly as approved. The payload cannot be changed here.
             </p>
@@ -130,7 +153,6 @@ export function ExecuteOperationModal({
         if (submitting || !operation.approval) return;
         setSubmitting(true);
         setError(null);
-        // Exact approval issuance currently displayed; never falls back.
         const result = await postExecuteOperation(operation.operationId, operation.approval.id);
         setSubmitting(false);
         if (result.ok) {

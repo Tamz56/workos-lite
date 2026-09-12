@@ -198,3 +198,89 @@ describe("Execution schema", () => {
         db.close();
     });
 });
+
+describe("ACC-P5-001 execution result invariants", () => {
+    it("keeps backlog.create committed rows bound to project_items", () => {
+        const db = createDb();
+        seedOperation(db);
+        insertApproval(db, "apr-1", "op-1", "approved");
+        expect(() => db.prepare(`
+            INSERT INTO operation_execution_attempts (
+                id, operation_id, approval_id, execution_kind, execution_status,
+                trigger_actor_type, trigger_actor_id, executor_actor_type, executor_actor_id,
+                started_at, finished_at, result_json, created_at, updated_at
+            ) VALUES ('bad-backlog', 'op-1', 'apr-1', 'backlog_create', 'committed',
+                'human', 'h1', 'system', 'system', 't', 't', '{}', 't', 't')
+        `).run()).toThrow();
+        db.close();
+    });
+
+    it("allows ai.read_analyze committed result with no fake domain target and rejects kind mismatch", () => {
+        const db = createDb();
+        db.prepare(`
+            INSERT INTO operations (
+                id, operation_type, target_type, target_ref, resolved_target_id,
+                payload_json, payload_hash, source, requester_actor_type, requester_actor_id,
+                status, validation_result_json, preview_json, preview_fingerprint, contract_version,
+                requested_at, created_at, updated_at
+            ) VALUES ('op-ai', 'ai.read_analyze', 'project', 'proj-a', 'p1', '{}', 'h', 'agent', 'agent', 'agent-1',
+                'pending', '{}', '{}', 'fp', 'ai.read_analyze.v1', 't', 't', 't')
+        `).run();
+        db.prepare(`
+            INSERT INTO operation_approvals (
+                id, operation_id, approval_status, approver_actor_type, approver_actor_id,
+                approver_display_name, approved_at, expires_at, bound_operation_type,
+                bound_target_type, bound_target_ref, bound_resolved_target_id, bound_payload_hash,
+                bound_contract_version, bound_preview_fingerprint, preview_json, created_at, updated_at
+            ) VALUES ('apr-ai','op-ai','approved','human','h1','Owner','t','z','ai.read_analyze','project','proj-a','p1','h','ai.read_analyze.v1','fp','{}','t','t')
+        `).run();
+        db.prepare(`
+            INSERT INTO operation_execution_attempts (
+                id, operation_id, approval_id, execution_kind, execution_status,
+                trigger_actor_type, trigger_actor_id, executor_actor_type, executor_actor_id,
+                started_at, finished_at, result_json, created_at, updated_at
+            ) VALUES ('ai-ok','op-ai','apr-ai','ai_read_analyze','committed',
+                'human','h1','system','system','t','t','{}','t','t')
+        `).run();
+        const row = db.prepare("SELECT target_table, target_record_id FROM operation_execution_attempts WHERE id='ai-ok'").get() as { target_table: string | null; target_record_id: string | null };
+        expect(row).toEqual({ target_table: null, target_record_id: null });
+        expect(() => db.prepare(`
+            INSERT INTO operation_execution_attempts (
+                id, operation_id, approval_id, execution_kind, execution_status,
+                trigger_actor_type, trigger_actor_id, executor_actor_type, executor_actor_id,
+                started_at, created_at, updated_at
+            ) VALUES ('kind-bad','op-ai','apr-ai','backlog_create','started','human','h1','system','system','t','t','t')
+        `).run()).toThrow();
+        db.close();
+    });
+
+    it("migrates the legacy execution table by classifying all proven legacy rows as backlog_create", () => {
+        const db = new Database(":memory:");
+        db.pragma("foreign_keys = ON");
+        db.exec(OPERATIONS_SCHEMA_SQL);
+        db.exec(APPROVALS_SCHEMA_SQL);
+        db.exec(`
+            CREATE TABLE operation_execution_attempts (
+              id TEXT PRIMARY KEY, operation_id TEXT NOT NULL, approval_id TEXT NOT NULL,
+              execution_status TEXT NOT NULL, trigger_actor_type TEXT NOT NULL,
+              trigger_actor_id TEXT NOT NULL, trigger_display_name TEXT NULL,
+              executor_actor_type TEXT NOT NULL, executor_actor_id TEXT NOT NULL,
+              started_at TEXT NOT NULL, finished_at TEXT NULL, target_table TEXT NULL,
+              target_record_id TEXT NULL, result_json TEXT NULL, failure_code TEXT NULL,
+              safe_failure_message TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            );
+        `);
+        seedOperation(db);
+        insertApproval(db, "apr-1", "op-1", "approved");
+        db.prepare(`INSERT INTO operation_execution_attempts (
+            id, operation_id, approval_id, execution_status, trigger_actor_type, trigger_actor_id,
+            executor_actor_type, executor_actor_id, started_at, finished_at, target_table,
+            target_record_id, result_json, created_at, updated_at
+        ) VALUES ('legacy','op-1','apr-1','committed','human','h1','system','system','t','t','project_items','item-1','{}','t','t')`).run();
+        ensureExecutionSchema(db, () => undefined);
+        const columns = db.prepare("PRAGMA table_info(operation_execution_attempts)").all() as { name: string }[];
+        expect(columns.map((c) => c.name)).toContain("execution_kind");
+        expect((db.prepare("SELECT execution_kind FROM operation_execution_attempts WHERE id='legacy'").get() as { execution_kind: string }).execution_kind).toBe("backlog_create");
+        db.close();
+    });
+});

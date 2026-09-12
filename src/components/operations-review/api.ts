@@ -126,6 +126,16 @@ export function friendlyExecutionError(code: string): string {
         case "OPS_EXECUTION_APPROVAL_BINDING_MISMATCH":
         case "OPS_EXECUTION_OPERATION_INTEGRITY_FAILED":
             return "Execution was blocked because the stored operation no longer matches the approved review snapshot.";
+        case "OPS_EXECUTION_IN_PROGRESS":
+            return "This operation is already executing. Refresh before trying again.";
+        case "OPS_EXECUTION_AI_NOT_CONFIGURED":
+            return "The approved AI runtime is not configured on this WorkOS instance.";
+        case "OPS_EXECUTION_AI_TIMEOUT":
+            return "The bounded AI analysis timed out without committing a result. You may retry while the approval remains valid.";
+        case "OPS_EXECUTION_AI_PROVIDER_FAILED":
+            return "The AI provider request failed without committing a result. You may retry while the approval remains valid.";
+        case "OPS_EXECUTION_AI_RESULT_INVALID":
+            return "The AI response did not satisfy the approved structured result contract and was not committed.";
         case "OPS_EXECUTION_ROLLED_BACK":
             return "The execution did not commit. The latest operation state has been refreshed.";
         case "OPS_EXECUTION_INTERNAL_ERROR":

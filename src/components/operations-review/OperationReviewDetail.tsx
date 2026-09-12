@@ -124,11 +124,13 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
             type: "success",
             text: replay
                 ? "This operation was already executed. Showing the committed result."
-                : "Backlog item created successfully.",
+                : detail?.operationType === "ai.read_analyze"
+                    ? "Bounded AI analysis completed. Review the structured result and evidence below."
+                    : "Backlog item created successfully.",
         });
         setActiveModal(null);
         load(true);
-    }, [load]);
+    }, [detail?.operationType, load]);
 
     const handleMutationSuccess = useCallback((text: string) => {
         setNotice({ type: "success", text });
@@ -385,11 +387,11 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
                             </div>
                             <div>
                                 <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Target table</dt>
-                                <dd className="mt-0.5 font-mono text-xs">{detail.execution.committed.targetTable}</dd>
+                                <dd className="mt-0.5 font-mono text-xs">{detail.execution.committed.targetTable ?? "—"}</dd>
                             </div>
                             <div>
                                 <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Target record ID</dt>
-                                <dd className="mt-0.5 font-mono text-xs break-all">{detail.execution.committed.targetRecordId}</dd>
+                                <dd className="mt-0.5 font-mono text-xs break-all">{detail.execution.committed.targetRecordId ?? "—"}</dd>
                             </div>
                             <div>
                                 <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Started at</dt>
@@ -408,6 +410,46 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
                                 </dd>
                             </div>
                         </dl>
+                    </div>
+                )}
+
+
+                {detail.execution?.committed?.aiResult && (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-5 shadow-sm">
+                        <div className="mb-3">
+                            <h2 className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                                AI Result / Evidence for Human Review
+                            </h2>
+                            <p className="mt-1 text-xs font-medium text-blue-900">
+                                Result evidence only — not canonical Project state.
+                            </p>
+                        </div>
+                        <div className="space-y-4 text-sm">
+                            <div>
+                                <h3 className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Summary</h3>
+                                <p className="mt-1 whitespace-pre-wrap text-xs text-neutral-800">{detail.execution.committed.aiResult.result.summary}</p>
+                            </div>
+                            {(["findings", "evidence", "limitations"] as const).map((section) => (
+                                <div key={section}>
+                                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">{section}</h3>
+                                    {detail.execution!.committed!.aiResult!.result[section].length === 0 ? (
+                                        <p className="mt-1 text-xs text-neutral-500">NONE</p>
+                                    ) : (
+                                        <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-neutral-800">
+                                            {detail.execution!.committed!.aiResult!.result[section].map((item, index) => (
+                                                <li key={`${section}-${index}`}>{item}</li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            ))}
+                            <dl className="grid grid-cols-1 gap-2 border-t border-blue-200 pt-3 text-xs sm:grid-cols-2">
+                                <div><dt className="font-bold text-neutral-500">Provider</dt><dd>{detail.execution.committed.aiResult.executionMetadata.provider}</dd></div>
+                                <div><dt className="font-bold text-neutral-500">Model</dt><dd>{detail.execution.committed.aiResult.executionMetadata.model}</dd></div>
+                                <div><dt className="font-bold text-neutral-500">Contract</dt><dd>{detail.execution.committed.aiResult.executionMetadata.contractVersion}</dd></div>
+                                <div><dt className="font-bold text-neutral-500">Attempt</dt><dd className="font-mono break-all">{detail.execution.committed.aiResult.executionMetadata.executionAttemptId}</dd></div>
+                            </dl>
+                        </div>
                     </div>
                 )}
 

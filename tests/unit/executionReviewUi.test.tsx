@@ -141,3 +141,36 @@ describe("Approve modal copy update", () => {
         expect(source).toContain("explicitly chooses Execute");
     });
 });
+
+describe("ACC-P5-001 AI review disclosure", () => {
+    it("shows bounded runtime and no-domain-mutation disclosure before execute", () => {
+        const html = renderToStaticMarkup(
+            <ExecuteOperationModalContent
+                operation={detail({
+                    operationType: "ai.read_analyze",
+                    preview: {
+                        proposed: { fields: { analysisMode: "summary_findings_evidence", sourceLabel: "S", sourceText: "Alpha" } },
+                        runtime: { provider: "openai", model: "gpt-5.6-terra" },
+                        effects: { workosDomainMutation: "NONE" },
+                    },
+                })}
+                onExecute={() => undefined}
+                onCancel={() => undefined}
+            />,
+        );
+        expect(html).toContain("bounded read-only AI analysis");
+        expect(html).toContain("openai");
+        expect(html).toContain("gpt-5.6-terra");
+        expect(html).toContain("WorkOS domain mutation: NONE");
+        expect(html).toContain("not canonical Project state");
+    });
+
+    it("keeps a dedicated Human-review result surface in OperationReviewDetail", () => {
+        const source = fs.readFileSync(
+            path.resolve(process.cwd(), "src/components/operations-review/OperationReviewDetail.tsx"),
+            "utf8",
+        );
+        expect(source).toContain("AI Result / Evidence for Human Review");
+        expect(source).toContain("not canonical Project state");
+    });
+});
