@@ -9,8 +9,10 @@ import {
     rejectOperation,
     revokeOperation,
 } from "@/lib/approvals/service";
+import { AI_READ_ANALYZE_OPENAI_PROFILE, buildAiReadAnalyzePreview, normalizeAiReadAnalyzePayload } from "@/lib/operations/adapters/aiReadAnalyze";
+import { canonicalJson, computeDomainHash } from "@/lib/operations/canonicalization";
 import { OPERATIONS_SCHEMA_SQL } from "@/lib/operations/operationsSchema";
-import { createOperation } from "@/lib/operations/service";
+import { createOperation, PREVIEW_HASH_PREFIX } from "@/lib/operations/service";
 import type { AgentPrincipal } from "@/lib/agent-auth/agentAuthentication";
 import type { OperationRecord } from "@/lib/operations/types";
 
@@ -45,6 +47,21 @@ function createValidOperation(db: Database.Database, title = "Task A"): Operatio
         targetRef: "project-a",
         payload: { title },
     });
+}
+
+function createAiOperation(db: Database.Database, profile: "deepseek" | "openai" = "deepseek"): OperationRecord {
+    const op = createOperation(db, principal(), { operationType: "ai.read_analyze", targetType: "project", targetRef: "project-a", payload: { analysisMode: "summary_findings_evidence", sourceLabel: "Integrity Source", sourceText: "Alpha" } });
+    if (profile === "deepseek") return op;
+    const payload = normalizeAiReadAnalyzePayload(op.payload);
+    const preview = buildAiReadAnalyzePreview({ targetRef: op.targetRef, resolvedTargetId: op.resolvedTargetId, payload, profile: AI_READ_ANALYZE_OPENAI_PROFILE });
+    const previewFingerprint = computeDomainHash(PREVIEW_HASH_PREFIX, preview);
+    db.prepare("UPDATE operations SET preview_json=?, preview_fingerprint=? WHERE id=?").run(canonicalJson(preview), previewFingerprint, op.id);
+    return { ...op, preview, previewFingerprint };
+}
+function relabelPreviewOnly(db: Database.Database, op: OperationRecord, runtime: { provider: string; model: string }): void {
+    const preview = JSON.parse(JSON.stringify(op.preview)) as Record<string, any>;
+    preview.runtime = { ...preview.runtime, ...runtime };
+    db.prepare("UPDATE operations SET preview_json=? WHERE id=?").run(canonicalJson(preview), op.id);
 }
 
 function expectedReview(op: OperationRecord): Record<string, string> {
@@ -149,6 +166,36 @@ describe("Approve", () => {
         expect(errorCode(() => approveOperation(db, HUMAN, op2.id, expectedReview(op2), { now: T0 })))
             .toBe("OPS_APPROVAL_NOT_REVIEWABLE");
         db.close();
+    });
+});
+
+describe("ACC-P5 provider-profile operation integrity", () => {
+    it("accepts historical OpenAI and new DeepSeek operations", () => {
+        for (const profile of ["openai", "deepseek"] as const) {
+            const db = createDb(); const op = createAiOperation(db, profile);
+            expect(approveOperation(db, HUMAN, op.id, expectedReview(op), { now: T0 }).review.state).toBe("approved");
+            expect(approvalCount(db)).toBe(1); expect(eventCount(db)).toBe(1); db.close();
+        }
+    });
+    it("rejects cross-profile relabels with zero lifecycle writes", () => {
+        for (const item of [
+            { source: "openai" as const, runtime: { provider: "deepseek", model: "deepseek-v4-flash" } },
+            { source: "deepseek" as const, runtime: { provider: "openai", model: "gpt-5.6-terra" } },
+        ]) {
+            const db=createDb(); const op=createAiOperation(db,item.source); relabelPreviewOnly(db,op,item.runtime);
+            expect(errorCode(()=>approveOperation(db,HUMAN,op.id,expectedReview(op),{now:T0}))).toBe("OPS_APPROVAL_OPERATION_INTEGRITY_FAILED");
+            expect(approvalCount(db)).toBe(0); expect(eventCount(db)).toBe(0); db.close();
+        }
+    });
+    it("rejects unknown/crossed provider-model pairs with zero lifecycle writes", () => {
+        for (const runtime of [
+            {provider:"arbitrary",model:"deepseek-v4-flash"},{provider:"deepseek",model:"arbitrary-model"},
+            {provider:"openai",model:"deepseek-v4-flash"},{provider:"deepseek",model:"gpt-5.6-terra"},
+        ]) {
+            const db=createDb(); const op=createAiOperation(db); relabelPreviewOnly(db,op,runtime);
+            expect(errorCode(()=>approveOperation(db,HUMAN,op.id,expectedReview(op),{now:T0}))).toBe("OPS_APPROVAL_OPERATION_INTEGRITY_FAILED");
+            expect(approvalCount(db)).toBe(0); expect(eventCount(db)).toBe(0); db.close();
+        }
     });
 });
 

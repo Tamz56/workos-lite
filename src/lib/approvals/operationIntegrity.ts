@@ -8,6 +8,7 @@
 import {
     AI_READ_ANALYZE_CONTRACT_VERSION,
     AI_READ_ANALYZE_OPERATION_TYPE,
+    aiReadAnalyzeProfileFromPreview,
     buildAiReadAnalyzePreview,
     normalizeAiReadAnalyzePayload,
 } from "@/lib/operations/adapters/aiReadAnalyze";
@@ -24,6 +25,7 @@ import type { OperationRow } from "./types";
 export function verifyOperationIntegrity(op: OperationRow): void {
     try {
         const rawPayload = JSON.parse(op.payload_json) as unknown;
+        const persistedPreview = JSON.parse(op.preview_json) as unknown;
         let normalized: unknown;
         let preview: unknown;
         let contractVersion: string;
@@ -40,11 +42,14 @@ export function verifyOperationIntegrity(op: OperationRow): void {
         } else if (op.operation_type === AI_READ_ANALYZE_OPERATION_TYPE) {
             contractVersion = AI_READ_ANALYZE_CONTRACT_VERSION;
             const payload = normalizeAiReadAnalyzePayload(rawPayload);
+            const profile = aiReadAnalyzeProfileFromPreview(persistedPreview);
+            if (!profile) throw new Error("unsupported ai.read_analyze provider profile");
             normalized = payload;
             preview = buildAiReadAnalyzePreview({
                 targetRef: op.target_ref,
                 resolvedTargetId: op.resolved_target_id,
                 payload,
+                profile,
             });
         } else {
             throw new Error("unsupported operation type");
@@ -64,7 +69,7 @@ export function verifyOperationIntegrity(op: OperationRow): void {
             throw new Error("payload hash mismatch");
         }
 
-        if (canonicalJson(preview) !== canonicalJson(JSON.parse(op.preview_json) as unknown)) {
+        if (canonicalJson(preview) !== canonicalJson(persistedPreview)) {
             throw new Error("preview mismatch");
         }
 

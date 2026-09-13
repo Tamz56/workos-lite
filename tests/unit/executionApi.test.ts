@@ -13,9 +13,9 @@ import type { OperationRecord } from "@/lib/operations/types";
 
 const { mockGetDb, mockAiRuntime } = vi.hoisted(() => ({ mockGetDb: vi.fn(), mockAiRuntime: vi.fn() }));
 vi.mock("@/db/db", () => ({ getDb: mockGetDb }));
-vi.mock("@/lib/ai/openaiReadAnalyze", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("@/lib/ai/openaiReadAnalyze")>();
-    return { ...actual, runOpenAiReadAnalyze: mockAiRuntime };
+vi.mock("@/lib/ai/deepseekReadAnalyze", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/ai/deepseekReadAnalyze")>();
+    return { ...actual, runDeepSeekReadAnalyze: mockAiRuntime };
 });
 
 import { POST as executeRoute } from "@/app/api/human/operations/[id]/execute/route";

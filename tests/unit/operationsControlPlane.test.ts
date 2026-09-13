@@ -632,7 +632,7 @@ describe("ACC-P5-001 operation admission", () => {
         expect(operation.contractVersion).toBe("ai.read_analyze.v1");
         expect(operation.status).toBe("pending");
         expect((operation.preview as { runtime: { provider: string; model: string } }).runtime)
-            .toEqual(expect.objectContaining({ provider: "openai", model: "gpt-5.6-terra" }));
+            .toEqual(expect.objectContaining({ provider: "deepseek", model: "deepseek-v4-flash" }));
         expectBusinessUnchanged(db, { projects: 1, items: 0, docBlocks: 0, tasks: 0 });
         db.close();
     });

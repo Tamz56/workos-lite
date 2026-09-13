@@ -7,8 +7,10 @@ import { EXECUTION_SCHEMA_SQL } from "@/lib/execution/executionSchema";
 import { getOperationExecutionPresentation } from "@/lib/execution/read";
 import { createHumanSession, SESSION_COOKIE_NAME } from "@/lib/human-auth/session";
 import { HUMAN_AUTH_SCHEMA_SQL } from "@/lib/human-auth/humanAuthSchema";
+import { AI_READ_ANALYZE_OPENAI_PROFILE, buildAiReadAnalyzePreview, normalizeAiReadAnalyzePayload } from "@/lib/operations/adapters/aiReadAnalyze";
+import { canonicalJson, computeDomainHash } from "@/lib/operations/canonicalization";
 import { OPERATIONS_SCHEMA_SQL } from "@/lib/operations/operationsSchema";
-import { createOperation } from "@/lib/operations/service";
+import { createOperation, PREVIEW_HASH_PREFIX } from "@/lib/operations/service";
 import type { AgentPrincipal } from "@/lib/agent-auth/agentAuthentication";
 import type { OperationRecord } from "@/lib/operations/types";
 
@@ -186,6 +188,29 @@ describe("Human detail API execution read", () => {
     });
 });
 
+describe("ACC-P5-PROV-03 provider-bound AI result read", () => {
+    function seedAi(db: Database.Database, profile: "deepseek" | "openai", persistedProvider: "deepseek" | "openai", persistedModel: "deepseek-v4-flash" | "gpt-5.6-terra") {
+        const principal: AgentPrincipal = { actorId: `agent-${profile}`, actorName: "Test Agent", scopes: ["operations:request"] };
+        const op = createOperation(db, principal, { operationType: "ai.read_analyze", targetType: "project", targetRef: "project-a", payload: { analysisMode: "summary_findings_evidence", sourceLabel: "Read Source", sourceText: "Alpha" } });
+        let preview = op.preview; let previewFingerprint = op.previewFingerprint;
+        if (profile === "openai") {
+            const payload = normalizeAiReadAnalyzePayload(op.payload);
+            preview = buildAiReadAnalyzePreview({ targetRef: op.targetRef, resolvedTargetId: op.resolvedTargetId, payload, profile: AI_READ_ANALYZE_OPENAI_PROFILE });
+            previewFingerprint = computeDomainHash(PREVIEW_HASH_PREFIX, preview);
+            db.prepare("UPDATE operations SET preview_json=?, preview_fingerprint=? WHERE id=?").run(canonicalJson(preview), previewFingerprint, op.id);
+        }
+        const historical = { ...op, preview, previewFingerprint };
+        const approvalId = approveOperation(db, HUMAN, historical.id, { expectedPreviewFingerprint: historical.previewFingerprint, expectedPayloadHash: historical.payloadHash, expectedContractVersion: historical.contractVersion }, { now: NOW }).review.approval!.id;
+        const attemptId = `opexec-${profile}`;
+        const persisted = { kind: "ai_read_analyze", result: { summary: "Summary", findings: ["F"], evidence: ["E"], limitations: [] }, executionMetadata: { operationId: historical.id, approvalId, executionAttemptId: attemptId, contractVersion: "ai.read_analyze.v1", provider: persistedProvider, model: persistedModel, startedAt: T0, finishedAt: T0 } };
+        db.prepare(`INSERT INTO operation_execution_attempts (id, operation_id, approval_id, execution_kind, execution_status, trigger_actor_type, trigger_actor_id, trigger_display_name, executor_actor_type, executor_actor_id, started_at, finished_at, result_json, created_at, updated_at) VALUES (?, ?, ?, 'ai_read_analyze', 'committed', 'human', 'h1', 'Owner', 'system', 'system', ?, ?, ?, ?, ?)`)
+            .run(attemptId, historical.id, approvalId, T0, T0, JSON.stringify(persisted), T0, T0);
+        return historical;
+    }
+    it("keeps correctly bound historical OpenAI evidence readable", () => { const db=createDb(); const op=seedAi(db,"openai","openai","gpt-5.6-terra"); expect(getOperationExecutionPresentation(db,op.id).committed?.aiResult?.executionMetadata.provider).toBe("openai"); db.close(); });
+    it("rejects cross-profile persisted evidence", () => { const dbA=createDb(); const opA=seedAi(dbA,"openai","deepseek","deepseek-v4-flash"); expect(getOperationExecutionPresentation(dbA,opA.id).committed?.aiResult).toBeNull(); dbA.close(); const dbB=createDb(); const opB=seedAi(dbB,"deepseek","openai","gpt-5.6-terra"); expect(getOperationExecutionPresentation(dbB,opB.id).committed?.aiResult).toBeNull(); dbB.close(); });
+});
+
 describe("ACC-P5-001 safe AI result read", () => {
     it("projects validated AI result/evidence without exposing raw result_json", () => {
         const db = createDb();
@@ -206,7 +231,7 @@ describe("ACC-P5-001 safe AI result read", () => {
             result: { summary: "Summary", findings: ["F"], evidence: ["E"], limitations: [] },
             executionMetadata: {
                 operationId: op.id, approvalId, executionAttemptId: "opexec-ai", contractVersion: "ai.read_analyze.v1",
-                provider: "openai", model: "gpt-5.6-terra", startedAt: T0, finishedAt: T0,
+                provider: "deepseek", model: "deepseek-v4-flash", startedAt: T0, finishedAt: T0,
             },
         };
         db.prepare(`INSERT INTO operation_execution_attempts (
