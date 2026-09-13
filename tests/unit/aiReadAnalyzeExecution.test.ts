@@ -6,8 +6,10 @@ import { AiRuntimeError } from "@/lib/ai/openaiReadAnalyze";
 import { ExecutionError } from "@/lib/execution/errors";
 import { EXECUTION_SCHEMA_SQL } from "@/lib/execution/executionSchema";
 import { executeAiReadAnalyze } from "@/lib/execution/aiReadAnalyze";
+import { AI_READ_ANALYZE_OPENAI_PROFILE, buildAiReadAnalyzePreview, normalizeAiReadAnalyzePayload } from "@/lib/operations/adapters/aiReadAnalyze";
+import { canonicalJson, computeDomainHash } from "@/lib/operations/canonicalization";
 import { OPERATIONS_SCHEMA_SQL } from "@/lib/operations/operationsSchema";
-import { createOperation } from "@/lib/operations/service";
+import { createOperation, PREVIEW_HASH_PREFIX } from "@/lib/operations/service";
 import type { AgentPrincipal } from "@/lib/agent-auth/agentAuthentication";
 
 const HUMAN = { actorId: "human-1", displayName: "Owner" };
@@ -45,6 +47,21 @@ function seed(db: Database.Database) {
     return { op, approvalId: approval.id };
 }
 
+function seedOpenAiBound(db: Database.Database) {
+    const principal: AgentPrincipal = { actorId: "agent-openai", actorName: "Agent", scopes: ["operations:request"] };
+    const op = createOperation(db, principal, {
+        operationType: "ai.read_analyze", targetType: "project", targetRef: "project-a",
+        payload: { analysisMode: "summary_findings_evidence", sourceLabel: "Source", sourceText: "Alpha" },
+    });
+    const payload = normalizeAiReadAnalyzePayload(op.payload);
+    const preview = buildAiReadAnalyzePreview({ targetRef: op.targetRef, resolvedTargetId: op.resolvedTargetId, payload, profile: AI_READ_ANALYZE_OPENAI_PROFILE });
+    const previewFingerprint = computeDomainHash(PREVIEW_HASH_PREFIX, preview);
+    db.prepare("UPDATE operations SET preview_json=?, preview_fingerprint=? WHERE id=?").run(canonicalJson(preview), previewFingerprint, op.id);
+    const historical = { ...op, preview, previewFingerprint };
+    const approval = approveOperation(db, HUMAN, historical.id, { expectedPreviewFingerprint: historical.previewFingerprint, expectedPayloadHash: historical.payloadHash, expectedContractVersion: historical.contractVersion }, { now: T0 }).review.approval!;
+    return { op: historical, approvalId: approval.id };
+}
+
 function clock(...times: string[]) {
     let i = 0;
     return () => times[Math.min(i++, times.length - 1)];
@@ -80,11 +97,21 @@ describe("ACC-P5-001 bounded AI execution", () => {
             approvalId,
             executionAttemptId: attempt.id,
             contractVersion: "ai.read_analyze.v1",
-            provider: "openai",
-            model: "gpt-5.6-terra",
+            provider: "deepseek",
+            model: "deepseek-v4-flash",
         });
         expect((db.prepare("SELECT approval_status FROM operation_approvals WHERE id=?").get(approvalId) as { approval_status: string }).approval_status).toBe("consumed");
         expect((db.prepare("SELECT status FROM operations WHERE id=?").get(op.id) as { status: string }).status).toBe("succeeded");
+        db.close();
+    });
+
+    it("blocks OpenAI-bound approval before DeepSeek runtime invocation", async () => {
+        const db = createDb();
+        const { op, approvalId } = seedOpenAiBound(db);
+        const runtime = vi.fn().mockResolvedValue(RESULT);
+        expect(await executionCode(executeAiReadAnalyze(db, HUMAN, op.id, { approvalId }, { runtime, now: clock(T0) }))).toBe("OPS_EXECUTION_NOT_EXECUTABLE");
+        expect(runtime).not.toHaveBeenCalled();
+        expect((db.prepare("SELECT COUNT(*) c FROM operation_execution_attempts").get() as { c: number }).c).toBe(0);
         db.close();
     });
 

@@ -80,11 +80,12 @@ export type PersistedAiReadAnalyzeResult = {
         approvalId: string;
         executionAttemptId: string;
         contractVersion: string;
-        provider: "openai";
-        model: "gpt-5.6-terra";
         startedAt: string;
         finishedAt: string;
-    };
+    } & (
+        | { provider: "openai"; model: "gpt-5.6-terra" }
+        | { provider: "deepseek"; model: "deepseek-v4-flash" }
+    );
 };
 
 export type ReviewDetail = ReviewSummary & {

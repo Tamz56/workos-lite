@@ -6,6 +6,7 @@
 
 import type Database from "better-sqlite3";
 import { validateAiReadAnalyzeResult } from "@/lib/ai/openaiReadAnalyze";
+import { aiReadAnalyzeProfileFromPreview } from "@/lib/operations/adapters/aiReadAnalyze";
 import type { ExecutionAttemptRow, PersistedAiReadAnalyzeResult } from "./types";
 
 export type ExecutionAttemptPresentation = {
@@ -27,9 +28,12 @@ export type OperationExecutionPresentation = {
     latestFailure: ExecutionAttemptPresentation | null;
 };
 
-function safeAiResult(row: ExecutionAttemptRow): PersistedAiReadAnalyzeResult | null {
+function safeAiResult(row: ExecutionAttemptRow, operation: { preview_json: string; contract_version: string } | undefined): PersistedAiReadAnalyzeResult | null {
     if (row.execution_kind !== "ai_read_analyze" || row.execution_status !== "committed" || !row.result_json) return null;
     try {
+        if (!operation) return null;
+        const profile = aiReadAnalyzeProfileFromPreview(JSON.parse(operation.preview_json) as unknown);
+        if (!profile) return null;
         const raw = JSON.parse(row.result_json) as Record<string, unknown>;
         if (raw.kind !== "ai_read_analyze" || !raw.executionMetadata || typeof raw.executionMetadata !== "object") return null;
         const metadata = raw.executionMetadata as Record<string, unknown>;
@@ -39,8 +43,9 @@ function safeAiResult(row: ExecutionAttemptRow): PersistedAiReadAnalyzeResult | 
             metadata.operationId !== row.operation_id ||
             metadata.approvalId !== row.approval_id ||
             metadata.executionAttemptId !== row.id ||
-            metadata.provider !== "openai" ||
-            metadata.model !== "gpt-5.6-terra"
+            metadata.contractVersion !== operation.contract_version ||
+            metadata.provider !== profile.provider ||
+            metadata.model !== profile.model
         ) return null;
         return {
             kind: "ai_read_analyze",
@@ -52,7 +57,7 @@ function safeAiResult(row: ExecutionAttemptRow): PersistedAiReadAnalyzeResult | 
     }
 }
 
-function project(row: ExecutionAttemptRow): ExecutionAttemptPresentation {
+function project(row: ExecutionAttemptRow, operation: { preview_json: string; contract_version: string } | undefined): ExecutionAttemptPresentation {
     return {
         attemptId: row.id,
         approvalId: row.approval_id,
@@ -64,7 +69,7 @@ function project(row: ExecutionAttemptRow): ExecutionAttemptPresentation {
         targetRecordId: row.target_record_id,
         failureCode: row.failure_code,
         safeFailureMessage: row.safe_failure_message,
-        aiResult: safeAiResult(row),
+        aiResult: safeAiResult(row, operation),
     };
 }
 
@@ -72,6 +77,10 @@ export function getOperationExecutionPresentation(
     db: Database.Database,
     operationId: string,
 ): OperationExecutionPresentation {
+    const operation = db.prepare("SELECT preview_json, contract_version FROM operations WHERE id = ?").get(operationId) as
+        | { preview_json: string; contract_version: string }
+        | undefined;
+
     const committed = db.prepare(`
         SELECT * FROM operation_execution_attempts
         WHERE operation_id = ? AND execution_status = 'committed'
@@ -86,7 +95,7 @@ export function getOperationExecutionPresentation(
     `).get(operationId) as ExecutionAttemptRow | undefined;
 
     return {
-        committed: committed ? project(committed) : null,
-        latestFailure: latestFailure ? project(latestFailure) : null,
+        committed: committed ? project(committed, operation) : null,
+        latestFailure: latestFailure ? project(latestFailure, operation) : null,
     };
 }

@@ -12,17 +12,17 @@ import { verifyOperationIntegrity } from "@/lib/approvals/operationIntegrity";
 import type { ApprovalRow, OperationRow } from "@/lib/approvals/types";
 import {
     AI_READ_ANALYZE_CONTRACT_VERSION,
-    AI_READ_ANALYZE_MODEL,
-    AI_READ_ANALYZE_PROVIDER,
+    AI_READ_ANALYZE_DEEPSEEK_PROFILE,
+    aiReadAnalyzeProfileFromPreview,
     normalizeAiReadAnalyzePayload,
 } from "@/lib/operations/adapters/aiReadAnalyze";
 import { canonicalJson } from "@/lib/operations/canonicalization";
 import {
     AiRuntimeError,
-    runOpenAiReadAnalyze,
     validateAiReadAnalyzeResult,
     type ReadAnalyzeRuntime,
 } from "@/lib/ai/openaiReadAnalyze";
+import { runDeepSeekReadAnalyze } from "@/lib/ai/deepseekReadAnalyze";
 import { ExecutionError, executionSafeMessage, type ExecutionErrorCode } from "./errors";
 import type {
     AiReadAnalyzeExecutionSuccessResult,
@@ -134,7 +134,25 @@ function verifyFreshProject(db: Database.Database, op: OperationRow, approval: A
     }
 }
 
-function parsePersistedResult(attempt: ExecutionAttemptRow): PersistedAiReadAnalyzeResult {
+function operationProviderProfile(op: OperationRow) {
+    try {
+        const profile = aiReadAnalyzeProfileFromPreview(JSON.parse(op.preview_json) as unknown);
+        if (!profile) throw new Error("unsupported provider profile");
+        return profile;
+    } catch {
+        throw new ExecutionError("OPS_EXECUTION_OPERATION_INTEGRITY_FAILED", executionSafeMessage("OPS_EXECUTION_OPERATION_INTEGRITY_FAILED"), 409, false);
+    }
+}
+
+function requireDeepSeekExecutionProfile(op: OperationRow) {
+    const profile = operationProviderProfile(op);
+    if (profile.provider !== AI_READ_ANALYZE_DEEPSEEK_PROFILE.provider || profile.model !== AI_READ_ANALYZE_DEEPSEEK_PROFILE.model) {
+        throw new ExecutionError("OPS_EXECUTION_NOT_EXECUTABLE", executionSafeMessage("OPS_EXECUTION_NOT_EXECUTABLE"), 409, false);
+    }
+    return profile;
+}
+
+function parsePersistedResult(attempt: ExecutionAttemptRow, op: OperationRow): PersistedAiReadAnalyzeResult {
     try {
         const raw = JSON.parse(attempt.result_json ?? "null") as Record<string, unknown> | null;
         if (!raw || raw.kind !== "ai_read_analyze" || !raw.executionMetadata || typeof raw.executionMetadata !== "object") {
@@ -147,9 +165,12 @@ function parsePersistedResult(attempt: ExecutionAttemptRow): PersistedAiReadAnal
             metadata.operationId !== attempt.operation_id ||
             metadata.approvalId !== attempt.approval_id ||
             metadata.executionAttemptId !== attempt.id ||
-            metadata.provider !== AI_READ_ANALYZE_PROVIDER ||
-            metadata.model !== AI_READ_ANALYZE_MODEL
+            metadata.contractVersion !== op.contract_version
         ) {
+            throw new Error("metadata mismatch");
+        }
+        const profile = operationProviderProfile(op);
+        if (metadata.provider !== profile.provider || metadata.model !== profile.model) {
             throw new Error("metadata mismatch");
         }
         return {
@@ -163,8 +184,8 @@ function parsePersistedResult(attempt: ExecutionAttemptRow): PersistedAiReadAnal
     }
 }
 
-function replayOutcome(attempt: ExecutionAttemptRow): DispatchExecuteOperationOutcome {
-    const aiResult = parsePersistedResult(attempt);
+function replayOutcome(attempt: ExecutionAttemptRow, op: OperationRow): DispatchExecuteOperationOutcome {
+    const aiResult = parsePersistedResult(attempt, op);
     return {
         replay: true,
         execution: {
@@ -204,7 +225,7 @@ function claimExecution(
             if (committed.approval_id !== approvalId || committed.execution_kind !== "ai_read_analyze") {
                 throw new ExecutionError("OPS_EXECUTION_CONFLICT", executionSafeMessage("OPS_EXECUTION_CONFLICT"), 409, false);
             }
-            return { replay: true, outcome: replayOutcome(committed) };
+            return { replay: true, outcome: replayOutcome(committed, op) };
         }
 
         if (op.status === "executing") {
@@ -234,6 +255,8 @@ function claimExecution(
         } catch {
             throw new ExecutionError("OPS_EXECUTION_OPERATION_INTEGRITY_FAILED", executionSafeMessage("OPS_EXECUTION_OPERATION_INTEGRITY_FAILED"), 409, false);
         }
+
+        requireDeepSeekExecutionProfile(op);
 
         const attemptId = `opexec-${randomUUID()}`;
         db.prepare(`
@@ -339,6 +362,7 @@ function finalizeSuccess(
         }
 
         const result = validateAiReadAnalyzeResult(rawResult);
+        const profile = requireDeepSeekExecutionProfile(op);
         const persisted: PersistedAiReadAnalyzeResult = {
             kind: "ai_read_analyze",
             result,
@@ -347,8 +371,8 @@ function finalizeSuccess(
                 approvalId: approval.id,
                 executionAttemptId: claim.attemptId,
                 contractVersion: AI_READ_ANALYZE_CONTRACT_VERSION,
-                provider: AI_READ_ANALYZE_PROVIDER,
-                model: AI_READ_ANALYZE_MODEL,
+                provider: profile.provider,
+                model: profile.model,
                 startedAt: claim.startedAt,
                 finishedAt,
             },
@@ -410,7 +434,7 @@ export async function executeAiReadAnalyze(
     const claim = claimExecution(db, human, operationId, approvalId, startedAt);
     if (claim.replay) return claim.outcome;
 
-    const runtime = deps.runtime ?? runOpenAiReadAnalyze;
+    const runtime = deps.runtime ?? runDeepSeekReadAnalyze;
     let result: unknown;
     try {
         result = validateAiReadAnalyzeResult(await runtime(claim.payload));

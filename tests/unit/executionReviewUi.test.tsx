@@ -150,7 +150,7 @@ describe("ACC-P5-001 AI review disclosure", () => {
                     operationType: "ai.read_analyze",
                     preview: {
                         proposed: { fields: { analysisMode: "summary_findings_evidence", sourceLabel: "S", sourceText: "Alpha" } },
-                        runtime: { provider: "openai", model: "gpt-5.6-terra" },
+                        runtime: { provider: "deepseek", model: "deepseek-v4-flash" },
                         effects: { workosDomainMutation: "NONE" },
                     },
                 })}
@@ -159,8 +159,8 @@ describe("ACC-P5-001 AI review disclosure", () => {
             />,
         );
         expect(html).toContain("bounded read-only AI analysis");
-        expect(html).toContain("openai");
-        expect(html).toContain("gpt-5.6-terra");
+        expect(html).toContain("deepseek");
+        expect(html).toContain("deepseek-v4-flash");
         expect(html).toContain("WorkOS domain mutation: NONE");
         expect(html).toContain("not canonical Project state");
     });

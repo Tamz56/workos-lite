@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import { OpsError } from "@/lib/operations/errors";
 import {
     AI_READ_ANALYZE_MAX_SOURCE_BYTES,
+    AI_READ_ANALYZE_OPENAI_PROFILE,
     buildAiReadAnalyzePreview,
     normalizeAiReadAnalyzePayload,
 } from "@/lib/operations/adapters/aiReadAnalyze";
 import { OPERATIONS_SCHEMA_SQL } from "@/lib/operations/operationsSchema";
-import { createOperation } from "@/lib/operations/service";
+import { computeDomainHash } from "@/lib/operations/canonicalization";
+import { createOperation, PREVIEW_HASH_PREFIX } from "@/lib/operations/service";
 import type { AgentPrincipal } from "@/lib/agent-auth/agentAuthentication";
 
 function code(fn: () => unknown): string {
@@ -53,8 +55,11 @@ describe("ACC-P5-001 Work Package adapter", () => {
             sourceText: "Alpha\nBeta",
         });
         const preview = buildAiReadAnalyzePreview({ targetRef: "project-a", resolvedTargetId: "p1", payload });
-        expect(preview.runtime).toEqual({ provider: "openai", model: "gpt-5.6-terra", tools: "NONE", timeoutMs: 30000 });
+        expect(preview.runtime).toEqual({ provider: "deepseek", model: "deepseek-v4-flash", tools: "NONE", timeoutMs: 30000 });
         expect(preview.effects.workosDomainMutation).toBe("NONE");
+        const openAiPreview = buildAiReadAnalyzePreview({ targetRef: "project-a", resolvedTargetId: "p1", payload, profile: AI_READ_ANALYZE_OPENAI_PROFILE });
+        expect(openAiPreview.runtime).toEqual({ provider: "openai", model: "gpt-5.6-terra", tools: "NONE", timeoutMs: 30000 });
+        expect(computeDomainHash(PREVIEW_HASH_PREFIX, openAiPreview)).not.toBe(computeDomainHash(PREVIEW_HASH_PREFIX, preview));
     });
 
     it("rejects unknown fields, unapproved modes, empty/NUL input and >16KiB UTF-8", () => {
@@ -74,7 +79,7 @@ describe("ACC-P5-001 Work Package adapter", () => {
         expect(first.contractVersion).toBe("ai.read_analyze.v1");
         expect(first.payloadHash).toBe(replay.payloadHash);
         expect(first.previewFingerprint).toBe(replay.previewFingerprint);
-        expect((first.preview as { runtime: { model: string } }).runtime.model).toBe("gpt-5.6-terra");
+        expect((first.preview as { runtime: { provider: string; model: string } }).runtime).toEqual(expect.objectContaining({ provider: "deepseek", model: "deepseek-v4-flash" }));
         expect(code(() => createOperation(d, principal, body("different", "same-key")))).toBe("OPS_IDEMPOTENCY_CONFLICT");
         d.close();
     });
