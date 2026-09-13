@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { resolveWorkosDbPath } from "@/db/dbPath";
 import { ensureProjectRegistryMetadataColumns } from "@/lib/projects/registryMetadata";
 import { ensureAuditSchema } from "@/lib/project-import/auditSchema";
 import { ensureHumanAuthSchema } from "@/lib/human-auth/humanAuthSchema";
@@ -10,7 +11,7 @@ import { ensureApprovalsSchema } from "@/lib/approvals/approvalsSchema";
 import { ensureExecutionSchema } from "@/lib/execution/executionSchema";
 import { ensurePlannerSchema } from "@/lib/planner/schema";
 
-const dbPath = path.resolve(process.cwd(), "data/workos.db");
+const dbPath = resolveWorkosDbPath(process.cwd(), process.env.WORKOS_DB_PATH);
 const dbDir = path.dirname(dbPath);
 
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
