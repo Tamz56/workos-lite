@@ -97,6 +97,147 @@ function failedAttempt(id: string, operationId: string, approvalId: string, stat
     };
 }
 
+
+function preP5ExecutionTableSql(
+    committedTargetPredicate: string,
+): string {
+    return `
+CREATE TABLE operation_execution_attempts (
+  id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL,
+  approval_id TEXT NOT NULL,
+  execution_status TEXT NOT NULL CHECK (execution_status IN ('started', 'committed', 'failed_before_write', 'rolled_back')),
+  trigger_actor_type TEXT NOT NULL CHECK (trigger_actor_type = 'human'),
+  trigger_actor_id TEXT NOT NULL,
+  trigger_display_name TEXT NULL,
+  executor_actor_type TEXT NOT NULL CHECK (executor_actor_type = 'system'),
+  executor_actor_id TEXT NOT NULL CHECK (executor_actor_id = 'system'),
+  started_at TEXT NOT NULL,
+  finished_at TEXT NULL,
+  target_table TEXT NULL,
+  target_record_id TEXT NULL,
+  result_json TEXT NULL,
+  failure_code TEXT NULL,
+  safe_failure_message TEXT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(operation_id) REFERENCES operations(id) ON DELETE RESTRICT,
+  FOREIGN KEY(approval_id) REFERENCES operation_approvals(id) ON DELETE RESTRICT,
+  CHECK (
+    (execution_status = 'started' AND finished_at IS NULL AND target_table IS NULL AND target_record_id IS NULL AND result_json IS NULL AND failure_code IS NULL AND safe_failure_message IS NULL)
+    OR
+    (execution_status = 'committed' AND finished_at IS NOT NULL AND ${committedTargetPredicate} AND target_record_id IS NOT NULL AND result_json IS NOT NULL AND failure_code IS NULL AND safe_failure_message IS NULL)
+    OR
+    (execution_status IN ('failed_before_write', 'rolled_back') AND finished_at IS NOT NULL AND target_table IS NULL AND target_record_id IS NULL AND result_json IS NULL AND failure_code IS NOT NULL AND safe_failure_message IS NOT NULL)
+  )
+)
+`;
+}
+
+const PRE_P5_BACKLOG_ONLY_SQL = preP5ExecutionTableSql(
+    "target_table = 'project_items'",
+);
+
+const PRE_P5_WIDENED_SQL = preP5ExecutionTableSql(
+    "target_table IN ('project_items', 'project_doc_blocks')",
+);
+
+const PRE_P5_UNKNOWN_SQL = preP5ExecutionTableSql(
+    "target_table IN ('project_items', 'notes')",
+);
+
+const PRE_P5_AUX_SQL = `
+CREATE UNIQUE INDEX idx_operation_execution_attempts_committed
+  ON operation_execution_attempts(operation_id)
+  WHERE execution_status = 'committed';
+CREATE INDEX idx_operation_execution_attempts_operation
+  ON operation_execution_attempts(operation_id);
+CREATE INDEX idx_operation_execution_attempts_approval
+  ON operation_execution_attempts(approval_id);
+CREATE INDEX idx_operation_execution_attempts_created
+  ON operation_execution_attempts(created_at);
+
+CREATE TRIGGER trg_operation_execution_attempts_pair_integrity
+BEFORE INSERT ON operation_execution_attempts
+FOR EACH ROW
+BEGIN
+  SELECT CASE
+    WHEN NOT EXISTS (
+      SELECT 1 FROM operation_approvals a
+      WHERE a.id = NEW.approval_id AND a.operation_id = NEW.operation_id
+    )
+    THEN RAISE(ABORT, 'execution approval/operation pair mismatch')
+  END;
+END;
+
+CREATE TRIGGER trg_operation_execution_attempts_binding_immutable
+BEFORE UPDATE OF
+  operation_id,
+  approval_id,
+  trigger_actor_type,
+  trigger_actor_id,
+  trigger_display_name,
+  executor_actor_type,
+  executor_actor_id,
+  started_at,
+  created_at
+ON operation_execution_attempts
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'execution attempt binding fields are immutable');
+END;
+`;
+
+function createPreP5Db(
+    tableSql: string,
+    withAux = true,
+): Database.Database {
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    db.exec(OPERATIONS_SCHEMA_SQL);
+    db.exec(APPROVALS_SCHEMA_SQL);
+    db.exec(tableSql);
+
+    if (withAux) {
+        db.exec(PRE_P5_AUX_SQL);
+    }
+
+    return db;
+}
+
+function executionTableSql(db: Database.Database): string {
+    const row = db.prepare(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='operation_execution_attempts'",
+    ).get() as { sql: string } | undefined;
+
+    if (!row) {
+        throw new Error("operation_execution_attempts missing");
+    }
+
+    return row.sql;
+}
+
+function executionTableRootPage(db: Database.Database): number {
+    return (
+        db.prepare(
+            "SELECT rootpage FROM sqlite_master WHERE type='table' AND name='operation_execution_attempts'",
+        ).get() as { rootpage: number }
+    ).rootpage;
+}
+
+function managedExecutionAuxNames(db: Database.Database): string[] {
+    return (
+        db.prepare(`
+            SELECT type || ':' || name AS value
+            FROM sqlite_master
+            WHERE tbl_name = 'operation_execution_attempts'
+              AND type IN ('index', 'trigger')
+              AND sql IS NOT NULL
+            ORDER BY type, name
+        `).all() as { value: string }[]
+    ).map((row) => row.value);
+}
+
 describe("Execution schema", () => {
     it("creates the table, is idempotent, and enforces FK RESTRICT", () => {
         const db = createDb();
@@ -259,17 +400,7 @@ describe("ACC-P5-001 execution result invariants", () => {
         db.pragma("foreign_keys = ON");
         db.exec(OPERATIONS_SCHEMA_SQL);
         db.exec(APPROVALS_SCHEMA_SQL);
-        db.exec(`
-            CREATE TABLE operation_execution_attempts (
-              id TEXT PRIMARY KEY, operation_id TEXT NOT NULL, approval_id TEXT NOT NULL,
-              execution_status TEXT NOT NULL, trigger_actor_type TEXT NOT NULL,
-              trigger_actor_id TEXT NOT NULL, trigger_display_name TEXT NULL,
-              executor_actor_type TEXT NOT NULL, executor_actor_id TEXT NOT NULL,
-              started_at TEXT NOT NULL, finished_at TEXT NULL, target_table TEXT NULL,
-              target_record_id TEXT NULL, result_json TEXT NULL, failure_code TEXT NULL,
-              safe_failure_message TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-            );
-        `);
+        db.exec(PRE_P5_BACKLOG_ONLY_SQL);
         seedOperation(db);
         insertApproval(db, "apr-1", "op-1", "approved");
         db.prepare(`INSERT INTO operation_execution_attempts (
@@ -281,6 +412,433 @@ describe("ACC-P5-001 execution result invariants", () => {
         const columns = db.prepare("PRAGMA table_info(operation_execution_attempts)").all() as { name: string }[];
         expect(columns.map((c) => c.name)).toContain("execution_kind");
         expect((db.prepare("SELECT execution_kind FROM operation_execution_attempts WHERE id='legacy'").get() as { execution_kind: string }).execution_kind).toBe("backlog_create");
+        db.close();
+    });
+});
+
+
+describe("ACC-P5-RTP-07 execution schema normalization", () => {
+    it("recognizes exact widened PRE-P5 zero-row state and migrates deterministically", () => {
+        const db = createPreP5Db(PRE_P5_WIDENED_SQL);
+
+        db.exec(`
+            CREATE TABLE rtp07_non_execution_sentinel (
+                id TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            INSERT INTO rtp07_non_execution_sentinel (id, value)
+            VALUES ('s1', 'preserve-me');
+        `);
+
+        expect(
+            (
+                db.prepare(
+                    "SELECT COUNT(*) AS c FROM operation_execution_attempts",
+                ).get() as { c: number }
+            ).c,
+        ).toBe(0);
+
+        ensureExecutionSchema(db, () => undefined);
+
+        const sql = executionTableSql(db);
+
+        expect(sql).toContain(
+            "execution_kind TEXT NOT NULL DEFAULT 'backlog_create'",
+        );
+        expect(sql).toContain(
+            "(execution_kind = 'backlog_create' AND target_table = 'project_items' AND target_record_id IS NOT NULL)",
+        );
+        expect(sql).toContain(
+            "(execution_kind = 'ai_read_analyze' AND target_table IS NULL AND target_record_id IS NULL)",
+        );
+        expect(sql).not.toContain("project_doc_blocks");
+
+        expect(
+            (
+                db.prepare(
+                    "SELECT COUNT(*) AS c FROM operation_execution_attempts",
+                ).get() as { c: number }
+            ).c,
+        ).toBe(0);
+
+        expect(
+            db.prepare(
+                "SELECT value FROM rtp07_non_execution_sentinel WHERE id='s1'",
+            ).get(),
+        ).toEqual({ value: "preserve-me" });
+
+        expect(managedExecutionAuxNames(db)).toEqual([
+            "index:idx_operation_execution_attempts_approval",
+            "index:idx_operation_execution_attempts_committed",
+            "index:idx_operation_execution_attempts_created",
+            "index:idx_operation_execution_attempts_operation",
+            "trigger:trg_operation_execution_attempts_binding_immutable",
+            "trigger:trg_operation_execution_attempts_kind_integrity",
+            "trigger:trg_operation_execution_attempts_pair_integrity",
+        ]);
+
+        db.close();
+    });
+
+    it("fails closed when widened PRE-P5 state contains a committed project_doc_blocks attempt", () => {
+        const db = createPreP5Db(PRE_P5_WIDENED_SQL);
+
+        seedOperation(db);
+        insertApproval(db, "apr-1", "op-1", "approved");
+
+        db.prepare(`
+            INSERT INTO operation_execution_attempts (
+                id,
+                operation_id,
+                approval_id,
+                execution_status,
+                trigger_actor_type,
+                trigger_actor_id,
+                executor_actor_type,
+                executor_actor_id,
+                started_at,
+                finished_at,
+                target_table,
+                target_record_id,
+                result_json,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'legacy-doc',
+                'op-1',
+                'apr-1',
+                'committed',
+                'human',
+                'h1',
+                'system',
+                'system',
+                't',
+                't',
+                'project_doc_blocks',
+                'doc-1',
+                '{}',
+                't',
+                't'
+            )
+        `).run();
+
+        const sqlBefore = executionTableSql(db);
+        const rootPageBefore = executionTableRootPage(db);
+
+        expect(
+            () => ensureExecutionSchema(db, () => undefined),
+        ).toThrow(/committed project_doc_blocks attempts/);
+
+        expect(executionTableSql(db)).toBe(sqlBefore);
+        expect(executionTableRootPage(db)).toBe(rootPageBefore);
+
+        expect(
+            db.prepare(
+                "SELECT target_table FROM operation_execution_attempts WHERE id='legacy-doc'",
+            ).get(),
+        ).toEqual({ target_table: "project_doc_blocks" });
+
+        const columns = db.prepare(
+            "PRAGMA table_info(operation_execution_attempts)",
+        ).all() as { name: string }[];
+
+        expect(columns.map((column) => column.name)).not.toContain(
+            "execution_kind",
+        );
+
+        db.close();
+    });
+
+    it("fails closed on an unrecognized PRE-P5 schema variant without destructive rebuild", () => {
+        const db = createPreP5Db(PRE_P5_UNKNOWN_SQL, false);
+
+        const sqlBefore = executionTableSql(db);
+        const rootPageBefore = executionTableRootPage(db);
+
+        expect(
+            () => ensureExecutionSchema(db, () => undefined),
+        ).toThrow(/unrecognized schema variant/);
+
+        expect(executionTableSql(db)).toBe(sqlBefore);
+        expect(executionTableRootPage(db)).toBe(rootPageBefore);
+
+        const columns = db.prepare(
+            "PRAGMA table_info(operation_execution_attempts)",
+        ).all() as { name: string }[];
+
+        expect(columns.map((column) => column.name)).not.toContain(
+            "execution_kind",
+        );
+
+        db.close();
+    });
+
+    it("migrates exact PRE-P5 backlog-only rows while preserving row counts and non-execution data", () => {
+        const db = createPreP5Db(PRE_P5_BACKLOG_ONLY_SQL);
+
+        db.exec(`
+            CREATE TABLE rtp07_non_execution_sentinel (
+                id TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            INSERT INTO rtp07_non_execution_sentinel (id, value)
+            VALUES ('s1', 'unchanged');
+        `);
+
+        seedOperation(db);
+        insertApproval(db, "apr-1", "op-1", "approved");
+
+        db.prepare(`
+            INSERT INTO operation_execution_attempts (
+                id,
+                operation_id,
+                approval_id,
+                execution_status,
+                trigger_actor_type,
+                trigger_actor_id,
+                executor_actor_type,
+                executor_actor_id,
+                started_at,
+                finished_at,
+                target_table,
+                target_record_id,
+                result_json,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'legacy-backlog',
+                'op-1',
+                'apr-1',
+                'committed',
+                'human',
+                'h1',
+                'system',
+                'system',
+                't',
+                't',
+                'project_items',
+                'item-1',
+                '{}',
+                't',
+                't'
+            )
+        `).run();
+
+        const countsBefore = {
+            operations: (
+                db.prepare("SELECT COUNT(*) AS c FROM operations").get() as { c: number }
+            ).c,
+            approvals: (
+                db.prepare(
+                    "SELECT COUNT(*) AS c FROM operation_approvals",
+                ).get() as { c: number }
+            ).c,
+            attempts: (
+                db.prepare(
+                    "SELECT COUNT(*) AS c FROM operation_execution_attempts",
+                ).get() as { c: number }
+            ).c,
+        };
+
+        ensureExecutionSchema(db, () => undefined);
+
+        const countsAfter = {
+            operations: (
+                db.prepare("SELECT COUNT(*) AS c FROM operations").get() as { c: number }
+            ).c,
+            approvals: (
+                db.prepare(
+                    "SELECT COUNT(*) AS c FROM operation_approvals",
+                ).get() as { c: number }
+            ).c,
+            attempts: (
+                db.prepare(
+                    "SELECT COUNT(*) AS c FROM operation_execution_attempts",
+                ).get() as { c: number }
+            ).c,
+        };
+
+        expect(countsAfter).toEqual(countsBefore);
+
+        expect(
+            db.prepare(`
+                SELECT execution_kind, target_table, target_record_id
+                FROM operation_execution_attempts
+                WHERE id='legacy-backlog'
+            `).get(),
+        ).toEqual({
+            execution_kind: "backlog_create",
+            target_table: "project_items",
+            target_record_id: "item-1",
+        });
+
+        expect(
+            db.prepare(
+                "SELECT value FROM rtp07_non_execution_sentinel WHERE id='s1'",
+            ).get(),
+        ).toEqual({ value: "unchanged" });
+
+        expect(executionTableSql(db)).not.toContain("project_doc_blocks");
+
+        db.close();
+    });
+
+    it("keeps the P5-current table idempotent without rebuilding it", () => {
+        const db = createDb();
+
+        const sqlBefore = executionTableSql(db);
+        const rootPageBefore = executionTableRootPage(db);
+        const auxBefore = managedExecutionAuxNames(db);
+
+        ensureExecutionSchema(db, () => undefined);
+
+        expect(executionTableSql(db)).toBe(sqlBefore);
+        expect(executionTableRootPage(db)).toBe(rootPageBefore);
+        expect(managedExecutionAuxNames(db)).toEqual(auxBefore);
+
+        db.close();
+    });
+
+    it("fails closed when a recognized legacy row is not safely classifiable as backlog_create", () => {
+        const db = createPreP5Db(PRE_P5_BACKLOG_ONLY_SQL);
+
+        db.prepare(`
+            INSERT INTO operations (
+                id,
+                operation_type,
+                target_type,
+                target_ref,
+                resolved_target_id,
+                payload_json,
+                payload_hash,
+                source,
+                requester_actor_type,
+                requester_actor_id,
+                status,
+                validation_result_json,
+                preview_json,
+                preview_fingerprint,
+                contract_version,
+                requested_at,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'op-ai-legacy',
+                'ai.read_analyze',
+                'project',
+                'proj-a',
+                'p1',
+                '{}',
+                'h',
+                'agent',
+                'agent',
+                'agent-1',
+                'pending',
+                '{}',
+                '{}',
+                'fp',
+                'ai.read_analyze.v1',
+                't',
+                't',
+                't'
+            )
+        `).run();
+
+        db.prepare(`
+            INSERT INTO operation_approvals (
+                id,
+                operation_id,
+                approval_status,
+                approver_actor_type,
+                approver_actor_id,
+                approver_display_name,
+                approved_at,
+                expires_at,
+                bound_operation_type,
+                bound_target_type,
+                bound_target_ref,
+                bound_resolved_target_id,
+                bound_payload_hash,
+                bound_contract_version,
+                bound_preview_fingerprint,
+                preview_json,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'apr-ai-legacy',
+                'op-ai-legacy',
+                'approved',
+                'human',
+                'h1',
+                'Owner',
+                't',
+                'z',
+                'ai.read_analyze',
+                'project',
+                'proj-a',
+                'p1',
+                'h',
+                'ai.read_analyze.v1',
+                'fp',
+                '{}',
+                't',
+                't'
+            )
+        `).run();
+
+        db.prepare(`
+            INSERT INTO operation_execution_attempts (
+                id,
+                operation_id,
+                approval_id,
+                execution_status,
+                trigger_actor_type,
+                trigger_actor_id,
+                executor_actor_type,
+                executor_actor_id,
+                started_at,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'unsafe-ai-legacy',
+                'op-ai-legacy',
+                'apr-ai-legacy',
+                'started',
+                'human',
+                'h1',
+                'system',
+                'system',
+                't',
+                't',
+                't'
+            )
+        `).run();
+
+        expect(
+            () => ensureExecutionSchema(db, () => undefined),
+        ).toThrow(/cannot be classified safely as historical backlog_create/);
+
+        const columns = db.prepare(
+            "PRAGMA table_info(operation_execution_attempts)",
+        ).all() as { name: string }[];
+
+        expect(columns.map((column) => column.name)).not.toContain(
+            "execution_kind",
+        );
+
+        expect(
+            (
+                db.prepare(
+                    "SELECT COUNT(*) AS c FROM operation_execution_attempts",
+                ).get() as { c: number }
+            ).c,
+        ).toBe(1);
+
         db.close();
     });
 });
