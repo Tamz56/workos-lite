@@ -164,3 +164,94 @@ export type ReviewTokens = {
     expectedPayloadHash: string;
     expectedContractVersion: string;
 };
+
+export type ResultReviewStatus =
+    | "READY_FOR_HUMAN_DECISION"
+    | "NEEDS_HUMAN_JUDGMENT"
+    | "INSUFFICIENT_EVIDENCE";
+
+export type ResultRecommendation =
+    | "ACCEPT"
+    | "REJECT"
+    | "RETURN"
+    | "NO_RECOMMENDATION";
+
+export type HumanResultDecision =
+    | "ACCEPTED"
+    | "REJECTED"
+    | "RETURNED";
+
+export type ResultReviewView = {
+    binding: {
+        operationId: string;
+        executionAttemptId: string;
+        approvalId: string;
+        executionKind: "ai_read_analyze";
+        executionStatus: "committed";
+        resultFingerprint: string;
+        reviewContractVersion:
+            "ACC-P6-REVIEW-CONTRACT-v0.1";
+        executionContractVersion: string;
+        provider:
+            | "openai"
+            | "deepseek";
+        model:
+            | "gpt-5.6-terra"
+            | "deepseek-v4-flash";
+        executionStartedAt: string;
+        executionFinishedAt: string;
+    };
+    sourceResult: AiReadAnalyzeSemanticResult;
+    arborReview: {
+        reviewStatus: ResultReviewStatus;
+        assessment: string;
+        recommendation: ResultRecommendation;
+        recommendationRationale: string;
+        identifiedRisks: string[];
+        evidenceGaps: string[];
+        proposedNextAction: string;
+        reviewAuthority: "ARBOR_ADVISORY";
+        decisionAuthority: "HUMAN";
+        canonicalMutation: "NONE";
+    };
+    humanDecisionState:
+        | "AWAITING_HUMAN_DECISION"
+        | HumanResultDecision;
+    decision: {
+        id: string;
+        operationId: string;
+        executionAttemptId: string;
+        approvalId: string;
+        resultFingerprint: string;
+        reviewContractVersion:
+            "ACC-P6-REVIEW-CONTRACT-v0.1";
+        decision: HumanResultDecision;
+        decidedByActorId: string;
+        decidedByDisplayName: string;
+        decidedAt: string;
+        reason: string | null;
+        returnInstruction: string | null;
+        createdAt: string;
+    } | null;
+    decisionStoreReady: boolean;
+    reconciliation: {
+        status:
+            | "PENDING"
+            | "NOT_REQUIRED"
+            | "REQUIRES_SEPARATE_ACTION";
+        candidateProjectState: null;
+        candidateNextAction: null;
+        reconciliationReason: string;
+    };
+};
+
+export type ResultReviewResponse = {
+    ok: true;
+    review: ResultReviewView;
+};
+
+export type ResultDecisionMutationResponse = {
+    ok: true;
+    replay: boolean;
+    review: ResultReviewView;
+};
