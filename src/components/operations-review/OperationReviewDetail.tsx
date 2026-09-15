@@ -10,6 +10,7 @@ import { RejectOperationModal } from "./RejectOperationModal";
 import { RevokeApprovalModal } from "./RevokeApprovalModal";
 import { ReviewStateBadge } from "./ReviewStateBadge";
 import { SignOutButton } from "./SignOutButton";
+import { ArborResultReviewPanel } from "./ArborResultReviewPanel";
 import {
     approveLabel,
     canExecute,
@@ -451,6 +452,12 @@ export function OperationReviewDetail({ operationId }: { operationId: string }) 
                             </dl>
                         </div>
                     </div>
+                )}
+
+                {detail.execution?.committed?.aiResult && (
+                    <ArborResultReviewPanel
+                        operationId={detail.operationId}
+                    />
                 )}
 
                 {!detail.execution?.committed && detail.execution?.latestFailure && (

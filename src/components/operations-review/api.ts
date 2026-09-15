@@ -6,6 +6,9 @@ import type {
     OperationsListResponse,
     ReviewTokens,
     SessionResponse,
+    ResultReviewResponse,
+    ResultDecisionMutationResponse,
+    HumanResultDecision,
 } from "./types";
 
 export type ApiResult<T> =
@@ -111,6 +114,77 @@ export function postExecuteOperation(
         method: "POST",
         body: JSON.stringify({ approvalId }),
     });
+}
+
+export function fetchHumanResultReview(
+    operationId: string,
+): Promise<ApiResult<ResultReviewResponse>> {
+    return request<ResultReviewResponse>(
+        `/api/human/operations/${encodeURIComponent(operationId)}/result-review`,
+    );
+}
+
+export function postHumanResultDecision(
+    operationId: string,
+    expectedResultFingerprint: string,
+    decision: HumanResultDecision,
+    optional: {
+        reason?: string;
+        returnInstruction?: string;
+    } = {},
+): Promise<ApiResult<ResultDecisionMutationResponse>> {
+    const body: Record<string, unknown> = {
+        expectedResultFingerprint,
+        decision,
+    };
+
+    if (
+        typeof optional.reason === "string"
+        && optional.reason.trim().length > 0
+    ) {
+        body.reason = optional.reason.trim();
+    }
+
+    if (
+        typeof optional.returnInstruction === "string"
+        && optional.returnInstruction.trim().length > 0
+    ) {
+        body.returnInstruction =
+            optional.returnInstruction.trim();
+    }
+
+    return request<ResultDecisionMutationResponse>(
+        `/api/human/operations/${encodeURIComponent(operationId)}/result-decision`,
+        {
+            method: "POST",
+            body: JSON.stringify(body),
+        },
+    );
+}
+
+export function friendlyResultReviewError(
+    code: string,
+): string {
+    switch (code) {
+        case "RESULT_NOT_REVIEWABLE":
+            return "This operation does not have a committed AI result available for post-result review.";
+        case "RESULT_BINDING_INVALID":
+            return "The committed AI result could not be verified against its execution provenance.";
+        case "RESULT_FINGERPRINT_MISMATCH":
+            return "The result changed since it was reviewed. Reload the bound result before deciding.";
+        case "DECISION_ALREADY_FINAL":
+            return "A final Human decision already exists for this result. The latest durable decision has been reloaded.";
+        case "RESULT_REVIEW_SCHEMA_NOT_READY":
+            return "Human result-decision persistence requires a separately authorized schema migration before decisions can be recorded.";
+        case "RESULT_DECISION_INVALID":
+            return "The Human decision request is invalid.";
+        case "RESULT_REVIEW_AUTH_REQUIRED":
+            return "Human authentication is required.";
+        case "HUMAN_AUTH_CSRF_REJECTED":
+            return "The decision request was rejected by the trusted-origin policy.";
+        default:
+            return "Unable to complete the result review request.";
+    }
 }
 
 export function friendlyExecutionError(code: string): string {
