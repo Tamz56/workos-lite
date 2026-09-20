@@ -5,6 +5,7 @@ import {
     EXECUTION_ATTEMPTS_INDEXES_TRIGGERS_SQL,
     EXECUTION_SCHEMA_SQL,
     ExecutionSchemaMigrationError,
+    detectExecutionAttemptsSchemaState,
     ensureExecutionSchema,
 } from "@/lib/execution/executionSchema";
 import { OPERATIONS_SCHEMA_SQL } from "@/lib/operations/operationsSchema";
@@ -133,6 +134,38 @@ CREATE TABLE operation_execution_attempts (
     (execution_status = 'committed' AND finished_at IS NOT NULL AND target_table = 'project_items' AND target_record_id IS NOT NULL AND result_json IS NOT NULL AND failure_code IS NULL AND safe_failure_message IS NULL)
     OR
     (execution_status IN ('failed_before_write', 'rolled_back') AND finished_at IS NOT NULL AND target_table IS NULL AND target_record_id IS NULL AND result_json IS NULL AND failure_code IS NOT NULL AND safe_failure_message IS NOT NULL)
+  )
+)
+`;
+
+
+// Forward schema fixture reproduced from the later P5 execution generation.
+// It is intentionally kind-aware: ai_read_analyze commits have result/evidence
+// but no target_table/target_record_id.
+const P5_FORWARD_CURRENT_EXECUTION_ATTEMPTS_TABLE_SQL = `
+CREATE TABLE operation_execution_attempts (
+  id TEXT PRIMARY KEY,
+  execution_kind TEXT NOT NULL DEFAULT 'backlog_create' CHECK (execution_kind IN ('backlog_create', 'ai_read_analyze')),
+  execution_status TEXT NOT NULL CHECK (execution_status IN ('started', 'committed', 'failed_before_write', 'rolled_back')),
+  finished_at TEXT NULL,
+  target_table TEXT NULL,
+  target_record_id TEXT NULL,
+  result_json TEXT NULL,
+  failure_code TEXT NULL,
+  safe_failure_message TEXT NULL,
+  CHECK (
+    execution_status <> 'committed'
+    OR (
+      finished_at IS NOT NULL
+      AND result_json IS NOT NULL
+      AND failure_code IS NULL
+      AND safe_failure_message IS NULL
+      AND (
+        (execution_kind = 'backlog_create' AND target_table = 'project_items' AND target_record_id IS NOT NULL)
+        OR
+        (execution_kind = 'ai_read_analyze' AND target_table IS NULL AND target_record_id IS NULL)
+      )
+    )
   )
 )
 `;
@@ -287,6 +320,59 @@ describe("Execution schema", () => {
 });
 
 describe("Execution schema migration (P1G-D0.7B-3C-9D1)", () => {
+
+    it("accepts a forward P5 kind-aware schema without rebuilding or downgrading it", () => {
+        const db = new Database(":memory:");
+        db.exec(P5_FORWARD_CURRENT_EXECUTION_ATTEMPTS_TABLE_SQL);
+        db.prepare(`
+            INSERT INTO operation_execution_attempts (
+                id, execution_kind, execution_status, finished_at,
+                target_table, target_record_id, result_json
+            ) VALUES (
+                'ai-1', 'ai_read_analyze', 'committed', 't',
+                NULL, NULL, '{}'
+            )
+        `).run();
+
+        const before = attemptsTableSql(db);
+        const rootPageBefore = (
+            db.prepare(
+                "SELECT rootpage FROM sqlite_master WHERE type='table' AND name='operation_execution_attempts'",
+            ).get() as { rootpage: number }
+        ).rootpage;
+
+        expect(detectExecutionAttemptsSchemaState(before)).toBe("p5_current");
+
+        ensureExecutionSchema(db, () => undefined);
+
+        const after = attemptsTableSql(db);
+        const rootPageAfter = (
+            db.prepare(
+                "SELECT rootpage FROM sqlite_master WHERE type='table' AND name='operation_execution_attempts'",
+            ).get() as { rootpage: number }
+        ).rootpage;
+
+        expect(after).toBe(before);
+        expect(rootPageAfter).toBe(rootPageBefore);
+        expect(
+            db.prepare(
+                "SELECT execution_kind, target_table, target_record_id, result_json FROM operation_execution_attempts WHERE id='ai-1'",
+            ).get(),
+        ).toEqual({
+            execution_kind: "ai_read_analyze",
+            target_table: null,
+            target_record_id: null,
+            result_json: "{}",
+        });
+        expect(
+            db.prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='operation_execution_attempts_new'",
+            ).get(),
+        ).toBeUndefined();
+
+        db.close();
+    });
+
     it("creates the widened committed CHECK on a fresh database", () => {
         const db = createDb();
         expect(attemptsTableSql(db)).toContain("target_table IN ('project_items', 'project_doc_blocks')");
