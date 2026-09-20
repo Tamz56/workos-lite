@@ -23,6 +23,16 @@ const NEW_TABLE_NAME = `${TABLE_NAME}_new`;
 const OLD_COMMITTED_TARGET = "target_table = 'project_items'";
 const NEW_COMMITTED_TARGET = "target_table IN ('project_items', 'project_doc_blocks')";
 
+// Forward-compatibility markers for the later P5 execution schema. This branch
+// must never try to downgrade/rebuild a kind-aware table that already supports
+// ai_read_analyze committed attempts with no domain target.
+const P5_EXECUTION_KIND_MARKER =
+    "execution_kind TEXT NOT NULL DEFAULT 'backlog_create' CHECK (execution_kind IN ('backlog_create', 'ai_read_analyze'))";
+const P5_BACKLOG_COMMITTED_MARKER =
+    "(execution_kind = 'backlog_create' AND target_table = 'project_items' AND target_record_id IS NOT NULL)";
+const P5_AI_COMMITTED_MARKER =
+    "(execution_kind = 'ai_read_analyze' AND target_table IS NULL AND target_record_id IS NULL)";
+
 const EXECUTION_ATTEMPT_COLUMNS = `
   id TEXT PRIMARY KEY,
   operation_id TEXT NOT NULL,
@@ -134,10 +144,17 @@ export class ExecutionSchemaMigrationError extends Error {
     }
 }
 
-export type ExecutionAttemptsSchemaState = "absent" | "current" | "old" | "unknown";
+export type ExecutionAttemptsSchemaState = "absent" | "p5_current" | "current" | "old" | "unknown";
 
 export function detectExecutionAttemptsSchemaState(tableSql: string | undefined): ExecutionAttemptsSchemaState {
     if (tableSql === undefined) return "absent";
+    if (
+        tableSql.includes(P5_EXECUTION_KIND_MARKER)
+        && tableSql.includes(P5_BACKLOG_COMMITTED_MARKER)
+        && tableSql.includes(P5_AI_COMMITTED_MARKER)
+    ) {
+        return "p5_current";
+    }
     if (tableSql.includes(NEW_COMMITTED_TARGET)) return "current";
     if (tableSql.includes(OLD_COMMITTED_TARGET)) return "old";
     return "unknown";
@@ -179,6 +196,13 @@ export function ensureExecutionSchema(db: Database.Database, log: (message: stri
         case "absent":
             db.exec(EXECUTION_SCHEMA_SQL);
             log("Execution schema ensured");
+            return;
+        case "p5_current":
+            // Forward-compatible schema from a later execution generation.
+            // Do not rebuild or "normalize" it with this older branch: doing so
+            // would drop execution_kind semantics and reject valid
+            // ai_read_analyze committed rows.
+            log("Execution schema already forward-compatible P5 current");
             return;
         case "current":
             // No rebuild; only re-ensure idempotent indexes/triggers.
