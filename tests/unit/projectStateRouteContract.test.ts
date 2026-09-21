@@ -15,10 +15,19 @@ describe("Project-State route contract", () => {
         expect(source).toContain('"Cache-Control": "no-store"');
     });
 
-    it("delegates canonical selection to the DB-injected read service", () => {
-        expect(source).toContain("readCanonicalProjectStateBySlug(getDb(), slug)");
+    it("uses the read-only DB boundary and delegates canonical selection to the read service", () => {
+        expect(source).toContain('from "@/db/readOnlyDb"');
+        expect(source).not.toMatch(/from ["']@\/db\/db["']/);
+        expect(source).toContain("openReadOnlyWorkosDatabase()");
+        expect(source).toContain("readCanonicalProjectStateBySlug(db, slug)");
+        expect(source).toContain("db.close()");
         expect(source).not.toContain("MAX(created_at)");
         expect(source).not.toContain("MAX(updated_at)");
+    });
+
+    it("fails closed to READ_UNAVAILABLE when the read-only DB cannot be used", () => {
+        expect(source).toContain('reason: "READ_UNAVAILABLE"');
+        expect(source).toContain("? 503");
     });
 
     it("contains no direct mutation SQL", () => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/db/db";
+import { openReadOnlyWorkosDatabase } from "@/db/readOnlyDb";
 import { readCanonicalProjectStateBySlug } from "@/lib/project-state/readService";
+import type { CanonicalProjectStateReadResult } from "@/lib/project-state/types";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -10,7 +11,22 @@ type ProjectStateRouteContext = {
 
 export async function GET(_request: NextRequest, { params }: ProjectStateRouteContext) {
     const { slug } = await params;
-    const result = readCanonicalProjectStateBySlug(getDb(), slug);
+    let result: CanonicalProjectStateReadResult;
+
+    try {
+        const db = openReadOnlyWorkosDatabase();
+        try {
+            result = readCanonicalProjectStateBySlug(db, slug);
+        } finally {
+            db.close();
+        }
+    } catch {
+        result = {
+            status: "NOT_PROVEN",
+            projectSlug: slug,
+            reason: "READ_UNAVAILABLE",
+        };
+    }
 
     const status = result.status === "PROJECT_NOT_FOUND"
         ? 404
