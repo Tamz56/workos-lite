@@ -1,54 +1,199 @@
-import { readFileSync } from "node:fs";
+import {
+    readFileSync,
+} from "node:fs";
+
 import path from "node:path";
-import { describe, expect, it } from "vitest";
 
-const ROUTE_PATH = path.resolve(
-    process.cwd(),
-    "src/app/api/arbor-desk/control-center/route.ts",
+import {
+    describe,
+    expect,
+    it,
+} from "vitest";
+
+const ROUTE_PATH =
+    path.resolve(
+        process.cwd(),
+        "src/app/api/arbor-desk/control-center/route.ts",
+    );
+
+const PROJECTION_PATH =
+    path.resolve(
+        process.cwd(),
+        "src/lib/arbor-desk/controlCenterProjection.ts",
+    );
+
+const routeSource =
+    readFileSync(
+        ROUTE_PATH,
+        "utf8",
+    );
+
+const projectionSource =
+    readFileSync(
+        PROJECTION_PATH,
+        "utf8",
+    );
+
+describe(
+    "Control Center route contract",
+    () => {
+        it(
+            "exposes GET only with no mutation handlers",
+            () => {
+                expect(
+                    routeSource,
+                ).toContain(
+                    "export async function GET",
+                );
+
+                for (
+                    const method
+                    of [
+                        "POST",
+                        "PUT",
+                        "PATCH",
+                        "DELETE",
+                    ]
+                ) {
+                    expect(
+                        routeSource,
+                    ).not.toMatch(
+                        new RegExp(
+                            `export\\s+(?:async\\s+)?function\\s+${method}\\b`,
+                        ),
+                    );
+                }
+            },
+        );
+
+        it(
+            "uses one read-only DB handle for Core and Planner projection reads",
+            () => {
+                expect(
+                    routeSource,
+                ).toContain(
+                    'from "@/db/readOnlyDb"',
+                );
+
+                expect(
+                    routeSource,
+                ).not.toContain(
+                    'from "@/db/db"',
+                );
+
+                expect(
+                    routeSource,
+                ).not.toContain(
+                    "getDb()",
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    "openReadOnlyWorkosDatabase()",
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    "buildControlCenterProjection(",
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    "db?.close()",
+                );
+
+                expect(
+                    projectionSource,
+                ).toContain(
+                    "readCoreProjectDirectory(db)",
+                );
+
+                expect(
+                    projectionSource,
+                ).toContain(
+                    "readPlanner(db, date)",
+                );
+            },
+        );
+
+        it(
+            "contains no direct database mutation SQL",
+            () => {
+                for (
+                    const source
+                    of [
+                        routeSource,
+                        projectionSource,
+                    ]
+                ) {
+                    expect(
+                        source,
+                    ).not.toMatch(
+                        /\b(INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE)\b/i,
+                    );
+                }
+            },
+        );
+
+        it(
+            "rejects malformed dates and disables caching",
+            () => {
+                expect(
+                    routeSource,
+                ).toContain(
+                    "Invalid date format. Expected YYYY-MM-DD.",
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    "status: 400",
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    '"Cache-Control":',
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    '"no-store, max-age=0"',
+                );
+            },
+        );
+
+        it(
+            "returns bounded errors and closes the DB in finally",
+            () => {
+                expect(
+                    routeSource,
+                ).toContain(
+                    '"CONTROL_CENTER_READ_UNAVAILABLE"',
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    "status: 500",
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    "} finally {",
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    "db?.close()",
+                );
+            },
+        );
+    },
 );
-
-const source = readFileSync(ROUTE_PATH, "utf8");
-
-describe("Control Center route contract", () => {
-    it("exposes GET only with no mutation handlers", () => {
-        expect(source).toContain("export async function GET");
-
-        for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
-            expect(source).not.toMatch(
-                new RegExp(`export\\s+(?:async\\s+)?function\\s+${method}\\b`),
-            );
-        }
-    });
-
-    it("delegates projection construction to the governed read service", () => {
-        expect(source).toContain(
-            'import { buildControlCenterProjection } from "@/lib/arbor-desk/controlCenterProjection"',
-        );
-        expect(source).toContain(
-            "buildControlCenterProjection(getDb(), date)",
-        );
-    });
-
-    it("contains no direct database mutation SQL", () => {
-        expect(source).not.toMatch(
-            /\b(INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE)\b/i,
-        );
-    });
-
-    it("rejects malformed explicit dates and disables response caching", () => {
-        expect(source).toContain(
-            "Invalid date format. Expected YYYY-MM-DD.",
-        );
-        expect(source).toContain("{ status: 400 }");
-        expect(source).toContain(
-            '"Cache-Control": "no-store, max-age=0"',
-        );
-    });
-
-    it("returns a bounded safe error instead of leaking internal errors", () => {
-        expect(source).toContain(
-            '{ error: "CONTROL_CENTER_READ_UNAVAILABLE" }',
-        );
-        expect(source).toContain("{ status: 500 }");
-    });
-});
