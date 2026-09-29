@@ -1,11 +1,16 @@
 import type Database from "better-sqlite3";
 import { readCanonicalProjectStateBySlug } from "@/lib/project-state/readService";
 import type { CanonicalProjectStateReadResult } from "@/lib/project-state/types";
+import { MANAGED_PROJECT_BINDINGS } from "./managedProjectBindings";
 import {
+    MANAGED_PROJECT_DIRECTORY_SCHEMA_VERSION,
     WORKOS_CORE_SCHEMA_VERSION,
     type CoreCanonicalStateSummary,
     type CoreProjectDirectoryEntry,
     type CoreProjectDirectoryResponse,
+    type ManagedProjectBindingDefinition,
+    type ManagedProjectDirectoryEntry,
+    type ManagedProjectDirectoryProjection,
 } from "./types";
 
 type ProjectDirectoryRow = {
@@ -89,6 +94,103 @@ function toDirectoryEntry(
     };
 }
 
+function toManagedProjectEntry(
+    definition: ManagedProjectBindingDefinition,
+    rawBySlug: ReadonlyMap<string, CoreProjectDirectoryEntry>,
+): ManagedProjectDirectoryEntry {
+    const workosSlug = definition.workosSlug;
+
+    if (workosSlug === null) {
+        return {
+            managedProjectId: definition.managedProjectId,
+            projectName: definition.projectName,
+            managedMembership: { ...definition.managedMembership },
+            workosSlug: null,
+            directoryBinding: "MISSING_OR_UNBOUND",
+            bindingCurrentness: definition.baselineCurrentness,
+            registryObservation: "NOT_PROVEN",
+            canonicalProjectState: null,
+            canonicalCurrentness: "NOT_PROVEN",
+            sourceRef: definition.sourceRef,
+            provenance: {
+                ...definition.provenance,
+                sourceRefs: [...definition.provenance.sourceRefs],
+            },
+            flags: [...definition.flags],
+        };
+    }
+
+    const rawProject = rawBySlug.get(workosSlug);
+
+    if (!rawProject) {
+        return {
+            managedProjectId: definition.managedProjectId,
+            projectName: definition.projectName,
+            managedMembership: { ...definition.managedMembership },
+            workosSlug,
+            directoryBinding: "BOUND",
+            bindingCurrentness: "STALE",
+            registryObservation: "PROVEN_ABSENT",
+            canonicalProjectState: null,
+            canonicalCurrentness: "NOT_PROVEN",
+            sourceRef: definition.sourceRef,
+            provenance: {
+                ...definition.provenance,
+                sourceRefs: [...definition.provenance.sourceRefs],
+            },
+            flags: [...definition.flags],
+        };
+    }
+
+    return {
+        managedProjectId: definition.managedProjectId,
+        projectName: definition.projectName,
+        managedMembership: { ...definition.managedMembership },
+        workosSlug,
+        directoryBinding: "BOUND",
+        bindingCurrentness: definition.baselineCurrentness,
+        registryObservation: "PROVEN_PRESENT",
+        canonicalProjectState:
+            rawProject.canonicalProjectState.stateVersionId,
+        canonicalCurrentness:
+            rawProject.canonicalProjectState.stateStatus,
+        sourceRef: definition.sourceRef,
+        provenance: {
+            ...definition.provenance,
+            sourceRefs: [...definition.provenance.sourceRefs],
+        },
+        flags: [...definition.flags],
+    };
+}
+
+function buildManagedPortfolio(
+    rawProjects: CoreProjectDirectoryEntry[],
+): ManagedProjectDirectoryProjection {
+    const rawBySlug = new Map(
+        rawProjects.map((project) => [project.projectSlug, project]),
+    );
+
+    const projects = MANAGED_PROJECT_BINDINGS.map((definition) =>
+        toManagedProjectEntry(definition, rawBySlug),
+    );
+
+    const boundCount = projects.filter(
+        (project) => project.directoryBinding === "BOUND",
+    ).length;
+
+    const missingOrUnboundCount = projects.filter(
+        (project) => project.directoryBinding === "MISSING_OR_UNBOUND",
+    ).length;
+
+    return {
+        schemaVersion: MANAGED_PROJECT_DIRECTORY_SCHEMA_VERSION,
+        projectCount: projects.length,
+        boundCount,
+        missingOrUnboundCount,
+        projects,
+    };
+}
+
 export function readCoreProjectDirectory(
     db: Database.Database,
 ): CoreProjectDirectoryResponse {
@@ -110,8 +212,11 @@ export function readCoreProjectDirectory(
         ORDER BY id ASC
     `).all() as ProjectDirectoryRow[];
 
+    const projects = rows.map((row) => toDirectoryEntry(db, row));
+
     return {
         schemaVersion: WORKOS_CORE_SCHEMA_VERSION,
-        projects: rows.map((row) => toDirectoryEntry(db, row)),
+        projects,
+        managedPortfolio: buildManagedPortfolio(projects),
     };
 }

@@ -10,7 +10,10 @@ const CURRENT_PAYLOAD = JSON.stringify({
     posture: { status: "KNOWN", value: "READ_ONLY" },
     phase: { status: "KNOWN", value: "P04-W04-I001" },
     currentFocus: { status: "KNOWN", value: "WorkOS Core API v0.1" },
-    nextAuthoritativeAction: { status: "KNOWN", value: "Run bounded runtime proof" },
+    nextAuthoritativeAction: {
+        status: "KNOWN",
+        value: "Run bounded runtime proof",
+    },
     waitingOrHold: { status: "NOT_GOVERNED" },
     blockers: { status: "KNOWN", value: [] },
     dependencies: { status: "KNOWN", value: [] },
@@ -21,7 +24,10 @@ const STALE_PAYLOAD = JSON.stringify({
     posture: { status: "KNOWN", value: "READ_ONLY" },
     phase: { status: "KNOWN", value: "OLD" },
     currentFocus: { status: "KNOWN", value: "Old state" },
-    nextAuthoritativeAction: { status: "KNOWN", value: "Old authoritative action" },
+    nextAuthoritativeAction: {
+        status: "KNOWN",
+        value: "Old authoritative action",
+    },
     waitingOrHold: { status: "NOT_GOVERNED" },
     blockers: { status: "KNOWN", value: [] },
     dependencies: { status: "KNOWN", value: [] },
@@ -48,15 +54,29 @@ function createProjectsTable(db: Database.Database): void {
 
 function insertProject(
     db: Database.Database,
-    values: { id: string; slug: string; name: string; nextAction: string },
+    values: {
+        id: string;
+        slug: string;
+        name: string;
+        nextAction: string;
+    },
 ): void {
     db.prepare(`
         INSERT INTO projects (
             id, slug, name, category, registry_status, priority,
             current_goal, progress_stage, next_action, cadence,
             risk_or_blocked_by, metadata_updated_at
-        ) VALUES (?, ?, ?, 'system', 'active', 'high', 'Registry goal', 'In Dev', ?, 'weekly', NULL, '2026-09-22T00:00:00Z')
-    `).run(values.id, values.slug, values.name, values.nextAction);
+        ) VALUES (
+            ?, ?, ?, 'system', 'active', 'high',
+            'Registry goal', 'In Dev', ?, 'weekly',
+            NULL, '2026-09-22T00:00:00Z'
+        )
+    `).run(
+        values.id,
+        values.slug,
+        values.name,
+        values.nextAction,
+    );
 }
 
 function insertVersion(
@@ -73,7 +93,13 @@ function insertVersion(
             id, project_id, schema_version, state_payload_json,
             supersedes_state_version_id, authority_ref, source_type,
             source_ref, source_hash, issued_at, issued_by, created_at
-        ) VALUES (?, ?, 'project-state.v1', ?, ?, ?, 'human_frozen_contract', ?, ?, '2026-09-22T00:00:00Z', 'human', '2026-09-22T00:00:00Z')
+        ) VALUES (
+            ?, ?, 'project-state.v1', ?, ?, ?,
+            'human_frozen_contract', ?, ?,
+            '2026-09-22T00:00:00Z',
+            'human',
+            '2026-09-22T00:00:00Z'
+        )
     `).run(
         values.id,
         values.projectId,
@@ -85,11 +111,24 @@ function insertVersion(
     );
 }
 
-function selectHead(db: Database.Database, projectId: string, versionId: string): void {
+function selectHead(
+    db: Database.Database,
+    projectId: string,
+    versionId: string,
+): void {
     db.prepare(`
         INSERT INTO project_state_heads (
-            project_id, current_state_version_id, selected_at, selected_by, selection_authority_ref
-        ) VALUES (?, ?, '2026-09-22T01:00:00Z', 'human', 'HEAD-AUTH')
+            project_id,
+            current_state_version_id,
+            selected_at,
+            selected_by,
+            selection_authority_ref
+        ) VALUES (
+            ?, ?,
+            '2026-09-22T01:00:00Z',
+            'human',
+            'HEAD-AUTH'
+        )
     `).run(projectId, versionId);
 }
 
@@ -116,7 +155,9 @@ describe("WorkOS Core API project directory", () => {
         expect(projectDirectorySource).toContain(
             "readCanonicalProjectStateBySlug(db, row.slug)",
         );
-        expect(projectDirectorySource).not.toMatch(/project_state_heads|project_state_versions/);
+        expect(projectDirectorySource).not.toMatch(
+            /project_state_heads|project_state_versions/,
+        );
         expect(projectDirectorySource).not.toMatch(/MAX\s*\(/i);
     });
 
@@ -135,10 +176,12 @@ describe("WorkOS Core API project directory", () => {
         selectHead(db, "P04", "PSV-WORKOS-LITE-000001");
 
         const result = readCoreProjectDirectory(db);
+
         expect(result.schemaVersion).toBe("workos-core.v0.1");
         expect(result.projects).toHaveLength(1);
 
         const project = result.projects[0];
+
         expect(project).toMatchObject({
             projectId: "P04",
             projectSlug: "workos-lite",
@@ -159,9 +202,10 @@ describe("WorkOS Core API project directory", () => {
                 },
             },
         });
-        expect(project.canonicalProjectState.nextAuthoritativeAction).not.toBe(
-            project.registryMetadata.nextAction,
-        );
+
+        expect(
+            project.canonicalProjectState.nextAuthoritativeAction,
+        ).not.toBe(project.registryMetadata.nextAction);
     });
 
     it("returns NOT_PROVEN without a head and never falls back to Registry nextAction", () => {
@@ -173,12 +217,16 @@ describe("WorkOS Core API project directory", () => {
         });
 
         const project = readCoreProjectDirectory(db).projects[0];
+
         expect(project.canonicalProjectState).toMatchObject({
             stateStatus: "NOT_PROVEN",
             stateVersionId: null,
             nextAuthoritativeAction: null,
         });
-        expect(project.registryMetadata.nextAction).toBe("Registry fallback forbidden");
+
+        expect(project.registryMetadata.nextAction).toBe(
+            "Registry fallback forbidden",
+        );
     });
 
     it("returns STALE and withholds nextAuthoritativeAction when the selected head is superseded", () => {
@@ -202,6 +250,7 @@ describe("WorkOS Core API project directory", () => {
         selectHead(db, "P-STALE", "PSV-STALE-1");
 
         const project = readCoreProjectDirectory(db).projects[0];
+
         expect(project.canonicalProjectState).toMatchObject({
             stateStatus: "STALE",
             stateVersionId: "PSV-STALE-1",
@@ -212,5 +261,117 @@ describe("WorkOS Core API project directory", () => {
     it("fails closed when the directory read itself is unavailable", () => {
         db.close();
         expect(() => readCoreProjectDirectory(db)).toThrow();
+    });
+
+    it("adds the managed Portfolio projection and resolves P04 only through its exact verified slug", () => {
+        insertProject(db, {
+            id: "WniiRWTaGeEY7gt3XAsm7",
+            slug: "workos-lite-arbordesk",
+            name: "WorkOS-Lite / ArborDesk",
+            nextAction: "Registry action",
+        });
+
+        insertVersion(db, {
+            id: "PSV-WORKOS-LITE-000002",
+            projectId: "WniiRWTaGeEY7gt3XAsm7",
+            payload: CURRENT_PAYLOAD,
+        });
+
+        selectHead(
+            db,
+            "WniiRWTaGeEY7gt3XAsm7",
+            "PSV-WORKOS-LITE-000002",
+        );
+
+        const result = readCoreProjectDirectory(db);
+
+        expect(result.projects).toHaveLength(1);
+        expect(result.managedPortfolio).toMatchObject({
+            schemaVersion: "managed-project-directory.v0.1",
+            projectCount: 15,
+            boundCount: 10,
+            missingOrUnboundCount: 5,
+        });
+
+        const p04 = result.managedPortfolio.projects.find(
+            (project) => project.managedProjectId === "P04",
+        );
+
+        expect(p04).toMatchObject({
+            managedProjectId: "P04",
+            workosSlug: "workos-lite-arbordesk",
+            directoryBinding: "BOUND",
+            bindingCurrentness: "CURRENT",
+            registryObservation: "PROVEN_PRESENT",
+            canonicalProjectState: "PSV-WORKOS-LITE-000002",
+            canonicalCurrentness: "CURRENT",
+        });
+    });
+
+    it("keeps all five missing/unbound Projects visible and performs no name matching", () => {
+        insertProject(db, {
+            id: "3bb5f841-113a-4e94-a477-12d84570177f",
+            slug: "green-fineness-operations-intelligence-tgd",
+            name: "Green Fineness — Nursery Operations Platform",
+            nextAction: "Must not bind to P01 by name",
+        });
+
+        const result = readCoreProjectDirectory(db);
+
+        const unbound = result.managedPortfolio.projects
+            .filter(
+                (project) =>
+                    project.directoryBinding === "MISSING_OR_UNBOUND",
+            )
+            .map((project) => project.managedProjectId)
+            .sort();
+
+        expect(unbound).toEqual([
+            "AVACRM",
+            "GF-LEARNING-CONTENT",
+            "GF-TOOLS",
+            "P01",
+            "P07",
+        ]);
+
+        const p01 = result.managedPortfolio.projects.find(
+            (project) => project.managedProjectId === "P01",
+        );
+
+        expect(p01).toMatchObject({
+            workosSlug: null,
+            directoryBinding: "MISSING_OR_UNBOUND",
+            registryObservation: "NOT_PROVEN",
+            canonicalProjectState: null,
+            canonicalCurrentness: "NOT_PROVEN",
+        });
+
+        expect(
+            result.managedPortfolio.projects.map(
+                (project) => project.workosSlug,
+            ),
+        ).not.toContain("green-fineness-operations-intelligence-tgd");
+
+        expect(result.projects[0].projectSlug).toBe(
+            "green-fineness-operations-intelligence-tgd",
+        );
+    });
+
+    it("keeps a frozen BOUND identity but marks its runtime binding STALE when the exact slug is absent", () => {
+        const result = readCoreProjectDirectory(db);
+
+        const p02 = result.managedPortfolio.projects.find(
+            (project) => project.managedProjectId === "P02",
+        );
+
+        expect(p02).toMatchObject({
+            managedProjectId: "P02",
+            workosSlug: "green-fineness-content",
+            directoryBinding: "BOUND",
+            bindingCurrentness: "STALE",
+            registryObservation: "PROVEN_ABSENT",
+            canonicalProjectState: null,
+            canonicalCurrentness: "NOT_PROVEN",
+        });
     });
 });
