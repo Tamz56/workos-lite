@@ -13,43 +13,106 @@ import {
     ShieldCheck,
 } from "lucide-react";
 
-type Availability = "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
-type Currentness = "CURRENT_WITHIN_SOURCE" | "NOT_PROVEN";
+type Availability =
+    | "AVAILABLE"
+    | "NOT_AVAILABLE"
+    | "UNKNOWN";
+
+type SourceCurrentness =
+    | "CURRENT_WITHIN_SOURCE"
+    | "NOT_PROVEN";
+
+type ClaimCurrentness =
+    | "CURRENT_WITHIN_SOURCE"
+    | "CURRENT"
+    | "STALE"
+    | "NOT_PROVEN"
+    | "UNBOUND";
+
+type DisclosureCurrentness =
+    | SourceCurrentness
+    | ClaimCurrentness;
+
+type GovernedFact =
+    | {
+        status: "KNOWN";
+        value: unknown;
+      }
+    | {
+        status: "UNKNOWN";
+      }
+    | {
+        status: "NOT_GOVERNED";
+      };
 
 type SourceDescriptor = {
     authority: string;
     availability: Availability;
-    currentness: Currentness;
+    currentness: SourceCurrentness;
+};
+
+type CoreRegistryMetadataValue = {
+    authority: "REGISTRY_METADATA";
+    currentness: "CURRENT_WITHIN_SOURCE";
+    category: string | null;
+    registryStatus: string | null;
+    priority: string | null;
+    currentGoal: string | null;
+    progressStage: string | null;
+    nextAction: string | null;
+    cadence: string | null;
+    riskOrBlockedBy: string | null;
+    metadataUpdatedAt: string | null;
 };
 
 type ProjectProjection = {
     identity: {
         id: string;
         name: string;
-        slug: string;
+        slug: string | null;
+        registryProjectId: string | null;
     };
+
+    directoryBinding:
+        | "BOUND"
+        | "MISSING_OR_UNBOUND";
+
+    registryObservation:
+        | "PROVEN_PRESENT"
+        | "PROVEN_ABSENT"
+        | "NOT_PROVEN";
+
     registryMetadata: {
-        authority: string;
-        currentness: Currentness;
-        status: string;
-        category: string | null;
-        registryStatus: string | null;
-        priority: string | null;
-        currentGoal: string | null;
-        progressStage: string | null;
-        nextAction: string | null;
-        cadence: string | null;
-        riskOrBlockedBy: string | null;
+        value:
+            | CoreRegistryMetadataValue
+            | null;
+        authority:
+            | "REGISTRY_METADATA"
+            | "NONE";
+        currentness:
+            ClaimCurrentness;
     };
+
     canonicalProjectState: {
-        value: unknown | null;
-        authority: string;
-        currentness: Currentness;
+        value:
+            | string
+            | null;
+        authority:
+            | "PROJECT_STATE"
+            | "NONE";
+        currentness:
+            ClaimCurrentness;
     };
+
     nextAuthoritativeAction: {
-        value: unknown | null;
-        authority: string;
-        currentness: Currentness;
+        value:
+            | GovernedFact
+            | null;
+        authority:
+            | "PROJECT_STATE"
+            | "NONE";
+        currentness:
+            ClaimCurrentness;
     };
 };
 
@@ -76,20 +139,43 @@ type PlannerItem = {
 type ControlCenterProjection = {
     schemaVersion: string;
     asOfDate: string;
+
     sources: {
-        projectRegistry: SourceDescriptor;
-        planner: SourceDescriptor;
-        coordination: SourceDescriptor;
-        projectMemory: SourceDescriptor;
-        executionEvidence: SourceDescriptor;
+        projectRegistry:
+            SourceDescriptor;
+
+        planner:
+            SourceDescriptor;
+
+        coordination:
+            SourceDescriptor;
+
+        projectMemory:
+            SourceDescriptor;
+
+        executionEvidence:
+            SourceDescriptor;
     };
-    projects: ProjectProjection[];
+
+    managedProjectSummary: {
+        projectCount: number;
+        boundCount: number;
+        missingOrUnboundCount: number;
+    };
+
+    managedProjects:
+        ProjectProjection[];
+
     plannerState: {
         authority: string;
-        currentness: Currentness;
-        availability: Availability;
-        day: PlannerDay | null;
-        items: PlannerItem[];
+        currentness:
+            SourceCurrentness;
+        availability:
+            Availability;
+        day:
+            PlannerDay | null;
+        items:
+            PlannerItem[];
     };
 };
 
@@ -99,19 +185,68 @@ function label(value: string | null | undefined) {
     return value && value.trim() ? value : "NOT_AVAILABLE";
 }
 
-function valueText(value: unknown, currentness: Currentness) {
-    if (value === null || value === undefined || value === "") {
-        return currentness === "NOT_PROVEN" ? "NOT_PROVEN" : "NOT_AVAILABLE";
+function valueText(
+    value: unknown,
+    currentness: DisclosureCurrentness,
+) {
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        if (
+            currentness === "STALE"
+            || currentness === "NOT_PROVEN"
+            || currentness === "UNBOUND"
+        ) {
+            return currentness;
+        }
+
+        return "NOT_AVAILABLE";
     }
-    if (typeof value === "string") return value;
+
+    if (
+        typeof value === "object"
+        && value !== null
+        && "status" in value
+    ) {
+        const fact =
+            value as GovernedFact;
+
+        if (
+            fact.status === "KNOWN"
+        ) {
+            const detail =
+                typeof fact.value === "string"
+                    ? fact.value
+                    : JSON.stringify(
+                        fact.value,
+                    );
+
+            return `KNOWN · ${detail}`;
+        }
+
+        return fact.status;
+    }
+
+    if (
+        typeof value === "string"
+    ) {
+        return value;
+    }
+
     return JSON.stringify(value);
 }
 
 function disclosureTone(value: string) {
-    if (value === "AVAILABLE" || value === "CURRENT_WITHIN_SOURCE") {
+    if (
+        value === "AVAILABLE"
+        || value === "CURRENT_WITHIN_SOURCE"
+        || value === "CURRENT"
+    ) {
         return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300";
     }
-    if (value === "UNKNOWN") {
+    if (value === "UNKNOWN" || value === "STALE") {
         return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300";
     }
     return "border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300";
@@ -143,7 +278,7 @@ function Disclosure({
     source: string;
     authority: string;
     availability?: Availability;
-    currentness: Currentness;
+    currentness: DisclosureCurrentness;
 }) {
     return (
         <div className="flex flex-wrap gap-1.5 text-[8px] font-black uppercase tracking-wider">
@@ -209,8 +344,33 @@ export default function GovernedControlCenterView() {
     }, [loadProjection]);
 
     const projectNames = useMemo(() => {
-        const index = new Map<string, string>();
-        data?.projects.forEach((project) => index.set(project.identity.id, project.identity.name));
+        const index =
+            new Map<string, string>();
+
+        data?.managedProjects.forEach(
+            (project) => {
+                index.set(
+                    project.identity.id,
+                    project.identity.name,
+                );
+
+                if (
+                    project
+                        .identity
+                        .registryProjectId
+                ) {
+                    index.set(
+                        project
+                            .identity
+                            .registryProjectId,
+                        project
+                            .identity
+                            .name,
+                    );
+                }
+            },
+        );
+
         return index;
     }, [data]);
 
@@ -255,9 +415,17 @@ export default function GovernedControlCenterView() {
     const reviewItems = data.plannerState.items.filter(
         (item) => item.planner_status.toLowerCase() === "review",
     );
-    const registryRiskRows = data.projects.filter((project) =>
-        Boolean(project.registryMetadata.riskOrBlockedBy?.trim()),
-    );
+    const registryRiskRows =
+        data.managedProjects.filter(
+            (project) =>
+                Boolean(
+                    project
+                        .registryMetadata
+                        .value
+                        ?.riskOrBlockedBy
+                        ?.trim(),
+                ),
+        );
 
     const itemLabel = (item: PlannerItem) => {
         const projectName = item.source_project_id ? projectNames.get(item.source_project_id) : undefined;
@@ -283,7 +451,7 @@ export default function GovernedControlCenterView() {
                         Governed Control Center
                     </h3>
                     <p className="mt-1 text-[10px] font-bold text-theme-muted">
-                        P3 read projection · {data.schemaVersion} · as of {data.asOfDate}
+                        Managed read projection · {data.schemaVersion} · as of {data.asOfDate}
                     </p>
                 </div>
                 <button
@@ -415,15 +583,22 @@ export default function GovernedControlCenterView() {
                         <Database className="h-4 w-4 text-indigo-600" />
                         Portfolio
                     </h4>
-                    <span className="text-[9px] font-black text-theme-muted">{data.projects.length} Registry projects</span>
+                    <span className="text-[9px] font-black text-theme-muted">{data.managedProjectSummary.projectCount} Managed Projects ·{" "}
+                        {data.managedProjectSummary.boundCount} bound ·{" "}
+                        {data.managedProjectSummary.missingOrUnboundCount} missing/unbound</span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    {data.projects.map((project) => (
+                    {data.managedProjects.map((project) => (
                         <article key={project.identity.id} className="space-y-4 rounded-[24px] border border-theme-border bg-theme-input/10 p-5">
                             <div>
                                 <div className="text-sm font-black text-theme-primary">{project.identity.name}</div>
-                                <div className="mt-0.5 text-[9px] font-bold text-theme-muted">{project.identity.slug}</div>
+                                <div className="mt-0.5 text-[9px] font-bold text-theme-muted">
+                                    {project.identity.slug ?? "UNBOUND"}
+                                </div>
+                                <div className="mt-1 text-[8px] font-black uppercase tracking-wider text-theme-muted">
+                                    {project.directoryBinding} · {project.registryObservation}
+                                </div>
                             </div>
 
                             <Disclosure
@@ -434,13 +609,13 @@ export default function GovernedControlCenterView() {
                             />
 
                             <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
-                                <div><dt className="text-[8px] font-black uppercase text-theme-muted">Registry status</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.registryStatus ?? project.registryMetadata.status)}</dd></div>
-                                <div><dt className="text-[8px] font-black uppercase text-theme-muted">Priority</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.priority)}</dd></div>
-                                <div className="sm:col-span-2"><dt className="text-[8px] font-black uppercase text-theme-muted">Current goal</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.currentGoal)}</dd></div>
-                                <div><dt className="text-[8px] font-black uppercase text-theme-muted">Registry stage</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.progressStage)}</dd></div>
-                                <div><dt className="text-[8px] font-black uppercase text-theme-muted">Cadence</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.cadence)}</dd></div>
-                                <div className="sm:col-span-2"><dt className="text-[8px] font-black uppercase text-theme-muted">Registry next action</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.nextAction)}</dd></div>
-                                <div className="sm:col-span-2"><dt className="text-[8px] font-black uppercase text-theme-muted">Blocker / risk</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.riskOrBlockedBy)}</dd></div>
+                                <div><dt className="text-[8px] font-black uppercase text-theme-muted">Registry status</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.registryStatus)}</dd></div>
+                                <div><dt className="text-[8px] font-black uppercase text-theme-muted">Priority</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.priority)}</dd></div>
+                                <div className="sm:col-span-2"><dt className="text-[8px] font-black uppercase text-theme-muted">Current goal</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.currentGoal)}</dd></div>
+                                <div><dt className="text-[8px] font-black uppercase text-theme-muted">Registry stage</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.progressStage)}</dd></div>
+                                <div><dt className="text-[8px] font-black uppercase text-theme-muted">Cadence</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.cadence)}</dd></div>
+                                <div className="sm:col-span-2"><dt className="text-[8px] font-black uppercase text-theme-muted">Registry next action</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.nextAction)}</dd></div>
+                                <div className="sm:col-span-2"><dt className="text-[8px] font-black uppercase text-theme-muted">Blocker / risk</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.riskOrBlockedBy)}</dd></div>
                             </dl>
 
                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -508,7 +683,7 @@ export default function GovernedControlCenterView() {
                             registryRiskRows.map((project) => (
                                 <div key={project.identity.id} className="rounded-xl border border-theme-border bg-theme-card p-3">
                                     <div className="text-[10px] font-black text-theme-primary">{project.identity.name}</div>
-                                    <div className="mt-1 text-[10px] font-bold text-theme-secondary">{project.registryMetadata.riskOrBlockedBy}</div>
+                                    <div className="mt-1 text-[10px] font-bold text-theme-secondary">{project.registryMetadata.value?.riskOrBlockedBy}</div>
                                 </div>
                             ))
                         )}

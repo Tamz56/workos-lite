@@ -1,29 +1,44 @@
 import type Database from "better-sqlite3";
+import { readCoreProjectDirectory } from "@/lib/core-api/projectDirectory";
+import type {
+    CoreProjectDirectoryEntry,
+    CoreRegistryMetadata,
+    ManagedProjectDirectoryEntry,
+} from "@/lib/core-api/types";
+import type { GovernedFact } from "@/lib/project-state/types";
 
-export const CONTROL_CENTER_PROJECTION_SCHEMA_VERSION = "ACC-PPC-v0.1" as const;
+export const CONTROL_CENTER_PROJECTION_SCHEMA_VERSION =
+    "ACC-PPC-v0.2" as const;
 
-type Availability = "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
-type Currentness = "CURRENT_WITHIN_SOURCE" | "NOT_PROVEN";
+type Availability =
+    | "AVAILABLE"
+    | "NOT_AVAILABLE"
+    | "UNKNOWN";
+
+type SourceCurrentness =
+    | "CURRENT_WITHIN_SOURCE"
+    | "NOT_PROVEN";
+
+type ClaimCurrentness =
+    | "CURRENT_WITHIN_SOURCE"
+    | "CURRENT"
+    | "STALE"
+    | "NOT_PROVEN"
+    | "UNBOUND";
 
 type SourceDescriptor = {
     authority: string;
     availability: Availability;
-    currentness: Currentness;
+    currentness: SourceCurrentness;
 };
 
-type ProjectRow = {
-    id: string;
-    name: string;
-    slug: string;
-    status: string;
-    category: string | null;
-    registry_status: string | null;
-    priority: string | null;
-    current_goal: string | null;
-    progress_stage: string | null;
-    next_action: string | null;
-    cadence: string | null;
-    risk_or_blocked_by: string | null;
+type GovernedClaim<T> = {
+    value: T | null;
+    authority:
+        | "REGISTRY_METADATA"
+        | "PROJECT_STATE"
+        | "NONE";
+    currentness: ClaimCurrentness;
 };
 
 type PlannerDayRow = {
@@ -49,23 +64,39 @@ type PlannerItemRow = {
 function descriptor(
     authority: string,
     availability: Availability,
-    currentness: Currentness,
+    currentness: SourceCurrentness,
 ): SourceDescriptor {
-    return { authority, availability, currentness };
+    return {
+        authority,
+        availability,
+        currentness,
+    };
 }
 
-function readPlanner(db: Database.Database, date: string) {
+function readPlanner(
+    db: Database.Database,
+    date: string,
+) {
     try {
         const day = db.prepare(`
-            SELECT id, plan_date, main_outcome, daily_capacity_minutes,
-                   energy_level, status
+            SELECT
+                id,
+                plan_date,
+                main_outcome,
+                daily_capacity_minutes,
+                energy_level,
+                status
             FROM planner_days
             WHERE plan_date = ?
         `).get(date) as PlannerDayRow | undefined;
 
         if (!day) {
             return {
-                source: descriptor("PLANNER_STATE", "NOT_AVAILABLE", "NOT_PROVEN"),
+                source: descriptor(
+                    "PLANNER_STATE",
+                    "NOT_AVAILABLE",
+                    "NOT_PROVEN",
+                ),
                 day: null,
                 items: [] as PlannerItemRow[],
             };
@@ -90,50 +121,293 @@ function readPlanner(db: Database.Database, date: string) {
               ON pi.source_type = 'project_item'
              AND pitem.id = pi.source_id
             WHERE pi.planner_day_id = ?
-            ORDER BY pi.planned_order ASC, pi.created_at ASC
+            ORDER BY
+                pi.planned_order ASC,
+                pi.created_at ASC
         `).all(day.id) as PlannerItemRow[];
 
         return {
-            source: descriptor("PLANNER_STATE", "AVAILABLE", "CURRENT_WITHIN_SOURCE"),
+            source: descriptor(
+                "PLANNER_STATE",
+                "AVAILABLE",
+                "CURRENT_WITHIN_SOURCE",
+            ),
             day,
             items,
         };
     } catch {
         return {
-            source: descriptor("PLANNER_STATE", "UNKNOWN", "NOT_PROVEN"),
+            source: descriptor(
+                "PLANNER_STATE",
+                "UNKNOWN",
+                "NOT_PROVEN",
+            ),
             day: null,
             items: [] as PlannerItemRow[],
         };
     }
 }
 
+function exactRawProject(
+    managed: ManagedProjectDirectoryEntry,
+    rawBySlug: ReadonlyMap<
+        string,
+        CoreProjectDirectoryEntry
+    >,
+): CoreProjectDirectoryEntry | null {
+    if (
+        managed.workosSlug === null
+        || managed.registryObservation !== "PROVEN_PRESENT"
+    ) {
+        return null;
+    }
+
+    const raw = rawBySlug.get(
+        managed.workosSlug,
+    );
+
+    if (
+        !raw
+        || raw.projectSlug !== managed.workosSlug
+    ) {
+        return null;
+    }
+
+    return raw;
+}
+
+function registryClaim(
+    managed: ManagedProjectDirectoryEntry,
+    raw: CoreProjectDirectoryEntry | null,
+): GovernedClaim<CoreRegistryMetadata> {
+    if (
+        managed.directoryBinding
+        === "MISSING_OR_UNBOUND"
+    ) {
+        return {
+            value: null,
+            authority: "NONE",
+            currentness: "UNBOUND",
+        };
+    }
+
+    if (!raw) {
+        return {
+            value: null,
+            authority: "REGISTRY_METADATA",
+            currentness: "NOT_PROVEN",
+        };
+    }
+
+    return {
+        value: raw.registryMetadata,
+        authority: "REGISTRY_METADATA",
+        currentness: "CURRENT_WITHIN_SOURCE",
+    };
+}
+
+function canonicalStateClaim(
+    managed: ManagedProjectDirectoryEntry,
+    raw: CoreProjectDirectoryEntry | null,
+): GovernedClaim<string> {
+    if (
+        managed.directoryBinding
+        === "MISSING_OR_UNBOUND"
+    ) {
+        return {
+            value: null,
+            authority: "NONE",
+            currentness: "UNBOUND",
+        };
+    }
+
+    if (!raw) {
+        return {
+            value: null,
+            authority: "NONE",
+            currentness: "NOT_PROVEN",
+        };
+    }
+
+    const canonical =
+        raw.canonicalProjectState;
+
+    if (canonical.stateStatus === "CURRENT") {
+        return {
+            value: canonical.stateVersionId,
+            authority: "PROJECT_STATE",
+            currentness: "CURRENT",
+        };
+    }
+
+    if (canonical.stateStatus === "STALE") {
+        return {
+            value: canonical.stateVersionId,
+            authority: "PROJECT_STATE",
+            currentness: "STALE",
+        };
+    }
+
+    return {
+        value: null,
+        authority: "PROJECT_STATE",
+        currentness: "NOT_PROVEN",
+    };
+}
+
+function nextAuthoritativeActionClaim(
+    managed: ManagedProjectDirectoryEntry,
+    raw: CoreProjectDirectoryEntry | null,
+): GovernedClaim<GovernedFact> {
+    if (
+        managed.directoryBinding
+        === "MISSING_OR_UNBOUND"
+    ) {
+        return {
+            value: null,
+            authority: "NONE",
+            currentness: "UNBOUND",
+        };
+    }
+
+    if (!raw) {
+        return {
+            value: null,
+            authority: "NONE",
+            currentness: "NOT_PROVEN",
+        };
+    }
+
+    const canonical =
+        raw.canonicalProjectState;
+
+    if (canonical.stateStatus === "CURRENT") {
+        return {
+            value:
+                canonical.nextAuthoritativeAction,
+            authority: "PROJECT_STATE",
+            currentness: "CURRENT",
+        };
+    }
+
+    if (canonical.stateStatus === "STALE") {
+        return {
+            value: null,
+            authority: "PROJECT_STATE",
+            currentness: "STALE",
+        };
+    }
+
+    return {
+        value: null,
+        authority: "PROJECT_STATE",
+        currentness: "NOT_PROVEN",
+    };
+}
+
+function toManagedProjectProjection(
+    managed: ManagedProjectDirectoryEntry,
+    rawBySlug: ReadonlyMap<
+        string,
+        CoreProjectDirectoryEntry
+    >,
+) {
+    const raw = exactRawProject(
+        managed,
+        rawBySlug,
+    );
+
+    return {
+        identity: {
+            id: managed.managedProjectId,
+            name: managed.projectName,
+            slug: managed.workosSlug,
+            registryProjectId:
+                raw?.projectId ?? null,
+        },
+
+        managedMembership: {
+            ...managed.managedMembership,
+        },
+
+        directoryBinding:
+            managed.directoryBinding,
+
+        bindingCurrentness:
+            managed.bindingCurrentness,
+
+        registryObservation:
+            managed.registryObservation,
+
+        registryMetadata:
+            registryClaim(managed, raw),
+
+        canonicalProjectState:
+            canonicalStateClaim(
+                managed,
+                raw,
+            ),
+
+        nextAuthoritativeAction:
+            nextAuthoritativeActionClaim(
+                managed,
+                raw,
+            ),
+
+        sourceRef:
+            managed.sourceRef,
+
+        provenance: {
+            ...managed.provenance,
+            sourceRefs: [
+                ...managed.provenance.sourceRefs,
+            ],
+        },
+
+        flags: [
+            ...managed.flags,
+        ],
+    };
+}
+
 export function buildControlCenterProjection(
     db: Database.Database,
     date: string,
 ) {
-    const registryRows = db.prepare(`
-        SELECT
-            id,
-            name,
-            slug,
-            status,
-            category,
-            registry_status,
-            priority,
-            current_goal,
-            progress_stage,
-            next_action,
-            cadence,
-            risk_or_blocked_by
-        FROM projects
-        ORDER BY created_at DESC
-    `).all() as ProjectRow[];
+    const core =
+        readCoreProjectDirectory(db);
 
-    const planner = readPlanner(db, date);
+    const rawBySlug = new Map(
+        core.projects.map((project) => [
+            project.projectSlug,
+            project,
+        ]),
+    );
+
+    const managedProjects =
+        core.managedPortfolio.projects.map(
+            (managed) =>
+                toManagedProjectProjection(
+                    managed,
+                    rawBySlug,
+                ),
+        );
+
+    const planner =
+        readPlanner(db, date);
 
     return {
-        schemaVersion: CONTROL_CENTER_PROJECTION_SCHEMA_VERSION,
-        asOfDate: date,
+        schemaVersion:
+            CONTROL_CENTER_PROJECTION_SCHEMA_VERSION,
+
+        asOfDate:
+            date,
+
+        coreSchemaVersion:
+            core.schemaVersion,
+
+        managedDirectorySchemaVersion:
+            core.managedPortfolio.schemaVersion,
 
         sources: {
             projectRegistry: descriptor(
@@ -141,17 +415,22 @@ export function buildControlCenterProjection(
                 "AVAILABLE",
                 "CURRENT_WITHIN_SOURCE",
             ),
-            planner: planner.source,
+
+            planner:
+                planner.source,
+
             coordination: descriptor(
                 "COORDINATION",
                 "NOT_AVAILABLE",
                 "NOT_PROVEN",
             ),
+
             projectMemory: descriptor(
                 "PROJECT_MEMORY",
                 "NOT_AVAILABLE",
                 "NOT_PROVEN",
             ),
+
             executionEvidence: descriptor(
                 "EXECUTION_EVIDENCE",
                 "NOT_AVAILABLE",
@@ -159,46 +438,35 @@ export function buildControlCenterProjection(
             ),
         },
 
-        projects: registryRows.map((row) => ({
-            identity: {
-                id: row.id,
-                name: row.name,
-                slug: row.slug,
-            },
+        managedProjectSummary: {
+            projectCount:
+                core.managedPortfolio.projectCount,
 
-            registryMetadata: {
-                authority: "REGISTRY_METADATA",
-                currentness: "CURRENT_WITHIN_SOURCE",
-                status: row.status,
-                category: row.category,
-                registryStatus: row.registry_status,
-                priority: row.priority,
-                currentGoal: row.current_goal,
-                progressStage: row.progress_stage,
-                nextAction: row.next_action,
-                cadence: row.cadence,
-                riskOrBlockedBy: row.risk_or_blocked_by,
-            },
+            boundCount:
+                core.managedPortfolio.boundCount,
 
-            canonicalProjectState: {
-                value: null,
-                authority: "NONE",
-                currentness: "NOT_PROVEN",
-            },
+            missingOrUnboundCount:
+                core.managedPortfolio
+                    .missingOrUnboundCount,
+        },
 
-            nextAuthoritativeAction: {
-                value: null,
-                authority: "NONE",
-                currentness: "NOT_PROVEN",
-            },
-        })),
+        managedProjects,
 
         plannerState: {
-            authority: "PLANNER_STATE",
-            currentness: planner.source.currentness,
-            availability: planner.source.availability,
-            day: planner.day,
-            items: planner.items,
+            authority:
+                "PLANNER_STATE",
+
+            currentness:
+                planner.source.currentness,
+
+            availability:
+                planner.source.availability,
+
+            day:
+                planner.day,
+
+            items:
+                planner.items,
         },
     };
 }
