@@ -35,7 +35,7 @@ const viewSource =
     );
 
 describe(
-    "ACC-PPC-v0.2 governed Control Center UI contract",
+    "ACC-PPC-v0.3 governed Control Center UI contract",
     () => {
         it(
             "mounts the governed view inside the existing host",
@@ -108,77 +108,169 @@ describe(
         );
 
         it(
-            "renders Managed Projects rather than raw Registry count",
+            "exposes exact governed Project links without deriving routes from names",
             () => {
                 expect(
                     viewSource,
                 ).toContain(
-                    "managedProjectSummary.projectCount",
+                    "project.projectLink.href",
                 );
 
                 expect(
                     viewSource,
                 ).toContain(
-                    "managedProjects",
-                );
-
-                expect(
-                    viewSource,
-                ).toContain(
-                    "Managed Projects",
+                    "Open Project",
                 );
 
                 expect(
                     viewSource,
                 ).not.toContain(
-                    "Registry projects",
+                    "encodeURIComponent(project.identity.name",
+                );
+
+                expect(
+                    viewSource,
+                ).not.toContain(
+                    "project.identity.id}/",
                 );
             },
         );
 
         it(
-            "keeps Registry, canonical state, and authoritative action separate",
+            "renders canonical Dependencies and Canonical State Evidence with exact wording",
             () => {
                 expect(
                     viewSource,
                 ).toContain(
-                    "registryMetadata",
+                    "Dependencies",
                 );
 
                 expect(
                     viewSource,
                 ).toContain(
-                    "canonicalProjectState",
+                    "Canonical State Evidence",
                 );
 
                 expect(
                     viewSource,
                 ).toContain(
-                    "nextAuthoritativeAction",
+                    "Open Canonical Evidence",
                 );
 
                 expect(
                     viewSource,
                 ).toContain(
-                    "Registry next action",
+                    "canonicalStateEvidence.value.sourceRef",
                 );
 
                 expect(
                     viewSource,
-                ).toContain(
-                    "Canonical Project State",
+                ).not.toContain(
+                    "href={project.canonicalStateEvidence.value.sourceRef}",
                 );
 
                 expect(
                     viewSource,
-                ).toContain(
-                    "Next Authoritative Action",
+                ).not.toContain(
+                    "Latest Evidence",
+                );
+
+                expect(
+                    viewSource,
+                ).not.toContain(
+                    "Latest Report",
+                );
+
+                expect(
+                    viewSource,
+                ).not.toContain(
+                    "Latest Execution Evidence",
                 );
             },
         );
 
         it(
-            "renders governed claim states and GovernedFact states explicitly",
+            "keeps Execution Evidence a separate unavailable governed source",
+            () => {
+                expect(
+                    viewSource,
+                ).toContain(
+                    "Execution Evidence",
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "data.sources.executionEvidence",
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "No governed execution activity is available in this projection.",
+                );
+            },
+        );
+
+        it(
+            "renders Portfolio Status as classification-only NOW NEXT WAITING BLOCKED buckets",
+            () => {
+                expect(
+                    viewSource,
+                ).toContain(
+                    "Portfolio Status",
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    '["NOW", "NEXT", "WAITING", "BLOCKED"]',
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "Classification only. Not portfolio priority or execution order.",
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "data.portfolioStatus.buckets[bucket]",
+                );
+            },
+        );
+
+        it(
+            "does not introduce Phase 7 portfolio ordering semantics",
+            () => {
+                for (
+                    const forbidden
+                    of [
+                        "Portfolio Priority",
+                        "What Must Happen First",
+                        "What Can Run in Parallel",
+                        "Human Decision Required ordering",
+                        "Waiting for External Dependency sequencing",
+                    ]
+                ) {
+                    expect(
+                        viewSource,
+                    ).not.toContain(
+                        forbidden,
+                    );
+                }
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "ID: {item.id}",
+                );
+            },
+        );
+
+        it(
+            "preserves explicit governed disclosure states",
             () => {
                 for (
                     const state
@@ -187,79 +279,28 @@ describe(
                         "STALE",
                         "NOT_PROVEN",
                         "UNBOUND",
-                        "KNOWN",
                         "UNKNOWN",
-                        "NOT_GOVERNED",
+                        "NOT_AVAILABLE",
+                        "CURRENT_WITHIN_SOURCE",
                     ]
                 ) {
                     expect(
                         viewSource,
                     ).toContain(
-                        `"${state}"`,
+                        state,
                     );
                 }
 
                 expect(
                     viewSource,
                 ).toContain(
-                    "CURRENT_WITHIN_SOURCE",
-                );
-            },
-        );
-
-        it(
-            "keeps Planner status surfaces explicit",
-            () => {
-                for (
-                    const status
-                    of [
-                        "doing",
-                        "ready",
-                        "waiting",
-                        "blocked",
-                        "review",
-                    ]
-                ) {
-                    expect(
-                        viewSource,
-                    ).toContain(
-                        `"${status}"`,
-                    );
-                }
-
-                expect(
-                    viewSource,
-                ).toContain(
-                    "is_main_task === 1",
+                    "Source:",
                 );
 
                 expect(
                     viewSource,
                 ).toContain(
-                    "No Today state is inferred",
-                );
-            },
-        );
-
-        it(
-            "keeps unavailable execution and dependency evidence explicit",
-            () => {
-                expect(
-                    viewSource,
-                ).toContain(
-                    "executionEvidence",
-                );
-
-                expect(
-                    viewSource,
-                ).toContain(
-                    "Dedicated dependency projection",
-                );
-
-                expect(
-                    viewSource,
-                ).toContain(
-                    "No governed execution activity is available in this projection.",
+                    "Authority:",
                 );
             },
         );
