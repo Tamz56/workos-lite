@@ -35,7 +35,7 @@ const projectionSource =
     );
 
 describe(
-    "Control Center route contract",
+    "ACC-PPC-v0.3 Control Center route contract",
     () => {
         it(
             "exposes GET only with no mutation handlers",
@@ -67,7 +67,7 @@ describe(
         );
 
         it(
-            "uses one read-only DB handle for Core and Planner projection reads",
+            "uses one read-only DB handle for Core Planner and canonical enrichment reads",
             () => {
                 expect(
                     routeSource,
@@ -94,18 +94,6 @@ describe(
                 );
 
                 expect(
-                    routeSource,
-                ).toContain(
-                    "buildControlCenterProjection(",
-                );
-
-                expect(
-                    routeSource,
-                ).toContain(
-                    "db?.close()",
-                );
-
-                expect(
                     projectionSource,
                 ).toContain(
                     "readCoreProjectDirectory(db)",
@@ -114,7 +102,42 @@ describe(
                 expect(
                     projectionSource,
                 ).toContain(
-                    "readPlanner(db, date)",
+                    "readPlanner(",
+                );
+
+                expect(
+                    projectionSource,
+                ).toContain(
+                    "readCanonicalProjectStateBySlug(",
+                );
+
+                expect(
+                    projectionSource,
+                ).toContain(
+                    "isCanonicalEnrichmentEligible(",
+                );
+
+                expect(
+                    routeSource,
+                ).toContain(
+                    "db?.close()",
+                );
+            },
+        );
+
+        it(
+            "does not select Project-State tables directly from the Control Center projection",
+            () => {
+                expect(
+                    projectionSource,
+                ).not.toMatch(
+                    /\bFROM\s+project_state_/i,
+                );
+
+                expect(
+                    projectionSource,
+                ).not.toMatch(
+                    /\bJOIN\s+project_state_/i,
                 );
             },
         );

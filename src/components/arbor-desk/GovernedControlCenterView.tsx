@@ -114,6 +114,47 @@ type ProjectProjection = {
         currentness:
             ClaimCurrentness;
     };
+
+    projectLink: {
+        href: string | null;
+        authority:
+            | "MANAGED_PROJECT_REGISTRY"
+            | "NONE";
+        currentness:
+            ClaimCurrentness;
+    };
+
+    dependencyClaim: {
+        value:
+            | GovernedFact
+            | null;
+        authority:
+            | "PROJECT_STATE"
+            | "NONE";
+        currentness:
+            ClaimCurrentness;
+    };
+
+    canonicalStateEvidence: {
+        value: {
+            stateVersionId: string;
+            href: string;
+            authorityRef: string;
+            sourceType: string;
+            sourceRef: string;
+            issuedAt: string;
+        } | null;
+        authority:
+            | "PROJECT_STATE"
+            | "NONE";
+        currentness:
+            ClaimCurrentness;
+    };
+
+    canonicalEnrichmentConsistency:
+        | "PASS"
+        | "FAIL"
+        | "NOT_APPLICABLE";
 };
 
 type PlannerDay = {
@@ -166,6 +207,10 @@ type ControlCenterProjection = {
     managedProjects:
         ProjectProjection[];
 
+    canonicalEnrichmentConsistency:
+        | "PASS"
+        | "FAIL";
+
     plannerState: {
         authority: string;
         currentness:
@@ -176,6 +221,23 @@ type ControlCenterProjection = {
             PlannerDay | null;
         items:
             PlannerItem[];
+    };
+
+    portfolioStatus: {
+        authority:
+            "PLANNER_STATE";
+        currentness:
+            SourceCurrentness;
+        availability:
+            Availability;
+        meaning:
+            string;
+        buckets: {
+            NOW: PlannerItem[];
+            NEXT: PlannerItem[];
+            WAITING: PlannerItem[];
+            BLOCKED: PlannerItem[];
+        };
     };
 };
 
@@ -577,6 +639,58 @@ export default function GovernedControlCenterView() {
                 </div>
             </div>
 
+            <div className="space-y-4 rounded-[24px] border border-theme-border bg-theme-input/10 p-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <h4 className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-theme-primary">
+                        <CalendarDays className="h-4 w-4 text-cyan-600" />
+                        Portfolio Status
+                    </h4>
+                    <span className="text-[8px] font-black uppercase tracking-wider text-theme-muted">
+                        NOW / NEXT / WAITING / BLOCKED
+                    </span>
+                </div>
+
+                <Disclosure
+                    source="Planner status classification"
+                    authority={data.portfolioStatus.authority}
+                    availability={data.portfolioStatus.availability}
+                    currentness={data.portfolioStatus.currentness}
+                />
+
+                <p className="text-[9px] font-bold text-theme-muted">
+                    Classification only. Not portfolio priority or execution order.
+                </p>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {(["NOW", "NEXT", "WAITING", "BLOCKED"] as const).map((bucket) => (
+                        <div key={bucket} className="rounded-2xl border border-theme-border bg-theme-card p-4">
+                            <div className="text-[9px] font-black uppercase tracking-wider text-theme-primary">
+                                {bucket}
+                            </div>
+
+                            {data.portfolioStatus.buckets[bucket].length === 0 ? (
+                                <div className="mt-2 text-[10px] font-bold text-theme-muted">
+                                    NOT_AVAILABLE
+                                </div>
+                            ) : (
+                                <div className="mt-2 space-y-2">
+                                    {data.portfolioStatus.buckets[bucket].map((item) => (
+                                        <div key={item.id} className="rounded-xl border border-theme-border bg-theme-input/20 p-2">
+                                            <div className="text-[10px] font-bold text-theme-primary">
+                                                {itemLabel(item)}
+                                            </div>
+                                            <div className="mt-1 text-[8px] font-black uppercase tracking-wider text-theme-muted">
+                                                ID: {item.id}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
                     <h4 className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-theme-primary">
@@ -617,6 +731,100 @@ export default function GovernedControlCenterView() {
                                 <div className="sm:col-span-2"><dt className="text-[8px] font-black uppercase text-theme-muted">Registry next action</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.nextAction)}</dd></div>
                                 <div className="sm:col-span-2"><dt className="text-[8px] font-black uppercase text-theme-muted">Blocker / risk</dt><dd className="mt-1 font-bold text-theme-primary">{label(project.registryMetadata.value?.riskOrBlockedBy)}</dd></div>
                             </dl>
+
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="rounded-xl border border-theme-border bg-theme-card p-3">
+                                    <div className="text-[8px] font-black uppercase text-theme-muted">
+                                        Dependencies
+                                    </div>
+                                    <div className="mt-1 text-[10px] font-bold text-theme-primary">
+                                        {valueText(project.dependencyClaim.value, project.dependencyClaim.currentness)}
+                                    </div>
+                                    <Disclosure
+                                        source="Canonical Project State dependencies"
+                                        authority={project.dependencyClaim.authority}
+                                        currentness={project.dependencyClaim.currentness}
+                                    />
+                                </div>
+
+                                <div className="rounded-xl border border-theme-border bg-theme-card p-3">
+                                    <div className="text-[8px] font-black uppercase text-theme-muted">
+                                        Project
+                                    </div>
+
+                                    {project.projectLink.href ? (
+                                        <Link
+                                            href={project.projectLink.href}
+                                            className="mt-1 inline-flex text-[10px] font-black text-blue-600 hover:underline"
+                                        >
+                                            Open Project
+                                        </Link>
+                                    ) : (
+                                        <div className="mt-1 text-[10px] font-bold text-theme-muted">
+                                            NOT_AVAILABLE
+                                        </div>
+                                    )}
+
+                                    <Disclosure
+                                        source="WorkOS Project Directory Binding"
+                                        authority={project.projectLink.authority}
+                                        currentness={project.projectLink.currentness}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border border-theme-border bg-theme-card p-3">
+                                <div className="text-[8px] font-black uppercase text-theme-muted">
+                                    Canonical State Evidence
+                                </div>
+
+                                {project.canonicalStateEvidence.value ? (
+                                    <div className="mt-2 space-y-2">
+                                        <div className="text-[10px] font-bold text-theme-primary">
+                                            {project.canonicalStateEvidence.value.stateVersionId}
+                                        </div>
+
+                                        <div className="text-[8px] font-bold text-theme-muted">
+                                            Authority ref: {project.canonicalStateEvidence.value.authorityRef}
+                                        </div>
+
+                                        <div className="text-[8px] font-bold text-theme-muted">
+                                            Source type: {project.canonicalStateEvidence.value.sourceType}
+                                        </div>
+
+                                        <div className="text-[8px] font-bold text-theme-muted">
+                                            Source ref: {project.canonicalStateEvidence.value.sourceRef}
+                                        </div>
+
+                                        <div className="text-[8px] font-bold text-theme-muted">
+                                            Issued: {project.canonicalStateEvidence.value.issuedAt}
+                                        </div>
+
+                                        <Link
+                                            href={project.canonicalStateEvidence.value.href}
+                                            className="inline-flex text-[10px] font-black text-blue-600 hover:underline"
+                                        >
+                                            Open Canonical Evidence
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <div className="mt-1 text-[10px] font-bold text-theme-muted">
+                                        {valueText(null, project.canonicalStateEvidence.currentness)}
+                                    </div>
+                                )}
+
+                                <div className="mt-2">
+                                    <Disclosure
+                                        source="Canonical Project State"
+                                        authority={project.canonicalStateEvidence.authority}
+                                        currentness={project.canonicalStateEvidence.currentness}
+                                    />
+                                </div>
+
+                                <div className="mt-2 text-[8px] font-black uppercase tracking-wider text-theme-muted">
+                                    Canonical enrichment consistency: {project.canonicalEnrichmentConsistency}
+                                </div>
+                            </div>
 
                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <div className="rounded-xl border border-theme-border bg-theme-card p-3">
@@ -689,11 +897,9 @@ export default function GovernedControlCenterView() {
                         )}
                     </div>
 
-                    <div className="rounded-xl border border-theme-border bg-theme-card p-3">
-                        <div className="text-[8px] font-black uppercase text-theme-muted">Dedicated dependency projection</div>
-                        <div className="mt-1 text-[10px] font-bold text-theme-primary">NOT_AVAILABLE</div>
-                        <Disclosure source="Dependency projection" authority="NONE" currentness="NOT_PROVEN" />
-                    </div>
+                    <p className="text-[9px] font-bold leading-relaxed text-theme-muted">
+                        Planner waiting/blocked and Registry blocker/risk are contextual only. Canonical Dependencies are shown on each governed Managed Project surface.
+                    </p>
                 </div>
 
                 <div className="space-y-4 rounded-[24px] border border-theme-border bg-theme-input/10 p-5">

@@ -11,7 +11,13 @@ import {
 import {
     buildControlCenterProjection,
     CONTROL_CENTER_PROJECTION_SCHEMA_VERSION,
+    isCanonicalEnrichmentEligible,
+    resolveCanonicalEnrichment,
 } from "@/lib/arbor-desk/controlCenterProjection";
+
+import type {
+    GovernedFact,
+} from "@/lib/project-state/types";
 
 import {
     ensureProjectStateSchema,
@@ -258,7 +264,7 @@ describe(
         });
 
         it(
-            "projects ACC-PPC-v0.2 from the frozen 15 / 10 / 5 managed directory",
+            "projects ACC-PPC-v0.3 from the frozen 15 / 10 / 5 managed directory",
             () => {
                 insertP04(db);
 
@@ -277,7 +283,7 @@ describe(
                 expect(
                     result.schemaVersion,
                 ).toBe(
-                    "ACC-PPC-v0.2",
+                    "ACC-PPC-v0.3",
                 );
 
                 expect(
@@ -685,5 +691,592 @@ describe(
                 });
             },
         );
+        it(
+            "projects canonical dependencies, exact project links, and Canonical State Evidence for consistent CURRENT state",
+            () => {
+                insertP04(db);
+
+                const result =
+                    buildControlCenterProjection(
+                        db,
+                        "2026-09-29",
+                    );
+
+                expect(
+                    result
+                        .canonicalEnrichmentConsistency,
+                ).toBe("PASS");
+
+                const p04 =
+                    result.managedProjects.find(
+                        (project) =>
+                            project.identity.id
+                            === "P04",
+                    );
+
+                expect(
+                    p04?.dependencyClaim,
+                ).toEqual({
+                    value: {
+                        status: "KNOWN",
+                        value: [],
+                    },
+                    authority:
+                        "PROJECT_STATE",
+                    currentness:
+                        "CURRENT",
+                });
+
+                expect(
+                    p04?.projectLink,
+                ).toEqual({
+                    href:
+                        "/projects/workos-lite-arbordesk",
+                    authority:
+                        "MANAGED_PROJECT_REGISTRY",
+                    currentness:
+                        "CURRENT",
+                });
+
+                expect(
+                    p04
+                        ?.canonicalStateEvidence,
+                ).toEqual({
+                    value: {
+                        stateVersionId:
+                            P04_STATE,
+                        href:
+                            "/api/projects/workos-lite-arbordesk/state",
+                        authorityRef:
+                            "PHASE6-TEST-AUTH",
+                        sourceType:
+                            "human_frozen_contract",
+                        sourceRef:
+                            "PHASE6-TEST-SOURCE",
+                        issuedAt:
+                            "2026-09-29T00:00:00Z",
+                    },
+                    authority:
+                        "PROJECT_STATE",
+                    currentness:
+                        "CURRENT",
+                });
+
+                expect(
+                    p04
+                        ?.canonicalEnrichmentConsistency,
+                ).toBe("PASS");
+
+                const p02 =
+                    result.managedProjects.find(
+                        (project) =>
+                            project.identity.id
+                            === "P02",
+                    );
+
+                expect(
+                    p02?.projectLink.href,
+                ).toBeNull();
+
+                expect(
+                    p02?.dependencyClaim,
+                ).toEqual({
+                    value: null,
+                    authority: "NONE",
+                    currentness:
+                        "NOT_PROVEN",
+                });
+
+                const p01 =
+                    result.managedProjects.find(
+                        (project) =>
+                            project.identity.id
+                            === "P01",
+                    );
+
+                expect(
+                    p01?.projectLink.href,
+                ).toBeNull();
+
+                expect(
+                    p01?.dependencyClaim,
+                ).toEqual({
+                    value: null,
+                    authority: "NONE",
+                    currentness:
+                        "UNBOUND",
+                });
+            },
+        );
+
+        it(
+            "preserves KNOWN UNKNOWN and NOT_GOVERNED dependency GovernedFact values exactly",
+            () => {
+                const context = {
+                    directoryBinding:
+                        "BOUND",
+                    registryObservation:
+                        "PROVEN_PRESENT",
+                    workosSlug:
+                        P04_SLUG,
+                    registryProjectId:
+                        P04_REGISTRY_ID,
+                    coreCanonical: {
+                        authority:
+                            "PROJECT_STATE",
+                        stateStatus:
+                            "CURRENT",
+                        stateVersionId:
+                            P04_STATE,
+                        stateRoute:
+                            "/api/projects/workos-lite-arbordesk/state",
+                        nextAuthoritativeAction:
+                            P04_ACTION,
+                    },
+                } as const;
+
+                const dependencies:
+                    GovernedFact[] = [
+                        {
+                            status: "KNOWN",
+                            value: [
+                                "P05",
+                            ],
+                        },
+                        {
+                            status:
+                                "UNKNOWN",
+                        },
+                        {
+                            status:
+                                "NOT_GOVERNED",
+                        },
+                    ];
+
+                for (
+                    const dependency
+                    of dependencies
+                ) {
+                    const result =
+                        resolveCanonicalEnrichment(
+                            context,
+                            {
+                                status:
+                                    "CURRENT",
+                                projectSlug:
+                                    P04_SLUG,
+                                projectId:
+                                    P04_REGISTRY_ID,
+                                stateVersionId:
+                                    P04_STATE,
+                                dependencies:
+                                    dependency,
+                                evidence: {
+                                    authorityRef:
+                                        "AUTH",
+                                    sourceType:
+                                        "TYPE",
+                                    sourceRef:
+                                        "REF",
+                                    issuedAt:
+                                        "2026-09-29T00:00:00Z",
+                                },
+                            },
+                        );
+
+                    expect(
+                        result.consistency,
+                    ).toBe("PASS");
+
+                    expect(
+                        result
+                            .dependencyClaim
+                            .value,
+                    ).toEqual(
+                        dependency,
+                    );
+                }
+            },
+        );
+
+        it(
+            "fails closed when Core and canonical enrichment disagree on CURRENT version",
+            () => {
+                const result =
+                    resolveCanonicalEnrichment(
+                        {
+                            directoryBinding:
+                                "BOUND",
+                            registryObservation:
+                                "PROVEN_PRESENT",
+                            workosSlug:
+                                P04_SLUG,
+                            registryProjectId:
+                                P04_REGISTRY_ID,
+                            coreCanonical: {
+                                authority:
+                                    "PROJECT_STATE",
+                                stateStatus:
+                                    "CURRENT",
+                                stateVersionId:
+                                    P04_STATE,
+                                stateRoute:
+                                    "/api/projects/workos-lite-arbordesk/state",
+                                nextAuthoritativeAction:
+                                    P04_ACTION,
+                            },
+                        },
+                        {
+                            status:
+                                "CURRENT",
+                            projectSlug:
+                                P04_SLUG,
+                            projectId:
+                                P04_REGISTRY_ID,
+                            stateVersionId:
+                                "WRONG-VERSION",
+                            dependencies: {
+                                status:
+                                    "KNOWN",
+                                value: [
+                                    "MUST-NOT-LEAK",
+                                ],
+                            },
+                            evidence: {
+                                authorityRef:
+                                    "AUTH",
+                                sourceType:
+                                    "TYPE",
+                                sourceRef:
+                                    "REF",
+                                issuedAt:
+                                    "2026-09-29T00:00:00Z",
+                            },
+                        },
+                    );
+
+                expect(
+                    result.consistency,
+                ).toBe("FAIL");
+
+                expect(
+                    result.dependencyClaim,
+                ).toEqual({
+                    value: null,
+                    authority:
+                        "PROJECT_STATE",
+                    currentness:
+                        "NOT_PROVEN",
+                });
+
+                expect(
+                    result
+                        .canonicalStateEvidence,
+                ).toEqual({
+                    value: null,
+                    authority:
+                        "PROJECT_STATE",
+                    currentness:
+                        "NOT_PROVEN",
+                });
+            },
+        );
+
+        it(
+            "permits canonical enrichment only for BOUND PROVEN_PRESENT exact slug eligibility",
+            () => {
+                expect(
+                    isCanonicalEnrichmentEligible({
+                        directoryBinding:
+                            "BOUND",
+                        registryObservation:
+                            "PROVEN_PRESENT",
+                        workosSlug:
+                            P04_SLUG,
+                    }),
+                ).toBe(true);
+
+                expect(
+                    isCanonicalEnrichmentEligible({
+                        directoryBinding:
+                            "BOUND",
+                        registryObservation:
+                            "PROVEN_ABSENT",
+                        workosSlug:
+                            P04_SLUG,
+                    }),
+                ).toBe(false);
+
+                expect(
+                    isCanonicalEnrichmentEligible({
+                        directoryBinding:
+                            "MISSING_OR_UNBOUND",
+                        registryObservation:
+                            "NOT_PROVEN",
+                        workosSlug:
+                            null,
+                    }),
+                ).toBe(false);
+
+                expect(
+                    isCanonicalEnrichmentEligible({
+                        directoryBinding:
+                            "BOUND",
+                        registryObservation:
+                            "PROVEN_PRESENT",
+                        workosSlug:
+                            null,
+                    }),
+                ).toBe(false);
+            },
+        );
+
+        it(
+            "maps Planner status to NOW NEXT WAITING BLOCKED and keeps membership and display order independent of priority planned_order and is_main_task",
+            () => {
+                createPlannerTables(db);
+
+                db.prepare(`
+                    INSERT INTO planner_days (
+                        id,
+                        plan_date,
+                        main_outcome,
+                        daily_capacity_minutes,
+                        energy_level,
+                        status
+                    ) VALUES (
+                        'status-day',
+                        '2026-09-29',
+                        'Classification proof',
+                        240,
+                        'normal',
+                        'active'
+                    )
+                `).run();
+
+                const rows = [
+                    [
+                        "status-20",
+                        "doing",
+                        "low",
+                        0,
+                        1,
+                    ],
+                    [
+                        "status-10",
+                        "doing",
+                        "critical",
+                        1,
+                        5,
+                    ],
+                    [
+                        "status-40",
+                        "ready",
+                        "medium",
+                        0,
+                        2,
+                    ],
+                    [
+                        "status-30",
+                        "waiting",
+                        "high",
+                        1,
+                        4,
+                    ],
+                    [
+                        "status-50",
+                        "blocked",
+                        "critical",
+                        0,
+                        3,
+                    ],
+                ] as const;
+
+                for (
+                    const [
+                        id,
+                        status,
+                        priority,
+                        isMain,
+                        plannedOrder,
+                    ]
+                    of rows
+                ) {
+                    db.prepare(`
+                        INSERT INTO planner_items (
+                            id,
+                            planner_day_id,
+                            source_type,
+                            source_id,
+                            work_mode,
+                            priority,
+                            planner_status,
+                            is_main_task,
+                            planned_order,
+                            created_at
+                        ) VALUES (
+                            ?,
+                            'status-day',
+                            'manual',
+                            ?,
+                            'focus',
+                            ?,
+                            ?,
+                            ?,
+                            ?,
+                            '2026-09-29T00:00:00Z'
+                        )
+                    `).run(
+                        id,
+                        id,
+                        priority,
+                        status,
+                        isMain,
+                        plannedOrder,
+                    );
+                }
+
+                const before =
+                    buildControlCenterProjection(
+                        db,
+                        "2026-09-29",
+                    );
+
+                const ids = (
+                    bucket:
+                        keyof typeof before
+                            .portfolioStatus
+                            .buckets,
+                ) =>
+                    before
+                        .portfolioStatus
+                        .buckets[
+                            bucket
+                        ]
+                        .map(
+                            (item) =>
+                                item.id,
+                        );
+
+                expect(
+                    ids("NOW"),
+                ).toEqual([
+                    "status-10",
+                    "status-20",
+                ]);
+
+                expect(
+                    ids("NEXT"),
+                ).toEqual([
+                    "status-40",
+                ]);
+
+                expect(
+                    ids("WAITING"),
+                ).toEqual([
+                    "status-30",
+                ]);
+
+                expect(
+                    ids("BLOCKED"),
+                ).toEqual([
+                    "status-50",
+                ]);
+
+                expect(
+                    before
+                        .portfolioStatus
+                        .meaning,
+                ).toBe(
+                    "Classification only. Not portfolio priority or execution order.",
+                );
+
+                const beforeIds =
+                    Object.fromEntries(
+                        (
+                            [
+                                "NOW",
+                                "NEXT",
+                                "WAITING",
+                                "BLOCKED",
+                            ] as const
+                        ).map(
+                            (bucket) => [
+                                bucket,
+                                before
+                                    .portfolioStatus
+                                    .buckets[
+                                        bucket
+                                    ]
+                                    .map(
+                                        (
+                                            item,
+                                        ) =>
+                                            item.id,
+                                    ),
+                            ],
+                        ),
+                    );
+
+                db.exec(`
+                    UPDATE planner_items
+                    SET
+                        priority =
+                            CASE
+                                WHEN priority = 'critical'
+                                THEN 'low'
+                                ELSE 'critical'
+                            END,
+                        planned_order =
+                            100 - planned_order,
+                        is_main_task =
+                            CASE
+                                WHEN is_main_task = 1
+                                THEN 0
+                                ELSE 1
+                            END
+                `);
+
+                const after =
+                    buildControlCenterProjection(
+                        db,
+                        "2026-09-29",
+                    );
+
+                const afterIds =
+                    Object.fromEntries(
+                        (
+                            [
+                                "NOW",
+                                "NEXT",
+                                "WAITING",
+                                "BLOCKED",
+                            ] as const
+                        ).map(
+                            (bucket) => [
+                                bucket,
+                                after
+                                    .portfolioStatus
+                                    .buckets[
+                                        bucket
+                                    ]
+                                    .map(
+                                        (
+                                            item,
+                                        ) =>
+                                            item.id,
+                                    ),
+                            ],
+                        ),
+                    );
+
+                expect(
+                    afterIds,
+                ).toEqual(
+                    beforeIds,
+                );
+            },
+        );
+
     },
 );
