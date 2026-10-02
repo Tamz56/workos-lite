@@ -35,7 +35,7 @@ const projectionSource =
     );
 
 describe(
-    "ACC-PPC-v0.3 Control Center route contract",
+    "ACC-PPC-v0.4 Control Center route contract",
     () => {
         it(
             "exposes GET only with no mutation handlers",
@@ -67,7 +67,7 @@ describe(
         );
 
         it(
-            "uses one read-only DB handle for Core Planner and canonical enrichment reads",
+            "uses one read-only DB handle for Core Planner canonical enrichment and Phase 7 reads",
             () => {
                 expect(
                     routeSource,
@@ -109,6 +109,18 @@ describe(
                     projectionSource,
                 ).toContain(
                     "readCanonicalProjectStateBySlug(",
+                );
+
+                expect(
+                    projectionSource,
+                ).toContain(
+                    "readPortfolioExecutionOrder(",
+                );
+
+                expect(
+                    projectionSource,
+                ).toContain(
+                    "derivePortfolioExecutionOrderProjection(",
                 );
 
                 expect(

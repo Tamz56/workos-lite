@@ -23,6 +23,10 @@ import {
     ensureProjectStateSchema,
 } from "@/lib/project-state/schema";
 
+import {
+    ensurePortfolioExecutionOrderSchema,
+} from "@/lib/portfolio-execution-order/schema";
+
 const P04_REGISTRY_ID =
     "WniiRWTaGeEY7gt3XAsm7";
 
@@ -264,7 +268,7 @@ describe(
         });
 
         it(
-            "projects ACC-PPC-v0.3 from the frozen 15 / 10 / 5 managed directory",
+            "projects ACC-PPC-v0.4 from the frozen 15 / 10 / 5 managed directory",
             () => {
                 insertP04(db);
 
@@ -283,7 +287,7 @@ describe(
                 expect(
                     result.schemaVersion,
                 ).toBe(
-                    "ACC-PPC-v0.3",
+                    "ACC-PPC-v0.4",
                 );
 
                 expect(
@@ -399,6 +403,89 @@ describe(
                     p04
                         ?.nextAuthoritativeAction
                         .value,
+                );
+            },
+        );
+
+        it(
+            "fails closed with available Phase 7 authority tables and no Human portfolio head",
+            () => {
+                ensurePortfolioExecutionOrderSchema(
+                    db,
+                );
+
+                insertP04(db);
+
+                const result =
+                    buildControlCenterProjection(
+                        db,
+                        "2026-09-29",
+                    );
+
+                expect(
+                    result
+                        .portfolioExecutionOrder
+                        .authorityRead,
+                ).toEqual({
+                    status:
+                        "NOT_PROVEN",
+                    reason:
+                        "NO_HEAD",
+                    humanPortfolioHead:
+                        "ABSENT",
+                });
+
+                expect(
+                    result
+                        .portfolioExecutionOrder
+                        .dependencyOrder
+                        .currentness,
+                ).toBe(
+                    "NOT_PROVEN",
+                );
+
+                expect(
+                    result
+                        .portfolioExecutionOrder
+                        .projects,
+                ).toHaveLength(15);
+
+                for (
+                    const project
+                    of result
+                        .portfolioExecutionOrder
+                        .projects
+                ) {
+                    expect(
+                        project
+                            .portfolioPriority
+                            .currentness,
+                    ).toBe(
+                        "NOT_PROVEN",
+                    );
+
+                    expect(
+                        project
+                            .executionPosture
+                            .currentness,
+                    ).toBe(
+                        "NOT_PROVEN",
+                    );
+
+                    expect(
+                        project
+                            .humanDecisionRequired
+                            .value
+                            ?.required,
+                    ).toBe(true);
+                }
+
+                expect(
+                    result
+                        .portfolioStatus
+                        .meaning,
+                ).toBe(
+                    "Classification only. Not portfolio priority or execution order.",
                 );
             },
         );

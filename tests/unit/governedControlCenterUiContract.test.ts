@@ -35,7 +35,7 @@ const viewSource =
     );
 
 describe(
-    "ACC-PPC-v0.3 governed Control Center UI contract",
+    "ACC-PPC-v0.4 governed Control Center UI contract",
     () => {
         it(
             "mounts the governed view inside the existing host",
@@ -242,24 +242,68 @@ describe(
         );
 
         it(
-            "does not introduce Phase 7 portfolio ordering semantics",
+            "adds Phase 7 only as a separate Portfolio Execution Order surface",
             () => {
+                expect(
+                    viewSource,
+                ).toContain(
+                    'data-testid="portfolio-execution-order"',
+                );
+
                 for (
-                    const forbidden
+                    const required
                     of [
+                        "Portfolio Execution Order",
                         "Portfolio Priority",
+                        "Execution Posture",
+                        "Blocking Status",
+                        "Dependency Order",
                         "What Must Happen First",
                         "What Can Run in Parallel",
-                        "Human Decision Required ordering",
-                        "Waiting for External Dependency sequencing",
+                        "Human Decision Required",
+                        "Waiting for External Dependency",
+                        "VALUE:",
+                        "AUTHORITY:",
+                        "CURRENTNESS:",
+                        "SOURCE_REFS:",
                     ]
                 ) {
                     expect(
                         viewSource,
-                    ).not.toContain(
-                        forbidden,
+                    ).toContain(
+                        required,
                     );
                 }
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "data.portfolioExecutionOrder",
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "Phase 6 NEXT != Phase 7 PRIMARY",
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "Phase 6 WAITING != Phase 7 HOLD",
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "Phase 6 BLOCKED != Phase 7 Blocking Status",
+                );
+
+                expect(
+                    viewSource,
+                ).toContain(
+                    "Classification only. Not portfolio priority or execution order.",
+                );
 
                 expect(
                     viewSource,
@@ -281,6 +325,7 @@ describe(
                         "UNBOUND",
                         "UNKNOWN",
                         "NOT_AVAILABLE",
+                        "CONFLICTED",
                         "CURRENT_WITHIN_SOURCE",
                     ]
                 ) {
