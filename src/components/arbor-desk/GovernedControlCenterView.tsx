@@ -27,11 +27,58 @@ type ClaimCurrentness =
     | "CURRENT"
     | "STALE"
     | "NOT_PROVEN"
-    | "UNBOUND";
+    | "UNBOUND"
+    | "NOT_AVAILABLE"
+    | "CONFLICTED";
 
 type DisclosureCurrentness =
     | SourceCurrentness
     | ClaimCurrentness;
+
+type Phase7Claim<T> = {
+    value: T | null;
+    authority: string;
+    currentness:
+        | "CURRENT"
+        | "STALE"
+        | "NOT_PROVEN"
+        | "UNBOUND"
+        | "NOT_AVAILABLE"
+        | "CONFLICTED";
+    authorityRef: string | null;
+    sourceRefs: string[];
+    reviewedAt: string | null;
+};
+
+type Phase7ProjectProjection = {
+    managedProjectId: string;
+    portfolioPriority:
+        Phase7Claim<string>;
+    executionPosture:
+        Phase7Claim<string>;
+    blockingStatus:
+        Phase7Claim<string>;
+    mustHappenFirst:
+        Phase7Claim<{
+            direct: string[];
+            transitive: string[];
+        }>;
+    canRunInParallel:
+        Phase7Claim<string[]>;
+    humanDecisionRequired:
+        Phase7Claim<{
+            required: boolean;
+            reasons: string[];
+        }>;
+    waitingForExternalDependency:
+        Phase7Claim<
+            Array<{
+                externalId: string;
+                label: string;
+                evidenceRef: string;
+            }>
+        >;
+};
 
 type GovernedFact =
     | {
@@ -207,6 +254,23 @@ type ControlCenterProjection = {
     managedProjects:
         ProjectProjection[];
 
+    portfolioExecutionOrder: {
+        contractRef: string;
+        authorityRead: {
+            status: string;
+            reason: string | null;
+            humanPortfolioHead:
+                | "PRESENT"
+                | "ABSENT"
+                | "NOT_AVAILABLE"
+                | "NOT_PROVEN";
+        };
+        dependencyOrder:
+            Phase7Claim<string[][]>;
+        projects:
+            Phase7ProjectProjection[];
+    };
+
     canonicalEnrichmentConsistency:
         | "PASS"
         | "FAIL";
@@ -260,6 +324,8 @@ function valueText(
             currentness === "STALE"
             || currentness === "NOT_PROVEN"
             || currentness === "UNBOUND"
+            || currentness === "NOT_AVAILABLE"
+            || currentness === "CONFLICTED"
         ) {
             return currentness;
         }
@@ -358,6 +424,53 @@ function Disclosure({
             <span className={`rounded-lg border px-2 py-1 ${disclosureTone(currentness)}`}>
                 {currentness}
             </span>
+        </div>
+    );
+}
+
+function Phase7ClaimCard<T>({
+    title,
+    claim,
+}: {
+    title: string;
+    claim: Phase7Claim<T>;
+}) {
+    return (
+        <div className="rounded-xl border border-theme-border bg-theme-card p-3">
+            <div className="text-[8px] font-black uppercase tracking-wider text-theme-muted">
+                {title}
+            </div>
+            <dl className="mt-2 space-y-1 text-[9px] font-bold text-theme-secondary">
+                <div>
+                    <dt className="inline font-black text-theme-muted">VALUE: </dt>
+                    <dd className="inline text-theme-primary">
+                        {valueText(
+                            claim.value,
+                            claim.currentness,
+                        )}
+                    </dd>
+                </div>
+                <div>
+                    <dt className="inline font-black text-theme-muted">AUTHORITY: </dt>
+                    <dd className="inline">
+                        {claim.authority}
+                    </dd>
+                </div>
+                <div>
+                    <dt className="inline font-black text-theme-muted">CURRENTNESS: </dt>
+                    <dd className="inline">
+                        {claim.currentness}
+                    </dd>
+                </div>
+                <div>
+                    <dt className="inline font-black text-theme-muted">SOURCE_REFS: </dt>
+                    <dd className="inline">
+                        {claim.sourceRefs.length > 0
+                            ? claim.sourceRefs.join(", ")
+                            : "NOT_AVAILABLE"}
+                    </dd>
+                </div>
+            </dl>
         </div>
     );
 }
@@ -687,6 +800,89 @@ export default function GovernedControlCenterView() {
                                 </div>
                             )}
                         </div>
+                    ))}
+                </div>
+            </div>
+
+            <div
+                data-testid="portfolio-execution-order"
+                className="space-y-4 rounded-[24px] border border-theme-border bg-theme-input/10 p-5"
+            >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h4 className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-theme-primary">
+                            <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                            Portfolio Execution Order
+                        </h4>
+                        <p className="mt-1 text-[9px] font-bold text-theme-muted">
+                            Phase 7 governed read projection · {data.portfolioExecutionOrder.contractRef}
+                        </p>
+                    </div>
+                    <div className="text-[8px] font-black uppercase tracking-wider text-theme-muted">
+                        Human head: {data.portfolioExecutionOrder.authorityRead.humanPortfolioHead}
+                        {" · "}
+                        {data.portfolioExecutionOrder.authorityRead.status}
+                        {data.portfolioExecutionOrder.authorityRead.reason
+                            ? ` · ${data.portfolioExecutionOrder.authorityRead.reason}`
+                            : ""}
+                    </div>
+                </div>
+
+                <p className="text-[9px] font-bold leading-relaxed text-theme-muted">
+                    Phase 6 NEXT != Phase 7 PRIMARY · Phase 6 WAITING != Phase 7 HOLD · Phase 6 BLOCKED != Phase 7 Blocking Status.
+                </p>
+
+                <Phase7ClaimCard
+                    title="Dependency Order"
+                    claim={data.portfolioExecutionOrder.dependencyOrder}
+                />
+
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                    {data.portfolioExecutionOrder.projects.map((project) => (
+                        <article
+                            key={project.managedProjectId}
+                            className="space-y-3 rounded-2xl border border-theme-border bg-theme-card p-4"
+                        >
+                            <div>
+                                <div className="text-[10px] font-black text-theme-primary">
+                                    {projectNames.get(project.managedProjectId) ?? project.managedProjectId}
+                                </div>
+                                <div className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-theme-muted">
+                                    {project.managedProjectId}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <Phase7ClaimCard
+                                    title="Portfolio Priority"
+                                    claim={project.portfolioPriority}
+                                />
+                                <Phase7ClaimCard
+                                    title="Execution Posture"
+                                    claim={project.executionPosture}
+                                />
+                                <Phase7ClaimCard
+                                    title="Blocking Status"
+                                    claim={project.blockingStatus}
+                                />
+                                <Phase7ClaimCard
+                                    title="What Must Happen First"
+                                    claim={project.mustHappenFirst}
+                                />
+                                <Phase7ClaimCard
+                                    title="What Can Run in Parallel"
+                                    claim={project.canRunInParallel}
+                                />
+                                <Phase7ClaimCard
+                                    title="Human Decision Required"
+                                    claim={project.humanDecisionRequired}
+                                />
+                                <Phase7ClaimCard
+                                    title="Waiting for External Dependency"
+                                    claim={project.waitingForExternalDependency}
+                                />
+                            </div>
+                        </article>
                     ))}
                 </div>
             </div>

@@ -20,8 +20,16 @@ import type {
     GovernedFact,
 } from "@/lib/project-state/types";
 
+import {
+    derivePortfolioExecutionOrderProjection,
+} from "@/lib/portfolio-execution-order/derive";
+
+import {
+    readPortfolioExecutionOrder,
+} from "@/lib/portfolio-execution-order/readService";
+
 export const CONTROL_CENTER_PROJECTION_SCHEMA_VERSION =
-    "ACC-PPC-v0.3" as const;
+    "ACC-PPC-v0.4" as const;
 
 type Availability =
     | "AVAILABLE"
@@ -37,7 +45,9 @@ type ClaimCurrentness =
     | "CURRENT"
     | "STALE"
     | "NOT_PROVEN"
-    | "UNBOUND";
+    | "UNBOUND"
+    | "NOT_AVAILABLE"
+    | "CONFLICTED";
 
 type SourceDescriptor = {
     authority: string;
@@ -83,6 +93,7 @@ export type CanonicalEnrichmentObservation =
         projectId: string;
         stateVersionId: string;
         dependencies: GovernedFact;
+        blockers: GovernedFact;
         evidence: {
             authorityRef: string;
             sourceType: string;
@@ -125,6 +136,8 @@ type CanonicalEnrichmentProjection = {
     consistency:
         CanonicalEnrichmentConsistency;
     dependencyClaim:
+        GovernedClaim<GovernedFact>;
+    blockerClaim:
         GovernedClaim<GovernedFact>;
     canonicalStateEvidence:
         GovernedClaim<
@@ -517,6 +530,10 @@ function canonicalObservationFromRead(
                 result.state
                     .payload
                     .dependencies,
+            blockers:
+                result.state
+                    .payload
+                    .blockers,
             evidence: {
                 authorityRef:
                     result.state
@@ -587,6 +604,14 @@ function failClosedCanonicalEnrichment():
                 "NOT_PROVEN",
         },
 
+        blockerClaim: {
+            value: null,
+            authority:
+                "PROJECT_STATE",
+            currentness:
+                "NOT_PROVEN",
+        },
+
         canonicalStateEvidence: {
             value: null,
             authority:
@@ -619,6 +644,13 @@ export function resolveCanonicalEnrichment(
                     "UNBOUND",
             },
 
+            blockerClaim: {
+                value: null,
+                authority: "NONE",
+                currentness:
+                    "UNBOUND",
+            },
+
             canonicalStateEvidence: {
                 value: null,
                 authority: "NONE",
@@ -638,6 +670,13 @@ export function resolveCanonicalEnrichment(
                 "NOT_APPLICABLE",
 
             dependencyClaim: {
+                value: null,
+                authority: "NONE",
+                currentness:
+                    "NOT_PROVEN",
+            },
+
+            blockerClaim: {
                 value: null,
                 authority: "NONE",
                 currentness:
@@ -696,6 +735,16 @@ export function resolveCanonicalEnrichment(
                 value:
                     observation
                         .dependencies,
+                authority:
+                    "PROJECT_STATE",
+                currentness:
+                    "CURRENT",
+            },
+
+            blockerClaim: {
+                value:
+                    observation
+                        .blockers,
                 authority:
                     "PROJECT_STATE",
                 currentness:
@@ -771,6 +820,14 @@ export function resolveCanonicalEnrichment(
                     "STALE",
             },
 
+            blockerClaim: {
+                value: null,
+                authority:
+                    "PROJECT_STATE",
+                currentness:
+                    "STALE",
+            },
+
             canonicalStateEvidence: {
                 value: null,
                 authority:
@@ -804,6 +861,14 @@ export function resolveCanonicalEnrichment(
                 "NOT_PROVEN",
         },
 
+        blockerClaim: {
+            value: null,
+            authority:
+                "PROJECT_STATE",
+            currentness:
+                "NOT_PROVEN",
+        },
+
         canonicalStateEvidence: {
             value: null,
             authority:
@@ -812,6 +877,24 @@ export function resolveCanonicalEnrichment(
                 "NOT_PROVEN",
         },
     };
+}
+
+function toCanonicalPhase7Currentness(
+    value: ClaimCurrentness,
+):
+    | "CURRENT"
+    | "STALE"
+    | "NOT_PROVEN"
+    | "UNBOUND" {
+    if (
+        value === "CURRENT"
+        || value === "STALE"
+        || value === "UNBOUND"
+    ) {
+        return value;
+    }
+
+    return "NOT_PROVEN";
 }
 
 function stableItemIdCompare(
@@ -1011,6 +1094,10 @@ function toManagedProjectProjection(
             canonicalEnrichment
                 .dependencyClaim,
 
+        blockerClaim:
+            canonicalEnrichment
+                .blockerClaim,
+
         canonicalStateEvidence:
             canonicalEnrichment
                 .canonicalStateEvidence,
@@ -1067,6 +1154,102 @@ export function buildControlCenterProjection(
                         rawBySlug,
                     ),
             );
+
+    const managedDirectoryRefs =
+        new Set(
+            core.managedPortfolio
+                .projects
+                .map(
+                    (project) =>
+                        project
+                            .provenance
+                            .baselineAuthority,
+                ),
+        );
+
+    const managedDirectoryRef =
+        managedDirectoryRefs.size === 1
+            ? [...managedDirectoryRefs][0]
+            : "";
+
+    const portfolioAuthorityRead =
+        readPortfolioExecutionOrder(
+            db,
+            {
+                managedDirectoryRef,
+                currentManagedProjectIds:
+                    core.managedPortfolio
+                        .projects
+                        .map(
+                            (project) =>
+                                project
+                                    .managedProjectId,
+                        ),
+            },
+        );
+
+    const portfolioExecutionOrder =
+        derivePortfolioExecutionOrderProjection({
+            portfolioRead:
+                portfolioAuthorityRead,
+            projects:
+                managedProjects.map(
+                    (project) => {
+                        const evidence =
+                            project
+                                .canonicalStateEvidence
+                                .value;
+
+                        const authorityRef =
+                            evidence
+                                ?.authorityRef
+                            ?? null;
+
+                        const sourceRefs =
+                            evidence
+                                ? [
+                                    evidence
+                                        .sourceRef,
+                                  ]
+                                : [];
+
+                        return {
+                            managedProjectId:
+                                project
+                                    .identity
+                                    .id,
+                            dependency: {
+                                fact:
+                                    project
+                                        .dependencyClaim
+                                        .value,
+                                currentness:
+                                    toCanonicalPhase7Currentness(
+                                        project
+                                            .dependencyClaim
+                                            .currentness,
+                                    ),
+                                authorityRef,
+                                sourceRefs,
+                            },
+                            blocker: {
+                                fact:
+                                    project
+                                        .blockerClaim
+                                        .value,
+                                currentness:
+                                    toCanonicalPhase7Currentness(
+                                        project
+                                            .blockerClaim
+                                            .currentness,
+                                    ),
+                                authorityRef,
+                                sourceRefs,
+                            },
+                        };
+                    },
+                ),
+        });
 
     const planner =
         readPlanner(
@@ -1157,6 +1340,8 @@ export function buildControlCenterProjection(
         },
 
         managedProjects,
+
+        portfolioExecutionOrder,
 
         plannerState: {
             authority:
