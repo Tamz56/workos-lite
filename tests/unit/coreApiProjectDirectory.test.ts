@@ -289,8 +289,8 @@ describe("WorkOS Core API project directory", () => {
         expect(result.managedPortfolio).toMatchObject({
             schemaVersion: "managed-project-directory.v0.1",
             projectCount: 15,
-            boundCount: 10,
-            missingOrUnboundCount: 5,
+            boundCount: 15,
+            missingOrUnboundCount: 0,
         });
 
         const p04 = result.managedPortfolio.projects.find(
@@ -308,7 +308,93 @@ describe("WorkOS Core API project directory", () => {
         });
     });
 
-    it("keeps all five missing/unbound Projects visible and performs no name matching", () => {
+    it("resolves each of the five approved bindings through its exact verified slug", () => {
+        const APPROVED = [
+            {
+                managedProjectId: "P01",
+                slug: "green-fineness-nursery-operations-platform",
+                name: "Green Fineness — Nursery Operations Platform",
+                currentness: "CURRENT",
+            },
+            {
+                managedProjectId: "P07",
+                slug: "arbor-local-ai-lab",
+                name: "Arbor Local AI Lab",
+                currentness: "CURRENT",
+            },
+            {
+                managedProjectId: "GF-TOOLS",
+                slug: "green-fineness-tools-digital-products",
+                name: "Green Fineness — Tools / Digital Products",
+                currentness: "CURRENT",
+            },
+            {
+                managedProjectId: "AVACRM",
+                slug: "avacrm-garden-crm",
+                name: "AvaCRM",
+                currentness: "STALE",
+            },
+            {
+                managedProjectId: "GF-LEARNING-CONTENT",
+                slug: "green-fineness-learning-content",
+                name: "Green Fineness Learning Content",
+                currentness: "STALE",
+            },
+        ] as const;
+
+        for (const approved of APPROVED) {
+            const registryId = `REG-${approved.managedProjectId}`;
+
+            insertProject(db, {
+                id: registryId,
+                slug: approved.slug,
+                name: approved.name,
+                nextAction: "Registry action",
+            });
+
+            insertVersion(db, {
+                id: `PSV-${approved.managedProjectId}`,
+                projectId: registryId,
+                payload: CURRENT_PAYLOAD,
+            });
+
+            selectHead(db, registryId, `PSV-${approved.managedProjectId}`);
+        }
+
+        const result = readCoreProjectDirectory(db);
+
+        expect(result.managedPortfolio).toMatchObject({
+            projectCount: 15,
+            boundCount: 15,
+            missingOrUnboundCount: 0,
+        });
+
+        expect(
+            result.managedPortfolio.projects.filter(
+                (project) =>
+                    project.directoryBinding === "MISSING_OR_UNBOUND",
+            ),
+        ).toEqual([]);
+
+        for (const approved of APPROVED) {
+            const entry = result.managedPortfolio.projects.find(
+                (project) =>
+                    project.managedProjectId === approved.managedProjectId,
+            );
+
+            expect(entry).toMatchObject({
+                managedProjectId: approved.managedProjectId,
+                workosSlug: approved.slug,
+                directoryBinding: "BOUND",
+                bindingCurrentness: approved.currentness,
+                registryObservation: "PROVEN_PRESENT",
+            });
+
+            expect(entry?.canonicalProjectState).not.toBeNull();
+        }
+    });
+
+    it("binds the five approved Projects by exact slug only and fails closed when that slug is absent", () => {
         insertProject(db, {
             id: "3bb5f841-113a-4e94-a477-12d84570177f",
             slug: "green-fineness-operations-intelligence-tgd",
@@ -318,30 +404,17 @@ describe("WorkOS Core API project directory", () => {
 
         const result = readCoreProjectDirectory(db);
 
-        const unbound = result.managedPortfolio.projects
-            .filter(
-                (project) =>
-                    project.directoryBinding === "MISSING_OR_UNBOUND",
-            )
-            .map((project) => project.managedProjectId)
-            .sort();
-
-        expect(unbound).toEqual([
-            "AVACRM",
-            "GF-LEARNING-CONTENT",
-            "GF-TOOLS",
-            "P01",
-            "P07",
-        ]);
-
         const p01 = result.managedPortfolio.projects.find(
             (project) => project.managedProjectId === "P01",
         );
 
+        // P01 is BOUND to its exact slug. A similarly named outside-set Project
+        // must not satisfy it, so the exact slug is absent and the runtime
+        // binding fails closed with no name-based fallback.
         expect(p01).toMatchObject({
-            workosSlug: null,
-            directoryBinding: "MISSING_OR_UNBOUND",
-            registryObservation: "NOT_PROVEN",
+            workosSlug: "green-fineness-nursery-operations-platform",
+            directoryBinding: "BOUND",
+            registryObservation: "PROVEN_ABSENT",
             canonicalProjectState: null,
             canonicalCurrentness: "NOT_PROVEN",
         });
@@ -351,6 +424,13 @@ describe("WorkOS Core API project directory", () => {
                 (project) => project.workosSlug,
             ),
         ).not.toContain("green-fineness-operations-intelligence-tgd");
+
+        expect(
+            result.managedPortfolio.projects.filter(
+                (project) =>
+                    project.directoryBinding === "MISSING_OR_UNBOUND",
+            ),
+        ).toEqual([]);
 
         expect(result.projects[0].projectSlug).toBe(
             "green-fineness-operations-intelligence-tgd",

@@ -2,25 +2,24 @@ import { describe, expect, it } from "vitest";
 import { MANAGED_PROJECT_BINDINGS } from "@/lib/core-api/managedProjectBindings";
 
 const EXPECTED_BOUND = {
+    P01: "green-fineness-nursery-operations-platform",
     P02: "green-fineness-content",
     P03: "arbor-plant-companion-widget-ycc",
     P04: "workos-lite-arbordesk",
     P05: "astro-real-app",
     P06: "www-greenfineness",
+    P07: "arbor-local-ai-lab",
     P08: "green-fineness-nutrient-planner-app-y2z",
     P09: "web-platform-prototype-y68",
+    "GF-TOOLS": "green-fineness-tools-digital-products",
     "MUSIC-LAB": "music-lab",
+    AVACRM: "avacrm-garden-crm",
     "PERSONAL-HEALTH": "personal-health-routine-tracker-0m8",
     GFKVS: "gf-knowledge-video-studio",
+    "GF-LEARNING-CONTENT": "green-fineness-learning-content",
 } as const;
 
-const EXPECTED_UNBOUND = [
-    "P01",
-    "P07",
-    "GF-TOOLS",
-    "AVACRM",
-    "GF-LEARNING-CONTENT",
-] as const;
+const EXPECTED_UNBOUND = [] as const;
 
 const FORBIDDEN_OUTSIDE_SLUGS = [
     "ba-project-omni-asm-ys4",
@@ -62,7 +61,7 @@ describe("managed Project binding manifest", () => {
         ]);
     });
 
-    it("contains exactly 10 verified bound slugs and five explicit null bindings", () => {
+    it("contains exactly 15 verified bound slugs and zero explicit null bindings", () => {
         const bound = Object.fromEntries(
             MANAGED_PROJECT_BINDINGS
                 .filter((project) => project.workosSlug !== null)
@@ -79,8 +78,8 @@ describe("managed Project binding manifest", () => {
 
         expect(bound).toEqual(EXPECTED_BOUND);
         expect(unbound).toEqual([...EXPECTED_UNBOUND].sort());
-        expect(Object.keys(bound)).toHaveLength(10);
-        expect(unbound).toHaveLength(5);
+        expect(Object.keys(bound)).toHaveLength(15);
+        expect(unbound).toHaveLength(0);
     });
 
     it("preserves frozen 10 CURRENT / 4 STALE / 1 NOT_PROVEN currentness", () => {
@@ -108,7 +107,7 @@ describe("managed Project binding manifest", () => {
             .map((project) => project.workosSlug)
             .filter((slug): slug is string => slug !== null);
 
-        expect(new Set(boundSlugs).size).toBe(10);
+        expect(new Set(boundSlugs).size).toBe(15);
 
         for (const forbidden of FORBIDDEN_OUTSIDE_SLUGS) {
             expect(boundSlugs).not.toContain(forbidden);
