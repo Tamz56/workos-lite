@@ -268,7 +268,7 @@ describe(
         });
 
         it(
-            "projects ACC-PPC-v0.4 from the frozen 15 / 10 / 5 managed directory",
+            "projects ACC-PPC-v0.4 from the frozen 15 / 15 / 0 managed directory",
             () => {
                 insertP04(db);
 
@@ -294,8 +294,8 @@ describe(
                     result.managedProjectSummary,
                 ).toEqual({
                     projectCount: 15,
-                    boundCount: 10,
-                    missingOrUnboundCount: 5,
+                    boundCount: 15,
+                    missingOrUnboundCount: 0,
                 });
 
                 expect(
@@ -321,13 +321,7 @@ describe(
 
                 expect(
                     unbound,
-                ).toEqual([
-                    "AVACRM",
-                    "GF-LEARNING-CONTENT",
-                    "GF-TOOLS",
-                    "P01",
-                    "P07",
-                ]);
+                ).toEqual([]);
 
                 const p04 =
                     result.managedProjects
@@ -529,36 +523,38 @@ describe(
                 expect(p01).toMatchObject({
                     identity: {
                         id: "P01",
-                        slug: null,
+                        slug:
+                            "green-fineness-nursery-operations-platform",
                         registryProjectId:
                             null,
                     },
 
                     directoryBinding:
-                        "MISSING_OR_UNBOUND",
+                        "BOUND",
 
                     registryObservation:
-                        "NOT_PROVEN",
+                        "PROVEN_ABSENT",
 
                     registryMetadata: {
                         value: null,
-                        authority: "NONE",
+                        authority:
+                            "REGISTRY_METADATA",
                         currentness:
-                            "UNBOUND",
+                            "NOT_PROVEN",
                     },
 
                     canonicalProjectState: {
                         value: null,
                         authority: "NONE",
                         currentness:
-                            "UNBOUND",
+                            "NOT_PROVEN",
                     },
 
                     nextAuthoritativeAction: {
                         value: null,
                         authority: "NONE",
                         currentness:
-                            "UNBOUND",
+                            "NOT_PROVEN",
                     },
                 });
 
@@ -891,7 +887,7 @@ describe(
                     value: null,
                     authority: "NONE",
                     currentness:
-                        "UNBOUND",
+                        "NOT_PROVEN",
                 });
             },
         );

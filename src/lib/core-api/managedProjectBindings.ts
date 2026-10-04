@@ -50,13 +50,11 @@ export const MANAGED_PROJECT_BINDINGS = [
     managedProject(
         "P01",
         "Green Fineness — Nursery Operations Platform",
-        null,
+        "green-fineness-nursery-operations-platform",
         "CURRENT",
-        "2026-09-28",
+        "2026-10-04 / CHG-20261004-020",
         [
-            "MISSING_WORKOS_BINDING",
             "MISSING_STANDARD_WORK_LOG",
-            "CANONICAL_STATE_UNBOUND",
         ],
     ),
     managedProject(
@@ -123,12 +121,10 @@ export const MANAGED_PROJECT_BINDINGS = [
     managedProject(
         "P07",
         "Arbor Local AI Lab",
-        null,
+        "arbor-local-ai-lab",
         "CURRENT",
-        "2026-09-28",
+        "2026-10-04 / CHG-20261004-020",
         [
-            "MISSING_WORKOS_BINDING",
-            "CANONICAL_STATE_UNBOUND",
             "ROLE_NORMALIZATION_PARTIAL",
         ],
     ),
@@ -160,12 +156,10 @@ export const MANAGED_PROJECT_BINDINGS = [
     managedProject(
         "GF-TOOLS",
         "Green Fineness — Tools / Digital Products",
-        null,
+        "green-fineness-tools-digital-products",
         "CURRENT",
-        "2026-09-24 / frozen 2026-09-28",
+        "2026-10-04 / CHG-20261004-020",
         [
-            "MISSING_WORKOS_BINDING",
-            "CANONICAL_STATE_UNBOUND",
             "ADVISOR_ROLE_NOT_NORMALIZED",
         ],
     ),
@@ -183,12 +177,10 @@ export const MANAGED_PROJECT_BINDINGS = [
     managedProject(
         "AVACRM",
         "AvaCRM",
-        null,
+        "avacrm-garden-crm",
         "STALE",
-        "2026-09-07",
+        "2026-10-04 / CHG-20261004-020",
         [
-            "MISSING_WORKOS_BINDING",
-            "CANONICAL_STATE_UNBOUND",
             "STALE_PROJECT_STATE",
             "SECURITY_GATE_RECONFIRM_REQUIRED",
             "ROLE_NOT_PROVEN",
@@ -224,14 +216,12 @@ export const MANAGED_PROJECT_BINDINGS = [
     managedProject(
         "GF-LEARNING-CONTENT",
         "Green Fineness Learning Content",
-        null,
+        "green-fineness-learning-content",
         "STALE",
-        "2026-08-27",
+        "2026-10-04 / CHG-20261004-020",
         [
-            "MISSING_WORKOS_BINDING",
             "MISSING_WORK_LOG",
             "INTAKE_ONLY",
-            "CANONICAL_STATE_UNBOUND",
             "ROLE_NOT_PROVEN",
             "LEGACY_SOURCE_CONFLICT",
         ],
