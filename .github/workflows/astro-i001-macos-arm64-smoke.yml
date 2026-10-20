@@ -1,0 +1,38 @@
+name: ASTRO I001 ARM64 Runner Smoke
+
+on:
+  push:
+    branches:
+      - astro-i001-macos-arm64-smoke-20261020
+    paths:
+      - .github/workflows/astro-i001-macos-arm64-smoke.yml
+
+permissions: {}
+
+jobs:
+  runner-identity:
+    if: github.repository == 'Tamz56/workos-lite'
+    runs-on: macos-15
+    timeout-minutes: 5
+
+    steps:
+      - name: OS Architecture Toolchain Identity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "RUNNER_OS=${RUNNER_OS:-UNKNOWN}"
+          echo "RUNNER_ARCH=${RUNNER_ARCH:-UNKNOWN}"
+
+          uname -s
+          uname -m
+          sw_vers
+
+          command -v node || true
+          node --version || true
+
+          command -v npm || true
+          npm --version || true
+
+          test "$(uname -s)" = "Darwin"
+          test "$(uname -m)" = "arm64"
